@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 export default async function EditarClientePage({
@@ -35,6 +36,9 @@ export default async function EditarClientePage({
       },
     });
 
+    revalidatePath("/");
+    revalidatePath("/clientes");
+    revalidatePath(`/clientes/${id}`);
     redirect(`/clientes/${id}?ok=editado`);
   }
 
