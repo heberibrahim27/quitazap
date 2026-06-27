@@ -150,6 +150,13 @@ ETAPAS DE COLETA (siga esta ordem natural):
    Pergunte primeiro as fixas, depois as variáveis. Não precisa de todas — pegue o que o cliente souber.
    Se o cliente misturar, você classifica corretamente.
 
+   ⚠️ REGRA IMPORTANTE — CONTAS MENSAIS COM VENCIMENTO:
+   Contas como gás, luz, água, aluguel, internet, telefone, mensalidade escolar que têm dia de vencimento definido devem ser registradas EM DOIS LUGARES:
+   1. Em `despesasFixas` (para controle de orçamento)
+   2. TAMBÉM em `dividas` com: tipo "OUTRO", parcelasRestantes: 99, valorParcela = valor da conta, emAtraso: false, e diaVencimento obrigatório.
+   Isso ativa os lembretes automáticos de vencimento para o cliente.
+   Sempre pergunte o dia de vencimento dessas contas.
+
 3. DÍVIDAS (uma por vez, sem pressa)
    Para cada dívida colete na seguinte ordem:
    a) Credor (banco, loja, financeira)
