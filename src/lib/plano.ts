@@ -195,6 +195,13 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const nome = diag.dadosPessoais?.nome ?? "cliente";
   const renda = diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
 
+  // ── Perfil (necessário cedo para ramificações de cálculo)
+  const vinculo = (diag.dadosPessoais?.vinculo ?? "").toUpperCase();
+  const objetivo = (diag.objetivos?.objetivoPrincipal ?? "").toUpperCase();
+  const dependentes = diag.dadosPessoais?.dependentes ?? 0;
+  const isAutonomo = ["AUTONOMO", "MEI", "FREELANCER"].some((v) => vinculo.includes(v));
+  const isServidor = vinculo.includes("SERVIDOR_PUBLICO");
+
   // ── Despesas fixas
   const totalFixo = (diag.despesasFixas ?? []).reduce((s, d) => s + d.valor, 0);
   const totalVariavel = (diag.despesasVariaveis ?? []).reduce((s, d) => s + d.valor, 0);
@@ -204,12 +211,36 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const cartoes = diag.cartoes ?? [];
   const emprestimos = diag.emprestimos ?? [];
 
+  // Para servidor público: consignados e associações já foram descontados do líquido.
+  // Separa os automáticos (folha) dos manuais (vencimento mensal normal).
+  const consignadosFolha = isServidor
+    ? dividas.filter((d) => d.tipo === "EMPRESTIMO" || d.tipo === "ASSOCIACAO")
+    : [];
+  const associacoesFolha = isServidor
+    ? dividas.filter((d) => d.tipo === "ASSOCIACAO")
+    : [];
+  const emprestimosConsig = isServidor
+    ? dividas.filter((d) => d.tipo === "EMPRESTIMO")
+    : [];
+  const dividasManuais = isServidor
+    ? dividas.filter((d) => d.tipo !== "EMPRESTIMO" && d.tipo !== "ASSOCIACAO")
+    : dividas;
+
+  const totalConsignadosMes = consignadosFolha.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
+  const totalAssociacoesMes = associacoesFolha.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
+  const totalEmprestimosConsigMes = emprestimosConsig.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
+
+  // Saldo devedor total: consignados + demais
   const totalDividas = dividas.reduce((s, d) => s + (d.saldoAtual ?? 0), 0);
-  const totalParcelas = dividas.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
+  const totalSaldoConsignados = emprestimosConsig.reduce((s, d) => s + (d.saldoAtual ?? 0), 0);
+
+  // Para comprometimento: servidor usa apenas dívidas manuais (consignados já estão no líquido)
+  const totalParcelasManuais = dividasManuais.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
   const totalFaturas = cartoes.reduce((s, c) => s + (c.faturaAtual ?? 0), 0);
 
-  const comprometidoMes = totalParcelas + totalFaturas;
+  const comprometidoMes = totalParcelasManuais + totalFaturas;
   const comprometimento = renda > 0 ? (comprometidoMes / renda) * 100 : 0;
+  // Para servidor: sobra = líquido (já descontou consignados) - despesas normais
   const sobra = renda - totalFixo - totalVariavel - comprometidoMes;
 
   // Nível de risco
@@ -223,11 +254,11 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const alertas = diag.alertas ?? {};
   const temAlerta = Object.values(alertas).some(Boolean);
 
-  // Dívidas em atraso
-  const emAtraso = dividas.filter((d) => d.emAtraso);
+  // Dívidas em atraso (apenas manuais para servidor)
+  const emAtraso = dividasManuais.filter((d) => d.emAtraso);
 
   // Ordenação por prioridade: em atraso primeiro, depois por maior juros, depois por maior valor
-  const ordenadas = [...dividas].sort((a, b) => {
+  const ordenadas = [...dividasManuais].sort((a, b) => {
     if (a.emAtraso && !b.emAtraso) return -1;
     if (!a.emAtraso && b.emAtraso) return 1;
     if ((b.juros ?? 0) !== (a.juros ?? 0)) return (b.juros ?? 0) - (a.juros ?? 0);
@@ -290,8 +321,8 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
     : "_(não informado)_";
 
   // ── SUGESTÕES AUTOMÁTICAS ─────────────────
-  // Snowball: menor saldo primeiro (correto para o método)
-  const ordenadosSnowball = [...dividas].sort((a, b) => (a.saldoAtual ?? 0) - (b.saldoAtual ?? 0));
+  // Snowball: menor saldo primeiro (correto para o método) — usa dividasManuais para servidor
+  const ordenadosSnowball = [...dividasManuais].sort((a, b) => (a.saldoAtual ?? 0) - (b.saldoAtual ?? 0));
   const menorDivida = ordenadosSnowball[0];
 
   const sugestoes: string[] = [];
@@ -316,10 +347,6 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   }
 
   // ── PERFIL DO CLIENTE ─────────────────────
-  const vinculo = (diag.dadosPessoais?.vinculo ?? "").toUpperCase();
-  const objetivo = (diag.objetivos?.objetivoPrincipal ?? "").toUpperCase();
-  const dependentes = diag.dadosPessoais?.dependentes ?? 0;
-  const isAutonomo = ["AUTONOMO", "MEI", "FREELANCER"].some((v) => vinculo.includes(v));
 
   // Sugestão extra por perfil
   if (isAutonomo) {
@@ -368,15 +395,59 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   if (!diag.renda?.totalFamiliar && !diag.renda?.salarioLiquido) pendentes.push("renda mensal");
   if ((diag.despesasFixas ?? []).length === 0) pendentes.push("despesas fixas detalhadas");
   if (cartoes.length === 0 && dividas.some((d) => d.tipo === "CARTAO")) pendentes.push("limite e fatura atual dos cartões");
-  if (dividas.some((d) => !d.diaVencimento)) pendentes.push("datas de vencimento das dívidas sem data");
+  // Consignados não têm vencimento manual — não reclamar deles
+  if (dividasManuais.some((d) => !d.diaVencimento)) pendentes.push("datas de vencimento das dívidas sem data");
 
   const pendentesTexto = pendentes.length > 0
     ? `\n\n📋 *Para completar seu diagnóstico, ainda falta:*\n${pendentes.map((p) => `• ${p}`).join("\n")}`
     : "";
 
+  // ── CALENDÁRIO DE LIBERAÇÃO (servidor público) ───────────────────────
+  let calendarioLiberacao = "";
+  if (isServidor && emprestimosConsig.length > 0) {
+    const hoje2 = new Date();
+    const linhas = [...emprestimosConsig]
+      .filter((d) => d.parcelasRestantes > 0)
+      .sort((a, b) => a.parcelasRestantes - b.parcelasRestantes)
+      .map((d) => {
+        const termino = new Date(hoje2);
+        termino.setMonth(termino.getMonth() + d.parcelasRestantes);
+        const mesTermino = termino.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+        return `• ${d.credor} — termina *${mesTermino}* → libera *R$ ${fmt(d.valorParcela)}/mês*`;
+      });
+    if (linhas.length > 0) {
+      calendarioLiberacao = `
+━━━━━━━━━━━━━━━━━━━━
+📅 *CALENDÁRIO DE LIBERAÇÃO DE MARGEM*
+━━━━━━━━━━━━━━━━━━━━
+${linhas.join("\n")}`;
+    }
+  }
+
+  // ── POTENCIAL DE RECUPERAÇÃO (servidor público) ──────────────────────
+  let potencialRecuperacao = "";
+  if (isServidor && totalConsignadosMes > 0) {
+    const linhas: string[] = [];
+    if (totalEmprestimosConsigMes > 0) {
+      linhas.push(`💸 Se quitar todos os empréstimos: recebe *+R$ ${fmt(totalEmprestimosConsigMes)}/mês* a mais`);
+    }
+    if (totalAssociacoesMes > 0) {
+      linhas.push(`🤝 Se cancelar as associações: recebe *+R$ ${fmt(totalAssociacoesMes)}/mês* a mais`);
+    }
+    if (linhas.length > 0) {
+      potencialRecuperacao = `
+━━━━━━━━━━━━━━━━━━━━
+🚀 *POTENCIAL DE RECUPERAÇÃO SALARIAL*
+━━━━━━━━━━━━━━━━━━━━
+${linhas.join("\n")}
+_Seu salário líquido real poderia ser *R$ ${fmt(renda + totalConsignadosMes)}* se estivesse livre de todas as dívidas em folha._`;
+    }
+  }
+
   // ── LINHA DE PERFIL ───────────────────────
   const perfilLabel =
-    vinculo.includes("CLT") ? "💼 CLT"
+    vinculo.includes("SERVIDOR_PUBLICO") ? "🏛️ Servidor Público"
+    : vinculo.includes("CLT") ? "💼 CLT"
     : vinculo.includes("AUTONOMO") ? "🔧 Autônomo"
     : vinculo.includes("MEI") ? "🏪 MEI"
     : vinculo.includes("EMPRESARIO") ? "🏢 Empresário"
@@ -392,6 +463,28 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
 
   const perfilLinha = [perfilLabel, objetivoLabel].filter(Boolean).join(" · ");
 
+  // ── SEÇÃO CONSIGNADOS EM FOLHA (servidor) ──────────────────────────────
+  const listaConsignadosFolha = isServidor && consignadosFolha.length > 0
+    ? (() => {
+        const emp = emprestimosConsig.map((d) => {
+          const parc = d.parcelasRestantes > 0 && d.parcelasRestantes < 900
+            ? ` (${d.parcelasRestantes}x restantes)`
+            : "";
+          return `• *${d.credor}*${parc}: R$ ${fmt(d.valorParcela)}/mês`;
+        }).join("\n");
+        const assoc = associacoesFolha.map((d) =>
+          `• *${d.credor}* (associação): R$ ${fmt(d.valorParcela)}/mês`
+        ).join("\n");
+        const partes = [emp, assoc].filter(Boolean).join("\n");
+        return `\n━━━━━━━━━━━━━━━━━━━━
+🏦 *DESCONTOS AUTOMÁTICOS EM FOLHA*
+━━━━━━━━━━━━━━━━━━━━
+_Pagos direto na folha — não precisa de ação manual:_
+${partes}
+Total descontado em folha: *R$ ${fmt(totalConsignadosMes)}/mês*`;
+      })()
+    : "";
+
   // ── RELATÓRIO FINAL ───────────────────────
   return `📊 *DIAGNÓSTICO FINANCEIRO — ${nome.toUpperCase()}*
 ${perfilLinha ? `_${perfilLinha}_` : ""}
@@ -400,25 +493,27 @@ ${temAlerta ? "\n🚨 *ATENÇÃO: Situação requer ação imediata!*" : ""}
 ━━━━━━━━━━━━━━━━━━━━
 💰 *RESUMO FINANCEIRO*
 ━━━━━━━━━━━━━━━━━━━━
-Renda mensal: *R$ ${fmt(renda)}*
-Despesas fixas: *R$ ${fmt(totalFixo)}*${totalVariavel > 0 ? `\nGastos variáveis: *R$ ${fmt(totalVariavel)}*` : ""}
-Total em dívidas: *R$ ${fmt(totalDividas)}*
+Salário líquido mensal: *R$ ${fmt(renda)}*${isServidor ? `\n_↳ Já descontados em folha: R$ ${fmt(totalConsignadosMes)}/mês_` : ""}
+${totalFixo > 0 ? `Despesas fixas: *R$ ${fmt(totalFixo)}*\n` : ""}${totalVariavel > 0 ? `Gastos variáveis: *R$ ${fmt(totalVariavel)}*\n` : ""}${isServidor
+  ? `Sobra mensal real: *R$ ${fmt(sobra)}*`
+  : `Total em dívidas: *R$ ${fmt(totalDividas)}*
 Parcelas/mês: *R$ ${fmt(comprometidoMes)}*
 Comprometimento: *${pct(comprometidoMes, renda)}* ${nivelRisco}
-${sobra >= 0 ? `Sobra mensal: *R$ ${fmt(sobra)}*` : `⚠️ Déficit: *R$ ${fmt(Math.abs(sobra))}* (renda insuficiente)`}
-
+${sobra >= 0 ? `Sobra mensal: *R$ ${fmt(sobra)}*` : `⚠️ Déficit: *R$ ${fmt(Math.abs(sobra))}* (renda insuficiente)`}`}
+${listaConsignadosFolha}
+${comprometidoMes > 0 ? `
 ━━━━━━━━━━━━━━━━━━━━
 🗓️ *O QUE PAGAR EM ${mesAtual}*
 ━━━━━━━━━━━━━━━━━━━━
-${listaMes || "_(nenhuma dívida cadastrada)_"}
+${listaMes}
 
 Total a pagar este mês: *R$ ${fmt(comprometidoMes)}*
-🔔 _Fique tranquilo — vou te avisar 1 dia antes de cada vencimento aqui pelo WhatsApp._
-
+🔔 _Vou te avisar 1 dia antes de cada vencimento aqui pelo WhatsApp._` : ""}
+${listaDividas ? `
 ━━━━━━━━━━━━━━━━━━━━
 📋 *SUAS DÍVIDAS (por prioridade)*
 ━━━━━━━━━━━━━━━━━━━━
-${listaDividas || "_(nenhuma dívida cadastrada)_"}
+${listaDividas}` : ""}${calendarioLiberacao}${potencialRecuperacao}
 
 ━━━━━━━━━━━━━━━━━━━━
 💡 *ORIENTAÇÕES*
