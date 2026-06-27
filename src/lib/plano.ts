@@ -315,6 +315,27 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
     sugestoes.push(`💚 Sobram *R$ ${fmt(sobra)}/mês* após todas as despesas. Coloque esse valor como pagamento extra na menor dívida — vai encurtar muito o prazo.`);
   }
 
+  // ── PERFIL DO CLIENTE ─────────────────────
+  const vinculo = (diag.dadosPessoais?.vinculo ?? "").toUpperCase();
+  const objetivo = (diag.objetivos?.objetivoPrincipal ?? "").toUpperCase();
+  const dependentes = diag.dadosPessoais?.dependentes ?? 0;
+  const isAutonomo = ["AUTONOMO", "MEI", "FREELANCER"].some((v) => vinculo.includes(v));
+
+  // Sugestão extra por perfil
+  if (isAutonomo) {
+    const metaSemanal = comprometidoMes / 4.33;
+    sugestoes.push(`📅 Como autônomo, sua renda pode variar. Meta semanal de faturamento para cobrir as dívidas: *R$ ${fmt(metaSemanal)}*. Nos meses ruins, priorize as parcelas antes de qualquer outro gasto.`);
+  }
+  if (dependentes > 0) {
+    sugestoes.push(`👨‍👩‍👧 Você tem ${dependentes} dependente(s). Inclua os gastos com família no orçamento e considere ter um seguro de vida — é proteção para quem você ama.`);
+  }
+  if (objetivo.includes("RESERVA")) {
+    sugestoes.push(`🏦 Seu objetivo é criar uma reserva. Além de pagar as dívidas, separe pelo menos *5% da renda* todo mês. Mesmo que seja pouco no começo, o hábito é o que importa.`);
+  }
+  if (objetivo.includes("INVESTIR")) {
+    sugestoes.push(`📈 Quer investir? Ótimo! A regra é: quite primeiro as dívidas com juros acima de 1% ao mês — elas "comem" mais do que qualquer investimento vai render. Depois, cada real livre vai direto pra renda fixa.`);
+  }
+
   const sugestoesTexto = sugestoes.length > 0 ? sugestoes.join("\n\n") : "Siga o plano de pagamento e evite novas dívidas.";
 
   // ── PLANO 30/90/180 DIAS ─────────────────
@@ -330,9 +351,17 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
 
   const meta90 = snowballExplicacao;
 
-  const meta180 = mesesParaQuitar <= 6
+  const meta180Base = mesesParaQuitar <= 6
     ? `Quitar *todas* as dívidas — livre em *${mesQuitacao}* seguindo o plano!`
     : `Reduzir o total de dívidas em 30% e aplicar a *Regra 50-30-20*: 50% da renda para necessidades fixas, 30% para estilo de vida, 20% para dívidas/reserva. Isso reorganiza as finanças de vez.`;
+
+  const meta180Extra = objetivo.includes("RESERVA")
+    ? ` Depois das dívidas quitadas, mude o foco: construa sua reserva de emergência (3x sua renda mensal).`
+    : objetivo.includes("INVESTIR")
+    ? ` Com as dívidas menores ou quitadas, abra uma conta em corretora e comece com renda fixa — seguro e acessível.`
+    : "";
+
+  const meta180 = meta180Base + meta180Extra;
 
   // ── INFORMAÇÕES PENDENTES ─────────────────
   const pendentes: string[] = [];
@@ -345,8 +374,27 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
     ? `\n\n📋 *Para completar seu diagnóstico, ainda falta:*\n${pendentes.map((p) => `• ${p}`).join("\n")}`
     : "";
 
+  // ── LINHA DE PERFIL ───────────────────────
+  const perfilLabel =
+    vinculo.includes("CLT") ? "💼 CLT"
+    : vinculo.includes("AUTONOMO") ? "🔧 Autônomo"
+    : vinculo.includes("MEI") ? "🏪 MEI"
+    : vinculo.includes("EMPRESARIO") ? "🏢 Empresário"
+    : vinculo.includes("FREELANCER") ? "💻 Freelancer"
+    : "";
+
+  const objetivoLabel =
+    objetivo.includes("QUITAR") ? "🎯 Quitar dívidas"
+    : objetivo.includes("RESERVA") ? "🏦 Criar reserva"
+    : objetivo.includes("INVESTIR") ? "📈 Investir"
+    : objetivo.includes("ORGANIZAR") ? "📋 Organizar"
+    : "";
+
+  const perfilLinha = [perfilLabel, objetivoLabel].filter(Boolean).join(" · ");
+
   // ── RELATÓRIO FINAL ───────────────────────
   return `📊 *DIAGNÓSTICO FINANCEIRO — ${nome.toUpperCase()}*
+${perfilLinha ? `_${perfilLinha}_` : ""}
 ${temAlerta ? "\n🚨 *ATENÇÃO: Situação requer ação imediata!*" : ""}
 
 ━━━━━━━━━━━━━━━━━━━━
