@@ -168,6 +168,9 @@ export async function processarLeadVendas(
     }
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "OFERTA" } });
     await sendWhatsApp(telefone, OFERTA);
+
+    // Agenda follow-up automático via QStash — dispara após 4h de silêncio
+    await agendarFollowup(telefone);
     return;
   }
 
@@ -202,6 +205,28 @@ export async function converterLead(telefone: string): Promise<void> {
     where: { telefone },
     data: { etapa: "CONVERTIDO" },
   });
+}
+
+// ── Agenda follow-up automático via QStash (4h) ──
+async function agendarFollowup(telefone: string): Promise<void> {
+  const qstashToken = process.env.QSTASH_TOKEN;
+  const siteUrl     = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!qstashToken || !siteUrl) return;
+
+  try {
+    await fetch(`https://qstash.upstash.io/v2/publish/${siteUrl}/api/cron/lead-followup`, {
+      method: "POST",
+      headers: {
+        Authorization:    `Bearer ${qstashToken}`,
+        "Content-Type":   "application/json",
+        "Upstash-Delay":  "14400s", // 4 horas
+      },
+      body: JSON.stringify({ telefone, agendadoEm: new Date().toISOString() }),
+    });
+    console.log(`[LEAD-FOLLOWUP] Follow-up agendado para ${telefone} em 4h`);
+  } catch (err) {
+    console.error("[LEAD-FOLLOWUP] Erro ao agendar:", err);
+  }
 }
 
 // ── Util ──────────────────────────────────

@@ -111,8 +111,10 @@ async function extrairTextoPDF(pdfUrl: string): Promise<string> {
   if (!res.ok) throw new Error(`Falha ao baixar PDF: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
 
-  // Importação dinâmica para evitar problemas de bundle
-  const pdfParse = (await import("pdf-parse")).default;
+  // Importação dinâmica — compatível com CJS e ESM
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfMod = await import("pdf-parse") as any;
+  const pdfParse = pdfMod.default ?? pdfMod;
   const data = await pdfParse(buffer);
   return data.text?.trim() ?? "";
 }
