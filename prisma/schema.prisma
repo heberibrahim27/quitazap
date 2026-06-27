@@ -26,8 +26,9 @@ model Cliente {
   rendaMensal           Float?
   despesasFixas         Float?
   valorDisponivelMensal Float?
-  gratuito              Boolean  @default(false)
-  criadoEm              DateTime @default(now())
+  gratuito              Boolean   @default(false)
+  assinaturaVenceEm     DateTime?
+  criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime @updatedAt
 
   dividas        Divida[]

@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
 
     const telefone = normalizarTelefone(phone);
 
+    // Vencimento = hoje + 30 dias
+    const assinaturaVenceEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
     // Cria ou encontra o cliente
     let cliente = await prisma.cliente.findFirst({ where: { telefone } });
 
@@ -57,13 +60,14 @@ export async function POST(req: NextRequest) {
           email: email ?? null,
           statusAtendimento: "AGUARDANDO_INFORMACOES",
           obs: `Comprou: ${oferta} via CAKTO`,
+          assinaturaVenceEm,
         },
       });
     } else {
-      // Atualiza status se já existe
+      // Renova assinatura
       await prisma.cliente.update({
         where: { id: cliente.id },
-        data: { statusAtendimento: "AGUARDANDO_INFORMACOES" },
+        data: { statusAtendimento: "AGUARDANDO_INFORMACOES", assinaturaVenceEm },
       });
     }
 

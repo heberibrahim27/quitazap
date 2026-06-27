@@ -234,6 +234,27 @@ export default async function ClienteDetalhePage({
               )}
             </div>
 
+            {!(cliente as { gratuito?: boolean }).gratuito && (
+              <div>
+                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Assinatura vence em</span>
+                {(cliente as { assinaturaVenceEm?: Date | null }).assinaturaVenceEm ? (() => {
+                  const vence = new Date((cliente as { assinaturaVenceEm: Date }).assinaturaVenceEm);
+                  const hoje = new Date();
+                  const diasRestantes = Math.ceil((vence.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                  const vencido = diasRestantes < 0;
+                  const urgente = diasRestantes <= 5 && diasRestantes >= 0;
+                  return (
+                    <strong style={{ fontSize: 14, color: vencido ? "#dc2626" : urgente ? "#d97706" : "#166534" }}>
+                      {vencido ? "⚠️ Vencida" : urgente ? "⏳" : "✅"} {fmtData(vence)}
+                      {!vencido && <span style={{ fontSize: 12, fontWeight: 400, marginLeft: 4 }}>({diasRestantes}d)</span>}
+                    </strong>
+                  );
+                })() : (
+                  <strong style={{ fontSize: 14, color: "#94a3b8" }}>Não definida</strong>
+                )}
+              </div>
+            )}
+
             {cliente.obs && (
               <div style={{ gridColumn: "1 / -1" }}>
                 <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Observações</span>

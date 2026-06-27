@@ -190,6 +190,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // ── Verifica assinatura vencida (só para clientes pagantes) ──
+    if (sessao.clienteId) {
+      const clienteAtual = await prisma.cliente.findUnique({
+        where: { id: sessao.clienteId },
+        select: { assinaturaVenceEm: true, gratuito: true },
+      });
+      const venceEm = clienteAtual?.assinaturaVenceEm;
+      const isGratuito = clienteAtual?.gratuito ?? false;
+
+      if (!isGratuito && venceEm && venceEm < new Date()) {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "nosso site";
+        await sendWhatsApp(
+          telefone,
+          `⚠️ Sua assinatura do QuitaZAP venceu em ${venceEm.toLocaleDateString("pt-BR")}.\n\nPara continuar acessando seu plano financeiro, renove pelo link:\n👉 ${siteUrl}\n\nSe já renovou, aguarde alguns minutos e tente novamente. 😊`
+        );
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     // ── Processa áudio ───────────────────────
     if (tipoEntrada === "audio") {
       try {
