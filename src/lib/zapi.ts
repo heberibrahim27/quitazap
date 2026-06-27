@@ -86,6 +86,72 @@ async function sendViaEvolution(phone: string, message: string) {
 }
 
 /**
+ * Envia uma imagem via WhatsApp com legenda opcional.
+ * @param phone   Número completo com DDI: "5511999999999"
+ * @param imageUrl URL pública da imagem (PNG ou JPG)
+ * @param caption  Texto abaixo da imagem (opcional)
+ */
+export async function sendWhatsAppImage(phone: string, imageUrl: string, caption?: string) {
+  if (PROVIDER === "evolution") {
+    return sendImageViaEvolution(phone, imageUrl, caption);
+  }
+  return sendImageViaZapi(phone, imageUrl, caption);
+}
+
+async function sendImageViaZapi(phone: string, imageUrl: string, caption?: string) {
+  if (!ZAPI_INSTANCE || ZAPI_INSTANCE === "SUA_INSTANCIA_AQUI") {
+    console.warn("[ZAPI] Credenciais não configuradas — imagem não enviada.");
+    console.log(`[ZAPI MOCK] Imagem para: ${phone} | URL: ${imageUrl}`);
+    return;
+  }
+
+  const url = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-image`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(ZAPI_CLIENT_TOKEN ? { "Client-Token": ZAPI_CLIENT_TOKEN } : {}),
+    },
+    body: JSON.stringify({ phone, image: imageUrl, caption: caption ?? "" }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Z-API image error ${res.status}: ${err}`);
+  }
+
+  return res.json();
+}
+
+async function sendImageViaEvolution(phone: string, imageUrl: string, caption?: string) {
+  if (!EVO_URL || !EVO_INSTANCE || !EVO_APIKEY) {
+    console.warn("[EVO] Credenciais não configuradas — imagem não enviada.");
+    return;
+  }
+
+  const url = `${EVO_URL}/message/sendMedia/${EVO_INSTANCE}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": EVO_APIKEY },
+    body: JSON.stringify({
+      number: phone,
+      mediatype: "image",
+      media: imageUrl,
+      caption: caption ?? "",
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Evolution API image error ${res.status}: ${err}`);
+  }
+
+  return res.json();
+}
+
+/**
  * Normaliza telefone para formato com DDI 55.
  * Suporta: "11999999999", "5511999999999", "+55 (11) 99999-9999"
  */

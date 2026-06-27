@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem } from "@/lib/ai-bot";
+import { processarLeadVendas } from "@/lib/sales-bot";
 import {
   gerarRelatorio,
   gerarResumoMensal,
@@ -185,8 +186,22 @@ export async function POST(req: NextRequest) {
     console.log(`[Z-API] sessao=${sessao ? `id=${sessao.id} etapa=${sessao.etapa}` : "null"}`);
 
     if (!sessao) {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "nosso site";
-      await sendWhatsApp(telefone, `Para acessar o QuitaZAP, faça sua assinatura em ${siteUrl}`);
+      // Verifica se é cliente cadastrado (sem sessão de bot ativa)
+      const clienteCadastrado = await prisma.cliente.findFirst({
+        where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } },
+        select: { id: true },
+      });
+
+      if (clienteCadastrado) {
+        // Cliente existe mas sem sessão bot — provavelmente precisa reativar
+        await sendWhatsApp(
+          telefone,
+          `Olá! 👋 Para reativar seu acesso ao QuitaZAP, entre em contato com o suporte. 😊`
+        );
+      } else {
+        // Número desconhecido → funil de vendas
+        await processarLeadVendas(telefone, mensagem);
+      }
       return NextResponse.json({ ok: true });
     }
 

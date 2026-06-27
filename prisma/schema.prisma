@@ -132,6 +132,21 @@ model BotSessao {
 }
 
 // ─────────────────────────────────────────
+// LEAD DE VENDAS (funil Instagram/Facebook)
+// ─────────────────────────────────────────
+// etapa: QUALIFICACAO | PROVA | OFERTA | FOLLOWUP | CONVERTIDO | DESISTIU
+model LeadVendas {
+  id           String   @id @default(cuid())
+  telefone     String   @unique
+  nome         String?
+  etapa        String   @default("QUALIFICACAO")
+  cupomEnviado Boolean  @default(false)
+  msgCount     Int      @default(0)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
 // LOG DE CONSUMO DE IA
 // ─────────────────────────────────────────
 model LogIA {
