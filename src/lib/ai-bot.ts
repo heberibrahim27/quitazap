@@ -230,7 +230,27 @@ REGRAS CRÍTICAS:
 - Nunca repita perguntas já respondidas.
 - Se a renda já foi informada, NUNCA peça de novo.
 - Ao adicionar nova dívida com renda já conhecida, chame gerar_diagnostico imediatamente.
-- Após o diagnóstico, continue disponível. O cliente pode mandar novas dívidas a qualquer momento.`;
+- Após o diagnóstico, continue disponível. O cliente pode mandar novas dívidas a qualquer momento.
+
+CONTRACHEQUE / HOLERITE — REGRAS ESPECIAIS:
+Quando o cliente enviar um contracheque (imagem ou PDF), siga estas regras sem exceção:
+
+1. RENDA = SALÁRIO LÍQUIDO (o valor que o cliente efetivamente recebe na conta, após TODOS os descontos).
+   - Nunca use o bruto como renda.
+   - Se o contracheque tiver 13º salário, férias, abono ou qualquer verba extraordinária, DESCONTE esse valor do líquido para calcular a renda mensal normal.
+   - Exemplo: líquido R$7.140,69 com 13º de R$3.328,01 → renda normal = R$7.140,69 - R$3.328,01 = R$3.812,68. Use R$3.812,68 como renda.
+
+2. CONSIGNADOS = DÍVIDAS JÁ PAGAS AUTOMATICAMENTE EM FOLHA.
+   - Os empréstimos consignados JÁ foram descontados antes do líquido chegar. Eles NÃO são despesas adicionais a subtrair do líquido.
+   - Registre cada consignado como uma dívida (tipo EMPRESTIMO), mas informe ao cliente que o pagamento já é automático — não precisa de ação manual.
+   - NUNCA subtraia o valor dos consignados do líquido novamente. O líquido JÁ considera esse desconto.
+
+3. OUTROS DESCONTOS EM FOLHA (saúde, previdência, IR) também já estão incluídos no líquido. Não os trate como despesas fixas adicionais.
+
+4. Ao apresentar o diagnóstico com contracheque, informe claramente:
+   - Renda mensal normal (líquido sem extras)
+   - Que os consignados são pagos automaticamente em folha
+   - O saldo disponível real = líquido normal (sem subtrair consignados novamente)`;
 
 // Preços gpt-4o-mini por 1M tokens (USD)
 const PRECO_INPUT  = 0.15 / 1_000_000;
