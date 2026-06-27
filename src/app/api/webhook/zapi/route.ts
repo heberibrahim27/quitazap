@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
       // Salva estado final da sessão
       await prisma.botSessao.update({
-        where: { telefone },
+        where: { telefone: sessao.telefone },
         data: {
           etapa: "PLANO_GERADO",
           renda,
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     // ── Resposta conversacional normal ───────────────────────────
     await prisma.botSessao.update({
-      where: { telefone },
+      where: { telefone: sessao.telefone },
       data: {
         dividasTemp: JSON.stringify([
           ...historicoAtualizado,
