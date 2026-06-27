@@ -140,8 +140,8 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const listaDividas = ordenadas.map((d, i) => {
     const jurosInfo = d.juros ? ` | Juros: ${d.juros}% a.m.` : "";
     const parcInfo = `${d.parcelasRestantes}x de R$ ${fmt(d.valorParcela)}`;
-    const quitarInfo = d.valorParaQuitar ? ` | Para quitar hoje: *R$ ${fmt(d.valorParaQuitar)}*` : "";
-    return `${emojis[i] ?? "•"} *${d.credor}* — R$ ${fmt(d.saldoAtual)}${jurosInfo}\n   ${parcInfo}${quitarInfo}`;
+    const quitarInfo = d.valorParaQuitar ? `\n• Para quitar hoje: *R$ ${fmt(d.valorParaQuitar)}*` : "";
+    return `${emojis[i] ?? "•"} *${d.credor}* — R$ ${fmt(d.saldoAtual)}${jurosInfo}\n\n• ${parcInfo}${quitarInfo}`;
   }).join("\n");
 
   // ── SEÇÃO: DESPESAS FIXAS ─────────────────
@@ -150,41 +150,49 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
     : "_(não informado)_";
 
   // ── SUGESTÕES AUTOMÁTICAS ─────────────────
+  // Snowball: menor saldo primeiro (correto para o método)
+  const ordenadosSnowball = [...dividas].sort((a, b) => (a.saldoAtual ?? 0) - (b.saldoAtual ?? 0));
+  const menorDivida = ordenadosSnowball[0];
+
   const sugestoes: string[] = [];
 
   if (emAtraso.length > 0) {
-    sugestoes.push(`🔥 Prioridade máxima: regularize as dívidas em atraso (${emAtraso.map((d) => d.credor).join(", ")}). Juros de mora corroem qualquer plano.`);
+    sugestoes.push(`🔥 Prioridade máxima: regularize ${emAtraso.map((d) => d.credor).join(", ")} (em atraso). Juros de mora crescem todo dia.`);
   }
 
   const dividasComDesconto = dividas.filter((d) => d.descontoAVista && d.valorParaQuitar);
   if (dividasComDesconto.length > 0) {
-    sugestoes.push(`💡 Há oferta(s) de desconto para quitação à vista. Se tiver como, quite ${dividasComDesconto.map((d) => d.credor).join(" e ")} primeiro — economia garantida.`);
+    sugestoes.push(`💡 Desconto para quitar à vista disponível em ${dividasComDesconto.map((d) => d.credor).join(" e ")}. Se tiver como, aproveite — é economia garantida.`);
   }
 
   if (comprometimento > 50) {
-    sugestoes.push(`📉 Mais de ${comprometimento.toFixed(0)}% da sua renda vai para dívidas. Priorize renegociar as de maior juros para reduzir esse percentual.`);
+    sugestoes.push(`📉 ${comprometimento.toFixed(0)}% da sua renda vai para dívidas. Tente renegociar as de maior juros para reduzir esse percentual.`);
   }
 
   if (sobra < 0) {
-    sugestoes.push(`⚠️ Suas despesas superam sua renda. É necessário cortar gastos variáveis ou renegociar dívidas imediatamente.`);
+    sugestoes.push(`⚠️ Suas despesas superam sua renda em *R$ ${fmt(Math.abs(sobra))}/mês*. Duas saídas: cortar gastos variáveis ou buscar uma renda extra. As duas juntas são mais poderosas.`);
   } else if (sobra > 200) {
-    sugestoes.push(`💚 Você tem *R$ ${fmt(sobra)}/mês* disponíveis após todas as despesas. Use isso para amortizar as dívidas mais caras.`);
+    sugestoes.push(`💚 Sobram *R$ ${fmt(sobra)}/mês* após todas as despesas. Coloque esse valor como pagamento extra na menor dívida — vai encurtar muito o prazo.`);
   }
 
   const sugestoesTexto = sugestoes.length > 0 ? sugestoes.join("\n\n") : "Siga o plano de pagamento e evite novas dívidas.";
 
   // ── PLANO 30/90/180 DIAS ─────────────────
   const meta30 = emAtraso.length > 0
-    ? `Regularizar ${emAtraso.map((d) => d.credor).join(", ")} (em atraso).`
+    ? `Regularizar ${emAtraso.map((d) => d.credor).join(", ")} (em atraso). Isso para o sangramento dos juros.`
     : dividasComDesconto.length > 0
-    ? `Aproveitar desconto de quitação à vista (${dividasComDesconto[0].credor}).`
-    : `Pagar todas as parcelas do mês em dia.`;
+    ? `Aproveitar o desconto de quitação à vista (${dividasComDesconto[0].credor}) — menor saída de dinheiro.`
+    : `Pagar todas as parcelas do mês em dia e não contrair nenhuma dívida nova.`;
 
-  const meta90 = `Quitar a menor dívida completa${ordenadas[0] ? ` (*${ordenadas[0].credor}* — R$ ${fmt(ordenadas[0].saldoAtual)})` : ""} usando o método bola de neve.`;
+  const snowballExplicacao = menorDivida
+    ? `Método Bola de Neve: pague o mínimo em todas as dívidas e concentre qualquer dinheiro extra na *${menorDivida.credor}* (R$ ${fmt(menorDivida.saldoAtual)} — a menor). Ao quitar, some o valor da parcela dela na próxima menor. A bola vai crescendo e o prazo encurtando.`
+    : `Quite as menores dívidas primeiro e use o valor liberado para acelerar as próximas.`;
+
+  const meta90 = snowballExplicacao;
 
   const meta180 = mesesParaQuitar <= 6
-    ? `Quitar *todas* as dívidas — você pode estar livre em *${mesQuitacao}* seguindo o plano!`
-    : `Reduzir o total de dívidas em pelo menos 30%. Foque nos credores com maior juros.`;
+    ? `Quitar *todas* as dívidas — livre em *${mesQuitacao}* seguindo o plano!`
+    : `Reduzir o total de dívidas em 30% e aplicar a *Regra 50-30-20*: 50% da renda para necessidades fixas, 30% para estilo de vida, 20% para dívidas/reserva. Isso reorganiza as finanças de vez.`;
 
   // ── INFORMAÇÕES PENDENTES ─────────────────
   const pendentes: string[] = [];
@@ -217,6 +225,7 @@ ${sobra >= 0 ? `Sobra mensal: *R$ ${fmt(sobra)}*` : `⚠️ Déficit: *R$ ${fmt(
 ${listaMes || "_(nenhuma dívida cadastrada)_"}
 
 Total a pagar este mês: *R$ ${fmt(comprometidoMes)}*
+🔔 _Fique tranquilo — vou te avisar 1 dia antes de cada vencimento aqui pelo WhatsApp._
 
 ━━━━━━━━━━━━━━━━━━━━
 📋 *SUAS DÍVIDAS (por prioridade)*
@@ -238,7 +247,9 @@ ${sugestoesTexto}
 📅 Previsão de quitação total: *${mesQuitacao}*${pendentesTexto}
 
 ━━━━━━━━━━━━━━━━━━━━
-✅ Diagnóstico salvo. Me avise quando pagar uma parcela ou contrair nova dívida — atualizo seu plano na hora.
+✅ Diagnóstico salvo. Estou aqui 24h — me avise quando pagar uma parcela e atualizo seu plano.
+
+⚠️ _Evite contrair novas dívidas por enquanto. Sua situação pede foco. Um passo de cada vez._
 
 _QuitaZAP — Organize hoje, quite amanhã_ 💚`;
 }
