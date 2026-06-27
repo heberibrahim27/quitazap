@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "dotenv": "^16.4.5",
     "next": "^16.2.9",
     "openai": "^6.45.0",
     "prisma": "^6.19.3",
@@ -10,7 +11,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
