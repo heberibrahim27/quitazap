@@ -299,7 +299,12 @@ function buildDiagContracheque(dados: PDFContracheque, nome: string): import("@/
 
   return {
     dadosPessoais: { nome, vinculo: "SERVIDOR_PUBLICO", profissao: dados.orgao },
-    renda: { salarioLiquido: liquidoNormal, totalFamiliar: liquidoNormal },
+    renda: {
+      salarioLiquido: liquidoNormal,
+      totalFamiliar: liquidoNormal,
+      salarioLiquidoComExtras: dados.extraOrdinario > 0 ? dados.salarioLiquidoTotal : undefined,
+      adiantamento13: dados.extraOrdinario > 0 ? dados.extraOrdinario : undefined,
+    },
     despesasFixas: [],
     despesasVariaveis: [],
     dividas,

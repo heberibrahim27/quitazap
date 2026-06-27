@@ -60,6 +60,8 @@ export type DadosPessoaisIA = {
 
 export type RendaIA = {
   salarioLiquido: number;
+  salarioLiquidoComExtras?: number; // líquido total do mês (com 13º/férias) — preencher quando houver extras
+  adiantamento13?: number;          // valor do 13º/férias/abono incluído no mês
   outrasRendas?: number;
   comissoes?: number;
   rendaConjuge?: number;

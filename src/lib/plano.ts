@@ -265,9 +265,10 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
     return (b.saldoAtual ?? 0) - (a.saldoAtual ?? 0);
   });
 
-  // Meses para quitar (bola de neve)
-  const mesesParaQuitar = dividas.length > 0
-    ? Math.max(...dividas.map((d) => d.parcelasRestantes || 1))
+  // Meses para quitar — para servidor usa só empréstimos (associações têm 999 parcelas = sem prazo)
+  const dividasParaQuitacao = isServidor ? emprestimosConsig : dividasManuais;
+  const mesesParaQuitar = dividasParaQuitacao.length > 0
+    ? Math.max(...dividasParaQuitacao.map((d) => d.parcelasRestantes || 1))
     : 0;
   const dataQuitacao = new Date();
   dataQuitacao.setMonth(dataQuitacao.getMonth() + mesesParaQuitar);
@@ -342,6 +343,8 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
 
   if (sobra < 0) {
     sugestoes.push(`⚠️ Suas despesas superam sua renda em *R$ ${fmt(Math.abs(sobra))}/mês*. Duas saídas: cortar gastos variáveis ou buscar uma renda extra. As duas juntas são mais poderosas.`);
+  } else if (isServidor && sobra > 0) {
+    sugestoes.push(`💚 Você tem *R$ ${fmt(sobra)}/mês* disponíveis após os descontos automáticos em folha. Suas dívidas já são pagas automaticamente — use esse valor para gastos pessoais, reserva de emergência ou acelerar o pagamento de algum empréstimo com refinanciamento.`);
   } else if (sobra > 200) {
     sugestoes.push(`💚 Sobram *R$ ${fmt(sobra)}/mês* após todas as despesas. Coloque esse valor como pagamento extra na menor dívida — vai encurtar muito o prazo.`);
   }
@@ -393,7 +396,8 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   // ── INFORMAÇÕES PENDENTES ─────────────────
   const pendentes: string[] = [];
   if (!diag.renda?.totalFamiliar && !diag.renda?.salarioLiquido) pendentes.push("renda mensal");
-  if ((diag.despesasFixas ?? []).length === 0) pendentes.push("despesas fixas detalhadas");
+  // Servidor público: despesas fixas são os descontos em folha — não pedir
+  if (!isServidor && (diag.despesasFixas ?? []).length === 0) pendentes.push("despesas fixas detalhadas");
   if (cartoes.length === 0 && dividas.some((d) => d.tipo === "CARTAO")) pendentes.push("limite e fatura atual dos cartões");
   // Consignados não têm vencimento manual — não reclamar deles
   if (dividasManuais.some((d) => !d.diaVencimento)) pendentes.push("datas de vencimento das dívidas sem data");
@@ -493,7 +497,10 @@ ${temAlerta ? "\n🚨 *ATENÇÃO: Situação requer ação imediata!*" : ""}
 ━━━━━━━━━━━━━━━━━━━━
 💰 *RESUMO FINANCEIRO*
 ━━━━━━━━━━━━━━━━━━━━
-Salário líquido mensal: *R$ ${fmt(renda)}*${isServidor ? `\n_↳ Já descontados em folha: R$ ${fmt(totalConsignadosMes)}/mês_` : ""}
+${isServidor && diag.renda?.salarioLiquidoComExtras
+  ? `Salário líquido do mês: *R$ ${fmt(diag.renda.salarioLiquidoComExtras)}*\n  ↳ Salário mensal normal: *R$ ${fmt(renda)}*\n  ↳ Adiantamento 13°: *R$ ${fmt(diag.renda.adiantamento13 ?? 0)}*`
+  : `Salário líquido mensal: *R$ ${fmt(renda)}*`}
+_↳ Já descontados em folha: R$ ${fmt(totalConsignadosMes)}/mês_
 ${totalFixo > 0 ? `Despesas fixas: *R$ ${fmt(totalFixo)}*\n` : ""}${totalVariavel > 0 ? `Gastos variáveis: *R$ ${fmt(totalVariavel)}*\n` : ""}${isServidor
   ? `Sobra mensal real: *R$ ${fmt(sobra)}*`
   : `Total em dívidas: *R$ ${fmt(totalDividas)}*
