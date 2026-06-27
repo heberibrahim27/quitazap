@@ -21,18 +21,23 @@ const CUSTO_DOMINIO = 5.83;   // R$70/ano ÷ 12
 const CUSTO_OPENAI_POR_CLIENTE = 0.07;
 
 export default async function FinanceiroPage() {
-  const totalAssinantes = await prisma.botSessao.count();
-  const totalClientes = await prisma.cliente.count();
-  const totalPlanos = await prisma.planoEnviado.count();
+  const [pagantes, totalGratuitos, totalPlanos] = await Promise.all([
+    prisma.cliente.count({ where: { gratuito: false } }),
+    prisma.cliente.count({ where: { gratuito: true } }),
+    prisma.planoEnviado.count(),
+  ]);
+
+  const totalAssinantes = pagantes; // apenas pagantes contam na receita
 
   // Receita
   const receitaBruta = totalAssinantes * PRECO_MENSAL;
   const comissaoCakto = receitaBruta * COMISSAO_CAKTO;
   const receitaLiquida = receitaBruta - comissaoCakto;
 
-  // Custos
+  // Custos (IA estimada por todos os clientes ativos, gratuitos inclusos)
+  const totalClientesAtivos = totalAssinantes + totalGratuitos;
   const custoFixo = CUSTO_ZAPI + CUSTO_DOMINIO;
-  const custoVariavel = totalAssinantes * CUSTO_OPENAI_POR_CLIENTE;
+  const custoVariavel = totalClientesAtivos * CUSTO_OPENAI_POR_CLIENTE;
   const custoTotal = custoFixo + custoVariavel;
 
   // Resultado
@@ -65,9 +70,11 @@ export default async function FinanceiroPage() {
         {/* Cards principais */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 32 }}>
           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 16, padding: "20px 24px" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#16a34a", fontWeight: 600 }}>Assinantes ativos</p>
+            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#16a34a", fontWeight: 600 }}>Assinantes pagos</p>
             <strong style={{ fontSize: 36, color: "#15803d" }}>{totalAssinantes}</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{totalClientes} clientes cadastrados</p>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
+              + {totalGratuitos} gratuito{totalGratuitos !== 1 ? "s" : ""} (não contabilizados)
+            </p>
           </div>
 
           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 16, padding: "20px 24px" }}>
@@ -162,7 +169,7 @@ export default async function FinanceiroPage() {
               {[
                 ["Z-API (WhatsApp)", fmt(CUSTO_ZAPI)],
                 ["Domínio (.com.br)", fmt(CUSTO_DOMINIO)],
-                [`OpenAI (${totalAssinantes} clientes × R$0,07)`, fmt(custoVariavel)],
+                [`OpenAI (${totalClientesAtivos} clientes × R$0,07)`, fmt(custoVariavel)],
               ].map(([label, valor]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                   <span style={{ color: "#64748b" }}>{label}</span>
