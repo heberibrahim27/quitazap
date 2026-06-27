@@ -21,15 +21,20 @@ export async function POST(req: NextRequest) {
     const mensagem = (body.text?.message ?? "").trim();
     if (!mensagem) return NextResponse.json({ ok: true });
 
-    const telefone = normalizarTelefone(body.phone ?? "");
+    const rawPhone = body.phone ?? "";
+    const telefone = normalizarTelefone(rawPhone);
+    console.log(`[Z-API] phone raw="${rawPhone}" normalizado="${telefone}"`);
     if (telefone.length < 10) return NextResponse.json({ ok: true });
 
-    // Busca sessão ativa do bot — tenta com e sem o dígito 9 extra (Brasil)
+    // Busca sessão — tenta formato com e sem dígito 9 extra (Brasil 8→9 dígitos)
+    // Ex: 5571993085436 (13) ↔ 557193085436 (12)
     const telefoneAlt = telefone.length === 13
-      ? "55" + telefone.slice(4, 13).replace(/^9/, "")  // 5571993085436 → 557193085436
+      ? telefone.slice(0, 4) + telefone.slice(5)   // remove o 9: 5571|9|93085436 → 557193085436
       : telefone.length === 12
-      ? telefone.slice(0, 4) + "9" + telefone.slice(4)  // 557193085436 → 5571993085436
+      ? telefone.slice(0, 4) + "9" + telefone.slice(4) // adiciona 9: 5571|93085436 → 5571993085436
       : null;
+
+    console.log(`[Z-API] buscando sessão: ${telefone} ou ${telefoneAlt}`);
 
     const sessao = await prisma.botSessao.findFirst({
       where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } }
