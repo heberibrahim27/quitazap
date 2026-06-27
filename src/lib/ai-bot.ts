@@ -238,15 +238,15 @@ Quando o cliente enviar um contracheque (imagem ou PDF), siga estas regras sem e
 
 1. RENDA = SALÁRIO LÍQUIDO NORMAL (sem verbas extraordinárias).
    - Nunca use o bruto como renda.
-   - ⚠️ Se o contracheque tiver 13º salário, férias, abono ou qualquer verba extraordinária nas VANTAGENS, OBRIGATORIAMENTE desconte do líquido para obter a renda mensal normal. Isso é CRÍTICO — sem esse desconto o diagnóstico fica completamente errado.
-   - Exemplo concreto: líquido R$7.140,69 com 13º de R$3.328,01 → renda normal = R$7.140,69 − R$3.328,01 = R$3.812,68. Use R$3.812,68 em salarioLiquido e totalFamiliar.
-   - NUNCA use o líquido cheio (com extras) como salarioLiquido na função gerar_diagnostico.
+   - ⚠️ REGRA ABSOLUTA: se o contracheque tiver 13º salário, férias, abono ou qualquer verba extraordinária nas VANTAGENS, DESCONTE esse valor do líquido antes de chamar gerar_diagnostico. O campo salarioLiquido na função DEVE conter o líquido sem extras.
+   - Exemplo: líquido R$7.140,69 com 13º de R$3.328,01 → salarioLiquido = 3812.68, totalFamiliar = 3812.68. NUNCA passe 7140.69 nesses campos.
+   - O valor cheio (com 13º) pode ser mencionado na conversa como informação, mas NUNCA deve entrar em salarioLiquido nem totalFamiliar.
 
 2. DESCONTOS EM FOLHA = EMPRÉSTIMOS CONSIGNADOS + ASSOCIAÇÕES. Ambos JÁ foram descontados antes do líquido chegar.
-   - Empréstimos consignados (Banco Digio, BB, Safra, Master etc): registre cada um como tipo EMPRESTIMO.
-   - Associações (ASTEBA, ASSEBA, ASPRA, Associação Jurídica etc — parcela NNN/999 ou NNN/000): registre cada uma como tipo ASSOCIACAO, parcelasRestantes: 999.
+   - Empréstimos consignados (Banco Digio, BB, Safra, Master etc): registre cada um como dívida tipo EMPRESTIMO.
+   - Associações (ASTEBA, ASSEBA, ASPRA, Associação Jurídica etc — parcela NNN/999 ou NNN/000): registre cada uma como dívida tipo ASSOCIACAO, parcelasRestantes: 999. ⚠️ NÃO adicione associações em despesasFixas — elas são descontos automáticos em folha, não despesas separadas.
    - NENHUM deles é despesa adicional — já saíram antes do líquido. NUNCA subtraia novamente.
-   - O cliente não precisa pagar nada manualmente — é tudo automático.
+   - NUNCA coloque consignados ou associações em despesasFixas ou despesasVariaveis. Só em dividas.
 
 3. OUTROS DESCONTOS EM FOLHA (saúde, previdência, IR) também já estão incluídos no líquido. Não os trate como despesas fixas adicionais.
 
