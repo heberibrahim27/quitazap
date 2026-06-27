@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────
 // QuitaZAP — Webhook Z-API (mensagens recebidas)
 // POST /api/webhook/zapi
-// Suporta: texto, áudio (Whisper) e imagem (GPT-4o Vision)
+// Suporta: texto, áudio (Whisper), imagem (GPT-4o Vision) e PDF (pdf-parse)
 // ─────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -103,6 +103,18 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, etc), responda apenas
 
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() ?? "";
+}
+
+// ── Leitura de PDF via pdf-parse ─────────
+async function extrairTextoPDF(pdfUrl: string): Promise<string> {
+  const res = await fetch(pdfUrl);
+  if (!res.ok) throw new Error(`Falha ao baixar PDF: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+
+  // Importação dinâmica para evitar problemas de bundle
+  const pdfParse = (await import("pdf-parse")).default;
+  const data = await pdfParse(buffer);
+  return data.text?.trim() ?? "";
 }
 
 // ── Detecção de comandos rápidos ──────────
@@ -261,10 +273,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Documento (PDF, etc.) ────────────────
+    // ── Documento (PDF) ──────────────────────
     if (tipoEntrada === "documento") {
-      await sendWhatsApp(sessao.telefone, "Recebi um documento, mas ainda não consigo lê-lo. Pode digitar ou me mandar uma foto da parte com os valores?");
-      return NextResponse.json({ ok: true });
+      const docUrl = body.document?.documentUrl ?? body.document?.fileUrl ?? "";
+      if (!docUrl) {
+        await sendWhatsApp(sessao.telefone, "Recebi um documento, mas não consegui acessar o arquivo. Pode tirar uma foto e me enviar como imagem?");
+        return NextResponse.json({ ok: true });
+      }
+      try {
+        await sendWhatsApp(sessao.telefone, "📄 Recebi seu PDF! Lendo o documento...");
+        const texto = await extrairTextoPDF(docUrl);
+        if (!texto || texto.length < 30) {
+          await sendWhatsApp(sessao.telefone, "Consegui abrir o PDF mas ele parece ser uma imagem escaneada — não consigo extrair o texto. Pode tirar uma foto do documento e enviar como imagem? 📷");
+          return NextResponse.json({ ok: true });
+        }
+        console.log(`[Z-API] PDF extraído (${texto.length} chars)`);
+        mensagem = `[Cliente enviou um PDF. Conteúdo extraído automaticamente — use esses dados para preencher o diagnóstico financeiro:]\n\n${texto.slice(0, 6000)}`;
+        tipoEntrada = "texto";
+      } catch (err) {
+        console.error("[Z-API] Erro ao ler PDF:", err);
+        await sendWhatsApp(sessao.telefone, "Tive dificuldade para ler esse PDF. Pode tirar uma foto e enviar como imagem? 📷");
+        return NextResponse.json({ ok: true });
+      }
     }
 
     // ── Comando RESETAR (funciona em qualquer etapa) ──
