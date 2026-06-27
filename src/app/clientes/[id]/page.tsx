@@ -62,12 +62,6 @@ export default async function ClienteDetalhePage({
     redirect(`/clientes/${id}?ok=resetado`);
   }
 
-  async function atualizarStatus(fd: FormData) {
-    "use server";
-    const status = String(fd.get("statusAtendimento") || "NOVO");
-    await prisma.cliente.update({ where: { id }, data: { statusAtendimento: status } });
-    redirect(`/clientes/${id}?ok=status`);
-  }
   // ───────────────────────────────────────────────────────
 
   const statusInfo  = STATUS_ATEND[cliente.statusAtendimento] ?? STATUS_ATEND["NOVO"];
@@ -83,7 +77,6 @@ export default async function ClienteDetalhePage({
 
   const mensagemOk: Record<string, string> = {
     editado:  "Cliente atualizado com sucesso!",
-    status:   "Status de atendimento atualizado!",
     resetado: "Conversa reiniciada! Histórico apagado.",
   };
 
@@ -135,32 +128,6 @@ export default async function ClienteDetalhePage({
           </div>
         </div>
 
-        {/* ── Status de atendimento ── */}
-        <form action={atualizarStatus} style={{
-          background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 14,
-          padding: "14px 16px", marginBottom: 20,
-          display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-        }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#64748b", whiteSpace: "nowrap" }}>
-            Status do atendimento:
-          </span>
-          <select name="statusAtendimento" defaultValue={cliente.statusAtendimento} style={{
-            border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 12px",
-            fontSize: 14, color: "#0f172a", background: "#f8fafc", flex: 1, minWidth: 200,
-          }}>
-            <option value="NOVO">🆕 Novo</option>
-            <option value="AGUARDANDO_INFORMACOES">⏳ Aguardando informações</option>
-            <option value="PLANO_GERADO">📋 Plano gerado</option>
-            <option value="ACOMPANHAMENTO">🔄 Acompanhamento</option>
-            <option value="ENCERRADO">✅ Encerrado</option>
-          </select>
-          <button type="submit" style={{
-            background: "#0f172a", color: "#fff", border: "none",
-            padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer",
-          }}>
-            Salvar
-          </button>
-        </form>
 
         {/* ── Dados do cliente ── */}
         <div style={{
