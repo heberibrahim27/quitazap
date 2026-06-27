@@ -7,6 +7,7 @@ const links = [
   { href: "/",         label: "Dashboard"   },
   { href: "/clientes", label: "Clientes"    },
   { href: "/vencidas", label: "⚠️ Vencidas" },
+  { href: "/financeiro", label: "💰 Financeiro" },
   { href: "/exportar", label: "Exportar"    },
   { href: "/oferta",         label: "Oferta"        },
   { href: "/configuracoes", label: "⚙️ Config"     },
