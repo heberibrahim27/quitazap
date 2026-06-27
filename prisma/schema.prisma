@@ -130,3 +130,17 @@ model BotSessao {
 
   cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
 }
+
+// ─────────────────────────────────────────
+// LOG DE CONSUMO DE IA
+// ─────────────────────────────────────────
+model LogIA {
+  id          String   @id @default(cuid())
+  clienteId   String?
+  gratuito    Boolean  @default(false)
+  tipo        String   // "chat" | "whisper" | "vision"
+  tokensInput Int      @default(0)
+  tokensOutput Int     @default(0)
+  custoUSD    Float    @default(0)
+  criadoEm   DateTime @default(now())
+}

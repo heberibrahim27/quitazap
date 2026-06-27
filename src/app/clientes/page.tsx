@@ -40,7 +40,7 @@ export default async function ClientesPage({
       telefone:         true,
       statusAtendimento: true,
       criadoEm:         true,
-      rendaMensal:      true,
+      gratuito:         true,
       _count:           { select: { planosEnviados: true } },
     },
   });
@@ -128,6 +128,7 @@ export default async function ClientesPage({
               {clientes.map((cliente) => {
                 const s = STATUS_ATEND[cliente.statusAtendimento] ?? STATUS_ATEND["NOVO"];
                 const planos = cliente._count.planosEnviados;
+                const isGratuito = (cliente as { gratuito?: boolean }).gratuito;
 
                 return (
                   <Link
@@ -153,6 +154,12 @@ export default async function ClientesPage({
                         }}>
                           {cliente.nome}
                         </strong>
+                        {isGratuito && (
+                          <span style={{
+                            background: "#dbeafe", color: "#1e40af",
+                            padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                          }}>🎁 Gratuito</span>
+                        )}
                         <span style={{
                           background: s.bg, color: s.color,
                           padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",

@@ -10,34 +10,27 @@ function fmtData(data: Date) {
 
 const PRECO_MENSAL = 47; // R$ por assinante/mês
 
-async function buscarCustoOpenAI(): Promise<{ gasto: number; saldo: number | null }> {
+async function buscarCustoIA(): Promise<{ gastoMes: number; gastoPagantes: number; gastoGratuitos: number }> {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { gasto: 0, saldo: null };
+    const { prisma } = await import("@/lib/prisma");
+    const inicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-    const hoje = new Date();
-    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const startDate = inicio.toISOString().split("T")[0];
-    const endDate   = hoje.toISOString().split("T")[0];
+    const [pagantes, gratuitos] = await Promise.all([
+      prisma.logIA.aggregate({
+        _sum: { custoUSD: true },
+        where: { gratuito: false, criadoEm: { gte: inicio } },
+      }),
+      prisma.logIA.aggregate({
+        _sum: { custoUSD: true },
+        where: { gratuito: true, criadoEm: { gte: inicio } },
+      }),
+    ]);
 
-    const res = await fetch(
-      `https://api.openai.com/v1/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`,
-      { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 3600 } }
-    );
-
-    if (!res.ok) return { gasto: 0, saldo: null };
-    const data = await res.json();
-    const gasto = (data.total_usage ?? 0) / 100; // centavos → dólares
-
-    // Tenta buscar saldo
-    const subRes = await fetch("https://api.openai.com/v1/dashboard/billing/subscription", {
-      headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 3600 },
-    });
-    const saldo = subRes.ok ? ((await subRes.json()).hard_limit_usd ?? null) : null;
-
-    return { gasto, saldo };
+    const gastoPagantes  = pagantes._sum.custoUSD  ?? 0;
+    const gastoGratuitos = gratuitos._sum.custoUSD ?? 0;
+    return { gastoMes: gastoPagantes + gastoGratuitos, gastoPagantes, gastoGratuitos };
   } catch {
-    return { gasto: 0, saldo: null };
+    return { gastoMes: 0, gastoPagantes: 0, gastoGratuitos: 0 };
   }
 }
 
@@ -46,7 +39,7 @@ export default async function Home() {
   hoje.setHours(0, 0, 0, 0);
   const em7Dias = new Date(hoje); em7Dias.setDate(em7Dias.getDate() + 7);
 
-  const [clientes, totalPlanos, openai] = await Promise.all([
+  const [clientes, totalPlanos, custoIA] = await Promise.all([
     prisma.cliente.findMany({
       select: {
         id: true,
@@ -61,7 +54,7 @@ export default async function Home() {
       orderBy: { criadoEm: "desc" },
     }),
     prisma.planoEnviado.count(),
-    buscarCustoOpenAI(),
+    buscarCustoIA(),
   ]);
 
   // ── Métricas de negócio ──────────────────
@@ -95,12 +88,12 @@ export default async function Home() {
   // Clientes sem data de vencimento definida (cadastrados antes da feature)
   const semVencimento = pagantes.filter((c) => !c.assinaturaVenceEm);
 
-  // Custo estimado mensal em BRL (USD × 5.7 aproximado)
-  const custoIABRL = openai.gasto * 5.7;
-
-  // Margem aproximada
-  const despesaTotal = custoIABRL;
-  const lucroEstimado = mrr - despesaTotal;
+  // Custo IA em BRL (USD × 5.7)
+  const USD_BRL = 5.7;
+  const custoIABRL         = custoIA.gastoMes      * USD_BRL;
+  const custoIAPagantesBRL = custoIA.gastoPagantes * USD_BRL;
+  const custoIAGratuitosBRL= custoIA.gastoGratuitos* USD_BRL;
+  const lucroEstimado      = mrr - custoIABRL;
 
   return (
     <main className="app-shell">
@@ -207,29 +200,20 @@ export default async function Home() {
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           <div className="stat-card" style={{ borderLeft: "4px solid #dc2626" }}>
             <p className="stat-label">Gasto IA este mês</p>
-            {openai.gasto > 0 ? (
-              <>
-                <strong className="stat-value" style={{ color: "#dc2626" }}>{fmt(custoIABRL)}</strong>
-                <span style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, display: "block" }}>
-                  US$ {openai.gasto.toFixed(2)} ≈ BRL
-                </span>
-              </>
-            ) : (
-              <>
-                <strong className="stat-value" style={{ color: "#94a3b8" }}>—</strong>
-                <span style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, display: "block" }}>
-                  Ver em platform.openai.com
-                </span>
-              </>
-            )}
+            <strong className="stat-value" style={{ color: custoIABRL > 0 ? "#dc2626" : "#94a3b8" }}>
+              {custoIABRL > 0 ? fmt(custoIABRL) : "R$ 0,00"}
+            </strong>
+            <span style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, display: "block" }}>
+              pagantes {fmt(custoIAPagantesBRL)} · gratuitos {fmt(custoIAGratuitosBRL)}
+            </span>
           </div>
           <div className="stat-card" style={{ borderLeft: lucroEstimado >= 0 ? "4px solid #16a34a" : "4px solid #dc2626" }}>
             <p className="stat-label">Lucro estimado/mês</p>
             <strong className="stat-value" style={{ color: lucroEstimado >= 0 ? "#16a34a" : "#dc2626" }}>
-              {openai.gasto > 0 ? fmt(lucroEstimado) : `≈ ${fmt(mrr)}`}
+              {fmt(lucroEstimado)}
             </strong>
             <span style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, display: "block" }}>
-              MRR {openai.gasto > 0 ? "− custo IA" : "(custo IA não calculado)"}
+              MRR − custo IA real
             </span>
           </div>
           <div className="stat-card" style={{ borderLeft: vencidas.length > 0 ? "4px solid #dc2626" : vencendoEm7.length > 0 ? "4px solid #d97706" : "4px solid #e2e8f0" }}>
@@ -310,14 +294,6 @@ export default async function Home() {
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <Link href="/exportar" style={{ color: "#64748b", fontSize: 14, fontWeight: 600 }}>⬇️ Exportar dados</Link>
           <Link href="/oferta" style={{ color: "#16a34a", fontSize: 14, fontWeight: 600 }}>🌐 Página de oferta</Link>
-          <a
-            href="https://platform.openai.com/usage"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "#7c3aed", fontSize: 14, fontWeight: 600 }}
-          >
-            🤖 Uso OpenAI →
-          </a>
         </div>
 
       </section>

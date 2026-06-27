@@ -224,10 +224,41 @@ REGRAS CRÍTICAS:
 - Ao adicionar nova dívida com renda já conhecida, chame gerar_diagnostico imediatamente.
 - Após o diagnóstico, continue disponível. O cliente pode mandar novas dívidas a qualquer momento.`;
 
+// Preços gpt-4o-mini por 1M tokens (USD)
+const PRECO_INPUT  = 0.15 / 1_000_000;
+const PRECO_OUTPUT = 0.60 / 1_000_000;
+
+async function registrarLogIA(opts: {
+  clienteId?: string | null;
+  gratuito?: boolean;
+  tipo: string;
+  tokensInput: number;
+  tokensOutput: number;
+}) {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const custo = opts.tokensInput * PRECO_INPUT + opts.tokensOutput * PRECO_OUTPUT;
+    await prisma.logIA.create({
+      data: {
+        clienteId:    opts.clienteId   ?? null,
+        gratuito:     opts.gratuito    ?? false,
+        tipo:         opts.tipo,
+        tokensInput:  opts.tokensInput,
+        tokensOutput: opts.tokensOutput,
+        custoUSD:     custo,
+      },
+    });
+  } catch (e) {
+    console.error("[LogIA] Erro ao registrar:", e);
+  }
+}
+
 export async function processarMensagemIA(
   historico: Mensagem[],
   novaMensagem: string,
-  nomeCliente: string
+  nomeCliente: string,
+  clienteId?: string | null,
+  gratuito?: boolean
 ): Promise<{ resposta: string; diagnostico?: DiagnosticoIA }> {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -421,6 +452,16 @@ export async function processarMensagemIA(
 
   const data = await res.json();
   const choice = data.choices?.[0];
+
+  // Registra consumo de tokens
+  const usage = data.usage ?? {};
+  await registrarLogIA({
+    clienteId,
+    gratuito,
+    tipo: "chat",
+    tokensInput:  usage.prompt_tokens     ?? 0,
+    tokensOutput: usage.completion_tokens ?? 0,
+  });
 
   // IA decidiu gerar o diagnóstico
   if (choice?.finish_reason === "tool_calls" && choice?.message?.tool_calls?.length > 0) {

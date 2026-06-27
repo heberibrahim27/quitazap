@@ -330,10 +330,22 @@ export async function POST(req: NextRequest) {
     // ── Processa com IA ──────────────────────
     const historico: Mensagem[] = JSON.parse(sessao.dividasTemp || "[]");
 
+    // Busca se cliente é gratuito para log de IA
+    let clienteGratuito = false;
+    if (sessao.clienteId) {
+      const cli = await prisma.cliente.findUnique({
+        where: { id: sessao.clienteId },
+        select: { gratuito: true },
+      });
+      clienteGratuito = cli?.gratuito ?? false;
+    }
+
     const resultado = await processarMensagemIA(
       historico,
       mensagem,
-      sessao.nome ?? "cliente"
+      sessao.nome ?? "cliente",
+      sessao.clienteId,
+      clienteGratuito
     );
 
     const historicoAtualizado: Mensagem[] = [

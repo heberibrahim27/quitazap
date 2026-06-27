@@ -231,12 +231,6 @@ export default async function ClienteDetalhePage({
           </div>
         </div>
 
-        {/* ── Botão Plano WhatsApp ── */}
-        <div style={{ marginBottom: 20 }}>
-          <Link href={`/clientes/${id}/plano`} className="btn-dark">
-            📲 Ver / Enviar Plano WhatsApp
-          </Link>
-        </div>
 
         {/* ── Último plano enviado ── */}
         {ultimoPlano && (
