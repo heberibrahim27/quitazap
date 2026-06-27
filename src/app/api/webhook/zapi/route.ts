@@ -97,6 +97,19 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, etc), responda apenas
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
+// ── Deduplicação de mensagens ─────────────
+const mensagensProcessadas = new Set<string>();
+function jáProcessou(id: string): boolean {
+  if (!id) return false;
+  if (mensagensProcessadas.has(id)) return true;
+  mensagensProcessadas.add(id);
+  if (mensagensProcessadas.size > 500) {
+    const primeiro = mensagensProcessadas.values().next().value;
+    if (primeiro) mensagensProcessadas.delete(primeiro);
+  }
+  return false;
+}
+
 // ── Webhook principal ─────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -104,6 +117,13 @@ export async function POST(req: NextRequest) {
 
     // Ignora mensagens enviadas pelo próprio bot
     if (body.fromMe === true) return NextResponse.json({ ok: true });
+
+    // Ignora duplicatas (Z-API pode enviar o mesmo webhook 2x)
+    const msgId = body.messageId ?? body.message?.messageId ?? "";
+    if (msgId && jáProcessou(msgId)) {
+      console.log(`[Z-API] Duplicata ignorada: ${msgId}`);
+      return NextResponse.json({ ok: true });
+    }
 
     // Tipo de entrada: texto, áudio ou imagem
     let mensagem = "";
