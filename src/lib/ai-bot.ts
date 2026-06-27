@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────
-// QuitaZAP — IA Consultora Financeira
+// QuitaZAP — IA Consultora Financeira v2
 // Modelo: gpt-4o-mini (OpenAI)
 // ─────────────────────────────────────────
 
@@ -8,73 +8,172 @@ export type Mensagem = {
   content: string;
 };
 
+// ── Tipos expandidos ─────────────────────
+
 export type DividaIA = {
   credor: string;
+  tipo: "CARTAO" | "EMPRESTIMO" | "FINANCIAMENTO" | "CHEQUE_ESPECIAL" | "CREDIARIO" | "LOJA" | "IMPOSTO" | "ALUGUEL" | "OUTRO";
+  valorOriginal: number;
+  saldoAtual: number;
+  juros?: number;
+  multa?: number;
+  valorParcela: number;
+  totalParcelas?: number;
+  parcelasRestantes: number;
+  diaVencimento?: number;
+  emAtraso: boolean;
+  diasAtraso?: number;
+  possuiProposta?: boolean;
+  valorParaQuitar?: number;
+  descontoAVista?: boolean;
+};
+
+export type CartaoIA = {
+  banco: string;
+  limite: number;
+  limiteDisponivel?: number;
+  faturaAtual: number;
+  valorMinimo?: number;
+  melhorDiaCompra?: number;
+  parcelasFuturas?: number;
+};
+
+export type EmprestimoIA = {
+  banco: string;
+  valorContratado: number;
+  saldoRestante: number;
+  taxaJuros?: number;
+  parcelasFaltam: number;
+  valorParcela: number;
+};
+
+export type DadosPessoaisIA = {
+  nome: string;
+  idade?: number;
+  cidade?: string;
+  estadoCivil?: string;
+  dependentes?: number;
+  filhos?: number;
+  profissao?: string;
+  vinculo?: string;
+};
+
+export type RendaIA = {
+  salarioLiquido: number;
+  outrasRendas?: number;
+  comissoes?: number;
+  rendaConjuge?: number;
+  rendaExtra?: number;
+  beneficios?: number;
+  totalFamiliar: number;
+};
+
+export type DespesaIA = {
+  descricao: string;
   valor: number;
-  parcelas: number;
-  tipo: "CARTAO" | "EMPRESTIMO" | "BOLETO" | "ACORDO" | "OUTRO";
-  valorParcela?: number;      // valor da parcela mensal
-  diaVencimento?: number;     // dia do mês que vence (1-31)
-  diaFechamento?: number;     // dia que fecha a fatura (cartões)
-  emAtraso?: boolean;         // está em atraso?
-  mesesAtraso?: number;       // quantos meses em atraso
 };
 
-export type PlanoIA = {
+export type PatrimonioIA = {
+  possuiCasa?: boolean;
+  possuiCarro?: boolean;
+  possuiMoto?: boolean;
+  possuiInvestimentos?: boolean;
+  reservaEmergencia?: number;
+  valorBens?: number;
+};
+
+export type ObjetivosIA = {
+  objetivoPrincipal?: string;
+  prazoQuitacao?: number;
+  valorDisponivel?: number;
+  aceitaReduzirGastos?: boolean;
+  aceitaRenegociar?: boolean;
+  pretendeMaiRenda?: boolean;
+};
+
+export type AlertasIA = {
+  acaoJudicial?: boolean;
+  negativado?: boolean;
+  bloqueioBancario?: boolean;
+  financiamentoAtraso?: boolean;
+  riscoPerdaPatrimonio?: boolean;
+};
+
+export type DiagnosticoIA = {
+  dadosPessoais: DadosPessoaisIA;
+  renda: RendaIA;
+  despesasFixas: DespesaIA[];
+  despesasVariaveis: DespesaIA[];
   dividas: DividaIA[];
-  renda: number;
+  cartoes: CartaoIA[];
+  emprestimos: EmprestimoIA[];
+  patrimonio: PatrimonioIA;
+  objetivos: ObjetivosIA;
+  alertas: AlertasIA;
 };
 
-const SYSTEM_PROMPT = `Você é o QuitaZAP — consultor financeiro pessoal do cliente, disponível 24h pelo WhatsApp.
+const SYSTEM_PROMPT = `Você é o QuitaZAP — consultor financeiro pessoal disponível 24h pelo WhatsApp.
 
-Seu papel é de um coach financeiro sério e profissional: direto, motivador e focado em resultados práticos. Você não organiza dívidas — você ajuda o cliente a SAIR delas. A diferença é enorme.
+Sua missão é entender a situação financeira do cliente e gerar um diagnóstico prático que mostre exatamente o que ele precisa pagar, quando, e como sair das dívidas. Você não é um formulário — é um consultor de verdade.
 
 TOM E POSTURA:
-- Fale como um consultor de verdade: confiante, claro e direto. Sem rodeios.
-- Seja motivador sem ser superficial. Valorize cada passo dado pelo cliente.
-- Trate o cliente pelo nome sempre que possível.
-- Use linguagem simples e direta.
-- Mensagens curtas. No WhatsApp, parágrafos longos não funcionam.
-- Use *negrito* para valores, credores e datas importantes (formato WhatsApp).
-- Emojis apenas quando reforçam a mensagem. Nada excessivo.
+- Profissional, direto e acolhedor. Nunca julgue.
+- Linguagem simples. O cliente não precisa entender finanças.
+- *Negrito* para valores e informações-chave (formato WhatsApp).
+- Respostas curtas — máximo 2 perguntas por mensagem.
+- Se o cliente não souber um valor exato, aceite o aproximado e siga em frente.
+- Muitos clientes têm vergonha da situação. Normalize. Foque na solução.
 
-FLUXO DE ATENDIMENTO:
-Para cada dívida, colete obrigatoriamente:
-1. Credor (ex: Nubank, Itaú, Financeira X)
-2. Tipo (cartão de crédito, empréstimo, boleto, acordo, outro)
-3. Valor total da dívida
-4. Quantas parcelas restam (ou se é à vista)
-5. Valor da parcela mensal (se souber)
-6. Para CARTÕES: qual o dia que fecha a fatura? E o dia que vence?
-7. Para EMPRÉSTIMOS/BOLETOS: qual o dia de vencimento?
-8. Está em atraso? Se sim, há quantos meses?
+ETAPAS DE COLETA (siga esta ordem natural):
 
-Faça as perguntas de forma natural e direta, uma ou duas por vez. Não pergunte tudo de uma vez.
-Quando o cliente terminar de listar, pergunte a renda mensal líquida (se ainda não souber).
-Com pelo menos 1 dívida + renda, chame gerar_plano imediatamente.
+1. RENDA
+   Pergunte a renda líquida mensal (salário + outras fontes se houver).
+   Se tiver cônjuge que contribui, some ao total.
 
-REGRAS IMPORTANTES:
-- O objetivo é dizer ao cliente QUANTO PAGAR e QUANDO — não apenas listar dívidas.
-- Se a renda já foi informada, NUNCA peça novamente. Use o valor já fornecido.
-- Ao adicionar nova dívida com renda já conhecida, chame gerar_plano imediatamente com todas as dívidas.
-- O cliente pode adicionar dívidas a qualquer momento. Sempre atualize o plano.
-- Nunca invente dados. Se o cliente não souber um valor exato, use o aproximado que ele disser.
-- Jamais use frases como "Claro!", "Com certeza!", "Ótimo!" no início — soe natural, não robótico.
+2. DESPESAS FIXAS
+   Pergunte quais são as contas fixas mensais: aluguel/financiamento, escola, plano de saúde, condomínio, energia, água, internet, transporte.
+   Não precisa de todos — pegue o que o cliente souber.
+   Calcule o total automaticamente.
 
-EXEMPLOS DE TOM CERTO:
-❌ "Olá! Estou aqui para te ajudar com suas finanças! 😊"
-✅ "Me conta suas dívidas — credor e valor. Vamos montar seu plano."
+3. DÍVIDAS (uma por vez)
+   Para cada dívida colete:
+   - Credor (banco, loja, etc.)
+   - Tipo (cartão, empréstimo, boleto, financiamento, cheque especial)
+   - Saldo atual (quanto ainda deve)
+   - Valor da parcela mensal
+   - Parcelas restantes
+   - Dia de vencimento
+   - Está em atraso? Se sim, há quantos dias?
+   - Existe oferta de desconto para quitar à vista?
 
-❌ "Ótimo! Você tem uma dívida de R$200 com o Nubank! Tem mais?"
-✅ "Nubank R$200 anotado. Qual o dia que vence? Está em atraso?"`;
+   Pergunte uma dívida por vez. Quando o cliente confirmar que acabou, passe para o próximo passo.
 
+4. OBJETIVOS
+   Pergunte apenas:
+   - Quanto consegue separar por mês para pagar dívidas?
+   - Qual o prazo que deseja para quitar tudo?
 
+5. ALERTAS (só se relevante)
+   Se o cliente mencionar ou parecer provável, pergunte:
+   - Tem alguma dívida negativada no SPC/Serasa?
+   - Existe financiamento de imóvel ou veículo em atraso?
+
+QUANDO CHAMAR gerar_diagnostico:
+- Após ter: renda, pelo menos 1 despesa fixa, pelo menos 1 dívida completa e o valor que consegue pagar por mês.
+- Se o cliente pedir o diagnóstico antes, gere com o que tiver.
+- Sempre que novas informações chegarem, atualize e gere novo diagnóstico completo.
+
+REGRAS CRÍTICAS:
+- Nunca repita perguntas já respondidas.
+- Se a renda já foi informada, NUNCA peça de novo.
+- Ao adicionar nova dívida com renda já conhecida, chame gerar_diagnostico imediatamente.
+- Após o diagnóstico, continue disponível. O cliente pode mandar novas dívidas a qualquer momento.`;
 
 export async function processarMensagemIA(
   historico: Mensagem[],
   novaMensagem: string,
   nomeCliente: string
-): Promise<{ resposta: string; plano?: PlanoIA }> {
+): Promise<{ resposta: string; diagnostico?: DiagnosticoIA }> {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey || apiKey.startsWith("sk-proj-SUA")) {
@@ -98,72 +197,157 @@ export async function processarMensagemIA(
       {
         type: "function",
         function: {
-          name: "gerar_plano",
+          name: "gerar_diagnostico",
           description:
-            "Chame esta função SOMENTE quando tiver coletado todas as dívidas do cliente E a renda mensal confirmada. Mínimo necessário: 1 dívida + renda.",
+            "Chame esta função quando tiver coletado dados suficientes para gerar o diagnóstico financeiro completo. Inclua todos os dados coletados até agora.",
           parameters: {
             type: "object",
             properties: {
-              dividas: {
+              dadosPessoais: {
+                type: "object",
+                properties: {
+                  nome: { type: "string" },
+                  idade: { type: "number" },
+                  cidade: { type: "string" },
+                  estadoCivil: { type: "string" },
+                  dependentes: { type: "number" },
+                  filhos: { type: "number" },
+                  profissao: { type: "string" },
+                  vinculo: { type: "string" },
+                },
+                required: ["nome"],
+              },
+              renda: {
+                type: "object",
+                properties: {
+                  salarioLiquido: { type: "number" },
+                  outrasRendas: { type: "number" },
+                  comissoes: { type: "number" },
+                  rendaConjuge: { type: "number" },
+                  rendaExtra: { type: "number" },
+                  beneficios: { type: "number" },
+                  totalFamiliar: { type: "number", description: "Soma de todas as fontes de renda" },
+                },
+                required: ["salarioLiquido", "totalFamiliar"],
+              },
+              despesasFixas: {
                 type: "array",
-                description: "Lista de todas as dívidas coletadas",
                 items: {
                   type: "object",
                   properties: {
-                    credor: {
-                      type: "string",
-                      description: "Nome do credor ou da dívida (ex: Nubank, Financeira, Luz)",
-                    },
-                    valor: {
-                      type: "number",
-                      description: "Valor total da dívida em reais",
-                    },
-                    parcelas: {
-                      type: "number",
-                      description: "Parcelas restantes. Use 1 para dívidas à vista ou boletos.",
-                    },
-                    tipo: {
-                      type: "string",
-                      enum: ["CARTAO", "EMPRESTIMO", "BOLETO", "ACORDO", "OUTRO"],
-                      description: "Tipo da dívida",
-                    },
-                    valorParcela: {
-                      type: "number",
-                      description: "Valor da parcela mensal em reais, se informado pelo cliente",
-                    },
-                    diaVencimento: {
-                      type: "number",
-                      description: "Dia do mês em que a parcela/fatura vence (1-31)",
-                    },
-                    diaFechamento: {
-                      type: "number",
-                      description: "Dia do mês em que a fatura fecha (apenas para cartões de crédito)",
-                    },
-                    emAtraso: {
-                      type: "boolean",
-                      description: "Se a dívida está em atraso",
-                    },
-                    mesesAtraso: {
-                      type: "number",
-                      description: "Quantidade de meses em atraso, se aplicável",
-                    },
+                    descricao: { type: "string" },
+                    valor: { type: "number" },
                   },
-                  required: ["credor", "valor", "parcelas", "tipo"],
+                  required: ["descricao", "valor"],
                 },
               },
-              renda: {
-                type: "number",
-                description: "Renda mensal do cliente em reais",
+              despesasVariaveis: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    descricao: { type: "string" },
+                    valor: { type: "number" },
+                  },
+                  required: ["descricao", "valor"],
+                },
+              },
+              dividas: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    credor: { type: "string" },
+                    tipo: { type: "string", enum: ["CARTAO", "EMPRESTIMO", "FINANCIAMENTO", "CHEQUE_ESPECIAL", "CREDIARIO", "LOJA", "IMPOSTO", "ALUGUEL", "OUTRO"] },
+                    valorOriginal: { type: "number" },
+                    saldoAtual: { type: "number" },
+                    juros: { type: "number" },
+                    multa: { type: "number" },
+                    valorParcela: { type: "number" },
+                    totalParcelas: { type: "number" },
+                    parcelasRestantes: { type: "number" },
+                    diaVencimento: { type: "number" },
+                    emAtraso: { type: "boolean" },
+                    diasAtraso: { type: "number" },
+                    possuiProposta: { type: "boolean" },
+                    valorParaQuitar: { type: "number" },
+                    descontoAVista: { type: "boolean" },
+                  },
+                  required: ["credor", "tipo", "saldoAtual", "valorParcela", "parcelasRestantes", "emAtraso"],
+                },
+              },
+              cartoes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    banco: { type: "string" },
+                    limite: { type: "number" },
+                    limiteDisponivel: { type: "number" },
+                    faturaAtual: { type: "number" },
+                    valorMinimo: { type: "number" },
+                    melhorDiaCompra: { type: "number" },
+                    parcelasFuturas: { type: "number" },
+                  },
+                  required: ["banco", "faturaAtual"],
+                },
+              },
+              emprestimos: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    banco: { type: "string" },
+                    valorContratado: { type: "number" },
+                    saldoRestante: { type: "number" },
+                    taxaJuros: { type: "number" },
+                    parcelasFaltam: { type: "number" },
+                    valorParcela: { type: "number" },
+                  },
+                  required: ["banco", "saldoRestante", "parcelasFaltam", "valorParcela"],
+                },
+              },
+              patrimonio: {
+                type: "object",
+                properties: {
+                  possuiCasa: { type: "boolean" },
+                  possuiCarro: { type: "boolean" },
+                  possuiMoto: { type: "boolean" },
+                  possuiInvestimentos: { type: "boolean" },
+                  reservaEmergencia: { type: "number" },
+                  valorBens: { type: "number" },
+                },
+              },
+              objetivos: {
+                type: "object",
+                properties: {
+                  objetivoPrincipal: { type: "string" },
+                  prazoQuitacao: { type: "number", description: "Em meses" },
+                  valorDisponivel: { type: "number", description: "Quanto pode pagar por mês" },
+                  aceitaReduzirGastos: { type: "boolean" },
+                  aceitaRenegociar: { type: "boolean" },
+                  pretendeMaiRenda: { type: "boolean" },
+                },
+              },
+              alertas: {
+                type: "object",
+                properties: {
+                  acaoJudicial: { type: "boolean" },
+                  negativado: { type: "boolean" },
+                  bloqueioBancario: { type: "boolean" },
+                  financiamentoAtraso: { type: "boolean" },
+                  riscoPerdaPatrimonio: { type: "boolean" },
+                },
               },
             },
-            required: ["dividas", "renda"],
+            required: ["dadosPessoais", "renda", "dividas"],
           },
         },
       },
     ],
     tool_choice: "auto",
-    temperature: 0.7,
-    max_tokens: 500,
+    temperature: 0.5,
+    max_tokens: 2000,
   };
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -183,14 +367,13 @@ export async function processarMensagemIA(
   const data = await res.json();
   const choice = data.choices?.[0];
 
-  // IA decidiu gerar o plano (function call)
+  // IA decidiu gerar o diagnóstico
   if (choice?.finish_reason === "tool_calls" && choice?.message?.tool_calls?.length > 0) {
     const toolCall = choice.message.tool_calls[0];
-    const plano = JSON.parse(toolCall.function.arguments) as PlanoIA;
-    return { resposta: "", plano };
+    const diagnostico = JSON.parse(toolCall.function.arguments) as DiagnosticoIA;
+    return { resposta: "", diagnostico };
   }
 
-  // Resposta conversacional normal
-  const resposta = choice?.message?.content ?? "Pode continuar me enviando suas informações. 😊";
+  const resposta = choice?.message?.content ?? "Pode continuar me enviando suas informações.";
   return { resposta };
 }

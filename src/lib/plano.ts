@@ -1,7 +1,19 @@
 // ─────────────────────────────────────────
-// QuitaZAP — Gerador de Plano de Quitação
+// QuitaZAP — Gerador de Relatório Financeiro
 // ─────────────────────────────────────────
 
+import type { DiagnosticoIA } from "./ai-bot";
+
+function fmt(n: number): string {
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function pct(v: number, total: number): string {
+  if (!total) return "0%";
+  return `${((v / total) * 100).toFixed(0)}%`;
+}
+
+// ── Mantém compatibilidade com código antigo ─
 export type DividaTemp = {
   texto: string;
   valor: number;
@@ -13,129 +25,220 @@ export type DividaTemp = {
   mesesAtraso?: number;
 };
 
-export function gerarMensagemPlano(
-  nome: string,
-  dividas: DividaTemp[],
-  renda: number
-): string {
-  const total = dividas.reduce((sum, d) => sum + (d.valor || 0), 0);
+export function gerarMensagemPlano(nome: string, dividas: DividaTemp[], renda: number): string {
+  return gerarRelatorio({
+    dadosPessoais: { nome },
+    renda: { salarioLiquido: renda, totalFamiliar: renda },
+    despesasFixas: [],
+    despesasVariaveis: [],
+    dividas: dividas.map((d) => ({
+      credor: d.texto,
+      tipo: "OUTRO" as const,
+      valorOriginal: d.valor,
+      saldoAtual: d.valor,
+      valorParcela: d.valorParcela ?? d.valor / (d.parcelas || 1),
+      parcelasRestantes: d.parcelas || 1,
+      diaVencimento: d.diaVencimento,
+      emAtraso: d.emAtraso ?? false,
+      diasAtraso: (d.mesesAtraso ?? 0) * 30,
+    })),
+    cartoes: [],
+    emprestimos: [],
+    patrimonio: {},
+    objetivos: {},
+    alertas: {},
+  });
+}
 
-  // Parcela mensal por dívida: usa valorParcela se disponível, senão divide pelo nº de parcelas
-  const dividasComParcela = dividas.map((d) => {
-    const parc = d.parcelas > 0 ? d.parcelas : 1;
-    const mensal = d.valorParcela && d.valorParcela > 0 ? d.valorParcela : d.valor / parc;
-    return { ...d, mensal };
+// ── Relatório principal ───────────────────
+export function gerarRelatorio(diag: DiagnosticoIA): string {
+  const nome = diag.dadosPessoais?.nome ?? "cliente";
+  const renda = diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
+
+  // ── Despesas fixas
+  const totalFixo = (diag.despesasFixas ?? []).reduce((s, d) => s + d.valor, 0);
+  const totalVariavel = (diag.despesasVariaveis ?? []).reduce((s, d) => s + d.valor, 0);
+
+  // ── Dívidas
+  const dividas = diag.dividas ?? [];
+  const cartoes = diag.cartoes ?? [];
+  const emprestimos = diag.emprestimos ?? [];
+
+  const totalDividas = dividas.reduce((s, d) => s + (d.saldoAtual ?? 0), 0);
+  const totalParcelas = dividas.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
+  const totalFaturas = cartoes.reduce((s, c) => s + (c.faturaAtual ?? 0), 0);
+
+  const comprometidoMes = totalParcelas + totalFaturas;
+  const comprometimento = renda > 0 ? (comprometidoMes / renda) * 100 : 0;
+  const sobra = renda - totalFixo - totalVariavel - comprometidoMes;
+
+  // Nível de risco
+  const nivelRisco =
+    comprometimento > 70 ? "🔴 CRÍTICO"
+    : comprometimento > 50 ? "🟠 ALTO"
+    : comprometimento > 30 ? "🟡 ATENÇÃO"
+    : "🟢 CONTROLADO";
+
+  // Alertas
+  const alertas = diag.alertas ?? {};
+  const temAlerta = Object.values(alertas).some(Boolean);
+
+  // Dívidas em atraso
+  const emAtraso = dividas.filter((d) => d.emAtraso);
+
+  // Ordenação por prioridade: em atraso primeiro, depois por maior juros, depois por maior valor
+  const ordenadas = [...dividas].sort((a, b) => {
+    if (a.emAtraso && !b.emAtraso) return -1;
+    if (!a.emAtraso && b.emAtraso) return 1;
+    if ((b.juros ?? 0) !== (a.juros ?? 0)) return (b.juros ?? 0) - (a.juros ?? 0);
+    return (b.saldoAtual ?? 0) - (a.saldoAtual ?? 0);
   });
 
-  const parcelaMensalTotal = dividasComParcela.reduce((sum, d) => sum + d.mensal, 0);
-  const comprometimento = renda > 0 ? (parcelaMensalTotal / renda) * 100 : 0;
-  const nivelRisco =
-    comprometimento > 50 ? "🔴 *Crítico* — renegociação urgente recomendada"
-    : comprometimento > 30 ? "🟡 *Atenção* — controle rígido necessário"
-    : "🟢 *Controlado* — siga o plano";
-
-  // Snowball: menores dívidas primeiro
-  const ordenadas = [...dividasComParcela].sort((a, b) => (a.valor || 0) - (b.valor || 0));
-
-  // Meses até quitar tudo
-  const mesesParaQuitar = Math.max(...dividas.map((d) => d.parcelas > 0 ? d.parcelas : 1));
+  // Meses para quitar (bola de neve)
+  const mesesParaQuitar = dividas.length > 0
+    ? Math.max(...dividas.map((d) => d.parcelasRestantes || 1))
+    : 0;
   const dataQuitacao = new Date();
   dataQuitacao.setMonth(dataQuitacao.getMonth() + mesesParaQuitar);
   const mesQuitacao = dataQuitacao.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
-  // ── SEÇÃO: O QUE PAGAR ESTE MÊS ─────────────────────────
+  // Data atual
   const hoje = new Date();
   const diaHoje = hoje.getDate();
-  const mesAtual = hoje.toLocaleDateString("pt-BR", { month: "long" });
-
-  const dividasComVencimento = dividasComParcela.filter((d) => d.diaVencimento);
-  const dividasSemVencimento = dividasComParcela.filter((d) => !d.diaVencimento);
-
-  // Ordena por urgência: quem vence primeiro (considerando o mês atual)
-  const ordenadosPorVencimento = [...dividasComVencimento].sort((a, b) => {
-    const vA = a.diaVencimento! >= diaHoje ? a.diaVencimento! : a.diaVencimento! + 31;
-    const vB = b.diaVencimento! >= diaHoje ? b.diaVencimento! : b.diaVencimento! + 31;
-    return vA - vB;
-  });
+  const mesAtual = hoje.toLocaleDateString("pt-BR", { month: "long" }).toUpperCase();
 
   const emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
 
-  // Lista "o que pagar este mês"
-  let listaMes = "";
-  if (ordenadosPorVencimento.length > 0) {
-    listaMes = ordenadosPorVencimento.map((d, i) => {
-      const label = d.texto.split(",")[0]?.trim() || `Dívida ${i + 1}`;
+  // ── SEÇÃO: O QUE PAGAR ESTE MÊS ─────────
+  const dividasComVenc = ordenadas.filter((d) => d.diaVencimento);
+  const dividasSemVenc = ordenadas.filter((d) => !d.diaVencimento);
+
+  const listaMes = [
+    ...dividasComVenc.sort((a, b) => {
+      const vA = a.diaVencimento! >= diaHoje ? a.diaVencimento! : a.diaVencimento! + 31;
+      const vB = b.diaVencimento! >= diaHoje ? b.diaVencimento! : b.diaVencimento! + 31;
+      return vA - vB;
+    }).map((d, i) => {
       const diasRestantes = d.diaVencimento! >= diaHoje
         ? d.diaVencimento! - diaHoje
         : (31 - diaHoje) + d.diaVencimento!;
-      const urgencia = diasRestantes <= 3 ? "⚠️ URGENTE — " : diasRestantes <= 7 ? "⏰ Esta semana — " : "";
-      const fechaInfo = d.diaFechamento ? ` (fecha dia ${d.diaFechamento})` : "";
-      const atrasoInfo = d.emAtraso ? ` ⚠️ em atraso${d.mesesAtraso ? ` (${d.mesesAtraso} meses)` : ""}` : "";
-      return `${emojis[i]} *${label}*${atrasoInfo}\n   ${urgencia}Pagar *R$ ${fmt(d.mensal)}* até dia *${d.diaVencimento}*${fechaInfo}`;
-    }).join("\n");
+      const urgencia = diasRestantes <= 3 ? "⚠️ *URGENTE* — " : diasRestantes <= 7 ? "⏰ Esta semana — " : "";
+      const atrasoTag = d.emAtraso ? ` 🚨 *EM ATRASO*${d.diasAtraso ? ` (${d.diasAtraso} dias)` : ""}` : "";
+      const desconto = d.descontoAVista ? `\n   💡 Desconto para quitar à vista${d.valorParaQuitar ? `: R$ ${fmt(d.valorParaQuitar)}` : ""}` : "";
+      return `${emojis[i] ?? "•"} *${d.credor}*${atrasoTag}\n   ${urgencia}Pagar *R$ ${fmt(d.valorParcela)}* até dia *${d.diaVencimento}*${desconto}`;
+    }),
+    ...dividasSemVenc.map((d, i) => {
+      const atrasoTag = d.emAtraso ? ` 🚨 *EM ATRASO*` : "";
+      return `• *${d.credor}*${atrasoTag} — R$ ${fmt(d.valorParcela)}/mês _(confirme o vencimento)_`;
+    }),
+    ...cartoes.map((c, i) => {
+      return `• *${c.banco} (cartão)* — Fatura R$ ${fmt(c.faturaAtual)}${c.valorMinimo ? ` | Mínimo R$ ${fmt(c.valorMinimo)}` : ""}${c.melhorDiaCompra ? ` | Melhor dia de compra: *${c.melhorDiaCompra}*` : ""}`;
+    }),
+  ].join("\n");
 
-    if (dividasSemVencimento.length > 0) {
-      const semData = dividasSemVencimento.map((d) => {
-        const label = d.texto.split(",")[0]?.trim() || "Dívida";
-        return `• *${label}* — R$ ${fmt(d.mensal)}/mês (confirme a data de vencimento)`;
-      }).join("\n");
-      listaMes += `\n\n📋 *Sem data informada:*\n${semData}`;
-    }
-  } else {
-    // Se não tem nenhuma data, mostra as parcelas sem urgência
-    listaMes = ordenadas.map((d, i) => {
-      const label = d.texto.split(",")[0]?.trim() || `Dívida ${i + 1}`;
-      const atrasoInfo = d.emAtraso ? ` ⚠️ em atraso` : "";
-      return `${emojis[i]} *${label}*${atrasoInfo} — R$ ${fmt(d.mensal)}/mês`;
-    }).join("\n");
+  // ── SEÇÃO: LISTA DE DÍVIDAS ──────────────
+  const listaDividas = ordenadas.map((d, i) => {
+    const jurosInfo = d.juros ? ` | Juros: ${d.juros}% a.m.` : "";
+    const parcInfo = `${d.parcelasRestantes}x de R$ ${fmt(d.valorParcela)}`;
+    const quitarInfo = d.valorParaQuitar ? ` | Para quitar hoje: *R$ ${fmt(d.valorParaQuitar)}*` : "";
+    return `${emojis[i] ?? "•"} *${d.credor}* — R$ ${fmt(d.saldoAtual)}${jurosInfo}\n   ${parcInfo}${quitarInfo}`;
+  }).join("\n");
+
+  // ── SEÇÃO: DESPESAS FIXAS ─────────────────
+  const listaDespesas = (diag.despesasFixas ?? []).length > 0
+    ? (diag.despesasFixas ?? []).map((d) => `• ${d.descricao}: R$ ${fmt(d.valor)}`).join("\n")
+    : "_(não informado)_";
+
+  // ── SUGESTÕES AUTOMÁTICAS ─────────────────
+  const sugestoes: string[] = [];
+
+  if (emAtraso.length > 0) {
+    sugestoes.push(`🔥 Prioridade máxima: regularize as dívidas em atraso (${emAtraso.map((d) => d.credor).join(", ")}). Juros de mora corroem qualquer plano.`);
   }
 
-  // Dívidas em atraso
-  const emAtraso = dividasComParcela.filter((d) => d.emAtraso);
-  const alertaAtraso = emAtraso.length > 0
-    ? `\n\n🚨 *ATENÇÃO — ${emAtraso.length} dívida(s) em atraso:*\n${emAtraso.map((d) => `• ${d.texto.split(",")[0]?.trim()}${d.mesesAtraso ? ` — ${d.mesesAtraso} meses sem pagar` : ""}`).join("\n")}\nPriorize quitar os juros do atraso antes de qualquer outra coisa.`
+  const dividasComDesconto = dividas.filter((d) => d.descontoAVista && d.valorParaQuitar);
+  if (dividasComDesconto.length > 0) {
+    sugestoes.push(`💡 Há oferta(s) de desconto para quitação à vista. Se tiver como, quite ${dividasComDesconto.map((d) => d.credor).join(" e ")} primeiro — economia garantida.`);
+  }
+
+  if (comprometimento > 50) {
+    sugestoes.push(`📉 Mais de ${comprometimento.toFixed(0)}% da sua renda vai para dívidas. Priorize renegociar as de maior juros para reduzir esse percentual.`);
+  }
+
+  if (sobra < 0) {
+    sugestoes.push(`⚠️ Suas despesas superam sua renda. É necessário cortar gastos variáveis ou renegociar dívidas imediatamente.`);
+  } else if (sobra > 200) {
+    sugestoes.push(`💚 Você tem *R$ ${fmt(sobra)}/mês* disponíveis após todas as despesas. Use isso para amortizar as dívidas mais caras.`);
+  }
+
+  const sugestoesTexto = sugestoes.length > 0 ? sugestoes.join("\n\n") : "Siga o plano de pagamento e evite novas dívidas.";
+
+  // ── PLANO 30/90/180 DIAS ─────────────────
+  const meta30 = emAtraso.length > 0
+    ? `Regularizar ${emAtraso.map((d) => d.credor).join(", ")} (em atraso).`
+    : dividasComDesconto.length > 0
+    ? `Aproveitar desconto de quitação à vista (${dividasComDesconto[0].credor}).`
+    : `Pagar todas as parcelas do mês em dia.`;
+
+  const meta90 = `Quitar a menor dívida completa${ordenadas[0] ? ` (*${ordenadas[0].credor}* — R$ ${fmt(ordenadas[0].saldoAtual)})` : ""} usando o método bola de neve.`;
+
+  const meta180 = mesesParaQuitar <= 6
+    ? `Quitar *todas* as dívidas — você pode estar livre em *${mesQuitacao}* seguindo o plano!`
+    : `Reduzir o total de dívidas em pelo menos 30%. Foque nos credores com maior juros.`;
+
+  // ── INFORMAÇÕES PENDENTES ─────────────────
+  const pendentes: string[] = [];
+  if (!diag.renda?.totalFamiliar && !diag.renda?.salarioLiquido) pendentes.push("renda mensal");
+  if ((diag.despesasFixas ?? []).length === 0) pendentes.push("despesas fixas detalhadas");
+  if (cartoes.length === 0 && dividas.some((d) => d.tipo === "CARTAO")) pendentes.push("limite e fatura atual dos cartões");
+  if (dividas.some((d) => !d.diaVencimento)) pendentes.push("datas de vencimento das dívidas sem data");
+
+  const pendentesTexto = pendentes.length > 0
+    ? `\n\n📋 *Para completar seu diagnóstico, ainda falta:*\n${pendentes.map((p) => `• ${p}`).join("\n")}`
     : "";
 
-  // Sobra após pagar
-  const sobra = renda - parcelaMensalTotal;
-  const sobraTexto = sobra > 0
-    ? `Sobram *R$ ${fmt(sobra)}/mês* após pagar todas as parcelas. Use parte para criar uma reserva de emergência.`
-    : `⚠️ Suas parcelas superam sua renda declarada. *Prioridade: renegociar as maiores dívidas imediatamente.*`;
+  // ── RELATÓRIO FINAL ───────────────────────
+  return `📊 *DIAGNÓSTICO FINANCEIRO — ${nome.toUpperCase()}*
+${temAlerta ? "\n🚨 *ATENÇÃO: Situação requer ação imediata!*" : ""}
 
-  // Estratégia snowball
-  const primeira = ordenadas[0];
-  const estrategia = primeira
-    ? `Quite *${primeira.texto.split(",")[0]?.trim()}* primeiro (menor dívida, R$ ${fmt(primeira.valor)}). Ao terminar, redirecione o valor da parcela para acelerar a próxima. Esse efeito reduz meses de prazo.`
-    : "Priorize as menores dívidas primeiro para ganhar fôlego financeiro.";
+━━━━━━━━━━━━━━━━━━━━
+💰 *RESUMO FINANCEIRO*
+━━━━━━━━━━━━━━━━━━━━
+Renda mensal: *R$ ${fmt(renda)}*
+Despesas fixas: *R$ ${fmt(totalFixo)}*${totalVariavel > 0 ? `\nGastos variáveis: *R$ ${fmt(totalVariavel)}*` : ""}
+Total em dívidas: *R$ ${fmt(totalDividas)}*
+Parcelas/mês: *R$ ${fmt(comprometidoMes)}*
+Comprometimento: *${pct(comprometidoMes, renda)}* ${nivelRisco}
+${sobra >= 0 ? `Sobra mensal: *R$ ${fmt(sobra)}*` : `⚠️ Déficit: *R$ ${fmt(Math.abs(sobra))}* (renda insuficiente)`}
 
-  return `📊 *Plano QuitaZAP — ${nome}*
+━━━━━━━━━━━━━━━━━━━━
+🗓️ *O QUE PAGAR EM ${mesAtual}*
+━━━━━━━━━━━━━━━━━━━━
+${listaMes || "_(nenhuma dívida cadastrada)_"}
 
-💳 *Situação geral:*
-Total em dívidas: *R$ ${fmt(total)}*
-Renda líquida: *R$ ${fmt(renda)}/mês*
-Comprometimento: *${comprometimento.toFixed(0)}%* — ${nivelRisco}${alertaAtraso}
+Total a pagar este mês: *R$ ${fmt(comprometidoMes)}*
 
-─────────────────────
-🗓️ *O QUE PAGAR EM ${mesAtual.toUpperCase()}:*
-${listaMes}
+━━━━━━━━━━━━━━━━━━━━
+📋 *SUAS DÍVIDAS (por prioridade)*
+━━━━━━━━━━━━━━━━━━━━
+${listaDividas || "_(nenhuma dívida cadastrada)_"}
 
-💰 *Total do mês: R$ ${fmt(parcelaMensalTotal)}*
-${sobraTexto}
+━━━━━━━━━━━━━━━━━━━━
+💡 *ORIENTAÇÕES*
+━━━━━━━━━━━━━━━━━━━━
+${sugestoesTexto}
 
-─────────────────────
-🎯 *Estratégia — Método Bola de Neve:*
-${estrategia}
+━━━━━━━━━━━━━━━━━━━━
+🎯 *METAS*
+━━━━━━━━━━━━━━━━━━━━
+*30 dias:* ${meta30}
+*90 dias:* ${meta90}
+*180 dias:* ${meta180}
 
-📅 *Previsão de quitação: ${mesesParaQuitar} ${mesesParaQuitar === 1 ? "mês" : "meses"}*
-Livre das dívidas em *${mesQuitacao}* seguindo o plano.
+📅 Previsão de quitação total: *${mesQuitacao}*${pendentesTexto}
 
-⚠️ *Regra de ouro:* Não contraia novas dívidas durante o plano.
-
-✅ Sempre que pagar uma parcela ou contrair nova dívida, me avise e atualizo seu plano.
+━━━━━━━━━━━━━━━━━━━━
+✅ Diagnóstico salvo. Me avise quando pagar uma parcela ou contrair nova dívida — atualizo seu plano na hora.
 
 _QuitaZAP — Organize hoje, quite amanhã_ 💚`;
-}
-
-function fmt(n: number): string {
-  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

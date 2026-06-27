@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem } from "@/lib/ai-bot";
-import { gerarMensagemPlano } from "@/lib/plano";
+import { gerarRelatorio } from "@/lib/plano";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,11 +27,10 @@ export async function POST(req: NextRequest) {
     if (telefone.length < 10) return NextResponse.json({ ok: true });
 
     // Busca sessão — tenta formato com e sem dígito 9 extra (Brasil 8→9 dígitos)
-    // Ex: 5571993085436 (13) ↔ 557193085436 (12)
     const telefoneAlt = telefone.length === 13
-      ? telefone.slice(0, 4) + telefone.slice(5)   // remove o 9: 5571|9|93085436 → 557193085436
+      ? telefone.slice(0, 4) + telefone.slice(5)
       : telefone.length === 12
-      ? telefone.slice(0, 4) + "9" + telefone.slice(4) // adiciona 9: 5571|93085436 → 5571993085436
+      ? telefone.slice(0, 4) + "9" + telefone.slice(4)
       : null;
 
     console.log(`[Z-API] buscando sessão: ${telefone} ou ${telefoneAlt}`);
@@ -47,18 +46,17 @@ export async function POST(req: NextRequest) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "nosso site";
       await sendWhatsApp(
         telefone,
-        `Olá! 👋 Para acessar o QuitaZAP, faça sua compra em ${siteUrl} 😊`
+        `Para acessar o QuitaZAP, faça sua assinatura em ${siteUrl}`
       );
       return NextResponse.json({ ok: true });
     }
 
-    // Plano gerado mas usuário enviou nova mensagem — reativa coleta
+    // Diagnóstico gerado mas usuário enviou nova mensagem — reativa para atualizar
     if (sessao.etapa === "PLANO_GERADO") {
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: { etapa: "COLETANDO_DIVIDAS" },
       });
-      // Atualiza etapa local para cair no fluxo de IA abaixo
       sessao.etapa = "COLETANDO_DIVIDAS";
     }
 
@@ -77,56 +75,66 @@ export async function POST(req: NextRequest) {
       { role: "user", content: mensagem },
     ];
 
-    // ── IA quer gerar o plano ────────────────────────────────────
-    if (resultado.plano) {
-      const { dividas, renda } = resultado.plano;
+    // ── IA quer gerar o diagnóstico completo ─────────────────────
+    if (resultado.diagnostico) {
+      const diag = resultado.diagnostico;
 
-      // Gera o texto do plano
-      const planoTexto = gerarMensagemPlano(
-        sessao.nome ?? "cliente",
-        dividas.map((d) => ({ texto: d.credor, valor: d.valor, parcelas: d.parcelas })),
-        renda
-      );
+      // Gera o relatório formatado para WhatsApp
+      const relatorio = gerarRelatorio(diag);
 
-      // Salva estado final da sessão
+      // Renda total para salvar no banco
+      const rendaTotal = diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
+
+      // Salva estado da sessão
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: {
           etapa: "PLANO_GERADO",
-          renda,
+          renda: rendaTotal,
           dividasTemp: JSON.stringify([
             ...historicoAtualizado,
-            { role: "assistant", content: planoTexto },
+            { role: "assistant", content: relatorio },
           ]),
         },
       });
 
-      // Persiste dados do cliente no banco
+      // Persiste dados no banco de clientes
       if (sessao.clienteId) {
         await prisma.cliente.update({
           where: { id: sessao.clienteId },
-          data: { rendaMensal: renda, statusAtendimento: "PLANO_GERADO" },
+          data: { rendaMensal: rendaTotal, statusAtendimento: "PLANO_GERADO" },
         });
 
-        for (const d of dividas) {
+        // Salva dívidas
+        for (const d of diag.dividas ?? []) {
           await prisma.divida.create({
             data: {
               clienteId: sessao.clienteId,
               credor: d.credor,
-              valorTotal: d.valor,
-              tipo: d.tipo,
-              status: "ATIVA",
-              obs: `${d.parcelas}x — cadastrado via bot`,
+              valorTotal: d.saldoAtual ?? d.valorOriginal ?? 0,
+              tipo: d.tipo ?? "OUTRO",
+              status: d.emAtraso ? "ATIVA" : "ATIVA",
+              obs: `${d.parcelasRestantes}x parcelas — via bot QuitaZAP${d.emAtraso ? ` — EM ATRASO${d.diasAtraso ? ` (${d.diasAtraso} dias)` : ""}` : ""}`,
             },
           });
         }
 
         await prisma.planoEnviado.create({
-          data: { clienteId: sessao.clienteId, texto: planoTexto },
+          data: { clienteId: sessao.clienteId, texto: relatorio },
         });
       }
 
-      await sendWhatsApp(telefone, planoTexto);
+      // Envia relatório dividido se muito longo (WhatsApp tem limite de ~4000 chars por mensagem)
+      if (relatorio.length > 3800) {
+        const partes = dividirMensagem(relatorio, 3800);
+        for (const parte of partes) {
+          await sendWhatsApp(telefone, parte);
+          await new Promise((r) => setTimeout(r, 1000)); // intervalo entre mensagens
+        }
+      } else {
+        await sendWhatsApp(telefone, relatorio);
+      }
+
       return NextResponse.json({ ok: true });
     }
 
@@ -147,4 +155,23 @@ export async function POST(req: NextRequest) {
     console.error("[Z-API] Erro no webhook:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
+}
+
+// Divide mensagens longas em partes sem quebrar palavras
+function dividirMensagem(texto: string, maxChars: number): string[] {
+  const partes: string[] = [];
+  const linhas = texto.split("\n");
+  let atual = "";
+
+  for (const linha of linhas) {
+    if ((atual + "\n" + linha).length > maxChars) {
+      if (atual) partes.push(atual.trim());
+      atual = linha;
+    } else {
+      atual = atual ? atual + "\n" + linha : linha;
+    }
+  }
+
+  if (atual.trim()) partes.push(atual.trim());
+  return partes;
 }
