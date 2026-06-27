@@ -69,9 +69,24 @@ async function analisarImagem(imageUrl: string): Promise<string> {
           content: [
             {
               type: "text",
-              text: `Analise esta imagem financeira (pode ser boleto, fatura de cartão, extrato, comprovante de empréstimo, carnê, etc).
+              text: `Analise esta imagem financeira. Pode ser:
+- Boleto, fatura de cartão, extrato bancário, comprovante de empréstimo, carnê
+- Contracheque / holerite / comprovante de salário / folha de pagamento (inclusive do Estado/governo)
 
-Extraia as seguintes informações se presentes:
+Se for um CONTRACHEQUE ou HOLERITE, extraia:
+- Nome do órgão/empresa pagador
+- Salário bruto
+- Salário líquido (valor a receber após todos os descontos)
+- Mês/ano de referência
+- Descontos presentes, especialmente: empréstimo consignado, plano de saúde, previdência (INSS/IPREV/FUNPREV), imposto de renda retido, vale transporte, alimentação, sindicato, e outros
+
+Responda assim:
+"Contracheque [órgão] — Bruto: R$ X.XXX,XX | Líquido: R$ X.XXX,XX (ref: mês/ano)
+Descontos identificados: Consignado R$ XXX,XX | Plano de saúde R$ XXX,XX | INSS R$ XXX,XX | IR R$ XXX,XX | [outros]"
+
+Use o salário líquido como base da renda mensal do cliente. O consignado já está descontado na folha — não conta como dívida separada a menos que o cliente mencione explicitamente.
+
+Se for BOLETO, FATURA ou DÍVIDA, extraia:
 - Credor / banco / loja
 - Valor total da dívida ou da fatura
 - Valor da parcela mensal
@@ -79,11 +94,9 @@ Extraia as seguintes informações se presentes:
 - Data de vencimento
 - Se está em atraso
 
-Responda de forma direta e simples, como se o próprio cliente estivesse descrevendo a dívida em uma conversa. Exemplo:
-"Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150."
-"Boleto Casas Bahia R$ 350 vence dia 20, em 3x."
+Responda assim: "Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150."
 
-Se a imagem NÃO for financeira (foto de pessoa, paisagem, etc), responda apenas: [NAO_FINANCEIRA]`,
+Se a imagem NÃO for financeira (foto de pessoa, paisagem, selfie, etc), responda apenas: [NAO_FINANCEIRA]`,
             },
             {
               type: "image_url",
