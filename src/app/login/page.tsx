@@ -20,6 +20,7 @@ export default async function LoginPage({
     const jar = await cookies();
     jar.set("qz_auth", correta, {
       httpOnly: true,
+      secure: true,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30, // 30 dias
       path: "/",
