@@ -3,9 +3,9 @@
 // Docs: https://developer.z-api.io
 // ─────────────────────────────────────────
 
-const INSTANCE     = process.env.ZAPI_INSTANCE!;
-const TOKEN        = process.env.ZAPI_TOKEN!;
-const CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN!;
+const INSTANCE     = process.env.ZAPI_INSTANCE ?? "";
+const TOKEN        = process.env.ZAPI_TOKEN ?? "";
+const CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN ?? "";
 
 /**
  * Envia uma mensagem de texto via Z-API.
@@ -25,7 +25,7 @@ export async function sendWhatsApp(phone: string, message: string) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Client-Token": CLIENT_TOKEN,
+      ...(CLIENT_TOKEN ? { "Client-Token": CLIENT_TOKEN } : {}),
     },
     body: JSON.stringify({ phone, message }),
   });
