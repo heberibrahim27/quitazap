@@ -142,6 +142,7 @@ export async function processarLeadVendas(
   let lead = await prisma.leadVendas.findFirst({
     where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } },
   });
+  console.log(`[SALES-BOT] telefone="${telefone}" alt="${telefoneAlt}" lead=${lead ? `found(tel=${lead.telefone}, etapa=${lead.etapa})` : "null"}`);
 
   // ── Novo contato: cria lead e envia boas-vindas ──
   if (!lead) {

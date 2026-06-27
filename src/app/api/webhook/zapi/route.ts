@@ -214,7 +214,14 @@ export async function POST(req: NextRequest) {
         );
       } else {
         // Número desconhecido → funil de vendas
-        await processarLeadVendas(telefone, mensagem);
+        // Busca lead existente para garantir que usamos o telefone no formato correto
+        const leadExistente = await prisma.leadVendas.findFirst({
+          where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } },
+          select: { telefone: true },
+        });
+        const telefoneParaFunil = leadExistente?.telefone ?? telefone;
+        console.log(`[FUNIL] raw="${rawPhone}" norm="${telefone}" alt="${telefoneAlt}" leadExistente="${leadExistente?.telefone ?? "null"}" → usando="${telefoneParaFunil}"`);
+        await processarLeadVendas(telefoneParaFunil, mensagem);
       }
       return NextResponse.json({ ok: true });
     }
