@@ -33,6 +33,7 @@ async function criarCliente(formData: FormData) {
   const email    = String(formData.get("email") || "").trim();
   const obs      = String(formData.get("obs") || "").trim();
   const ativarBot = formData.get("ativarBot") === "on";
+  const gratuito  = formData.get("gratuito") === "on";
 
   const rendaTexto    = String(formData.get("rendaMensal") || "").replace(",", ".");
   const despesasTexto = String(formData.get("despesasFixas") || "").replace(",", ".");
@@ -48,6 +49,7 @@ async function criarCliente(formData: FormData) {
       cpf:   cpf   || null,
       email: email || null,
       obs:   obs   || null,
+      gratuito,
       statusAtendimento: statusAtend,
       rendaMensal:           rendaTexto    ? Number(rendaTexto)    : null,
       despesasFixas:         despesasTexto ? Number(despesasTexto) : null,
@@ -162,6 +164,27 @@ export default function NovoClientePage() {
               Se preenchido, será usado como base do cenário realista no plano.
             </span>
           </label>
+
+          {/* ── Gratuito ── */}
+          <div style={{
+            background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12,
+            padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12,
+          }}>
+            <input
+              type="checkbox"
+              name="gratuito"
+              id="gratuito"
+              style={{ marginTop: 2, width: 18, height: 18, cursor: "pointer", accentColor: "#2563eb" }}
+            />
+            <label htmlFor="gratuito" style={{ cursor: "pointer" }}>
+              <strong style={{ fontSize: 14, color: "#1e40af", display: "block", marginBottom: 2 }}>
+                🎁 Acesso gratuito
+              </strong>
+              <span style={{ fontSize: 13, color: "#1d4ed8" }}>
+                Marque para família e amigos. Não contabiliza nas receitas e exibe "Gratuito" no perfil.
+              </span>
+            </label>
+          </div>
 
           {/* ── Ativar bot ── */}
           <div style={{
