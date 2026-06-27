@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, msg: "nova mensagem, skip" });
     }
 
-    // Só processa se ainda estiver coletando dados
-    if (sessao.etapa !== "COLETANDO_DIVIDAS") {
-      return NextResponse.json({ ok: true, msg: "etapa não aplicável" });
+    // Só processa se ainda não gerou o plano
+    if (sessao.etapa === "PLANO_GERADO") {
+      return NextResponse.json({ ok: true, msg: "plano já gerado" });
     }
 
     // Verifica se tem histórico suficiente (mínimo 2 mensagens do usuário)

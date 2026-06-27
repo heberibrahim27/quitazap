@@ -10,8 +10,8 @@ const STATUS_ATEND: Record<string, { label: string; bg: string; color: string }>
   ENCERRADO:              { label: "Encerrado",       bg: "#f1f5f9", color: "#475569" },
 };
 
-function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function fmtData(d: Date) {
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default async function ClientesPage({
@@ -34,9 +34,14 @@ export default async function ClientesPage({
           }
         : {}),
     },
-    include: {
-      dividas: { select: { id: true, valorTotal: true, valorPago: true, status: true } },
-      _count:  { select: { planosEnviados: true } },
+    select: {
+      id:               true,
+      nome:             true,
+      telefone:         true,
+      statusAtendimento: true,
+      criadoEm:         true,
+      rendaMensal:      true,
+      _count:           { select: { planosEnviados: true } },
     },
   });
 
@@ -57,9 +62,7 @@ export default async function ClientesPage({
         {ok === "criado" && <AlertaBanner tipo="sucesso" mensagem="Cliente cadastrado com sucesso!" />}
 
         {/* Barra de busca + filtro */}
-        <form method="GET" style={{
-          display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap",
-        }}>
+        <form method="GET" style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           <input
             name="q"
             defaultValue={q}
@@ -123,11 +126,8 @@ export default async function ClientesPage({
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
               {clientes.map((cliente) => {
-                const dividasAtivas = cliente.dividas.filter((d) => d.status !== "QUITADA");
-                const totalDevido   = dividasAtivas.reduce((t, d) => t + Number(d.valorTotal), 0);
-                const totalPago     = cliente.dividas.reduce((t, d) => t + Number(d.valorPago), 0);
-                const saldo         = Math.max(0, totalDevido - totalPago);
-                const s             = STATUS_ATEND[cliente.statusAtendimento] ?? STATUS_ATEND["NOVO"];
+                const s = STATUS_ATEND[cliente.statusAtendimento] ?? STATUS_ATEND["NOVO"];
+                const planos = cliente._count.planosEnviados;
 
                 return (
                   <Link
@@ -144,6 +144,7 @@ export default async function ClientesPage({
                       gap: 16,
                     }}
                   >
+                    {/* Info principal */}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                         <strong style={{
@@ -161,27 +162,23 @@ export default async function ClientesPage({
                       </div>
                       <span style={{ display: "block", color: "#64748b", fontSize: 13 }}>
                         {cliente.telefone}
-                        {cliente._count.planosEnviados > 0 && (
-                          <span style={{ marginLeft: 8, color: "#94a3b8" }}>
-                            · {cliente._count.planosEnviados} plano{cliente._count.planosEnviados !== 1 ? "s" : ""}
-                          </span>
-                        )}
                       </span>
                     </div>
 
+                    {/* Resumo direita */}
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      {dividasAtivas.length > 0 ? (
-                        <>
-                          <strong style={{ display: "block", color: saldo > 0 ? "#dc2626" : "#16a34a", fontSize: 14 }}>
-                            {fmt(saldo)}
-                          </strong>
-                          <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                            {dividasAtivas.length} dívida{dividasAtivas.length !== 1 ? "s" : ""}
-                          </span>
-                        </>
+                      {planos > 0 ? (
+                        <strong style={{ display: "block", color: "#6b21a8", fontSize: 13 }}>
+                          📋 {planos} plano{planos !== 1 ? "s" : ""}
+                        </strong>
                       ) : (
-                        <span style={{ fontSize: 13, color: "#16a34a", fontWeight: 700 }}>✅ Quitado</span>
+                        <strong style={{ display: "block", color: "#94a3b8", fontSize: 13 }}>
+                          Sem plano
+                        </strong>
                       )}
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                        desde {fmtData(cliente.criadoEm)}
+                      </span>
                     </div>
 
                     <span style={{ color: "#94a3b8", fontSize: 18, flexShrink: 0 }}>›</span>

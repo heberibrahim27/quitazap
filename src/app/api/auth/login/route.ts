@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 30, // 30 dias
     path: "/",
+    // Cobre tanto quitazap.com.br quanto www.quitazap.com.br
+    ...(process.env.NODE_ENV === "production"
+      ? { domain: ".quitazap.com.br" }
+      : {}),
   });
 
   return res;
