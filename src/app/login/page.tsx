@@ -1,32 +1,9 @@
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ erro?: string }>;
 }) {
   const { erro } = await searchParams;
-
-  async function entrar(fd: FormData) {
-    "use server";
-    const senha = String(fd.get("senha") || "");
-    const correta = process.env.APP_SENHA || "quitazap2024";
-
-    if (senha !== correta) {
-      redirect("/login?erro=1");
-    }
-
-    const jar = await cookies();
-    jar.set("qz_auth", correta, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 dias
-      path: "/",
-    });
-    redirect("/");
-  }
 
   return (
     <main style={{
@@ -39,7 +16,6 @@ export default async function LoginPage({
         width: "100%", maxWidth: 400,
         boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
       }}>
-        {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{
             width: 56, height: 56, background: "#16a34a", borderRadius: 16,
@@ -62,7 +38,7 @@ export default async function LoginPage({
           </div>
         )}
 
-        <form action={entrar} style={{ display: "grid", gap: 16 }}>
+        <form method="POST" action="/api/auth/login" style={{ display: "grid", gap: 16 }}>
           <label style={{ display: "grid", gap: 6, fontWeight: 700, fontSize: 14, color: "#0f172a" }}>
             Senha de acesso
             <input

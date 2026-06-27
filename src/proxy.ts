@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const COOKIE_NAME = "qz_auth";
+const COOKIE_TOKEN = "qz_autenticado";
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Rotas públicas — não precisam de login
+  // Rotas públicas
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/oferta") ||
@@ -14,10 +17,9 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const senha = process.env.APP_SENHA || "quitazap2024";
-  const cookie = req.cookies.get("qz_auth")?.value;
+  const cookie = req.cookies.get(COOKIE_NAME)?.value;
 
-  if (cookie !== senha) {
+  if (cookie !== COOKIE_TOKEN) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
