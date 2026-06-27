@@ -131,8 +131,17 @@ export async function processarLeadVendas(
   telefone: string,
   mensagem: string,
 ): Promise<void> {
-  // Busca lead existente
-  let lead = await prisma.leadVendas.findUnique({ where: { telefone } });
+  // Telefone alternativo (com/sem 9 dígito — Z-API pode variar)
+  const telefoneAlt = telefone.length === 13
+    ? telefone.slice(0, 4) + telefone.slice(5)
+    : telefone.length === 12
+    ? telefone.slice(0, 4) + "9" + telefone.slice(4)
+    : null;
+
+  // Busca lead existente (tenta os dois formatos)
+  let lead = await prisma.leadVendas.findFirst({
+    where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } },
+  });
 
   // ── Novo contato: cria lead e envia boas-vindas ──
   if (!lead) {
