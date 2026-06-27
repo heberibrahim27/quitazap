@@ -52,13 +52,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Plano já gerado — responde mensagens posteriores
+    // Plano gerado mas usuário enviou nova mensagem — reativa coleta
     if (sessao.etapa === "PLANO_GERADO") {
-      await sendWhatsApp(
-        telefone,
-        "Seu plano já foi gerado! 📊\n\nSe quiser revisar suas informações ou tiver dúvidas, entre em contato."
-      );
-      return NextResponse.json({ ok: true });
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: { etapa: "COLETANDO_DIVIDAS" },
+      });
+      // Atualiza etapa local para cair no fluxo de IA abaixo
+      sessao.etapa = "COLETANDO_DIVIDAS";
     }
 
     // ── Processa com IA ──────────────────────────────────────────
