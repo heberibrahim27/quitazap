@@ -50,6 +50,146 @@ export function gerarMensagemPlano(nome: string, dividas: DividaTemp[], renda: n
   });
 }
 
+// ── Helpers de formatação ─────────────────
+function fmtParcela(obs: string | null | undefined, valorTotal: number): number {
+  if (obs) {
+    const m = obs.match(/de R\$?(\d+(?:[,.]?\d+)?)\s*[—\-]/);
+    if (m) {
+      const v = parseFloat(m[1].replace(",", "."));
+      if (!isNaN(v) && v > 0) return v;
+    }
+  }
+  return valorTotal;
+}
+
+// ── Resumo mensal curto ───────────────────
+export function gerarResumoMensal(nome: string, renda: number, totalParcelas: number): string {
+  const saldo = renda - totalParcelas;
+  const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long" }).toUpperCase();
+
+  const dica =
+    saldo > 500
+      ? `Você ainda tem *R$ ${fmt(saldo)}* livres este mês. Considere usar uma parte pra quitar uma dívida mais rápido — é a melhor decisão agora. 💪`
+      : saldo > 0
+      ? `Sobram *R$ ${fmt(saldo)}* — guarda esse valor e evite gastos por impulso esta semana.`
+      : `Sua renda está toda comprometida. Foque em pagar em dia e evite qualquer gasto extra.`;
+
+  return `📊 *RESUMO SIMPLES — ${mesAtual}*
+
+> RECEITA MENSAL:
+• *R$ ${fmt(renda)}*
+
+> DESPESAS ACUMULADAS (dívidas):
+• *R$ ${fmt(totalParcelas)}*
+
+> SALDO:
+• *R$ ${fmt(Math.max(saldo, 0))}*${saldo < 0 ? `\n_⚠️ Déficit de R$ ${fmt(Math.abs(saldo))}/mês_` : ""}
+
+💡 ${dica}`;
+}
+
+// ── Resumo semanal (autônomos, Uber, taxistas) ──
+export function gerarResumoSemana(
+  nome: string,
+  renda: number,
+  totalParcelas: number,
+  modo: "receita" | "gastar"
+): string {
+  const saldoMensal = renda - totalParcelas;
+  const necessidadeSemanal = totalParcelas / 4.33;
+  const disponivelSemanal = saldoMensal / 4.33;
+  const primeiroNome = nome.split(" ")[0];
+
+  if (modo === "receita") {
+    return `📅 *META DA SEMANA — ${primeiroNome}*
+
+Para cobrir suas dívidas mensais você precisa faturar pelo menos:
+💵 *R$ ${fmt(necessidadeSemanal)}/semana*
+
+${renda > 0 ? `Sua renda atual dá ~R$ ${fmt(renda / 4.33)}/semana.` : ""}
+
+${
+  disponivelSemanal >= 0
+    ? `✅ Está no caminho certo! Sobrando R$ ${fmt(disponivelSemanal)}/semana.`
+    : `⚠️ Precisa faturar mais *R$ ${fmt(Math.abs(disponivelSemanal))}/semana* para cobrir tudo.`
+}
+
+Força! Cada corrida, venda ou serviço conta. 💪`;
+  } else {
+    return `💳 *DISPONÍVEL ESTA SEMANA — ${primeiroNome}*
+
+${
+  disponivelSemanal > 0
+    ? `Você pode gastar até *R$ ${fmt(disponivelSemanal)}* esta semana sem comprometer seu plano.`
+    : `⚠️ Sua renda atual não cobre todas as dívidas. Evite gastos extras esta semana.`
+}
+
+_Calculado com base na sua renda menos as parcelas mensais, dividido por 4 semanas._`;
+  }
+}
+
+// ── Lista de despesas do mês ──────────────
+export function gerarDespesasMes(
+  dividas: Array<{
+    credor: string;
+    valorParcela: number;
+    diaVencimento: number | null;
+    emAtraso: boolean;
+  }>
+): string {
+  const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long" }).toUpperCase();
+  const total = dividas.reduce((t, d) => t + d.valorParcela, 0);
+  const emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+
+  const lista = [...dividas]
+    .sort((a, b) => (a.diaVencimento ?? 99) - (b.diaVencimento ?? 99))
+    .map((d, i) => {
+      const venc = d.diaVencimento ? ` — vence dia *${d.diaVencimento}*` : "";
+      const atraso = d.emAtraso ? " 🚨 *EM ATRASO*" : "";
+      return `${emojis[i] ?? "•"} *${d.credor}*${atraso}: R$ ${fmt(d.valorParcela)}${venc}`;
+    })
+    .join("\n");
+
+  return `💸 *DESPESAS DE ${mesAtual}*
+
+${lista || "_(nenhuma dívida cadastrada)_"}
+
+━━━━━━━━━
+Total a pagar: *R$ ${fmt(total)}*
+
+🔔 _Me avise quando pagar qualquer uma e eu atualizo seu plano!_`;
+}
+
+// ── Lista de comandos disponíveis ─────────
+export function gerarListaComandos(nome: string): string {
+  const primeiroNome = nome.split(" ")[0];
+  return `Oi ${primeiroNome}! 👋 Aqui está tudo que você pode me pedir:
+
+📊 *"resumo do mês"* ou *"saldo do mês"*
+↳ Receita, despesas e saldo rápido
+
+💸 *"despesas do mês"*
+↳ Lista tudo que você precisa pagar
+
+📅 *"quanto preciso ganhar essa semana?"*
+↳ Ideal pra Uber, taxista, autônomo...
+
+💳 *"posso gastar quanto essa semana?"*
+↳ Seu saldo disponível da semana
+
+🔄 *"atualiza meu plano"*
+↳ Me conta que pagou uma dívida ou adicione uma nova
+
+É só mandar a mensagem — pode escrever do seu jeito! 😊`;
+}
+
+// ── Calcula total mensal a partir das dívidas do DB ──
+export function calcularTotalParcelas(
+  dividas: Array<{ obs: string | null; valorTotal: number }>
+): number {
+  return dividas.reduce((t, d) => t + fmtParcela(d.obs, d.valorTotal), 0);
+}
+
 // ── Relatório principal ───────────────────
 export function gerarRelatorio(diag: DiagnosticoIA): string {
   const nome = diag.dadosPessoais?.nome ?? "cliente";

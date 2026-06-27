@@ -8,7 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem } from "@/lib/ai-bot";
-import { gerarRelatorio } from "@/lib/plano";
+import {
+  gerarRelatorio,
+  gerarResumoMensal,
+  gerarResumoSemana,
+  gerarDespesasMes,
+  gerarListaComandos,
+  calcularTotalParcelas,
+} from "@/lib/plano";
 
 // ── Transcrição de áudio via Whisper ─────
 async function transcreverAudio(audioUrl: string): Promise<string> {
@@ -95,6 +102,21 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, etc), responda apenas
 
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() ?? "";
+}
+
+// ── Detecção de comandos rápidos ──────────
+function detectarComando(msg: string): string | null {
+  // Remove acentos para comparação robusta
+  const m = msg
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  if (/resumo|saldo do mes|resumo do mes|resumo simples/.test(m)) return "RESUMO_MES";
+  if (/despesas? do mes|quanto devo por mes|minhas despesas/.test(m)) return "DESPESAS_MES";
+  if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar/.test(m)) return "RECEITA_SEMANA";
+  if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana/.test(m)) return "GASTAR_SEMANA";
+  if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso perguntar)/.test(m)) return "AJUDA";
+  return null;
 }
 
 // ── Deduplicação de mensagens ─────────────
@@ -210,6 +232,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // ── Comandos rápidos (responde sem reativar sessão) ──
+    const comando = detectarComando(mensagem);
+    if (comando && sessao.renda && sessao.renda > 0) {
+      const nome = sessao.nome ?? "cliente";
+      let resposta = "";
+
+      if (sessao.clienteId) {
+        const dividasDB = await prisma.divida.findMany({
+          where: { clienteId: sessao.clienteId, status: "ATIVA" },
+          select: { credor: true, valorTotal: true, diaVencimento: true, emAtraso: true, obs: true },
+        });
+        const totalParcelas = calcularTotalParcelas(dividasDB);
+        const dividasFormatadas = dividasDB.map((d) => ({
+          credor: d.credor,
+          valorParcela: calcularTotalParcelas([d]),
+          diaVencimento: d.diaVencimento,
+          emAtraso: d.emAtraso,
+        }));
+
+        switch (comando) {
+          case "RESUMO_MES":
+            resposta = gerarResumoMensal(nome, sessao.renda, totalParcelas);
+            break;
+          case "DESPESAS_MES":
+            resposta = gerarDespesasMes(dividasFormatadas);
+            break;
+          case "RECEITA_SEMANA":
+            resposta = gerarResumoSemana(nome, sessao.renda, totalParcelas, "receita");
+            break;
+          case "GASTAR_SEMANA":
+            resposta = gerarResumoSemana(nome, sessao.renda, totalParcelas, "gastar");
+            break;
+          case "AJUDA":
+            resposta = gerarListaComandos(nome);
+            break;
+        }
+      } else if (comando === "AJUDA") {
+        resposta = gerarListaComandos(nome);
+      }
+
+      if (resposta) {
+        await sendWhatsApp(telefone, resposta);
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     // Reativa sessão se plano já gerado
     if (sessao.etapa === "PLANO_GERADO") {
       await prisma.botSessao.updateMany({
@@ -288,6 +356,10 @@ export async function POST(req: NextRequest) {
         await sendWhatsApp(telefone, relatorio);
       }
 
+      // Envia lista de comandos como segunda mensagem
+      await new Promise((r) => setTimeout(r, 2000));
+      await sendWhatsApp(telefone, gerarListaComandos(sessao.nome ?? "cliente"));
+
       return NextResponse.json({ ok: true });
     }
 
@@ -307,7 +379,7 @@ export async function POST(req: NextRequest) {
     // ── Agenda resumo automático via QStash (10 min) ──
     const qstashToken = process.env.QSTASH_TOKEN;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    if (qstashToken && siteUrl && sessao.etapa === "COLETANDO_DIVIDAS") {
+    if (qstashToken && siteUrl && sessao.etapa !== "PLANO_GERADO") {
       try {
         await fetch(`https://qstash.upstash.io/v2/publish/${siteUrl}/api/cron/resumo`, {
           method: "POST",
