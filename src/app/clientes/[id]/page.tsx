@@ -86,6 +86,29 @@ export default async function ClienteDetalhePage({
     redirect(`/clientes/${id}?ok=parcela_excluida`);
   }
 
+  async function resetarCliente(_fd: FormData) {
+    "use server";
+    // Apaga dívidas (cascade remove parcelas e pagamentos vinculados)
+    await prisma.divida.deleteMany({ where: { clienteId: id } });
+    // Apaga planos enviados
+    await prisma.planoEnviado.deleteMany({ where: { clienteId: id } });
+    // Reseta sessão do bot
+    await prisma.botSessao.updateMany({
+      where: { clienteId: id },
+      data: {
+        etapa: "COLETANDO_DIVIDAS",
+        dividasTemp: "[]",
+        renda: null,
+      },
+    });
+    // Reseta cliente
+    await prisma.cliente.update({
+      where: { id },
+      data: { statusAtendimento: "NOVO", rendaMensal: null },
+    });
+    redirect(`/clientes/${id}?ok=resetado`);
+  }
+
   async function atualizarStatus(fd: FormData) {
     "use server";
     const status = String(fd.get("statusAtendimento") || "NOVO");
@@ -136,6 +159,7 @@ export default async function ClienteDetalhePage({
     pagamento:       "Pagamento registrado com sucesso!",
     status:          "Status de atendimento atualizado!",
     paga:            "Parcela marcada como paga!",
+    resetado:        "Conversa reiniciada! Todas as dívidas foram apagadas.",
   };
 
   return (
@@ -167,6 +191,11 @@ export default async function ClienteDetalhePage({
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
             <Link href={`/clientes/${id}/editar`} className="btn-secondary">Editar</Link>
+            <ExcluirForm
+              action={resetarCliente}
+              mensagem={`Reiniciar a conversa de "${cliente.nome}"? Isso apaga todas as dívidas e planos cadastrados, mas mantém o cadastro do cliente.`}
+              label="🔄 Reiniciar"
+            />
             <ExcluirForm
               action={excluirCliente}
               mensagem={`Excluir o cliente "${cliente.nome}" e todas as suas dívidas? Esta ação não pode ser desfeita.`}

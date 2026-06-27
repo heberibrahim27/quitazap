@@ -116,6 +116,7 @@ function detectarComando(msg: string): string | null {
   if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar/.test(m)) return "RECEITA_SEMANA";
   if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana/.test(m)) return "GASTAR_SEMANA";
   if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso perguntar)/.test(m)) return "AJUDA";
+  if (/^(resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
   return null;
 }
 
@@ -229,6 +230,26 @@ export async function POST(req: NextRequest) {
     // ── Documento (PDF, etc.) ────────────────
     if (tipoEntrada === "documento") {
       await sendWhatsApp(sessao.telefone, "Recebi um documento, mas ainda não consigo lê-lo. Pode digitar ou me mandar uma foto da parte com os valores?");
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Comando RESETAR (funciona em qualquer etapa) ──
+    if (detectarComando(mensagem) === "RESETAR") {
+      if (sessao.clienteId) {
+        await prisma.divida.deleteMany({ where: { clienteId: sessao.clienteId } });
+        await prisma.planoEnviado.deleteMany({ where: { clienteId: sessao.clienteId } });
+        await prisma.cliente.update({
+          where: { id: sessao.clienteId },
+          data: { statusAtendimento: "NOVO", rendaMensal: null },
+        });
+      }
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: { etapa: "COLETANDO_DIVIDAS", dividasTemp: "[]", renda: null },
+      });
+      await sendWhatsApp(telefone,
+        `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOi, ${sessao.nome ?? "cliente"}! 😊 Para montar seu novo plano, me conta 3 coisas rápidas:\n\n1️⃣ *Como você trabalha?* CLT, autônomo, MEI, empresário ou freelancer?\n2️⃣ *Qual é seu objetivo principal agora?* Quitar as dívidas, criar reserva ou investir?\n3️⃣ *Você tem dependentes?* Companheiro(a), filhos ou alguém que depende de você?`
+      );
       return NextResponse.json({ ok: true });
     }
 
