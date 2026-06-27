@@ -303,6 +303,30 @@ export async function POST(req: NextRequest) {
     });
 
     await sendWhatsApp(telefone, resultado.resposta);
+
+    // ── Agenda resumo automático via QStash (10 min) ──
+    const qstashToken = process.env.QSTASH_TOKEN;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (qstashToken && siteUrl && sessao.etapa === "COLETANDO_DIVIDAS") {
+      try {
+        await fetch(`https://qstash.upstash.io/v2/publish/${siteUrl}/api/cron/resumo`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${qstashToken}`,
+            "Content-Type": "application/json",
+            "Upstash-Delay": "600s",
+          },
+          body: JSON.stringify({
+            telefone: sessao.telefone,
+            agendadoEm: new Date().toISOString(),
+          }),
+        });
+        console.log(`[QSTASH] Resumo agendado para ${sessao.telefone} em 10 min`);
+      } catch (err) {
+        console.error("[QSTASH] Erro ao agendar resumo:", err);
+      }
+    }
+
     return NextResponse.json({ ok: true });
 
   } catch (err) {
