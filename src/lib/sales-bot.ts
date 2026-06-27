@@ -4,9 +4,8 @@
 // ─────────────────────────────────────────
 
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp, sendWhatsAppImage } from "@/lib/zapi";
+import { sendWhatsApp } from "@/lib/zapi";
 
-const SITE_URL   = process.env.NEXT_PUBLIC_SITE_URL ?? "https://quitazap.com.br";
 const CAKTO_LINK = "https://pay.cakto.com.br/3fz3gz6_945044";
 
 // ── Mensagens do funil ────────────────────
@@ -27,13 +26,36 @@ A ideia é simples: você me conta suas dívidas aqui no WhatsApp — pode ser p
 
 Deixa eu te mostrar como funciona na prática 👇`;
 
-const PROVA_LEGENDA_1 = `💬 *Veja como é simples*
+const PROVA_EXEMPLO = `💬 *Veja como é simples — exemplo real:*
 
-Você manda suas dívidas no chat e o bot organiza tudo automaticamente — sem planilha, sem complicação.`;
+👤 _Cliente:_ "Tenho cartão Nubank de R$ 2.800, empréstimo no banco de R$ 4.200 e uma dívida de moto de R$ 10.440"
 
-const PROVA_LEGENDA_2 = `📋 *Plano de quitação gerado em minutos*
+🤖 _QuitaZAP:_ Recebi! Organizando suas dívidas...
 
-O QuitaZAP calcula a melhor ordem de pagamento com base na sua renda e prioriza as dívidas mais urgentes.`;
+✅ *3 dívidas cadastradas*
+💳 Nubank (rotativo) → R$ 2.800
+🏦 Empréstimo → R$ 4.200
+🏍️ Financiamento moto → R$ 10.440
+━━━━━━━━━━━
+💰 *Total: R$ 17.440*
+
+É exatamente assim que funciona — você fala do jeito que quiser, eu organizo tudo. 👆`;
+
+const PROVA_PLANO = `📋 *Plano de quitação gerado pela IA:*
+
+👤 Renda mensal: R$ 3.500
+💸 Total em dívidas: R$ 17.440
+
+*Ordem de prioridade:*
+1️⃣ Nubank rotativo — R$ 560/mês ⚡ _eliminar juros de 400% a.a._
+2️⃣ Empréstimo banco — R$ 420/mês
+3️⃣ Financiamento moto — R$ 580/mês
+
+📊 Parcela total: *R$ 1.560/mês*
+✅ Sobra livre: *R$ 1.940/mês*
+🏁 Previsão de quitação: *14 meses*
+
+Isso é o que o QuitaZAP faz por você — em minutos, pelo WhatsApp. 👇`;
 
 const PROVA_CHAMADA = `Tudo isso disponível *24h por dia*, direto no seu WhatsApp. Sem precisar instalar nada. 📱
 
@@ -142,17 +164,9 @@ export async function processarLeadVendas(
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "PROVA" } });
     await sendWhatsApp(telefone, QUALIFICACAO);
     await delay(1500);
-    await sendWhatsAppImage(
-      telefone,
-      `${SITE_URL}/api/vendas/conversa`,
-      PROVA_LEGENDA_1,
-    );
+    await sendWhatsApp(telefone, PROVA_EXEMPLO);
     await delay(2000);
-    await sendWhatsAppImage(
-      telefone,
-      `${SITE_URL}/api/vendas/plano`,
-      PROVA_LEGENDA_2,
-    );
+    await sendWhatsApp(telefone, PROVA_PLANO);
     await delay(2000);
     await sendWhatsApp(telefone, PROVA_CHAMADA);
     return;
