@@ -113,8 +113,11 @@ export async function POST(req: NextRequest) {
               credor: d.credor,
               valorTotal: d.saldoAtual ?? d.valorOriginal ?? 0,
               tipo: d.tipo ?? "OUTRO",
-              status: d.emAtraso ? "ATIVA" : "ATIVA",
-              obs: `${d.parcelasRestantes}x parcelas — via bot QuitaZAP${d.emAtraso ? ` — EM ATRASO${d.diasAtraso ? ` (${d.diasAtraso} dias)` : ""}` : ""}`,
+              status: "ATIVA",
+              diaVencimento: d.diaVencimento ?? null,
+              emAtraso: d.emAtraso ?? false,
+              diasAtraso: d.diasAtraso ?? null,
+              obs: `${d.parcelasRestantes}x de R$${d.valorParcela} — via bot QuitaZAP`,
             },
           });
         }

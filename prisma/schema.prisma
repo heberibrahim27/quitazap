@@ -52,6 +52,9 @@ model Divida {
   tipo           String    @default("OUTRO")
   status         String    @default("ATIVA")
   prioridade     Int       @default(0)
+  diaVencimento  Int?
+  emAtraso       Boolean   @default(false)
+  diasAtraso     Int?
   dataReferencia DateTime?
   criadoEm       DateTime  @default(now())
   atualizadoEm   DateTime  @updatedAt
