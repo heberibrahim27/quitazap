@@ -1,13 +1,10 @@
 // QuitaZAP - Schema Prisma
-// Banco local: SQLite (MVP)
-// Para migrar para PostgreSQL em produção:
-//   1. Alterar provider para "postgresql"
-//   2. Atualizar DATABASE_URL no .env
-//   3. Rodar: npx prisma migrate deploy
+// Banco: PostgreSQL (Supabase)
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {

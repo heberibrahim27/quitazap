@@ -7,3 +7,7 @@ prisma/dev.db-journal
 .env
 
 /generated/prisma
+
+# Scripts temporarios (podem conter segredos)
+*.bat
+*.ps1
