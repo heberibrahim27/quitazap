@@ -74,6 +74,13 @@ export default async function ClienteDetalhePage({
   const planos      = cliente._count.planosEnviados;
   const ultimoPlano = cliente.planosEnviados[0] ?? null;
 
+  // Total pago em assinaturas: meses desde cadastro × R$47
+  const PRECO_MENSAL = 47;
+  const mesesAtivo   = Math.max(1, Math.floor(
+    (Date.now() - new Date(cliente.criadoEm).getTime()) / (1000 * 60 * 60 * 24 * 30)
+  ));
+  const totalAssinaturas = mesesAtivo * PRECO_MENSAL;
+
   const mensagemOk: Record<string, string> = {
     editado:  "Cliente atualizado com sucesso!",
     status:   "Status de atendimento atualizado!",
@@ -211,6 +218,16 @@ export default async function ClienteDetalhePage({
             <div>
               <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Cliente desde</span>
               <strong style={{ fontSize: 14, color: "#0f172a" }}>{fmtData(cliente.criadoEm)}</strong>
+            </div>
+
+            <div>
+              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Meses ativo</span>
+              <strong style={{ fontSize: 14, color: "#0f172a" }}>{mesesAtivo} mês{mesesAtivo !== 1 ? "es" : ""}</strong>
+            </div>
+
+            <div>
+              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Total pago em assinaturas</span>
+              <strong style={{ fontSize: 14, color: "#7c3aed" }}>{fmt(totalAssinaturas)}</strong>
             </div>
 
             {cliente.obs && (
