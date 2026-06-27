@@ -16,7 +16,7 @@ const links = [
 export function Navbar() {
   const pathname = usePathname();
 
-  if (pathname === "/oferta") return null;
+  if (pathname === "/oferta" || pathname === "/login") return null;
 
   function ativo(href: string) {
     if (href === "/") return pathname === "/";
