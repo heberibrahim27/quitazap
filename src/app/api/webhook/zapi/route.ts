@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
       where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } }
     });
 
+    console.log(`[Z-API] sessao=${sessao ? `id=${sessao.id} etapa=${sessao.etapa}` : "null"}`);
+
     // Contato desconhecido — não comprou ainda
     if (!sessao) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "nosso site";
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest) {
       );
 
       // Salva estado final da sessão
-      await prisma.botSessao.update({
+      await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: {
           etapa: "PLANO_GERADO",
@@ -128,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Resposta conversacional normal ───────────────────────────
-    await prisma.botSessao.update({
+    await prisma.botSessao.updateMany({
       where: { id: sessao.id },
       data: {
         dividasTemp: JSON.stringify([
