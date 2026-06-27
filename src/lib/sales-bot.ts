@@ -44,7 +44,7 @@ Você pode perguntar a qualquer hora:
 
 *Quer ter seu plano personalizado agora?* 👇`;
 
-const OFERTA = `🚀 *QuitaZAP — R$ 47/mês*
+const OFERTA = `🚀 *QuitaZAP — R$ 29,90/mês*
 
 ✅ Plano de quitação personalizado por IA
 ✅ Funciona 24h no seu WhatsApp
@@ -52,7 +52,7 @@ const OFERTA = `🚀 *QuitaZAP — R$ 47/mês*
 ✅ Relatórios e resumos automáticos
 ✅ Cancele quando quiser — sem burocracia
 
-Por apenas *R$ 47 por mês* — menos que uma conta de streaming — você tem um consultor financeiro no bolso.
+Por apenas *R$ 29,90 por mês* — menos que uma pizza — você tem um consultor financeiro no bolso.
 
 👇 *Assine agora e comece hoje:*
 ${CAKTO_LINK}`;

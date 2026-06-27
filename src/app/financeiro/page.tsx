@@ -14,7 +14,7 @@ function pct(v: number) {
   return (v * 100).toFixed(1) + "%";
 }
 
-const PRECO_MENSAL = 47.00;
+const PRECO_MENSAL = 29.90;
 const COMISSAO_CAKTO = 0.053; // 5,3% via PIX
 const CUSTO_ZAPI = 99.99;
 const CUSTO_DOMINIO = 5.83;   // R$70/ano ÷ 12
@@ -80,7 +80,7 @@ export default async function FinanceiroPage() {
           <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 16, padding: "20px 24px" }}>
             <p style={{ margin: "0 0 4px", fontSize: 13, color: "#16a34a", fontWeight: 600 }}>Receita bruta/mês</p>
             <strong style={{ fontSize: 28, color: "#15803d" }}>{fmt(receitaBruta)}</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{totalAssinantes} × R$47,00</p>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{totalAssinantes} × R$29,90</p>
           </div>
 
           <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: 16, padding: "20px 24px" }}>

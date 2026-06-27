@@ -8,7 +8,7 @@ const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
 export const metadata = {
   title: "QuitaZAP — Saia das dívidas com inteligência artificial pelo WhatsApp",
   description:
-    "82,8 milhões de brasileiros estão endividados. O QuitaZAP organiza todas as suas dívidas pelo WhatsApp, usa IA para criar um plano real de quitação e te mostra exatamente o que fazer. Comece agora por R$47/mês.",
+    "82,8 milhões de brasileiros estão endividados. O QuitaZAP organiza todas as suas dívidas pelo WhatsApp, usa IA para criar um plano real de quitação e te mostra exatamente o que fazer. Comece agora por R$29,90/mês.",
   openGraph: {
     title: "QuitaZAP — Saia das dívidas com inteligência artificial",
     description: "Organize suas dívidas pelo WhatsApp e receba um plano real de quitação em minutos.",
@@ -36,12 +36,12 @@ const faq = [
   { p: "O plano funciona para todo tipo de dívida?", r: "Sim — cartão de crédito, cheque especial, empréstimo pessoal, financiamento, boleto em atraso, dívida com familiar, negociação. A IA entende todos os cenários." },
   { p: "E se eu não gostar?", r: "Garantia incondicional de 7 dias. Se por qualquer motivo não gostar, devolvemos 100% do valor — sem burocracia, sem perguntas." },
   { p: "Com que frequência posso usar?", r: "Sem limites. Pode conversar com a IA sempre que precisar: atualizar dívidas, tirar dúvidas, revisar o plano, pedir nova análise." },
-  { p: "O preço muda?", r: "R$ 47/mês é o preço fixo. Sem taxa de adesão, sem cobrança por dívida, sem surpresas na fatura." },
+  { p: "O preço muda?", r: "R$ 29,90/mês é o preço fixo. Sem taxa de adesão, sem cobrança por dívida, sem surpresas na fatura." },
   { p: "Posso cancelar quando quiser?", r: "Sim. Cancela com um clique, sem multa, sem período mínimo, sem burocracia. O acesso continua até o fim do período pago." },
   { p: "E se eu pagar uma dívida — atualizo no QuitaZAP?", r: "Sim. Pode mandar a atualização pelo WhatsApp a qualquer hora e a IA recalcula o plano com os novos números." },
   { p: "Funciona para pessoa jurídica?", r: "O QuitaZAP é focado em finanças pessoais. Para dívidas empresariais, recomendamos um contador." },
   { p: "Preciso informar senha ou dados bancários?", r: "Jamais. Nunca pedimos senhas, acesso a conta bancária, CPF completo ou qualquer dado sensível além do que você escolhe compartilhar." },
-  { p: "A IA substitui um consultor financeiro?", r: "Para organizar dívidas e criar um plano inicial, sim — e a uma fração do custo. Consultores humanos cobram R$ 500–800/mês. O QuitaZAP faz o mesmo por R$ 47." },
+  { p: "A IA substitui um consultor financeiro?", r: "Para organizar dívidas e criar um plano inicial, sim — e a uma fração do custo. Consultores humanos cobram R$ 500–800/mês. O QuitaZAP faz o mesmo por R$ 29,90." },
   { p: "O que é a estratégia Snowball?", r: "É quitar primeiro as menores dívidas para ganhar impulso psicológico. A IA analisa seu perfil e pode recomendar Snowball ou Avalanche (maior juros primeiro) — o que for melhor para você." },
   { p: "Em quanto tempo recebo meu plano?", r: "Em média, 5 a 15 minutos depois de mandar suas dívidas. A IA processa tudo em tempo real." },
   { p: "Posso usar no computador também?", r: "O QuitaZAP funciona pelo WhatsApp — seja no celular, tablet ou WhatsApp Web no computador." },
@@ -535,7 +535,7 @@ export default function OfertaPage() {
                 <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 47</div>
+                <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 29,90</div>
                 <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
               </div>
             </div>
@@ -567,7 +567,7 @@ export default function OfertaPage() {
               padding: "16px 24px", borderRadius: 12,
               textDecoration: "none", textAlign: "center",
             }}>
-              Assinar por R$ 47/mês
+              Assinar por R$ 29,90/mês
             </a>
 
             {/* Garantia */}
@@ -593,7 +593,7 @@ export default function OfertaPage() {
             {[
               { label: "Consultor financeiro humano", valor: "R$ 500–800/mês", strike: true },
               { label: "Continuar pagando só o mínimo do cartão", valor: "R$ ∞ em juros", strike: true },
-              { label: "QuitaZAP", valor: "R$ 47/mês", strike: false },
+              { label: "QuitaZAP", valor: "R$ 29,90/mês", strike: false },
             ].map((item) => (
               <div key={item.label} style={{
                 display: "flex", justifyContent: "space-between",
@@ -731,7 +731,7 @@ export default function OfertaPage() {
             padding: "18px 48px", borderRadius: 12,
             textDecoration: "none",
           }}>
-            Começar agora — R$ 47/mês
+            Começar agora — R$ 29,90/mês
           </a>
 
           <p style={{ marginTop: 16, fontSize: 13, color: "#475569" }}>

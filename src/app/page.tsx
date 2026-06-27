@@ -8,7 +8,7 @@ function fmtData(data: Date) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(data));
 }
 
-const PRECO_MENSAL = 47; // R$ por assinante/mês
+const PRECO_MENSAL = 29.90; // R$ por assinante/mês
 
 async function buscarCustoIA(): Promise<{ gastoMes: number; gastoPagantes: number; gastoGratuitos: number }> {
   try {
@@ -61,10 +61,10 @@ export default async function Home() {
   const pagantes   = clientes.filter((c) => !c.gratuito);
   const gratuitos  = clientes.filter((c) => c.gratuito);
 
-  // MRR = assinantes pagantes × R$47
+  // MRR = assinantes pagantes × R$29,90
   const mrr = pagantes.length * PRECO_MENSAL;
 
-  // Receita total estimada (meses ativos × R$47)
+  // Receita total estimada (meses ativos × R$29,90)
   const receitaTotal = pagantes.reduce((acc, c) => {
     const meses = Math.max(1, Math.floor(
       (Date.now() - new Date(c.criadoEm).getTime()) / (1000 * 60 * 60 * 24 * 30)

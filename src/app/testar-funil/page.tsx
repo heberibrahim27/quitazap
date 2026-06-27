@@ -31,7 +31,7 @@ Deixa eu te mostrar como funciona na prática 👇`,
     `Tudo isso disponível *24h por dia*, direto no seu WhatsApp. Sem precisar instalar nada. 📱\n\nVocê pode perguntar a qualquer hora:\n📊 "Qual meu saldo devedor total?"\n📅 "Quanto preciso pagar essa semana?"\n💰 "Quanto sobra do meu salário?"\n\n*Quer ter seu plano personalizado agora?* 👇`,
   ],
 
-  OFERTA: `🚀 *QuitaZAP — R$ 47/mês*
+  OFERTA: `🚀 *QuitaZAP — R$ 29,90/mês*
 
 ✅ Plano de quitação personalizado por IA
 ✅ Funciona 24h no seu WhatsApp
@@ -39,7 +39,7 @@ Deixa eu te mostrar como funciona na prática 👇`,
 ✅ Relatórios e resumos automáticos
 ✅ Cancele quando quiser — sem burocracia
 
-Por apenas *R$ 47 por mês* você tem um consultor financeiro no bolso.
+Por apenas *R$ 29,90 por mês* você tem um consultor financeiro no bolso.
 
 👇 *Assine agora e comece hoje:*
 ${CAKTO_LINK}`,

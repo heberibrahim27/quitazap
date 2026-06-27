@@ -68,8 +68,8 @@ export default async function ClienteDetalhePage({
   const planos      = cliente._count.planosEnviados;
   const ultimoPlano = cliente.planosEnviados[0] ?? null;
 
-  // Total pago em assinaturas: meses desde cadastro × R$47 (só para clientes pagantes)
-  const PRECO_MENSAL = 47;
+  // Total pago em assinaturas: meses desde cadastro × R$29,90 (só para clientes pagantes)
+  const PRECO_MENSAL = 29.90;
   const mesesAtivo   = Math.max(1, Math.floor(
     (Date.now() - new Date(cliente.criadoEm).getTime()) / (1000 * 60 * 60 * 24 * 30)
   ));
