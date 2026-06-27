@@ -81,7 +81,9 @@ Se for um CONTRACHEQUE ou HOLERITE, extraia:
 - Total de descontos
 - Salário líquido (valor a receber)
 - Se houver 13º salário, abono, férias ou parcela extraordinária nas vantagens, informe o valor e calcule o líquido normal sem esse extra
-- Liste todos os empréstimos consignados com banco e valor da parcela
+- Liste todos os empréstimos consignados com banco, valor da parcela e parcela atual/total (formato NNN/NNN logo após o nome do banco)
+- Liste todas as ASSOCIAÇÕES descontadas em folha (ASTEBA, ASSEBA, ASPRA, etc) — parcela NNN/999 significa mensalidade sem prazo. Informe nome e valor de cada uma.
+- Informe MARGEM COMPROMETIDA = soma de consignados + associações
 - Liste descontos de saúde (plano, Planserv, assistência), previdência (INSS/SPSM/IPREV) e IR
 
 Responda de forma clara e estruturada assim:
@@ -180,6 +182,8 @@ Se for CONTRACHEQUE ou HOLERITE:
 - Salário bruto, total de descontos, salário líquido
 - Se houver 13º, férias ou verba extraordinária, informe e calcule o líquido normal sem esse extra
 - Liste todos os empréstimos consignados (banco + valor da parcela + parcela atual/total). ATENÇÃO: o número da parcela no contracheque aparece no formato NNN/NNN logo após o nome do banco (ex: "027/120" = parcela 27 de 120). Ignore números que façam parte do nome do empréstimo (ex: "Empréstimo Comum 3" — o "3" é parte do nome, não a parcela).
+- Liste todas as ASSOCIAÇÕES descontadas em folha (ex: ASTEBA, ASSEBA, ASPRA, Associação Jurídica, etc). Associações geralmente aparecem com parcela no formato NNN/999 ou NNN/000, onde 999 ou 000 significa mensalidade contínua sem prazo de término. Informe o nome e o valor mensal de cada uma.
+- Calcule: MARGEM COMPROMETIDA = soma de todos os consignados + associações. Informe este total.
 - Liste descontos de saúde, previdência e IR
 
 Se for BOLETO, FATURA ou EXTRATO:

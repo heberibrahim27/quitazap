@@ -12,7 +12,7 @@ export type Mensagem = {
 
 export type DividaIA = {
   credor: string;
-  tipo: "CARTAO" | "EMPRESTIMO" | "FINANCIAMENTO" | "CHEQUE_ESPECIAL" | "CREDIARIO" | "LOJA" | "IMPOSTO" | "ALUGUEL" | "OUTRO";
+  tipo: "CARTAO" | "EMPRESTIMO" | "FINANCIAMENTO" | "CHEQUE_ESPECIAL" | "CREDIARIO" | "LOJA" | "IMPOSTO" | "ALUGUEL" | "ASSOCIACAO" | "OUTRO";
   valorOriginal: number;
   saldoAtual: number;
   juros?: number;
@@ -157,14 +157,14 @@ ETAPAS DE COLETA (siga esta ordem natural):
    Exemplo de abertura:
    "Oi, [nome]! 😊 Sou o QuitaZAP, seu consultor financeiro pelo WhatsApp. Antes de montar seu plano, me conta 3 coisas rápidas:
 
-   1️⃣ *Como você trabalha?* CLT, autônomo, MEI, empresário ou freelancer?
+   1️⃣ *Como você trabalha?* CLT, servidor público, autônomo, MEI, empresário ou freelancer?
    2️⃣ *Qual é seu objetivo principal agora?* Quitar as dívidas, criar uma reserva de emergência ou começar a investir?
    3️⃣ *Você tem dependentes?* Companheiro(a), filhos ou alguém que depende de você financeiramente?
 
    Com isso, meu plano vai ser bem mais certeiro pra sua realidade. 💪"
 
    Salve as respostas em:
-   - dadosPessoais.vinculo = "CLT" | "AUTONOMO" | "MEI" | "EMPRESARIO" | "FREELANCER"
+   - dadosPessoais.vinculo = "CLT" | "AUTONOMO" | "MEI" | "EMPRESARIO" | "FREELANCER" | "SERVIDOR_PUBLICO"
    - dadosPessoais.estadoCivil e dadosPessoais.dependentes (número)
    - objetivos.objetivoPrincipal = "QUITAR_DIVIDAS" | "CRIAR_RESERVA" | "INVESTIR" | "ORGANIZAR"
 
@@ -214,6 +214,7 @@ ETAPAS DE COLETA (siga esta ordem natural):
 ADAPTAÇÕES POR PERFIL (aplique ao longo de toda a conversa):
 
 - CLT: foco em pagar dívidas com o salário fixo. Bola de neve funciona bem.
+- SERVIDOR_PUBLICO: ative imediatamente a análise de MARGEM CONSIGNÁVEL (seção abaixo). Pergunte se tem contracheque para enviar — é a forma mais rápida de mapear a situação. Foque em liberação de margem, calendário de quitação dos consignados e revisão das associações.
 - AUTÔNOMO / MEI / FREELANCER: renda variável — pergunte a média mensal. Mencione metas semanais de faturamento. Reforce a importância de reserva para meses ruins.
 - EMPRESÁRIO: pergunte se mistura conta pessoal com empresa. Se sim, oriente a separar.
 - COM DEPENDENTES: inclua no plano as despesas com filhos/família. Recomende seguro de vida se não tiver.
@@ -250,7 +251,65 @@ Quando o cliente enviar um contracheque (imagem ou PDF), siga estas regras sem e
 4. Ao apresentar o diagnóstico com contracheque, informe claramente:
    - Renda mensal normal (líquido sem extras)
    - Que os consignados são pagos automaticamente em folha
-   - O saldo disponível real = líquido normal (sem subtrair consignados novamente)`;
+   - O saldo disponível real = líquido normal (sem subtrair consignados novamente)
+
+SERVIDOR PÚBLICO — ANÁLISE ESPECIAL DE MARGEM CONSIGNÁVEL:
+Quando o cliente for servidor público (vínculo "SERVIDOR_PUBLICO" ou contracheque de órgão do governo), aplique estas regras:
+
+1. MARGEM CONSIGNÁVEL LEGAL = 30% do salário BRUTO (limite máximo que pode ser comprometido com consignados + associações)
+   - Em alguns estados pode ser 35% — use 30% como padrão conservador
+   - Exemplo: bruto R$6.800 → margem máxima = R$2.040/mês
+
+2. MARGEM COMPROMETIDA = soma de todos os consignados (empréstimos) + associações com desconto em folha
+
+3. MARGEM DISPONÍVEL = margem consignável - margem comprometida
+   - Se margem disponível ≤ 0: alerte que o servidor ATINGIU O LIMITE — não pode contratar mais consignado
+   - Se margem disponível > 0: informe quanto ainda pode contratar
+
+4. ASSOCIAÇÕES (ASTEBA, ASSEBA, ASPRA, etc):
+   - Parcela NNN/999 ou NNN/000 = mensalidade recorrente SEM prazo de término
+   - São opcionais — o servidor PODE cancelar associações para liberar margem
+   - Registre como tipo ASSOCIACAO, parcelasRestantes: 999
+   - Apresente como "gasto recorrente mensal" e pergunte se o cliente realmente usa os benefícios de cada uma
+
+5. CALENDÁRIO DE LIBERAÇÃO DE MARGEM:
+   - Calcule para cada empréstimo: parcelas restantes × valor da parcela = saldo restante
+   - Ordene os empréstimos por menor número de parcelas restantes
+   - Mostre quando cada um termina (mês/ano aproximado baseado na data atual) e quanto isso libera de margem
+   - Exemplo: "Banco Safra 003/120 termina em Dez/2035 — libera R$ 100/mês"
+   - Isso ajuda o servidor a enxergar a "luz no fim do túnel"
+
+6. ESTRATÉGIAS ESPECÍFICAS PARA SERVIDOR PÚBLICO:
+   a) REFINANCIAMENTO CONSIGNADO: juntar vários empréstimos menores em um único com prazo maior e parcela menor. Útil quando a margem está quase cheia mas o servidor precisa de folga mensal.
+   b) PORTABILIDADE DE CRÉDITO CONSIGNADO: migrar empréstimos para banco com taxa menor (taxa consignado público gira em torno de 1,5% a 2,5% a.m.). Vale verificar.
+   c) CANCELAR ASSOCIAÇÕES: se o servidor não usa os benefícios (jurídico, saúde complementar), cancelar libera margem imediatamente.
+   d) NÃO RECOMENDAR mais empréstimos consignados se margem disponível < R$ 200.
+
+7. DIAGNÓSTICO PARA SERVIDOR PÚBLICO — formato sugerido:
+   "📋 Diagnóstico do Servidor Público
+
+   💰 Renda líquida mensal: R$ X.XXX,XX
+   📊 Bruto: R$ X.XXX,XX | Margem consignável (30%): R$ X.XXX,XX
+
+   🔴 Margem comprometida: R$ X.XXX,XX (XX% do bruto)
+   🟢 Margem disponível: R$ XXX,XX
+
+   Empréstimos em folha (X no total):
+   • Banco X — R$ XXX/mês (parcela XX/120 — termina MM/AAAA)
+   ...
+
+   Associações mensais:
+   • ASTEBA — R$ 80/mês (recorrente)
+   • ASSEBA — R$ 80/mês (recorrente)
+   [Dica: revise se está usando os benefícios — cancelar economiza R$ XXX/mês]
+
+   📅 Calendário de liberação:
+   • MM/AAAA — Banco X quita → libera R$ XXX/mês
+   • MM/AAAA — Banco Y quita → libera R$ XXX/mês
+
+   💡 Recomendação principal: [refinanciamento / cancelar associação / portabilidade]"
+
+   Use o dadosPessoais.vinculo = "SERVIDOR_PUBLICO" para ativar este modo.`;
 
 // Preços gpt-4o-mini por 1M tokens (USD)
 const PRECO_INPUT  = 0.15 / 1_000_000;
@@ -372,7 +431,7 @@ export async function processarMensagemIA(
                   type: "object",
                   properties: {
                     credor: { type: "string" },
-                    tipo: { type: "string", enum: ["CARTAO", "EMPRESTIMO", "FINANCIAMENTO", "CHEQUE_ESPECIAL", "CREDIARIO", "LOJA", "IMPOSTO", "ALUGUEL", "OUTRO"] },
+                    tipo: { type: "string", enum: ["CARTAO", "EMPRESTIMO", "FINANCIAMENTO", "CHEQUE_ESPECIAL", "CREDIARIO", "LOJA", "IMPOSTO", "ALUGUEL", "ASSOCIACAO", "OUTRO"] },
                     valorOriginal: { type: "number" },
                     saldoAtual: { type: "number" },
                     juros: { type: "number" },
