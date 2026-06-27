@@ -369,29 +369,57 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const sugestoesTexto = sugestoes.length > 0 ? sugestoes.join("\n\n") : "Siga o plano de pagamento e evite novas dívidas.";
 
   // ── PLANO 30/90/180 DIAS ─────────────────
-  const meta30 = emAtraso.length > 0
-    ? `Regularizar ${emAtraso.map((d) => d.credor).join(", ")} (em atraso). Isso para o sangramento dos juros.`
-    : dividasComDesconto.length > 0
-    ? `Aproveitar o desconto de quitação à vista (${dividasComDesconto[0].credor}) — menor saída de dinheiro.`
-    : `Pagar todas as parcelas do mês em dia e não contrair nenhuma dívida nova.`;
+  let meta30: string;
+  let meta90: string;
+  let meta180: string;
 
-  const snowballExplicacao = menorDivida
-    ? `Método Bola de Neve: pague o mínimo em todas as dívidas e concentre qualquer dinheiro extra na *${menorDivida.credor}* (R$ ${fmt(menorDivida.saldoAtual)} — a menor). Ao quitar, some o valor da parcela dela na próxima menor. A bola vai crescendo e o prazo encurtando.`
-    : `Quite as menores dívidas primeiro e use o valor liberado para acelerar as próximas.`;
+  if (isServidor) {
+    // Metas específicas para servidor público
+    const primeiroEmprestimo = [...emprestimosConsig].sort((a, b) => a.parcelasRestantes - b.parcelasRestantes)[0];
+    const liberacaoStr = primeiroEmprestimo
+      ? (() => {
+          const t = new Date(); t.setMonth(t.getMonth() + primeiroEmprestimo.parcelasRestantes);
+          return `${primeiroEmprestimo.credor} quita em ${t.toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} — libera *R$ ${fmt(primeiroEmprestimo.valorParcela)}/mês*`;
+        })()
+      : "";
 
-  const meta90 = snowballExplicacao;
+    meta30 = `Organize seus *R$ ${fmt(renda)}/mês* disponíveis. Suas dívidas são descontadas automaticamente em folha — não há parcelas para pagar manualmente. Evite contrair novas dívidas fora da folha.`;
 
-  const meta180Base = mesesParaQuitar <= 6
-    ? `Quitar *todas* as dívidas — livre em *${mesQuitacao}* seguindo o plano!`
-    : `Reduzir o total de dívidas em 30% e aplicar a *Regra 50-30-20*: 50% da renda para necessidades fixas, 30% para estilo de vida, 20% para dívidas/reserva. Isso reorganiza as finanças de vez.`;
+    meta90 = `Pesquise *portabilidade de crédito consignado* — migrar empréstimos para banco com taxa menor (ideal: abaixo de 1,8% a.m.) reduz o valor descontado em folha e aumenta o que cai na sua conta. BB, Caixa e BRB costumam ter boas taxas para servidor público.`;
 
-  const meta180Extra = objetivo.includes("RESERVA")
-    ? ` Depois das dívidas quitadas, mude o foco: construa sua reserva de emergência (3x sua renda mensal).`
-    : objetivo.includes("INVESTIR")
-    ? ` Com as dívidas menores ou quitadas, abra uma conta em corretora e comece com renda fixa — seguro e acessível.`
-    : "";
+    const associacoesMsg = totalAssociacoesMes > 0
+      ? ` Avalie também cancelar associações que não usa — economia de *R$ ${fmt(totalAssociacoesMes)}/mês*.`
+      : "";
+    const liberacaoMsg = liberacaoStr ? ` Quando o ${liberacaoStr}, use os recursos liberados para construir uma reserva de emergência (meta: 3x seu salário mensal).` : "";
 
-  const meta180 = meta180Base + meta180Extra;
+    meta180 = `Revise as associações em folha — você realmente usa os benefícios da ASTEBA, ASSEBA e ASPRA?${associacoesMsg}${liberacaoMsg}`;
+
+  } else {
+    // Metas para não-servidor
+    meta30 = emAtraso.length > 0
+      ? `Regularizar ${emAtraso.map((d) => d.credor).join(", ")} (em atraso). Isso para o sangramento dos juros.`
+      : dividasComDesconto.length > 0
+      ? `Aproveitar o desconto de quitação à vista (${dividasComDesconto[0].credor}) — menor saída de dinheiro.`
+      : `Pagar todas as parcelas do mês em dia e não contrair nenhuma dívida nova.`;
+
+    const snowballExplicacao = menorDivida
+      ? `Método Bola de Neve: pague o mínimo em todas as dívidas e concentre qualquer dinheiro extra na *${menorDivida.credor}* (R$ ${fmt(menorDivida.saldoAtual)} — a menor). Ao quitar, some o valor da parcela dela na próxima menor.`
+      : `Quite as menores dívidas primeiro e use o valor liberado para acelerar as próximas.`;
+
+    meta90 = snowballExplicacao;
+
+    const meta180Base = mesesParaQuitar <= 6
+      ? `Quitar *todas* as dívidas — livre em *${mesQuitacao}* seguindo o plano!`
+      : `Reduzir o total de dívidas em 30% e aplicar a *Regra 50-30-20*: 50% da renda para necessidades fixas, 30% para estilo de vida, 20% para dívidas/reserva.`;
+
+    const meta180Extra = objetivo.includes("RESERVA")
+      ? ` Depois, construa sua reserva de emergência (3x sua renda mensal).`
+      : objetivo.includes("INVESTIR")
+      ? ` Com as dívidas quitadas, abra uma conta em corretora e comece com renda fixa.`
+      : "";
+
+    meta180 = meta180Base + meta180Extra;
+  }
 
   // ── INFORMAÇÕES PENDENTES ─────────────────
   const pendentes: string[] = [];
@@ -502,7 +530,7 @@ ${isServidor && diag.renda?.salarioLiquidoComExtras
   : `Salário líquido mensal: *R$ ${fmt(renda)}*`}
 _↳ Já descontados em folha: R$ ${fmt(totalConsignadosMes)}/mês_
 ${totalFixo > 0 ? `Despesas fixas: *R$ ${fmt(totalFixo)}*\n` : ""}${totalVariavel > 0 ? `Gastos variáveis: *R$ ${fmt(totalVariavel)}*\n` : ""}${isServidor
-  ? `Sobra mensal real: *R$ ${fmt(sobra)}*`
+  ? `💳 Disponível na conta este mês: *R$ ${fmt(diag.renda?.salarioLiquidoComExtras ?? renda)}*${diag.renda?.adiantamento13 ? `\n_↳ Nos demais meses (sem 13°): R$ ${fmt(renda)}_` : ""}`
   : `Total em dívidas: *R$ ${fmt(totalDividas)}*
 Parcelas/mês: *R$ ${fmt(comprometidoMes)}*
 Comprometimento: *${pct(comprometidoMes, renda)}* ${nivelRisco}
