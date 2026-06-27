@@ -1,0 +1,130 @@
+// QuitaZAP - Schema Prisma
+// Banco local: SQLite (MVP)
+// Para migrar para PostgreSQL em produção:
+//   1. Alterar provider para "postgresql"
+//   2. Atualizar DATABASE_URL no .env
+//   3. Rodar: npx prisma migrate deploy
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─────────────────────────────────────────
+// CLIENTE
+// ─────────────────────────────────────────
+// statusAtendimento: NOVO | AGUARDANDO_INFORMACOES | PLANO_GERADO | ACOMPANHAMENTO | ENCERRADO
+model Cliente {
+  id                    String   @id @default(cuid())
+  nome                  String
+  telefone              String
+  cpf                   String?
+  email                 String?
+  obs                   String?
+  statusAtendimento     String   @default("NOVO")
+  rendaMensal           Float?
+  despesasFixas         Float?
+  valorDisponivelMensal Float?
+  criadoEm              DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
+
+  dividas        Divida[]
+  pagamentos     Pagamento[]
+  planosEnviados PlanoEnviado[]
+  botSessoes     BotSessao[]
+}
+
+// ─────────────────────────────────────────
+// DÍVIDA
+// ─────────────────────────────────────────
+// tipo:      CARTAO | EMPRESTIMO | BOLETO | ACORDO | OUTRO
+// status:    ATIVA  | QUITADA    | NEGOCIANDO
+// prioridade: 1 = mais urgente, 0 = sem prioridade definida
+model Divida {
+  id             String    @id @default(cuid())
+  clienteId      String
+  credor         String
+  descricao      String?
+  obs            String?
+  valorTotal     Float
+  valorPago      Float     @default(0)
+  tipo           String    @default("OUTRO")
+  status         String    @default("ATIVA")
+  prioridade     Int       @default(0)
+  dataReferencia DateTime?
+  criadoEm       DateTime  @default(now())
+  atualizadoEm   DateTime  @updatedAt
+
+  cliente    Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  parcelas   Parcela[]
+  pagamentos Pagamento[]
+}
+
+// ─────────────────────────────────────────
+// PARCELA
+// ─────────────────────────────────────────
+// status: PENDENTE | PAGA | VENCIDA | CANCELADA
+model Parcela {
+  id           String   @id @default(cuid())
+  dividaId     String
+  numero       Int
+  valor        Float
+  vencimento   DateTime
+  status       String   @default("PENDENTE")
+  obs          String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  divida Divida @relation(fields: [dividaId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// PAGAMENTO
+// ─────────────────────────────────────────
+model Pagamento {
+  id           String   @id @default(cuid())
+  dividaId     String
+  clienteId    String
+  valor        Float
+  data         DateTime
+  obs          String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  divida  Divida  @relation(fields: [dividaId], references: [id], onDelete: Cascade)
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// PLANO ENVIADO
+// ─────────────────────────────────────────
+model PlanoEnviado {
+  id        String   @id @default(cuid())
+  clienteId String
+  texto     String
+  criadoEm  DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// BOT SESSAO (conversa WhatsApp)
+// ─────────────────────────────────────────
+// etapa: COLETANDO_DIVIDAS | AGUARDANDO_RENDA | PLANO_GERADO
+model BotSessao {
+  id           String   @id @default(cuid())
+  telefone     String   @unique
+  clienteId    String?
+  etapa        String   @default("COLETANDO_DIVIDAS")
+  nome         String?
+  dividasTemp  String   @default("[]") // JSON: [{texto, valor, parcelas}]
+  renda        Float?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+}
