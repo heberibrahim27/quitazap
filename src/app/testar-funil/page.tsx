@@ -108,7 +108,6 @@ export default function TestarFunilPage() {
       setEtapa("FOLLOWUP");
       addMsg([
         { de: "bot", texto: MSGS.FOLLOWUP as string },
-        { de: "bot", texto: MSGS.CUPOM as string },
       ], 800);
     } else if (etapa === "FOLLOWUP") {
       setEtapa("fim");
