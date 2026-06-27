@@ -130,18 +130,83 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, selfie, etc), respond
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
-// ── Leitura de PDF via pdf-parse ─────────
+// ── Leitura de PDF via OpenAI (upload + GPT-4o) ──
+// pdf-parse usa pdfjs-dist que requer APIs de browser (DOMMatrix) — não funciona em Vercel Node.js
+// Solução: faz upload do PDF para a OpenAI e deixa o GPT-4o ler
 async function extrairTextoPDF(pdfUrl: string): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY!;
+
+  // 1. Baixa o PDF
   const res = await fetch(pdfUrl);
   if (!res.ok) throw new Error(`Falha ao baixar PDF: ${res.status}`);
-  const buffer = Buffer.from(await res.arrayBuffer());
+  const buffer = await res.arrayBuffer();
 
-  // Importa o core direto — evita bug do pdf-parse em serverless (Vercel)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfMod = await import("pdf-parse/lib/pdf-parse.js") as any;
-  const pdfParse = pdfMod.default ?? pdfMod;
-  const data = await pdfParse(buffer);
-  return data.text?.trim() ?? "";
+  // 2. Faz upload para a OpenAI Files API
+  const form = new FormData();
+  form.append("file", new Blob([buffer], { type: "application/pdf" }), "documento.pdf");
+  form.append("purpose", "user_data");
+
+  const uploadRes = await fetch("https://api.openai.com/v1/files", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  if (!uploadRes.ok) {
+    const err = await uploadRes.text();
+    throw new Error(`OpenAI upload falhou ${uploadRes.status}: ${err}`);
+  }
+  const { id: fileId } = await uploadRes.json() as { id: string };
+
+  try {
+    // 3. Envia para o GPT-4o extrair as informações
+    const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "file", file: { file_id: fileId } },
+            {
+              type: "text",
+              text: `Analise este documento financeiro (pode ser contracheque, holerite, boleto, extrato, fatura).
+
+Se for CONTRACHEQUE ou HOLERITE:
+- Informe órgão/empresa, cargo, mês/ano
+- Salário bruto, total de descontos, salário líquido
+- Se houver 13º, férias ou verba extraordinária, informe e calcule o líquido normal sem esse extra
+- Liste todos os empréstimos consignados (banco + valor da parcela + parcela atual/total)
+- Liste descontos de saúde, previdência e IR
+
+Se for BOLETO, FATURA ou EXTRATO:
+- Credor, valor, vencimento, parcelas
+
+Responda em português de forma direta e estruturada.`,
+            },
+          ],
+        }],
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!chatRes.ok) {
+      const err = await chatRes.text();
+      throw new Error(`GPT-4o PDF erro ${chatRes.status}: ${err}`);
+    }
+    const chatData = await chatRes.json() as { choices: { message: { content: string } }[] };
+    return chatData.choices[0]?.message?.content?.trim() ?? "";
+
+  } finally {
+    // 4. Deleta o arquivo da OpenAI após uso
+    await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    }).catch(() => {});
+  }
 }
 
 // ── Detecção de comandos rápidos ──────────
