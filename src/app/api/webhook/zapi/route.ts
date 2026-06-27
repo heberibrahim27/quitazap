@@ -24,8 +24,16 @@ export async function POST(req: NextRequest) {
     const telefone = normalizarTelefone(body.phone ?? "");
     if (telefone.length < 10) return NextResponse.json({ ok: true });
 
-    // Busca sessão ativa do bot
-    const sessao = await prisma.botSessao.findUnique({ where: { telefone } });
+    // Busca sessão ativa do bot — tenta com e sem o dígito 9 extra (Brasil)
+    const telefoneAlt = telefone.length === 13
+      ? "55" + telefone.slice(4, 13).replace(/^9/, "")  // 5571993085436 → 557193085436
+      : telefone.length === 12
+      ? telefone.slice(0, 4) + "9" + telefone.slice(4)  // 557193085436 → 5571993085436
+      : null;
+
+    const sessao = await prisma.botSessao.findFirst({
+      where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } }
+    });
 
     // Contato desconhecido — não comprou ainda
     if (!sessao) {
