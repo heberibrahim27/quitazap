@@ -179,7 +179,7 @@ Se for CONTRACHEQUE ou HOLERITE:
 - Informe órgão/empresa, cargo, mês/ano
 - Salário bruto, total de descontos, salário líquido
 - Se houver 13º, férias ou verba extraordinária, informe e calcule o líquido normal sem esse extra
-- Liste todos os empréstimos consignados (banco + valor da parcela + parcela atual/total)
+- Liste todos os empréstimos consignados (banco + valor da parcela + parcela atual/total). ATENÇÃO: o número da parcela no contracheque aparece no formato NNN/NNN logo após o nome do banco (ex: "027/120" = parcela 27 de 120). Ignore números que façam parte do nome do empréstimo (ex: "Empréstimo Comum 3" — o "3" é parte do nome, não a parcela).
 - Liste descontos de saúde, previdência e IR
 
 Se for BOLETO, FATURA ou EXTRATO:
