@@ -75,16 +75,28 @@ async function analisarImagem(imageUrl: string): Promise<string> {
 
 Se for um CONTRACHEQUE ou HOLERITE, extraia:
 - Nome do órgão/empresa pagador
-- Salário bruto
-- Salário líquido (valor a receber após todos os descontos)
+- Cargo/função
 - Mês/ano de referência
-- Descontos presentes, especialmente: empréstimo consignado, plano de saúde, previdência (INSS/IPREV/FUNPREV), imposto de renda retido, vale transporte, alimentação, sindicato, e outros
+- Total de vantagens (bruto)
+- Total de descontos
+- Salário líquido (valor a receber)
+- Se houver 13º salário, abono, férias ou parcela extraordinária nas vantagens, informe o valor e calcule o líquido normal sem esse extra
+- Liste todos os empréstimos consignados com banco e valor da parcela
+- Liste descontos de saúde (plano, Planserv, assistência), previdência (INSS/SPSM/IPREV) e IR
 
-Responda assim:
-"Contracheque [órgão] — Bruto: R$ X.XXX,XX | Líquido: R$ X.XXX,XX (ref: mês/ano)
-Descontos identificados: Consignado R$ XXX,XX | Plano de saúde R$ XXX,XX | INSS R$ XXX,XX | IR R$ XXX,XX | [outros]"
+Responda de forma clara e estruturada assim:
+"Contracheque PM-BA — Soldado — Junho/2026
+💰 Líquido este mês: R$ 7.140,69 (inclui 13º de R$ 3.328,01)
+💰 Líquido normal estimado: R$ 3.812,68
 
-Use o salário líquido como base da renda mensal do cliente. O consignado já está descontado na folha — não conta como dívida separada a menos que o cliente mencione explicitamente.
+Consignados já descontados na folha (R$ 1.862,65/mês):
+• Banco Digio: R$ 304,00 (27/120)
+• BB: R$ 321,64 (65/96)
+• [etc]
+
+Outros descontos fixos: Saúde R$ XXX | Previdência R$ XXX | IR R$ XXX"
+
+IMPORTANTE: os consignados já estão descontados no líquido — são dívidas automáticas em andamento. Use o líquido NORMAL (sem 13º/férias) como renda base do cliente.
 
 Se for BOLETO, FATURA ou DÍVIDA, extraia:
 - Credor / banco / loja
