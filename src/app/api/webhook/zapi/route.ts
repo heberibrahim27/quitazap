@@ -132,18 +132,46 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, selfie, etc), respond
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
-// ── Leitura de PDF via OpenAI (upload + GPT-4o) ──
-// pdf-parse usa pdfjs-dist que requer APIs de browser (DOMMatrix) — não funciona em Vercel Node.js
-// Solução: faz upload do PDF para a OpenAI e deixa o GPT-4o ler
-async function extrairTextoPDF(pdfUrl: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY!;
+// ── Tipos para extração de PDF ──────────────────────────────────────────
 
-  // 1. Baixa o PDF
+type EmprestimoConsig = {
+  banco: string;
+  valorParcela: number;
+  parcelaAtual: number;
+  totalParcelas: number;
+};
+
+type AssociacaoConsig = {
+  nome: string;
+  valorMensal: number;
+};
+
+type PDFContracheque = {
+  tipo: "CONTRACHEQUE";
+  orgao: string;
+  salarioBruto: number;
+  salarioLiquidoTotal: number;   // líquido que aparece no contracheque (pode incluir 13º)
+  extraOrdinario: number;        // total de 13º + férias + abonos (0 se nenhum)
+  salarioLiquidoNormal: number;  // = salarioLiquidoTotal - extraOrdinario
+  emprestimos: EmprestimoConsig[];
+  associacoes: AssociacaoConsig[];
+};
+
+type PDFOutro = {
+  tipo: "OUTRO";
+  texto: string;
+};
+
+type PDFResult = PDFContracheque | PDFOutro;
+
+// ── Upload de PDF para OpenAI Files API ──────────────────────────────────
+
+async function uploadPDFOpenAI(pdfUrl: string): Promise<{ fileId: string; apiKey: string }> {
+  const apiKey = process.env.OPENAI_API_KEY!;
   const res = await fetch(pdfUrl);
   if (!res.ok) throw new Error(`Falha ao baixar PDF: ${res.status}`);
   const buffer = await res.arrayBuffer();
 
-  // 2. Faz upload para a OpenAI Files API
   const form = new FormData();
   form.append("file", new Blob([buffer], { type: "application/pdf" }), "documento.pdf");
   form.append("purpose", "user_data");
@@ -158,15 +186,27 @@ async function extrairTextoPDF(pdfUrl: string): Promise<string> {
     throw new Error(`OpenAI upload falhou ${uploadRes.status}: ${err}`);
   }
   const { id: fileId } = await uploadRes.json() as { id: string };
+  return { fileId, apiKey };
+}
+
+async function deletePDFOpenAI(fileId: string, apiKey: string) {
+  await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${apiKey}` },
+  }).catch(() => {});
+}
+
+// ── Extração estruturada de PDF via GPT-4o ───────────────────────────────
+// Para contracheques: retorna JSON estruturado (bypassa gpt-4o-mini)
+// Para outros docs: retorna texto para processar normalmente
+
+async function extrairPDF(pdfUrl: string): Promise<PDFResult> {
+  const { fileId, apiKey } = await uploadPDFOpenAI(pdfUrl);
 
   try {
-    // 3. Envia para o GPT-4o extrair as informações
     const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [{
@@ -175,25 +215,38 @@ async function extrairTextoPDF(pdfUrl: string): Promise<string> {
             { type: "file", file: { file_id: fileId } },
             {
               type: "text",
-              text: `Analise este documento financeiro (pode ser contracheque, holerite, boleto, extrato, fatura).
+              text: `Analise este documento. Se for um CONTRACHEQUE ou HOLERITE (folha de pagamento de servidor público ou funcionário), responda APENAS com este JSON (sem markdown):
 
-Se for CONTRACHEQUE ou HOLERITE:
-- Informe órgão/empresa, cargo, mês/ano
-- Salário bruto, total de descontos, salário líquido
-- Se houver 13º, férias ou verba extraordinária, informe e calcule o líquido normal sem esse extra
-- Liste todos os empréstimos consignados (banco + valor da parcela + parcela atual/total). ATENÇÃO: o número da parcela no contracheque aparece no formato NNN/NNN logo após o nome do banco (ex: "027/120" = parcela 27 de 120). Ignore números que façam parte do nome do empréstimo (ex: "Empréstimo Comum 3" — o "3" é parte do nome, não a parcela).
-- Liste todas as ASSOCIAÇÕES descontadas em folha (ex: ASTEBA, ASSEBA, ASPRA, Associação Jurídica, etc). Associações geralmente aparecem com parcela no formato NNN/999 ou NNN/000, onde 999 ou 000 significa mensalidade contínua sem prazo de término. Informe o nome e o valor mensal de cada uma.
-- Calcule: MARGEM COMPROMETIDA = soma de todos os consignados + associações. Informe este total.
-- Liste descontos de saúde, previdência e IR
+{
+  "tipo": "CONTRACHEQUE",
+  "orgao": "nome do órgão/empresa",
+  "salarioBruto": 0.00,
+  "salarioLiquidoTotal": 0.00,
+  "extraOrdinario": 0.00,
+  "salarioLiquidoNormal": 0.00,
+  "emprestimos": [
+    { "banco": "Nome do banco", "valorParcela": 0.00, "parcelaAtual": 0, "totalParcelas": 0 }
+  ],
+  "associacoes": [
+    { "nome": "Nome da associação", "valorMensal": 0.00 }
+  ]
+}
 
-Se for BOLETO, FATURA ou EXTRATO:
-- Credor, valor, vencimento, parcelas
+Regras para o JSON:
+- salarioLiquidoTotal = valor líquido impresso no contracheque (pode incluir 13º/férias)
+- extraOrdinario = soma de 13º salário + férias + abono + qualquer verba eventual presente nas VANTAGENS. Se não houver nenhum, use 0.
+- salarioLiquidoNormal = salarioLiquidoTotal - extraOrdinario (renda mensal real)
+- emprestimos: o número da parcela aparece como NNN/NNN logo APÓS o nome do banco. "Empréstimo Comum 3" → o "3" é parte do nome, NÃO é a parcela. Leia o número correto.
+- associacoes: incluir ASTEBA, ASSEBA, ASPRA e qualquer outra associação/mensalidade com parcela NNN/999 ou NNN/000
+- NÃO incluir INSS, IR, saúde/Planserv nos arrays — esses são descontos, não dívidas
 
-Responda em português de forma direta e estruturada.`,
+Se NÃO for contracheque (for boleto, fatura, extrato, etc), responda com:
+{ "tipo": "OUTRO", "texto": "descrição do documento em português" }`,
             },
           ],
         }],
-        max_tokens: 1000,
+        max_tokens: 1500,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -202,15 +255,60 @@ Responda em português de forma direta e estruturada.`,
       throw new Error(`GPT-4o PDF erro ${chatRes.status}: ${err}`);
     }
     const chatData = await chatRes.json() as { choices: { message: { content: string } }[] };
-    return chatData.choices[0]?.message?.content?.trim() ?? "";
+    const raw = chatData.choices[0]?.message?.content?.trim() ?? "{}";
+    const parsed = JSON.parse(raw) as PDFResult;
+    console.log(`[PDF] tipo="${parsed.tipo}"`, parsed.tipo === "CONTRACHEQUE"
+      ? `liq=${parsed.salarioLiquidoNormal} emp=${parsed.emprestimos.length} assoc=${parsed.associacoes.length}`
+      : "");
+    return parsed;
 
   } finally {
-    // 4. Deleta o arquivo da OpenAI após uso
-    await fetch(`https://api.openai.com/v1/files/${fileId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    }).catch(() => {});
+    await deletePDFOpenAI(fileId, apiKey);
   }
+}
+
+// ── Monta DiagnosticoIA diretamente do contracheque (sem gpt-4o-mini) ────
+
+function buildDiagContracheque(dados: PDFContracheque, nome: string): import("@/lib/ai-bot").DiagnosticoIA {
+  const liquidoNormal = dados.salarioLiquidoNormal > 0
+    ? dados.salarioLiquidoNormal
+    : dados.salarioLiquidoTotal;
+
+  const dividas: import("@/lib/ai-bot").DiagnosticoIA["dividas"] = [
+    ...dados.emprestimos.map((e) => ({
+      credor: e.banco,
+      tipo: "EMPRESTIMO" as const,
+      valorOriginal: e.valorParcela * e.totalParcelas,
+      saldoAtual: e.valorParcela * Math.max(e.totalParcelas - e.parcelaAtual, 0),
+      valorParcela: e.valorParcela,
+      totalParcelas: e.totalParcelas,
+      parcelasRestantes: Math.max(e.totalParcelas - e.parcelaAtual, 1),
+      emAtraso: false,
+    })),
+    ...dados.associacoes.map((a) => ({
+      credor: a.nome,
+      tipo: "ASSOCIACAO" as const,
+      valorOriginal: 0,
+      saldoAtual: 0,
+      valorParcela: a.valorMensal,
+      totalParcelas: 999,
+      parcelasRestantes: 999,
+      emAtraso: false,
+    })),
+  ];
+
+  return {
+    dadosPessoais: { nome, vinculo: "SERVIDOR_PUBLICO", profissao: dados.orgao },
+    renda: { salarioLiquido: liquidoNormal, totalFamiliar: liquidoNormal },
+    despesasFixas: [],
+    despesasVariaveis: [],
+    dividas,
+    cartoes: [],
+    emprestimos: [],
+    patrimonio: {},
+    objetivos: { objetivoPrincipal: "QUITAR_DIVIDAS" },
+    alertas: {},
+  };
 }
 
 // ── Detecção de comandos rápidos ──────────
@@ -385,13 +483,79 @@ export async function POST(req: NextRequest) {
       }
       try {
         await sendWhatsApp(sessao.telefone, "📄 Recebi seu PDF! Lendo o documento...");
-        const texto = await extrairTextoPDF(docUrl);
+        const pdfResult = await extrairPDF(docUrl);
+
+        if (pdfResult.tipo === "CONTRACHEQUE") {
+          // ── Caminho direto: monta diagnóstico sem passar pelo gpt-4o-mini ──
+          const diag = buildDiagContracheque(pdfResult, sessao.nome ?? "cliente");
+          const relatorio = gerarRelatorio(diag);
+          const rendaTotal = diag.renda.salarioLiquido;
+
+          const historicoComRelatorio = [
+            { role: "assistant" as const, content: relatorio },
+          ];
+
+          await prisma.botSessao.updateMany({
+            where: { id: sessao.id },
+            data: {
+              etapa: "PLANO_GERADO",
+              renda: rendaTotal,
+              dividasTemp: JSON.stringify(historicoComRelatorio),
+            },
+          });
+
+          if (sessao.clienteId) {
+            await prisma.cliente.update({
+              where: { id: sessao.clienteId },
+              data: { rendaMensal: rendaTotal, statusAtendimento: "PLANO_GERADO" },
+            });
+            await prisma.divida.deleteMany({ where: { clienteId: sessao.clienteId } });
+            for (const d of diag.dividas) {
+              await prisma.divida.create({
+                data: {
+                  clienteId: sessao.clienteId,
+                  credor: d.credor,
+                  valorTotal: d.saldoAtual ?? 0,
+                  tipo: d.tipo ?? "OUTRO",
+                  status: "ATIVA",
+                  diaVencimento: null,
+                  emAtraso: false,
+                  obs: `${d.parcelasRestantes}x de R$${d.valorParcela} — contracheque`,
+                },
+              });
+            }
+            await prisma.planoEnviado.create({
+              data: { clienteId: sessao.clienteId, texto: relatorio },
+            });
+          }
+
+          const partes = relatorio.length > 3800 ? dividirMensagem(relatorio, 3800) : [relatorio];
+          for (const parte of partes) {
+            await sendWhatsApp(sessao.telefone, parte);
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+
+          // Pergunta follow-up: se tem outras dívidas fora da folha
+          await new Promise((r) => setTimeout(r, 2000));
+          await sendWhatsApp(sessao.telefone,
+            `Esse foi o diagnóstico com base no seu contracheque! 📊\n\n` +
+            `Você tem outras dívidas *fora da folha*? Por exemplo:\n` +
+            `• Cartão de crédito\n` +
+            `• Boleto em atraso\n` +
+            `• Financiamento de veículo ou imóvel\n\n` +
+            `Me conta que eu atualizo seu plano! 😊`
+          );
+          return NextResponse.json({ ok: true });
+        }
+
+        // ── PDF não é contracheque: processa como texto normalmente ──
+        const texto = pdfResult.texto;
         if (!texto || texto.length < 30) {
           await sendWhatsApp(sessao.telefone, "Consegui abrir o PDF mas ele parece ser uma imagem escaneada — não consigo extrair o texto. Pode tirar uma foto do documento e enviar como imagem? 📷");
           return NextResponse.json({ ok: true });
         }
-        console.log(`[Z-API] PDF extraído (${texto.length} chars)`);
-        mensagem = `[Cliente enviou um PDF. Conteúdo extraído automaticamente — use esses dados para preencher o diagnóstico financeiro:]\n\n${texto.slice(0, 6000)}`;
+        console.log(`[Z-API] PDF (outro) extraído (${texto.length} chars)`);
+        mensagem = `[Cliente enviou um PDF com este conteúdo:]\n\n${texto.slice(0, 4000)}`;
         tipoEntrada = "texto";
       } catch (err) {
         console.error("[Z-API] Erro ao ler PDF:", err);
