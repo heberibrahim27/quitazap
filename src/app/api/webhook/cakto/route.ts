@@ -9,15 +9,16 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
 
 function msgBoasVindas(nome: string, oferta: string): string {
-  return `Olá, ${nome}! 👋
+  return `Olá, *${nome}*! 👋 Seja bem-vindo(a) ao *QuitaZAP!*
 
-Sua compra do *${oferta}* foi confirmada ✅
+Sua assinatura do *${oferta}* está confirmada ✅
 
-Sou o QuitaZAP, seu consultor financeiro pessoal. Estou aqui para te ajudar a organizar suas dívidas e montar um plano claro de quitação.
+Sou seu consultor financeiro pessoal. Vou te ajudar a sair das dívidas com um plano claro e direto. 💪
 
-Para começar: me conta suas dívidas. Pode mandar do jeito que preferir — nome, valor, parcelas. Não precisa ser formato exato, eu entendo. 😊
+*Antes de começar, me conta rapidinho:*
 
-Qual é a primeira dívida?`;
+1️⃣ Como você trabalha? CLT, servidor público, autônomo, MEI ou empresário?
+2️⃣ Tem dependentes? Filhos ou alguém que depende de você financeiramente?`;
 }
 
 export async function POST(req: NextRequest) {
