@@ -381,13 +381,15 @@ Regras:
 - diaVencimento: dia do mês (1-31). "dia 20" → 20. Se não mencionado, use ${hoje.getDate() + 1}.
 - enviarAgora: true se o usuário disse "agora", "hoje", "já", "manda agora", "envia agora". false caso contrário.
 - mensagemCustom: texto entre aspas ou após "mensagem:", "aviso:", "escreva:". null se não informado.
-- pixChave: chave pix do credor se informada. null se não informado.
-- camposFaltando: lista de campos ausentes entre ["nome", "telefone", "valor"]. Nunca inclua "diaVencimento" — use o padrão.
+- pixChave: chave pix do CREDOR (quem está cobrando) para o devedor efetuar o pagamento. Pode ser CPF, CNPJ, e-mail, telefone ou chave aleatória. Palavras-chave: "pix:", "minha chave", "chave pix". null se não informado.
+- camposFaltando: lista de campos ausentes entre ["nome", "telefone", "valor"]. Nunca inclua "diaVencimento" nem "pixChave" — são opcionais.
 
 Exemplos:
 "cobrar João 71999999999 500 dia 20" → devedorNome:"João", devedorFone:"5571999999999", valor:500, camposFaltando:[]
 "cobrar o Pedro" → devedorNome:"Pedro", devedorFone:null, valor:0, camposFaltando:["telefone","valor"]
-"cobrar Ana, 11987654321, R$300, mensagem: Aninha, não esquece!" → devedorNome:"Ana", valor:300, mensagemCustom:"Aninha, não esquece!"`,
+"cobrar Ana, 11987654321, R$300, mensagem: Aninha, não esquece!" → devedorNome:"Ana", valor:300, mensagemCustom:"Aninha, não esquece!"
+"cobrar João, 71999999999, R$500, dia 20, pix: 123.456.789-00" → pixChave:"123.456.789-00"
+"cobrar Maria, 71988887777, R$200, minha chave pix é joao@email.com" → pixChave:"joao@email.com"`,
         },
         { role: "user", content: mensagem },
       ],
@@ -733,7 +735,7 @@ export async function POST(req: NextRequest) {
       });
 
       const credorNome = credor?.nome ?? sessao.nome ?? "QuitaZAP";
-      const pixChave   = dados.pixChave ?? credor?.telefone ?? null;
+      const pixChave   = dados.pixChave ?? null;
 
       const cobranca = await prisma.cobranca.create({
         data: {
@@ -779,6 +781,7 @@ export async function POST(req: NextRequest) {
           `👤 *Devedor:* ${dados.devedorNome}\n` +
           `📞 *WhatsApp:* ${dados.devedorFone}\n` +
           `💰 *Valor:* ${fmtValor}\n` +
+          (pixChave ? `🔑 *Chave Pix:* ${pixChave}\n` : "") +
           (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
           `\nSe não pagar, reenvio automático em *+3 dias* (mais firme) e *+7 dias* (última chance). 📲`
         );
@@ -789,6 +792,7 @@ export async function POST(req: NextRequest) {
           `📞 *WhatsApp:* ${dados.devedorFone}\n` +
           `💰 *Valor:* ${fmtValor}\n` +
           `📅 *Vencimento:* dia ${fmtData}\n` +
+          (pixChave ? `🔑 *Chave Pix:* ${pixChave}\n` : "") +
           (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
           `\nA mensagem será enviada automaticamente no dia ${fmtData}. 📲\n` +
           `Se não pagar, reenvio automático em *+3* e *+7 dias* com tom diferente.`

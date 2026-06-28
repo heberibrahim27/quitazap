@@ -183,6 +183,7 @@ export function gerarListaComandos(nome: string): string {
 💰 *"Cobrar [Nome], [número], R$[valor], dia [X]"*
 ↳ Agenda cobrança automática pelo WhatsApp
 ↳ Funciona por áudio também! 🎤
+↳ Pode incluir: *pix: [sua chave]* para o devedor pagar direto
 
 📋 *"minhas cobranças"*
 ↳ Vê quem ainda não pagou e o status de cada cobrança
