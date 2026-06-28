@@ -180,7 +180,14 @@ export function gerarListaComandos(nome: string): string {
 🔄 *"atualiza meu plano"*
 ↳ Me conta que pagou uma dívida ou adicione uma nova
 
-É só mandar a mensagem — pode escrever do seu jeito! 😊`;
+💰 *"Cobrar [Nome], [número], R$[valor], dia [X]"*
+↳ Agenda cobrança automática pelo WhatsApp
+↳ Funciona por áudio também! 🎤
+
+📋 *"minhas cobranças"*
+↳ Vê quem ainda não pagou e o status de cada cobrança
+
+É só mandar a mensagem — pode escrever ou mandar áudio do seu jeito! 😊`;
 }
 
 // ── Calcula total mensal a partir das dívidas do DB ──

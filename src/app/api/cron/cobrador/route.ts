@@ -79,12 +79,17 @@ function msgEtapa3(devedorNome: string, credorNome: string, valor: number, pixCh
 }
 
 export async function GET(req: NextRequest) {
-  // Verifica secret para segurança (opcional, mas recomendado)
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Permite chamadas internas do painel admin (x-internal-call)
+  const isInternal = req.headers.get("x-internal-call") === "1";
+
+  // Verifica secret para chamadas externas (Vercel Cron usa Authorization: Bearer <secret>)
+  if (!isInternal) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers.get("authorization");
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
   }
 

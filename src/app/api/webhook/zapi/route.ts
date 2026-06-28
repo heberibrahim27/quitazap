@@ -340,8 +340,10 @@ async function parsearComandoCobrar(mensagem: string): Promise<{
   devedorFone: string;
   valor: number;
   diaVencimento: number;
+  enviarAgora: boolean;
   mensagemCustom?: string;
   pixChave?: string;
+  camposFaltando?: string[];
 } | null> {
   const apiKey = process.env.OPENAI_API_KEY!;
   const hoje = new Date();
@@ -359,20 +361,37 @@ async function parsearComandoCobrar(mensagem: string): Promise<{
       messages: [
         {
           role: "system",
-          content: `Você extrai dados de comandos de cobrança em português. Hoje é ${hoje.toLocaleDateString("pt-BR")} (mês ${mesAtual}/${anoAtual}).
+          content: `Você extrai dados de cobranças financeiras enviadas pelo WhatsApp em português. Hoje é ${hoje.toLocaleDateString("pt-BR")} (dia ${hoje.getDate()}, mês ${mesAtual}/${anoAtual}).
+
 Responda APENAS com JSON válido no formato:
-{"devedorNome":"Nome","devedorFone":"5511999999999","valor":500.00,"diaVencimento":20,"mensagemCustom":"mensagem opcional","pixChave":"chave pix opcional"}
+{
+  "devedorNome": "Nome da pessoa que deve (null se não informado)",
+  "devedorFone": "55DDD+número com 13 dígitos (null se não informado)",
+  "valor": 500.00,
+  "diaVencimento": 20,
+  "enviarAgora": false,
+  "mensagemCustom": "mensagem personalizada ou null",
+  "pixChave": "chave pix ou null",
+  "camposFaltando": []
+}
+
 Regras:
-- devedorFone: apenas dígitos, com DDI 55 se tiver DDD, ou adicione 55 se começar com DDD. Ex: "71999999999" → "5571999999999"
-- valor: número decimal. "R$500" → 500.0, "1.500,00" → 1500.0
-- diaVencimento: dia do mês (1-31). Se não informado, use ${hoje.getDate() + 1}
-- mensagemCustom: texto personalizado entre aspas ou após "mensagem:" (pode ser null)
-- pixChave: chave pix do credor se informada (pode ser null)
-Se não conseguir extrair nome ou telefone, responda: null`,
+- devedorFone: apenas dígitos, sempre com DDI 55. Ex: "71999999999" → "5571999999999". Se não mencionado, use null.
+- valor: número decimal. "R$500" → 500.0, "1.500,00" → 1500.0. Se não mencionado, use 0.
+- diaVencimento: dia do mês (1-31). "dia 20" → 20. Se não mencionado, use ${hoje.getDate() + 1}.
+- enviarAgora: true se o usuário disse "agora", "hoje", "já", "manda agora", "envia agora". false caso contrário.
+- mensagemCustom: texto entre aspas ou após "mensagem:", "aviso:", "escreva:". null se não informado.
+- pixChave: chave pix do credor se informada. null se não informado.
+- camposFaltando: lista de campos ausentes entre ["nome", "telefone", "valor"]. Nunca inclua "diaVencimento" — use o padrão.
+
+Exemplos:
+"cobrar João 71999999999 500 dia 20" → devedorNome:"João", devedorFone:"5571999999999", valor:500, camposFaltando:[]
+"cobrar o Pedro" → devedorNome:"Pedro", devedorFone:null, valor:0, camposFaltando:["telefone","valor"]
+"cobrar Ana, 11987654321, R$300, mensagem: Aninha, não esquece!" → devedorNome:"Ana", valor:300, mensagemCustom:"Aninha, não esquece!"`,
         },
         { role: "user", content: mensagem },
       ],
-      max_tokens: 200,
+      max_tokens: 300,
       response_format: { type: "json_object" },
     }),
   });
@@ -383,11 +402,11 @@ Se não conseguir extrair nome ou telefone, responda: null`,
   }
 
   const data = await res.json() as { choices: { message: { content: string } }[] };
-  const raw = data.choices?.[0]?.message?.content?.trim() ?? "null";
+  const raw = data.choices?.[0]?.message?.content?.trim() ?? "{}";
 
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || !parsed.devedorNome || !parsed.devedorFone || !parsed.valor) return null;
+    if (!parsed || !parsed.devedorNome) return null;
     return parsed;
   } catch {
     return null;
@@ -665,22 +684,46 @@ export async function POST(req: NextRequest) {
 
       const dados = await parsearComandoCobrar(mensagem);
 
+      // Se não conseguiu extrair nada minimamente útil
       if (!dados) {
         await sendWhatsApp(telefone,
-          "❌ Não consegui entender os dados da cobrança.\n\n" +
-          "*Formato correto:*\n" +
-          "Cobrar [Nome], [número WhatsApp], R$[valor], dia [dia]\n\n" +
-          "*Exemplo:*\n" +
-          "Cobrar João Silva, 71999999999, R$500, dia 20, mensagem: \"João, combinamos R$500 para o dia 20\""
+          "Não entendi quem você quer cobrar. 😅\n\n" +
+          "Me manda assim:\n" +
+          "*Cobrar [Nome], [WhatsApp], R$[valor], dia [X]*\n\n" +
+          "Exemplo: _Cobrar João, 71999999999, R$500, dia 20_\n\n" +
+          "Pode mandar por áudio também! 🎤"
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      // Se faltam campos obrigatórios, pede de forma conversacional
+      const faltando = dados.camposFaltando ?? [];
+      if (faltando.length > 0 || !dados.devedorFone || !dados.valor) {
+        const partesFaltando: string[] = [];
+        if (!dados.devedorNome) partesFaltando.push("o *nome* de quem deve");
+        if (!dados.devedorFone) partesFaltando.push("o *WhatsApp* de quem deve");
+        if (!dados.valor || dados.valor === 0) partesFaltando.push("o *valor* da dívida");
+
+        const nomeMencionado = dados.devedorNome ? `*${dados.devedorNome}*` : "essa pessoa";
+        await sendWhatsApp(telefone,
+          `Entendi que você quer cobrar ${nomeMencionado}! 👍\n\n` +
+          `Só preciso saber mais ${partesFaltando.length === 1 ? "uma coisa" : "algumas coisas"}:\n\n` +
+          partesFaltando.map((p) => `• ${p}`).join("\n") +
+          `\n\nMe manda os dados que eu registro a cobrança! 😊`
         );
         return NextResponse.json({ ok: true });
       }
 
       // Calcula data de vencimento
-      const hoje2 = new Date();
-      let dataVenc = new Date(hoje2.getFullYear(), hoje2.getMonth(), dados.diaVencimento);
-      if (dataVenc < hoje2) {
-        dataVenc = new Date(hoje2.getFullYear(), hoje2.getMonth() + 1, dados.diaVencimento);
+      const hojeC = new Date();
+      let dataVenc: Date;
+      if (dados.enviarAgora) {
+        dataVenc = hojeC; // Vencimento hoje = envio imediato
+      } else {
+        dataVenc = new Date(hojeC.getFullYear(), hojeC.getMonth(), dados.diaVencimento);
+        if (dataVenc < hojeC) {
+          dataVenc = new Date(hojeC.getFullYear(), hojeC.getMonth() + 1, dados.diaVencimento);
+        }
       }
 
       // Busca nome e telefone do credor
@@ -689,38 +732,70 @@ export async function POST(req: NextRequest) {
         select: { nome: true, telefone: true },
       });
 
+      const credorNome = credor?.nome ?? sessao.nome ?? "QuitaZAP";
+      const pixChave   = dados.pixChave ?? credor?.telefone ?? null;
+
       const cobranca = await prisma.cobranca.create({
         data: {
           clienteId:   sessao.clienteId,
-          credorNome:  credor?.nome ?? sessao.nome ?? "QuitaZAP",
+          credorNome,
           devedorNome: dados.devedorNome,
           devedorFone: dados.devedorFone,
           valor:       dados.valor,
           vencimento:  dataVenc,
           mensagem:    dados.mensagemCustom ?? null,
-          pixChave:    dados.pixChave ?? credor?.telefone ?? null,
-          status:      "PENDENTE",
+          pixChave,
+          status:      dados.enviarAgora ? "ENVIADA" : "PENDENTE",
           etapa:       1,
+          ultimoEnvio: dados.enviarAgora ? new Date() : null,
+          tentativas:  dados.enviarAgora ? 1 : 0,
         },
       });
 
       const fmtValor = dados.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       const fmtData  = dataVenc.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-      await sendWhatsApp(telefone,
-        `✅ *Cobrança agendada com sucesso!*\n\n` +
-        `👤 *Devedor:* ${dados.devedorNome}\n` +
-        `📞 *WhatsApp:* ${dados.devedorFone}\n` +
-        `💰 *Valor:* ${fmtValor}\n` +
-        `📅 *Vencimento:* dia ${fmtData}\n` +
-        (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
-        `\n` +
-        `📲 A mensagem será enviada automaticamente no dia ${fmtData}.\n` +
-        `Se não pagar, reenvio automático em *+3 dias* (mais firme) e *+7 dias* (última chance).\n\n` +
-        `Para ver suas cobranças: *www.quitazap.com.br/cobrador* 📊`
-      );
+      // Se "enviar agora", dispara imediatamente para o devedor
+      if (dados.enviarAgora) {
+        try {
+          const msgDevedor =
+            `Oi *${dados.devedorNome}*! 👋\n\n` +
+            `*${credorNome}* está te lembrando de um compromisso financeiro:\n\n` +
+            `💰 *Valor:* ${fmtValor}\n` +
+            `📅 *Vencimento:* hoje\n` +
+            (dados.mensagemCustom ? `\n💬 _"${dados.mensagemCustom}"_\n` : "") +
+            (pixChave ? `\nPara pagar via Pix: 🔑 *${pixChave}*` : "") +
+            `\n\n──────────────────\n` +
+            `💬 _Mensagem enviada pelo QuitaZAP_\n` +
+            `👉 www.quitazap.com.br`;
+          await sendWhatsApp(dados.devedorFone, msgDevedor);
+          console.log(`[COBRAR] Enviado imediatamente para ${dados.devedorNome} (${dados.devedorFone})`);
+        } catch (err) {
+          console.error("[COBRAR] Erro ao enviar imediatamente:", err);
+        }
 
-      console.log(`[COBRAR] Cobrança criada id=${cobranca.id} devedor=${dados.devedorNome} valor=${dados.valor}`);
+        await sendWhatsApp(telefone,
+          `✅ *Cobrança enviada agora!*\n\n` +
+          `👤 *Devedor:* ${dados.devedorNome}\n` +
+          `📞 *WhatsApp:* ${dados.devedorFone}\n` +
+          `💰 *Valor:* ${fmtValor}\n` +
+          (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
+          `\nSe não pagar, reenvio automático em *+3 dias* (mais firme) e *+7 dias* (última chance). 📲`
+        );
+      } else {
+        await sendWhatsApp(telefone,
+          `✅ *Cobrança agendada!*\n\n` +
+          `👤 *Devedor:* ${dados.devedorNome}\n` +
+          `📞 *WhatsApp:* ${dados.devedorFone}\n` +
+          `💰 *Valor:* ${fmtValor}\n` +
+          `📅 *Vencimento:* dia ${fmtData}\n` +
+          (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
+          `\nA mensagem será enviada automaticamente no dia ${fmtData}. 📲\n` +
+          `Se não pagar, reenvio automático em *+3* e *+7 dias* com tom diferente.`
+        );
+      }
+
+      console.log(`[COBRAR] id=${cobranca.id} devedor=${dados.devedorNome} valor=${dados.valor} enviarAgora=${dados.enviarAgora}`);
       return NextResponse.json({ ok: true });
     }
 
