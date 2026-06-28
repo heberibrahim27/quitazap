@@ -17,6 +17,7 @@ import {
   gerarListaComandos,
   calcularTotalParcelas,
 } from "@/lib/plano";
+import { urlPainelCobrador } from "@/lib/cobrador-token";
 
 // ── Transcrição de áudio via Whisper ─────
 async function transcreverAudio(audioUrl: string): Promise<string> {
@@ -331,6 +332,7 @@ function detectarComando(msg: string): string | null {
   if (/^(resete|resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
   if (/^cobrar?\s+\S/.test(m)) return "COBRAR";
   if (/minhas cobran[cç]as|ver cobran[cç]as|lista de cobran[cç]as|quem me deve/.test(m)) return "VER_COBRANCAS";
+  if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel/.test(m)) return "MEU_PAINEL";
   return null;
 }
 
@@ -835,9 +837,23 @@ export async function POST(req: NextRequest) {
         const st    = fmtStatus[c.status] ?? c.status;
         lista += `👤 *${c.devedorNome}* — ${valor} — dia ${venc} — ${st}\n`;
       }
-      lista += `\nPara gerenciar: *www.quitazap.com.br/cobrador* 📊`;
+      const linkPainel = urlPainelCobrador(sessao.clienteId);
+      lista += `\n\n📊 *Seu painel completo:*\n${linkPainel}`;
 
       await sendWhatsApp(telefone, lista);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Comando MEU_PAINEL ───────────────────────────────────────────────────
+    if (detectarComando(mensagem) === "MEU_PAINEL" && sessao.clienteId) {
+      const link = urlPainelCobrador(sessao.clienteId);
+      await sendWhatsApp(telefone,
+        `📊 *Seu Painel de Cobranças*\n\n` +
+        `Acesse suas cobranças direto pelo link:\n` +
+        `👉 ${link}\n\n` +
+        `_O link é exclusivo para você e não expira._ 🔐\n\n` +
+        `Dica: salve o link nos favoritos do celular para acesso rápido! 📌`
+      );
       return NextResponse.json({ ok: true });
     }
 

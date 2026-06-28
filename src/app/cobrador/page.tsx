@@ -3,9 +3,11 @@
 // ─────────────────────────────────────────
 // QuitaZAP — Cobrador Automático (painel)
 // /cobrador — redesign v3 (inline styles para prod)
+// Suporta link mágico: /cobrador?id=clienteId&token=hmac
 // ─────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface Cobranca {
   id: string;
@@ -55,6 +57,12 @@ const DARK = "#1a1f36";
 const DARK2 = "#2e3a6e";
 
 export default function CobradorPage() {
+  const searchParams = useSearchParams();
+  const clienteIdParam = searchParams.get("id")   ?? "";
+  const tokenParam     = searchParams.get("token") ?? "";
+  // Modo cliente: tem id+token na URL → mostra só cobranças daquele cliente
+  const modoCliente = !!(clienteIdParam && tokenParam);
+
   const [cobrancas, setCobrancas]     = useState<Cobranca[]>([]);
   const [total, setTotal]             = useState(0);
   const [loading, setLoading]         = useState(true);
@@ -78,7 +86,10 @@ export default function CobradorPage() {
   const carregar = useCallback(async () => {
     setLoading(true);
     const qs = filtro ? `&status=${filtro}` : "";
-    const res = await fetch(`/api/cobrador?limit=100${qs}`);
+    const authQs = modoCliente
+      ? `&clienteId=${encodeURIComponent(clienteIdParam)}&token=${encodeURIComponent(tokenParam)}`
+      : "";
+    const res = await fetch(`/api/cobrador?limit=100${qs}${authQs}`);
     if (res.ok) {
       const d = await res.json();
       setCobrancas(d.cobrancas ?? []);
@@ -92,7 +103,7 @@ export default function CobradorPage() {
   async function marcarPaga(id: string) {
     const res = await fetch("/api/cobrador", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "PAGA" }),
+      body: JSON.stringify({ id, status: "PAGA", ...(modoCliente ? { clienteId: clienteIdParam, token: tokenParam } : {}) }),
     });
     if (res.ok) {
       setCobrancas((prev) => prev.map((c) => c.id === id ? { ...c, status: "PAGA" } : c));
@@ -103,7 +114,7 @@ export default function CobradorPage() {
   async function cancelarCobranca(id: string) {
     const res = await fetch("/api/cobrador", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "CANCELADA" }),
+      body: JSON.stringify({ id, status: "CANCELADA", ...(modoCliente ? { clienteId: clienteIdParam, token: tokenParam } : {}) }),
     });
     if (res.ok) {
       setCobrancas((prev) => prev.map((c) => c.id === id ? { ...c, status: "CANCELADA" } : c));
@@ -136,6 +147,7 @@ export default function CobradorPage() {
     const res = await fetch("/api/cobrador", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        clienteId:     modoCliente ? clienteIdParam : undefined,
         devedorNome:   form.devedorNome.trim(),
         devedorFone:   form.devedorFone.trim(),
         valor:         parseFloat(form.valor.replace(",", ".")),
@@ -226,13 +238,17 @@ export default function CobradorPage() {
             <div>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: "#93c5fd", textTransform: "uppercase", marginBottom: 4 }}>QuitaZAP</p>
               <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>💸 Cobrador Automático</h1>
-              <p style={{ fontSize: 12, color: "#bfdbfe", marginTop: 4 }}>{total} cobrança{total !== 1 ? "s" : ""} registradas</p>
+              <p style={{ fontSize: 12, color: "#bfdbfe", marginTop: 4 }}>
+                {modoCliente ? "🔐 Seu painel privado — " : ""}{total} cobrança{total !== 1 ? "s" : ""} registradas
+              </p>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <button onClick={abrirBroadcast}
-                style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
-                📣 Avisar clientes
-              </button>
+              {!modoCliente && (
+                <button onClick={abrirBroadcast}
+                  style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
+                  📣 Avisar clientes
+                </button>
+              )}
               <button onClick={() => setMostrarForm(!mostrarForm)}
                 style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
                 + Nova cobrança

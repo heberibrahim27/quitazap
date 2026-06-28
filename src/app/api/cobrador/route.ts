@@ -8,14 +8,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizarTelefone } from "@/lib/zapi";
+import { verificarTokenCobrador } from "@/lib/cobrador-token";
 
 // GET — lista cobranças de um cliente (ou todas para admin)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const clienteId = searchParams.get("clienteId");
+  const token     = searchParams.get("token");
   const status    = searchParams.get("status"); // opcional: filtrar por status
   const page      = parseInt(searchParams.get("page") ?? "1");
   const limit     = parseInt(searchParams.get("limit") ?? "50");
+
+  // Se vier token, valida — caso contrário assume acesso admin (sem filtro)
+  if (clienteId && token && !verificarTokenCobrador(clienteId, token)) {
+    return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+  }
 
   const where: Record<string, unknown> = {};
   if (clienteId) where.clienteId = clienteId;
@@ -113,10 +120,22 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, status, obs } = body;
+    const { id, status, obs, clienteId, token } = body;
 
     if (!id || !status) {
       return NextResponse.json({ error: "id e status são obrigatórios" }, { status: 400 });
+    }
+
+    // Valida token se vier de cliente (não admin)
+    if (clienteId && token && !verificarTokenCobrador(clienteId, token)) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+    }
+    // Se tiver clienteId+token válido, garante que a cobrança pertence ao cliente
+    if (clienteId && token) {
+      const cobrancaCheck = await prisma.cobranca.findFirst({ where: { id, clienteId } });
+      if (!cobrancaCheck) {
+        return NextResponse.json({ error: "Cobrança não encontrada" }, { status: 404 });
+      }
     }
 
     const statusValidos = ["PAGA", "CANCELADA", "PENDENTE", "ENVIADA"];
