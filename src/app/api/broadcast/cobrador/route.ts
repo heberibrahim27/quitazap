@@ -50,6 +50,18 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const mensagemCustom: string | undefined = body.mensagem;
   const mensagem = mensagemCustom ?? MENSAGEM_COBRADOR;
+  const telefoneUnico: string | undefined = body.telefone; // se definido, envia só para esse número
+
+  // Se telefone único, envia direto sem buscar clientes
+  if (telefoneUnico) {
+    try {
+      await sendWhatsApp(telefoneUnico, mensagemCustom ?? mensagem);
+      return NextResponse.json({ ok: true, enviados: 1, erros: 0, falhas: [] });
+    } catch (err) {
+      console.error(`[BROADCAST] Erro ao enviar para ${telefoneUnico}:`, err);
+      return NextResponse.json({ ok: false, enviados: 0, erros: 1, falhas: [telefoneUnico] });
+    }
+  }
 
   // Busca todos os clientes com sessão bot ativa e clienteId (assinantes)
   const sessoes = await prisma.botSessao.findMany({
