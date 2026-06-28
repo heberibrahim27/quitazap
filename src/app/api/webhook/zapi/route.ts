@@ -328,7 +328,7 @@ function detectarComando(msg: string): string | null {
   if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar/.test(m)) return "RECEITA_SEMANA";
   if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana/.test(m)) return "GASTAR_SEMANA";
   if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso perguntar)/.test(m)) return "AJUDA";
-  if (/^(resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
+  if (/^(resete|resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
   return null;
 }
 
@@ -584,7 +584,7 @@ export async function POST(req: NextRequest) {
         data: { etapa: "COLETANDO_DIVIDAS", dividasTemp: "[]", renda: null },
       });
       await sendWhatsApp(telefone,
-        `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOi, ${sessao.nome ?? "cliente"}! 😊 Para montar seu novo plano, me conta 3 coisas rápidas:\n\n1️⃣ *Como você trabalha?* CLT, autônomo, MEI, empresário ou freelancer?\n2️⃣ *Qual é seu objetivo principal agora?* Quitar as dívidas, criar reserva ou investir?\n3️⃣ *Você tem dependentes?* Companheiro(a), filhos ou alguém que depende de você?`
+        `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOlá, *${sessao.nome ?? "cliente"}*! 👋 Seja bem-vindo(a) de volta ao *QuitaZAP!*\n\nSou seu consultor financeiro pessoal. Vou te ajudar a sair das dívidas com um plano claro e direto. 💪\n\n*Antes de começar, me conta rapidinho:*\n\n1️⃣ Como você trabalha? CLT, servidor público, autônomo, MEI ou empresário?\n2️⃣ Tem dependentes? Filhos ou alguém que depende de você financeiramente?`
       );
       return NextResponse.json({ ok: true });
     }
