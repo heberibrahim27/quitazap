@@ -35,6 +35,7 @@ model Cliente {
   pagamentos     Pagamento[]
   planosEnviados PlanoEnviado[]
   botSessoes     BotSessao[]
+  cobrancas      Cobranca[]
 }
 
 // ─────────────────────────────────────────
@@ -144,6 +145,31 @@ model LeadVendas {
   msgCount     Int      @default(0)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
+// COBRANÇA (Cobrador Automático Pessoal)
+// ─────────────────────────────────────────
+// status: PENDENTE | ENVIADA | PAGA | CANCELADA
+// etapa:  1=amigável, 2=firme, 3=última chance
+model Cobranca {
+  id           String    @id @default(cuid())
+  clienteId    String
+  credorNome   String    // nome do assinante que cobra (ex: "Ibrahim")
+  devedorNome  String    // nome de quem deve
+  devedorFone  String    // whatsapp de quem deve (com DDI)
+  valor        Float
+  vencimento   DateTime
+  mensagem     String?   // mensagem personalizada do credor
+  pixChave     String?   // chave pix do credor (default: telefone do credor)
+  status       String    @default("PENDENTE")
+  etapa        Int       @default(1)
+  tentativas   Int       @default(0)
+  ultimoEnvio  DateTime?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 }
 
 // ─────────────────────────────────────────

@@ -329,7 +329,69 @@ function detectarComando(msg: string): string | null {
   if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana/.test(m)) return "GASTAR_SEMANA";
   if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso perguntar)/.test(m)) return "AJUDA";
   if (/^(resete|resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
+  if (/^cobrar?\s+\S/.test(m)) return "COBRAR";
+  if (/minhas cobran[cç]as|ver cobran[cç]as|lista de cobran[cç]as|quem me deve/.test(m)) return "VER_COBRANCAS";
   return null;
+}
+
+// ── Parseia comando "cobrar" com GPT ──────
+async function parsearComandoCobrar(mensagem: string): Promise<{
+  devedorNome: string;
+  devedorFone: string;
+  valor: number;
+  diaVencimento: number;
+  mensagemCustom?: string;
+  pixChave?: string;
+} | null> {
+  const apiKey = process.env.OPENAI_API_KEY!;
+  const hoje = new Date();
+  const mesAtual = hoje.getMonth() + 1;
+  const anoAtual = hoje.getFullYear();
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Você extrai dados de comandos de cobrança em português. Hoje é ${hoje.toLocaleDateString("pt-BR")} (mês ${mesAtual}/${anoAtual}).
+Responda APENAS com JSON válido no formato:
+{"devedorNome":"Nome","devedorFone":"5511999999999","valor":500.00,"diaVencimento":20,"mensagemCustom":"mensagem opcional","pixChave":"chave pix opcional"}
+Regras:
+- devedorFone: apenas dígitos, com DDI 55 se tiver DDD, ou adicione 55 se começar com DDD. Ex: "71999999999" → "5571999999999"
+- valor: número decimal. "R$500" → 500.0, "1.500,00" → 1500.0
+- diaVencimento: dia do mês (1-31). Se não informado, use ${hoje.getDate() + 1}
+- mensagemCustom: texto personalizado entre aspas ou após "mensagem:" (pode ser null)
+- pixChave: chave pix do credor se informada (pode ser null)
+Se não conseguir extrair nome ou telefone, responda: null`,
+        },
+        { role: "user", content: mensagem },
+      ],
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`[COBRAR] GPT parse erro ${res.status}`);
+    return null;
+  }
+
+  const data = await res.json() as { choices: { message: { content: string } }[] };
+  const raw = data.choices?.[0]?.message?.content?.trim() ?? "null";
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.devedorNome || !parsed.devedorFone || !parsed.valor) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 // ── Deduplicação de mensagens ─────────────
@@ -586,6 +648,117 @@ export async function POST(req: NextRequest) {
       await sendWhatsApp(telefone,
         `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOlá, *${sessao.nome ?? "cliente"}*! 👋 Seja bem-vindo(a) de volta ao *QuitaZAP!*\n\nSou seu consultor financeiro pessoal. Vou te ajudar a sair das dívidas com um plano claro e direto. 💪\n\n*Antes de começar, me conta rapidinho:*\n\n1️⃣ Como você trabalha? CLT, servidor público, autônomo, MEI ou empresário?\n2️⃣ Tem dependentes? Filhos ou alguém que depende de você financeiramente?`
       );
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Comando COBRAR ───────────────────────────────────────────────────────
+    if (detectarComando(mensagem) === "COBRAR") {
+      if (!sessao.clienteId) {
+        await sendWhatsApp(telefone,
+          "⚠️ Apenas assinantes do QuitaZAP podem usar o Cobrador Automático.\n\n" +
+          "Acesse *www.quitazap.com.br* e assine para liberar essa função! 🚀"
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      await sendWhatsApp(telefone, "⏳ Processando sua cobrança...");
+
+      const dados = await parsearComandoCobrar(mensagem);
+
+      if (!dados) {
+        await sendWhatsApp(telefone,
+          "❌ Não consegui entender os dados da cobrança.\n\n" +
+          "*Formato correto:*\n" +
+          "Cobrar [Nome], [número WhatsApp], R$[valor], dia [dia]\n\n" +
+          "*Exemplo:*\n" +
+          "Cobrar João Silva, 71999999999, R$500, dia 20, mensagem: \"João, combinamos R$500 para o dia 20\""
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      // Calcula data de vencimento
+      const hoje2 = new Date();
+      let dataVenc = new Date(hoje2.getFullYear(), hoje2.getMonth(), dados.diaVencimento);
+      if (dataVenc < hoje2) {
+        dataVenc = new Date(hoje2.getFullYear(), hoje2.getMonth() + 1, dados.diaVencimento);
+      }
+
+      // Busca nome e telefone do credor
+      const credor = await prisma.cliente.findUnique({
+        where: { id: sessao.clienteId },
+        select: { nome: true, telefone: true },
+      });
+
+      const cobranca = await prisma.cobranca.create({
+        data: {
+          clienteId:   sessao.clienteId,
+          credorNome:  credor?.nome ?? sessao.nome ?? "QuitaZAP",
+          devedorNome: dados.devedorNome,
+          devedorFone: dados.devedorFone,
+          valor:       dados.valor,
+          vencimento:  dataVenc,
+          mensagem:    dados.mensagemCustom ?? null,
+          pixChave:    dados.pixChave ?? credor?.telefone ?? null,
+          status:      "PENDENTE",
+          etapa:       1,
+        },
+      });
+
+      const fmtValor = dados.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      const fmtData  = dataVenc.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+      await sendWhatsApp(telefone,
+        `✅ *Cobrança agendada com sucesso!*\n\n` +
+        `👤 *Devedor:* ${dados.devedorNome}\n` +
+        `📞 *WhatsApp:* ${dados.devedorFone}\n` +
+        `💰 *Valor:* ${fmtValor}\n` +
+        `📅 *Vencimento:* dia ${fmtData}\n` +
+        (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
+        `\n` +
+        `📲 A mensagem será enviada automaticamente no dia ${fmtData}.\n` +
+        `Se não pagar, reenvio automático em *+3 dias* (mais firme) e *+7 dias* (última chance).\n\n` +
+        `Para ver suas cobranças: *www.quitazap.com.br/cobrador* 📊`
+      );
+
+      console.log(`[COBRAR] Cobrança criada id=${cobranca.id} devedor=${dados.devedorNome} valor=${dados.valor}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Comando VER_COBRANCAS ────────────────────────────────────────────────
+    if (detectarComando(mensagem) === "VER_COBRANCAS" && sessao.clienteId) {
+      const cobrancas = await prisma.cobranca.findMany({
+        where: { clienteId: sessao.clienteId, status: { not: "CANCELADA" } },
+        orderBy: { vencimento: "asc" },
+        take: 10,
+      });
+
+      if (cobrancas.length === 0) {
+        await sendWhatsApp(telefone,
+          "📋 Você ainda não tem cobranças cadastradas.\n\n" +
+          "Para cobrar alguém, use:\n" +
+          "*Cobrar [Nome], [número], R$[valor], dia [dia]*\n\n" +
+          "Exemplo: Cobrar João, 71999999999, R$500, dia 20"
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const fmtStatus: Record<string, string> = {
+        PENDENTE: "⏳ Pendente",
+        ENVIADA: "📤 Enviada",
+        PAGA: "✅ Paga",
+        CANCELADA: "❌ Cancelada",
+      };
+
+      let lista = `📋 *Suas Cobranças:*\n\n`;
+      for (const c of cobrancas) {
+        const valor = c.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const venc  = c.vencimento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+        const st    = fmtStatus[c.status] ?? c.status;
+        lista += `👤 *${c.devedorNome}* — ${valor} — dia ${venc} — ${st}\n`;
+      }
+      lista += `\nPara gerenciar: *www.quitazap.com.br/cobrador* 📊`;
+
+      await sendWhatsApp(telefone, lista);
       return NextResponse.json({ ok: true });
     }
 

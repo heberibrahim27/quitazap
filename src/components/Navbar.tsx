@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/",         label: "Dashboard"   },
-  { href: "/clientes", label: "Clientes"    },
-  { href: "/vencidas", label: "⚠️ Vencidas" },
-  { href: "/financeiro", label: "💰 Financeiro" },
-  { href: "/exportar", label: "Exportar"    },
-  { href: "/oferta",         label: "Oferta"        },
-  { href: "/configuracoes", label: "⚙️ Config"     },
+  { href: "/",              label: "Dashboard"       },
+  { href: "/clientes",      label: "Clientes"        },
+  { href: "/vencidas",      label: "⚠️ Vencidas"    },
+  { href: "/financeiro",    label: "💰 Financeiro"   },
+  { href: "/cobrador",      label: "💸 Cobrador"     },
+  { href: "/testar-funil",  label: "🧪 Testes"       },
+  { href: "/exportar",      label: "Exportar"        },
+  { href: "/oferta",        label: "Oferta"          },
+  { href: "/configuracoes", label: "⚙️ Config"       },
 ];
 
 export function Navbar() {

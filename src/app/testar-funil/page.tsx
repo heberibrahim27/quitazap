@@ -252,6 +252,62 @@ function AbaFunil() {
   );
 }
 
+// ── Respostas predefinidas por categoria ──
+const RESPOSTAS_RAPIDAS: { categoria: string; emoji: string; itens: string[] }[] = [
+  {
+    categoria: "Perfil",
+    emoji: "👤",
+    itens: [
+      "CLT, tenho esposa e 2 filhos",
+      "Autônomo, sem dependentes",
+      "Servidor público, tenho 1 filho",
+      "MEI, minha esposa depende de mim",
+    ],
+  },
+  {
+    categoria: "Renda",
+    emoji: "💰",
+    itens: [
+      "Recebo R$ 3.500 líquido por mês",
+      "Meu salário é R$ 2.800, às vezes faço bicos",
+      "Ganho R$ 5.200 e minha esposa ganha R$ 1.800",
+      "Sou autônomo, média de R$ 4.000 por mês",
+    ],
+  },
+  {
+    categoria: "Despesas",
+    emoji: "🏠",
+    itens: [
+      "Aluguel R$ 900, internet R$ 100, energia R$ 150, escola R$ 400, plano de saúde R$ 280",
+      "Aluguel R$ 1.200, luz R$ 120, internet R$ 100, Netflix R$ 45, academia R$ 99",
+      "Financiamento da casa R$ 850, condomínio R$ 300, escola R$ 500, plano R$ 350",
+      "Mercado R$ 600 por mês, combustível R$ 300, farmácia R$ 80",
+    ],
+  },
+  {
+    categoria: "Dívidas",
+    emoji: "💳",
+    itens: [
+      "Nubank cartão R$ 4.500, parcela R$ 375, 12x restantes, vence dia 10",
+      "Empréstimo Banco do Brasil R$ 15.000, parcela R$ 850, faltam 18 meses, vence dia 5",
+      "Casas Bahia R$ 1.800, 9x de R$ 200, vence dia 20",
+      "Financiamento do carro R$ 22.000, parcela R$ 680, 32x restantes, vence dia 15",
+      "Não tenho mais dívidas",
+    ],
+  },
+  {
+    categoria: "Outros",
+    emoji: "💬",
+    itens: [
+      "Não tenho reserva de emergência",
+      "Tenho R$ 500 guardado",
+      "Consigo separar uns R$ 300 por mês para pagar dívidas",
+      "Estou negativado no Serasa",
+      "Qual meu QuitaScore?",
+    ],
+  },
+];
+
 // ── Aba Bot QuitaZAP ─────────────────────
 function AbaBot() {
   const [chat, setChat] = useState<MensagemChat[]>([
@@ -260,16 +316,17 @@ function AbaBot() {
   const [historico, setHistorico] = useState<MensagemIA[]>([
     { role: "assistant", content: MSG_BOAS_VINDAS },
   ]);
-  const [input, setInput]       = useState("");
+  const [input, setInput]           = useState("");
   const [carregando, setCarregando] = useState(false);
-  const [nome, setNome]         = useState("Ibrahim");
+  const [nome, setNome]             = useState("Ibrahim");
+  const [categoriaAberta, setCategoriaAberta] = useState<string | null>("Perfil");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function enviar() {
-    const texto = input.trim();
+  async function enviar(textoOverride?: string) {
+    const texto = (textoOverride ?? input).trim();
     if (!texto || carregando) return;
 
-    setInput("");
+    if (!textoOverride) setInput("");
     setChat((prev) => [...prev, { de: "lead", texto }]);
     setCarregando(true);
 
@@ -295,13 +352,13 @@ function AbaBot() {
         setChat((prev) => [...prev, { de: "bot", texto: data.resposta }]);
         novoHistorico.push({ role: "assistant", content: data.resposta });
       } else if (data.diagnostico) {
-        const resumo = `✅ *Diagnóstico gerado!*\n\nDados coletados com sucesso. Em produção, o bot geraria o diagnóstico completo aqui.`;
+        const resumo = `✅ *Diagnóstico gerado!*\n\nDados coletados com sucesso. Em produção o bot apresentaria o diagnóstico completo aqui.`;
         setChat((prev) => [...prev, { de: "bot", texto: resumo }]);
         novoHistorico.push({ role: "assistant", content: resumo });
       }
 
       setHistorico(novoHistorico);
-    } catch (err) {
+    } catch {
       setChat((prev) => [...prev, { de: "bot", texto: `❌ Erro de conexão.` }]);
     } finally {
       setCarregando(false);
@@ -313,6 +370,7 @@ function AbaBot() {
     setChat([{ de: "bot", texto: MSG_BOAS_VINDAS }]);
     setHistorico([{ role: "assistant", content: MSG_BOAS_VINDAS }]);
     setInput("");
+    setCategoriaAberta("Perfil");
   }
 
   return (
@@ -342,7 +400,7 @@ function AbaBot() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviar()}
-              placeholder="Digite sua mensagem..."
+              placeholder="Digite ou use os atalhos abaixo..."
               disabled={carregando}
               style={{
                 flex: 1, border: "1px solid #d1d5db", borderRadius: 20,
@@ -351,7 +409,7 @@ function AbaBot() {
               }}
             />
             <button
-              onClick={enviar}
+              onClick={() => enviar()}
               disabled={carregando || !input.trim()}
               style={{
                 background: carregando || !input.trim() ? "#9ca3af" : "#25D366",
@@ -363,6 +421,53 @@ function AbaBot() {
           </div>
         }
       />
+
+      {/* Respostas rápidas */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>⚡ Respostas rápidas</span>
+          <span style={{ fontSize: 12, color: "#9ca3af" }}>— clique para enviar sem digitar</span>
+        </div>
+
+        {RESPOSTAS_RAPIDAS.map(({ categoria, emoji, itens }) => (
+          <div key={categoria} style={{ borderBottom: "1px solid #f1f5f9" }}>
+            <button
+              onClick={() => setCategoriaAberta(categoriaAberta === categoria ? null : categoria)}
+              style={{
+                width: "100%", textAlign: "left", background: categoriaAberta === categoria ? "#f0fdf4" : "#fff",
+                border: "none", padding: "10px 16px", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>{emoji}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{categoria}</span>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af" }}>
+                {categoriaAberta === categoria ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {categoriaAberta === categoria && (
+              <div style={{ padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                {itens.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => enviar(item)}
+                    disabled={carregando}
+                    style={{
+                      textAlign: "left", background: "#DCF8C6", border: "1px solid #86efac",
+                      borderRadius: 8, padding: "7px 12px", fontSize: 13,
+                      cursor: carregando ? "not-allowed" : "pointer", color: "#166534",
+                      opacity: carregando ? 0.5 : 1, lineHeight: 1.4,
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", margin: 0 }}>
         💡 Este chat chama a IA diretamente — sem WhatsApp. Respostas reais do bot.
