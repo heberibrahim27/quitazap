@@ -2,7 +2,7 @@
 
 // ─────────────────────────────────────────
 // QuitaZAP — Cobrador Automático (painel)
-// /cobrador
+// /cobrador — redesign moderno v2
 // ─────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
@@ -21,126 +21,122 @@ interface Cobranca {
   tentativas: number;
   ultimoEnvio: string | null;
   criadoEm: string;
-  cliente?: { nome: string; telefone: string };
 }
-
-const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string }> = {
-  PENDENTE:  { label: "Pendente",  dot: "bg-amber-400",  badge: "bg-amber-50 text-amber-700 border border-amber-200"   },
-  ENVIADA:   { label: "Enviada",   dot: "bg-blue-400",   badge: "bg-blue-50 text-blue-700 border border-blue-200"       },
-  PAGA:      { label: "Paga",      dot: "bg-emerald-400",badge: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  CANCELADA: { label: "Cancelada", dot: "bg-gray-300",   badge: "bg-gray-50 text-gray-500 border border-gray-200"       },
-};
-
-const ETAPA_LABEL: Record<number, { label: string; cor: string }> = {
-  1: { label: "Amigável",      cor: "text-blue-600 bg-blue-50"   },
-  2: { label: "Firme",         cor: "text-orange-600 bg-orange-50" },
-  3: { label: "Última chance", cor: "text-red-600 bg-red-50"     },
-};
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
-
-function fmtData(s: string) {
-  return new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
 function fmtDataCurta(s: string) {
   return new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
-
 function diasRestantes(vencimento: string): number {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const venc = new Date(vencimento);
-  venc.setHours(0, 0, 0, 0);
-  return Math.round((venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const venc = new Date(vencimento); venc.setHours(0, 0, 0, 0);
+  return Math.round((venc.getTime() - hoje.getTime()) / 86_400_000);
 }
 
-export default function CobradorPage() {
-  const [cobrancas, setCobrancas]       = useState<Cobranca[]>([]);
-  const [total, setTotal]               = useState(0);
-  const [loading, setLoading]           = useState(true);
-  const [filtroStatus, setFiltroStatus] = useState("");
-  const [form, setForm]                 = useState({
-    devedorNome: "", devedorFone: "", valor: "", diaVencimento: "",
-    mensagem: "", pixChave: "",
-  });
-  const [criando, setCriando]           = useState(false);
-  const [disparando, setDisparando]     = useState<string | null>(null);
-  const [feedback, setFeedback]         = useState<{ msg: string; tipo: "ok" | "erro" } | null>(null);
-  const [mostrarForm, setMostrarForm]   = useState(false);
+const STATUS_DOT: Record<string, string> = {
+  PENDENTE:  "bg-amber-400",
+  ENVIADA:   "bg-blue-400",
+  PAGA:      "bg-emerald-400",
+  CANCELADA: "bg-gray-300",
+};
+const STATUS_PILL: Record<string, string> = {
+  PENDENTE:  "bg-amber-100 text-amber-800",
+  ENVIADA:   "bg-blue-100 text-blue-800",
+  PAGA:      "bg-emerald-100 text-emerald-800",
+  CANCELADA: "bg-gray-100 text-gray-500",
+};
+const STATUS_LABEL: Record<string, string> = {
+  PENDENTE: "Pendente", ENVIADA: "Enviada", PAGA: "Paga", CANCELADA: "Cancelada",
+};
+const ETAPA_PILL: Record<number, string> = {
+  1: "bg-sky-100 text-sky-700",
+  2: "bg-orange-100 text-orange-700",
+  3: "bg-red-100 text-red-700",
+};
+const ETAPA_LABEL: Record<number, string> = {
+  1: "Amigável", 2: "Firme", 3: "Última chance",
+};
 
-  const showFeedback = (msg: string, tipo: "ok" | "erro" = "ok") => {
-    setFeedback({ msg, tipo });
-    setTimeout(() => setFeedback(null), 4000);
+export default function CobradorPage() {
+  const [cobrancas, setCobrancas]     = useState<Cobranca[]>([]);
+  const [total, setTotal]             = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [filtro, setFiltro]           = useState("");
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [criando, setCriando]         = useState(false);
+  const [disparando, setDisparando]   = useState<string | null>(null);
+  const [toast, setToast]             = useState<{ msg: string; ok: boolean } | null>(null);
+  const [form, setForm]               = useState({
+    devedorNome: "", devedorFone: "", valor: "", diaVencimento: "", mensagem: "", pixChave: "",
+  });
+
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 4000);
   };
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const qs = filtroStatus ? `&status=${filtroStatus}` : "";
+    const qs = filtro ? `&status=${filtro}` : "";
     const res = await fetch(`/api/cobrador?limit=100${qs}`);
     if (res.ok) {
-      const data = await res.json();
-      setCobrancas(data.cobrancas ?? []);
-      setTotal(data.total ?? 0);
+      const d = await res.json();
+      setCobrancas(d.cobrancas ?? []);
+      setTotal(d.total ?? 0);
     }
     setLoading(false);
-  }, [filtroStatus]);
+  }, [filtro]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  async function atualizarStatus(id: string, status: string) {
+  async function marcarPaga(id: string) {
     const res = await fetch("/api/cobrador", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "PAGA" }),
     });
     if (res.ok) {
-      setCobrancas((prev) => prev.map((c) => c.id === id ? { ...c, status: status as Cobranca["status"] } : c));
-      showFeedback(status === "PAGA" ? "✅ Marcada como paga!" : "Cobrança atualizada.");
-    } else {
-      showFeedback("Erro ao atualizar.", "erro");
-    }
+      setCobrancas((prev) => prev.map((c) => c.id === id ? { ...c, status: "PAGA" } : c));
+      showToast("✅ Marcada como paga!");
+    } else showToast("Erro ao atualizar.", false);
   }
 
-  async function enviarCobrancaAgora(c: Cobranca) {
-    setDisparando(c.id);
-    // Atualiza status para ENVIADA — o cron já enviará na próxima rodada
-    // Para envio imediato, chamamos o endpoint de disparar filtrando essa cobrança
-    const res = await fetch("/api/cobrador/disparar", { method: "POST" });
-    const data = await res.json();
-    setDisparando(null);
+  async function cancelarCobranca(id: string) {
+    const res = await fetch("/api/cobrador", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "CANCELADA" }),
+    });
     if (res.ok) {
-      showFeedback(`📤 ${data.disparadas ?? 0} cobrança(s) disparada(s)!`);
-      carregar();
-    } else {
-      showFeedback("Erro ao disparar.", "erro");
-    }
+      setCobrancas((prev) => prev.map((c) => c.id === id ? { ...c, status: "CANCELADA" } : c));
+      showToast("Cobrança cancelada.");
+    } else showToast("Erro ao cancelar.", false);
   }
 
   async function dispararTodas() {
     setDisparando("all");
     const res = await fetch("/api/cobrador/disparar", { method: "POST" });
-    const data = await res.json();
+    const d   = await res.json();
     setDisparando(null);
     if (res.ok) {
-      const msg = data.disparadas > 0
-        ? `🚀 ${data.disparadas} mensagem(ns) enviada(s)!`
-        : "Nenhuma cobrança pendente para enviar hoje.";
-      showFeedback(msg);
+      showToast(d.disparadas > 0 ? `🚀 ${d.disparadas} mensagem(ns) enviada(s)!` : "Nenhuma pendente para hoje.");
       carregar();
-    } else {
-      showFeedback(`Erro: ${data.error ?? "desconhecido"}`, "erro");
-    }
+    } else showToast(`Erro: ${d.error ?? "desconhecido"}`, false);
+  }
+
+  async function enviarAgora() {
+    setDisparando("now");
+    const res = await fetch("/api/cobrador/disparar", { method: "POST" });
+    const d   = await res.json();
+    setDisparando(null);
+    if (res.ok) { showToast(`📤 ${d.disparadas ?? 0} enviada(s)!`); carregar(); }
+    else showToast("Erro ao disparar.", false);
   }
 
   async function criarCobranca(e: React.FormEvent) {
-    e.preventDefault();
-    setCriando(true);
+    e.preventDefault(); setCriando(true);
     const res = await fetch("/api/cobrador", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         devedorNome:   form.devedorNome.trim(),
         devedorFone:   form.devedorFone.trim(),
@@ -152,119 +148,121 @@ export default function CobradorPage() {
     });
     setCriando(false);
     if (res.ok) {
-      showFeedback("✅ Cobrança criada!");
+      showToast("✅ Cobrança criada!");
       setForm({ devedorNome: "", devedorFone: "", valor: "", diaVencimento: "", mensagem: "", pixChave: "" });
-      setMostrarForm(false);
-      carregar();
+      setMostrarForm(false); carregar();
     } else {
       const err = await res.json();
-      showFeedback(`Erro: ${err.error ?? "desconhecido"}`, "erro");
+      showToast(`Erro: ${err.error ?? "desconhecido"}`, false);
     }
   }
 
-  // Totalizadores
-  const pendentes  = cobrancas.filter((c) => c.status === "PENDENTE").length;
-  const enviadas   = cobrancas.filter((c) => c.status === "ENVIADA").length;
-  const pagas      = cobrancas.filter((c) => c.status === "PAGA").length;
-  const valorAberto = cobrancas
-    .filter((c) => c.status !== "PAGA" && c.status !== "CANCELADA")
-    .reduce((s, c) => s + c.valor, 0);
-  const valorRecebido = cobrancas
-    .filter((c) => c.status === "PAGA")
-    .reduce((s, c) => s + c.valor, 0);
+  // KPIs
+  const pendentes     = cobrancas.filter((c) => c.status === "PENDENTE").length;
+  const enviadas      = cobrancas.filter((c) => c.status === "ENVIADA").length;
+  const pagas         = cobrancas.filter((c) => c.status === "PAGA").length;
+  const valorAberto   = cobrancas.filter((c) => c.status !== "PAGA" && c.status !== "CANCELADA").reduce((s, c) => s + c.valor, 0);
+  const valorRecebido = cobrancas.filter((c) => c.status === "PAGA").reduce((s, c) => s + c.valor, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Topbar */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              💸 Cobrador Automático
-            </h1>
-            <p className="text-xs text-gray-400 mt-0.5">{total} cobrança{total !== 1 ? "s" : ""} no total</p>
+    <div className="min-h-screen bg-[#f4f6fb]">
+
+      {/* ── Hero header ─────────────────────── */}
+      <div className="bg-gradient-to-br from-[#1a1f36] to-[#2e3a6e] text-white">
+        <div className="max-w-5xl mx-auto px-4 pt-8 pb-6">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-blue-300 mb-1">QuitaZAP</p>
+              <h1 className="text-2xl sm:text-3xl font-bold">💸 Cobrador Automático</h1>
+              <p className="text-sm text-blue-200 mt-1">{total} cobrança{total !== 1 ? "s" : ""} registradas</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setMostrarForm(!mostrarForm)}
+                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition backdrop-blur"
+              >
+                + Nova cobrança
+              </button>
+              <button
+                onClick={dispararTodas}
+                disabled={disparando === "all"}
+                className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-900/40 transition"
+              >
+                {disparando === "all" ? "⏳ Enviando..." : "🚀 Disparar pendentes"}
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={dispararTodas}
-              disabled={disparando === "all"}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-            >
-              {disparando === "all" ? "⏳ Enviando..." : "🚀 Disparar pendentes"}
-            </button>
-            <button
-              onClick={() => setMostrarForm(!mostrarForm)}
-              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-            >
-              + Nova cobrança
-            </button>
+
+          {/* KPI cards inside hero */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
+            {[
+              { label: "Pendentes",  val: pendentes,            icon: "⏳", color: "bg-amber-500/20 border-amber-400/30  text-amber-300"  },
+              { label: "Enviadas",   val: enviadas,             icon: "📤", color: "bg-blue-500/20  border-blue-400/30   text-blue-300"   },
+              { label: "Pagas",      val: pagas,                icon: "✅", color: "bg-emerald-500/20 border-emerald-400/30 text-emerald-300" },
+              { label: "Em aberto",  val: fmtValor(valorAberto),  icon: "💰", color: "bg-orange-500/20 border-orange-400/30 text-orange-300" },
+              { label: "Recebido",   val: fmtValor(valorRecebido),icon: "🏆", color: "bg-green-500/20  border-green-400/30  text-green-300"  },
+            ].map((k) => (
+              <div key={k.label} className={`${k.color} border rounded-2xl p-3 backdrop-blur`}>
+                <div className="text-xl mb-0.5">{k.icon}</div>
+                <div className="text-lg sm:text-xl font-bold leading-tight">{k.val}</div>
+                <div className="text-xs font-medium opacity-80 mt-0.5">{k.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Feedback */}
-        {feedback && (
-          <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium ${
-            feedback.tipo === "erro"
-              ? "bg-red-50 text-red-700 border border-red-200"
-              : "bg-green-50 text-green-700 border border-green-200"
+      {/* ── Conteúdo ─────────────────────────── */}
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+        {/* Toast */}
+        {toast && (
+          <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-2xl shadow-xl text-sm font-medium text-white transition-all ${
+            toast.ok ? "bg-emerald-600" : "bg-red-600"
           }`}>
-            {feedback.msg}
+            {toast.msg}
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          {[
-            { label: "Pendentes",    value: pendentes,          sub: "aguardando envio",   color: "text-amber-600",   bg: "bg-amber-50 border-amber-100"    },
-            { label: "Enviadas",     value: enviadas,           sub: "aguardando pagamento",color: "text-blue-600",    bg: "bg-blue-50 border-blue-100"      },
-            { label: "Pagas",        value: pagas,              sub: "confirmadas",         color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
-            { label: "Em aberto",    value: fmtValor(valorAberto),  sub: "a receber",     color: "text-orange-600",  bg: "bg-orange-50 border-orange-100"   },
-            { label: "Recebido",     value: fmtValor(valorRecebido),sub: "confirmado",     color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-100" },
-          ].map((k) => (
-            <div key={k.label} className={`${k.bg} border rounded-xl p-3`}>
-              <div className={`text-xl font-bold ${k.color}`}>{k.value}</div>
-              <div className="text-xs font-medium text-gray-700 mt-0.5">{k.label}</div>
-              <div className="text-xs text-gray-400">{k.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Formulário nova cobrança */}
+        {/* ── Formulário ─── */}
         {mostrarForm && (
-          <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6">
-            <h2 className="font-semibold text-gray-800 mb-1">Nova cobrança manual</h2>
-            <p className="text-xs text-gray-400 mb-4">Pelo WhatsApp do bot, basta dizer: <em>Cobrar João, 71999..., R$500, dia 20</em></p>
-            <form onSubmit={criarCobranca} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-gray-800">Nova cobrança</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Ou no WhatsApp: <em>Cobrar João, 71999..., R$500, dia 20</em></p>
+              </div>
+              <button onClick={() => setMostrarForm(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+            <form onSubmit={criarCobranca} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { field: "devedorNome",   label: "Nome do devedor *",     placeholder: "João Silva"            },
-                { field: "devedorFone",   label: "WhatsApp do devedor *", placeholder: "71999999999"           },
-                { field: "valor",         label: "Valor (R$) *",          placeholder: "500,00"                },
-                { field: "diaVencimento", label: "Dia do vencimento *",   placeholder: "20"                   },
-                { field: "mensagem",      label: "Mensagem personalizada", placeholder: "João, combinamos..."   },
-                { field: "pixChave",      label: "Chave Pix (opcional)",  placeholder: "71999999999 ou email"  },
-              ].map(({ field, label, placeholder }) => (
+                { field: "devedorNome",   label: "Nome do devedor",      placeholder: "João Silva",         req: true  },
+                { field: "devedorFone",   label: "WhatsApp do devedor",   placeholder: "71999999999",        req: true  },
+                { field: "valor",         label: "Valor (R$)",            placeholder: "500,00",             req: true  },
+                { field: "diaVencimento", label: "Dia do vencimento",     placeholder: "20",                 req: true  },
+                { field: "pixChave",      label: "Chave Pix (opcional)",  placeholder: "CPF, e-mail, etc.", req: false },
+                { field: "mensagem",      label: "Mensagem personalizada",placeholder: "João, combinamos…",  req: false },
+              ].map(({ field, label, placeholder, req }) => (
                 <div key={field}>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                    {label}{req && <span className="text-red-400 ml-0.5">*</span>}
+                  </label>
                   <input
-                    required={label.includes("*")}
+                    required={req}
                     value={form[field as keyof typeof form]}
                     onChange={(e) => setForm({ ...form, [field]: e.target.value })}
                     placeholder={placeholder}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition"
                   />
                 </div>
               ))}
-              <div className="sm:col-span-2 flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setMostrarForm(false)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">
+              <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setMostrarForm(false)}
+                  className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2.5 rounded-xl transition">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={criando}
-                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium px-6 py-2 rounded-lg transition"
-                >
+                <button type="submit" disabled={criando}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-bold px-7 py-2.5 rounded-xl shadow-md shadow-green-200 transition">
                   {criando ? "Salvando..." : "Criar cobrança"}
                 </button>
               </div>
@@ -272,131 +270,147 @@ export default function CobradorPage() {
           </div>
         )}
 
-        {/* Filtros */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {/* ── Filtros ─── */}
+        <div className="flex items-center gap-2 flex-wrap">
           {[
-            { v: "",           label: "Todas"      },
-            { v: "PENDENTE",   label: "Pendentes"  },
-            { v: "ENVIADA",    label: "Enviadas"   },
-            { v: "PAGA",       label: "Pagas"      },
-            { v: "CANCELADA",  label: "Canceladas" },
+            { v: "",          label: "Todas"      },
+            { v: "PENDENTE",  label: "⏳ Pendentes" },
+            { v: "ENVIADA",   label: "📤 Enviadas"  },
+            { v: "PAGA",      label: "✅ Pagas"     },
+            { v: "CANCELADA", label: "Canceladas"  },
           ].map((f) => (
-            <button
-              key={f.v}
-              onClick={() => setFiltroStatus(f.v)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-                filtroStatus === f.v
-                  ? "bg-gray-900 text-white border-gray-900"
+            <button key={f.v} onClick={() => setFiltro(f.v)}
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition border ${
+                filtro === f.v
+                  ? "bg-[#1a1f36] text-white border-[#1a1f36] shadow"
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
-            >
+              }`}>
               {f.label}
             </button>
           ))}
-          <button onClick={carregar} className="ml-auto text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2">
+          <button onClick={carregar}
+            className="ml-auto text-xs text-gray-400 hover:text-gray-600 bg-white border border-gray-200 px-3 py-2 rounded-full transition">
             ↺ Atualizar
           </button>
         </div>
 
-        {/* Lista */}
+        {/* ── Lista ─── */}
         {loading ? (
-          <div className="text-center text-gray-300 py-16 text-4xl">⏳</div>
+          <div className="text-center py-20 text-4xl animate-pulse">⏳</div>
         ) : cobrancas.length === 0 ? (
-          <div className="bg-white rounded-2xl border p-12 text-center">
-            <div className="text-5xl mb-3">💸</div>
-            <p className="font-medium text-gray-700 mb-1">Nenhuma cobrança encontrada</p>
-            <p className="text-sm text-gray-400">
-              Pelo WhatsApp do bot, diga:<br />
-              <span className="font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs mt-1 inline-block">
-                Cobrar João Silva, 71999999999, R$500, dia 20
-              </span>
-            </p>
+          <div className="bg-white rounded-3xl border border-dashed border-gray-200 p-14 text-center">
+            <div className="text-6xl mb-4">💸</div>
+            <p className="font-bold text-gray-700 text-lg mb-1">Nenhuma cobrança ainda</p>
+            <p className="text-sm text-gray-400 mb-5">Crie uma acima ou mande no WhatsApp:</p>
+            <code className="inline-block bg-gray-50 border border-gray-200 text-gray-600 text-xs px-4 py-2 rounded-xl">
+              Cobrar João Silva, 71999999999, R$500, dia 20
+            </code>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {cobrancas.map((c) => {
-              const st    = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.PENDENTE;
-              const etapa = ETAPA_LABEL[c.etapa];
-              const dias  = diasRestantes(c.vencimento);
-              const vencida = dias < 0 && c.status !== "PAGA" && c.status !== "CANCELADA";
+              const dias   = diasRestantes(c.vencimento);
+              const atrasada = dias < 0 && c.status !== "PAGA" && c.status !== "CANCELADA";
+              const urgente  = !atrasada && dias <= 3 && dias >= 0 && c.status === "PENDENTE";
 
               return (
-                <div
-                  key={c.id}
-                  className={`bg-white rounded-xl border px-5 py-4 flex items-start gap-4 ${
-                    vencida ? "border-red-200" : "border-gray-100"
-                  } hover:shadow-sm transition`}
-                >
-                  {/* Dot status */}
-                  <div className="mt-1 flex-shrink-0">
-                    <span className={`w-2.5 h-2.5 rounded-full block ${st.dot}`} />
-                  </div>
+                <div key={c.id}
+                  className={`bg-white rounded-2xl border shadow-sm transition hover:shadow-md ${
+                    atrasada ? "border-red-200" : urgente ? "border-amber-200" : "border-gray-100"
+                  }`}>
+                  {/* Linha colorida no topo para status */}
+                  <div className={`h-1 rounded-t-2xl ${STATUS_DOT[c.status]}`} />
 
-                  {/* Info principal */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-semibold text-gray-900 text-sm">{c.devedorNome}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.badge}`}>
-                        {st.label}
-                      </span>
-                      {c.status === "ENVIADA" && etapa && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${etapa.cor}`}>
-                          {etapa.label}
-                        </span>
-                      )}
-                      {vencida && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-medium border border-red-100">
-                          {Math.abs(dias)}d de atraso
-                        </span>
-                      )}
-                      {!vencida && dias >= 0 && dias <= 3 && c.status === "PENDENTE" && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium border border-amber-100">
-                          vence em {dias === 0 ? "hoje" : `${dias}d`}
-                        </span>
-                      )}
+                  <div className="px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      {/* Avatar inicial */}
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-0.5">
+                        {c.devedorNome.charAt(0).toUpperCase()}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        {/* Linha 1: Nome + badges */}
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-bold text-gray-900">{c.devedorNome}</span>
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${STATUS_PILL[c.status]}`}>
+                            {STATUS_LABEL[c.status]}
+                          </span>
+                          {c.status === "ENVIADA" && (
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${ETAPA_PILL[c.etapa] ?? "bg-gray-100 text-gray-600"}`}>
+                              {ETAPA_LABEL[c.etapa]}
+                            </span>
+                          )}
+                          {atrasada && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                              🚨 {Math.abs(dias)}d atraso
+                            </span>
+                          )}
+                          {urgente && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                              ⚡ vence {dias === 0 ? "hoje" : `em ${dias}d`}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Linha 2: Detalhes */}
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                          <span>{c.devedorFone}</span>
+                          <span className="font-bold text-gray-800 text-sm">{fmtValor(c.valor)}</span>
+                          <span>📅 {fmtDataCurta(c.vencimento)}</span>
+                          {c.pixChave && <span>🔑 Pix: {c.pixChave}</span>}
+                          {c.ultimoEnvio && <span>📤 {fmtDataCurta(c.ultimoEnvio)} ({c.tentativas}×)</span>}
+                        </div>
+
+                        {c.mensagem && (
+                          <p className="mt-1.5 text-xs text-gray-400 italic">"{c.mensagem}"</p>
+                        )}
+                      </div>
+
+                      {/* Ações — desktop: coluna vertical */}
+                      <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0 items-end">
+                        {(c.status === "PENDENTE" || c.status === "ENVIADA") && (
+                          <button onClick={() => marcarPaga(c.id)}
+                            className="text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl shadow-sm transition whitespace-nowrap">
+                            ✅ Paga
+                          </button>
+                        )}
+                        {c.status === "PENDENTE" && (
+                          <button onClick={enviarAgora} disabled={!!disparando}
+                            className="text-xs font-semibold bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-xl shadow-sm transition whitespace-nowrap">
+                            {disparando === "now" ? "⏳" : "📤 Enviar agora"}
+                          </button>
+                        )}
+                        {c.status !== "CANCELADA" && c.status !== "PAGA" && (
+                          <button onClick={() => cancelarCobranca(c.id)}
+                            className="text-xs text-gray-400 hover:text-red-500 transition px-2">
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
-                      <span>📞 {c.devedorFone}</span>
-                      <span>💰 <strong className="text-gray-700">{fmtValor(c.valor)}</strong></span>
-                      <span>📅 vence {fmtDataCurta(c.vencimento)}</span>
-                      {c.ultimoEnvio && (
-                        <span>📤 último envio {fmtDataCurta(c.ultimoEnvio)} ({c.tentativas}×)</span>
+                    {/* Ações — mobile: linha horizontal */}
+                    <div className="flex sm:hidden gap-2 mt-3 pt-3 border-t border-gray-50">
+                      {(c.status === "PENDENTE" || c.status === "ENVIADA") && (
+                        <button onClick={() => marcarPaga(c.id)}
+                          className="flex-1 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl transition">
+                          ✅ Paga
+                        </button>
+                      )}
+                      {c.status === "PENDENTE" && (
+                        <button onClick={enviarAgora} disabled={!!disparando}
+                          className="flex-1 text-xs font-bold bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white py-2 rounded-xl transition">
+                          📤 Enviar agora
+                        </button>
+                      )}
+                      {c.status !== "CANCELADA" && c.status !== "PAGA" && (
+                        <button onClick={() => cancelarCobranca(c.id)}
+                          className="text-xs text-gray-400 hover:text-red-500 px-3 py-2 rounded-xl transition">
+                          ✕
+                        </button>
                       )}
                     </div>
-
-                    {c.mensagem && (
-                      <p className="mt-1 text-xs text-gray-400 italic">"{c.mensagem}"</p>
-                    )}
-                  </div>
-
-                  {/* Ações */}
-                  <div className="flex flex-col gap-1.5 flex-shrink-0 items-end">
-                    {(c.status === "PENDENTE" || c.status === "ENVIADA") && (
-                      <button
-                        onClick={() => atualizarStatus(c.id, "PAGA")}
-                        className="text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition whitespace-nowrap"
-                      >
-                        ✅ Marcar paga
-                      </button>
-                    )}
-                    {c.status === "PENDENTE" && (
-                      <button
-                        onClick={() => enviarCobrancaAgora(c)}
-                        disabled={disparando === c.id}
-                        className="text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition whitespace-nowrap disabled:opacity-50"
-                      >
-                        {disparando === c.id ? "⏳" : "📤 Enviar agora"}
-                      </button>
-                    )}
-                    {c.status !== "CANCELADA" && c.status !== "PAGA" && (
-                      <button
-                        onClick={() => atualizarStatus(c.id, "CANCELADA")}
-                        className="text-xs text-gray-400 hover:text-red-500 transition"
-                      >
-                        Cancelar
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -404,15 +418,29 @@ export default function CobradorPage() {
           </div>
         )}
 
-        {/* Instrução do bot */}
-        <div className="mt-8 bg-green-50 border border-green-100 rounded-2xl p-5">
-          <p className="text-sm font-semibold text-green-800 mb-2">💬 Como criar cobranças pelo WhatsApp:</p>
-          <div className="font-mono bg-white border border-green-200 rounded-lg p-3 text-xs text-gray-700 mb-2">
-            Cobrar João Silva, 71999999999, R$500, dia 20<br />
-            mensagem: &quot;João, combinamos R$500 para o dia 20&quot;
+        {/* ── Como usar ─── */}
+        <div className="bg-gradient-to-br from-[#1a1f36] to-[#2e3a6e] text-white rounded-3xl p-6 mt-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-300 mb-3">Como cobrar</p>
+          <div className="space-y-3">
+            {[
+              { emoji: "💬", title: "Agendar cobrança",      text: 'Cobrar João, 71999999999, R$500, dia 20' },
+              { emoji: "⚡", title: "Enviar imediatamente",  text: 'Cobrar Maria, 71988887777, R$200, manda agora' },
+              { emoji: "🔑", title: "Com chave Pix",         text: 'Cobrar Ana, 71977776666, R$300, dia 15, pix: 071.234.567-00' },
+              { emoji: "🎤", title: "Por áudio",             text: "Fale a cobrança no áudio — o bot transcreve e processa igual" },
+            ].map((item) => (
+              <div key={item.title} className="flex gap-3 items-start">
+                <span className="text-xl mt-0.5">{item.emoji}</span>
+                <div>
+                  <p className="text-xs font-semibold text-blue-200 mb-0.5">{item.title}</p>
+                  <code className="text-xs bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-blue-100 block">
+                    {item.text}
+                  </code>
+                </div>
+              </div>
+            ))}
           </div>
-          <p className="text-xs text-green-700">
-            O bot entende mensagem de texto ou áudio 🎤. Diga "manda agora" para envio imediato sem agendamento.
+          <p className="text-xs text-blue-300 mt-5 border-t border-white/10 pt-4">
+            Régua automática: <strong>Amigável</strong> no vencimento → <strong>Firme</strong> em +3 dias → <strong>Última chance</strong> em +7 dias 🔄
           </p>
         </div>
       </div>
