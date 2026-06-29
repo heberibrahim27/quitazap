@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-function fecharMenu() {
-  const toggle = document.getElementById("nav-toggle") as HTMLInputElement | null;
-  if (toggle) toggle.checked = false;
-}
+import { useState } from "react";
 
 const links = [
   { href: "/",              label: "Dashboard"       },
@@ -22,6 +18,7 @@ const links = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const [menuAberto, setMenuAberto] = useState(false);
 
   if (pathname === "/oferta" || pathname === "/login") return null;
 
@@ -30,11 +27,13 @@ export function Navbar() {
     return pathname.startsWith(href);
   }
 
+  function fecharMenu() {
+    setMenuAberto(false);
+  }
+
   return (
     <>
       <style>{`
-        #nav-toggle { display: none; }
-
         .nav-bar {
           position: sticky; top: 0; z-index: 300;
           background: #0f172a; border-bottom: 1px solid #1e293b;
@@ -55,54 +54,19 @@ export function Navbar() {
         .nav-new   { background: #16a34a; color: #fff; font-weight: 700; font-size: 13px;
                      padding: 7px 13px; border-radius: 8px; white-space: nowrap; margin-left: 4px; }
 
-        .nav-hamburger-label {
+        .nav-hamburger-btn {
           display: none;
           background: #1e293b; border: none; border-radius: 8px;
           cursor: pointer; padding: 8px 14px; color: #fff;
           font-size: 24px; line-height: 1; flex-shrink: 0; user-select: none;
         }
 
-        .nav-mobile-menu {
-          display: none;
-          position: fixed; top: 56px; left: 0; right: 0; bottom: 0;
-          background: #0f172a; z-index: 299;
-          padding: 16px; flex-direction: column; gap: 4px; overflow-y: auto;
-        }
-
-        #nav-toggle:checked ~ .nav-mobile-menu { display: flex; }
-        #nav-toggle:checked ~ .nav-bar .nav-hamburger-label::after { content: "✕"; }
-        .nav-hamburger-label::after { content: "☰"; }
-
         @media (max-width: 700px) {
           .nav-links  { display: none; }
           .nav-new    { display: none; }
-          .nav-hamburger-label { display: flex; align-items: center; justify-content: center; }
+          .nav-hamburger-btn { display: flex; align-items: center; justify-content: center; }
         }
       `}</style>
-
-      <input type="checkbox" id="nav-toggle" />
-
-      <div className="nav-mobile-menu">
-        {links.map((l) => (
-          <Link key={l.href} href={l.href} onClick={fecharMenu} style={{
-            color: ativo(l.href) ? "#fff" : "#94a3b8",
-            fontWeight: ativo(l.href) ? 700 : 500,
-            fontSize: 17, padding: "16px", borderRadius: 12,
-            background: ativo(l.href) ? "#1e293b" : "transparent", display: "block",
-          }}>
-            {l.label}
-          </Link>
-        ))}
-        <div style={{ borderTop: "1px solid #1e293b", marginTop: 8, paddingTop: 8 }}>
-          <Link href="/clientes/novo" onClick={fecharMenu} style={{
-            background: "#16a34a", color: "#fff", fontWeight: 700,
-            fontSize: 16, padding: "16px", borderRadius: 12,
-            display: "block", textAlign: "center",
-          }}>
-            + Novo cliente
-          </Link>
-        </div>
-      </div>
 
       <nav className="nav-bar">
         <Link href="/" className="nav-logo">
@@ -129,8 +93,42 @@ export function Navbar() {
           padding: "6px 10px", borderRadius: 8, whiteSpace: "nowrap",
         }} className="nav-links">Sair</Link>
 
-        <label htmlFor="nav-toggle" className="nav-hamburger-label" />
+        <button
+          className="nav-hamburger-btn"
+          onClick={() => setMenuAberto(!menuAberto)}
+          aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
+        >
+          {menuAberto ? "✕" : "☰"}
+        </button>
       </nav>
+
+      {menuAberto && (
+        <div style={{
+          position: "fixed", top: 56, left: 0, right: 0, bottom: 0,
+          background: "#0f172a", zIndex: 299,
+          padding: 16, display: "flex", flexDirection: "column", gap: 4, overflowY: "auto",
+        }}>
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} onClick={fecharMenu} style={{
+              color: ativo(l.href) ? "#fff" : "#94a3b8",
+              fontWeight: ativo(l.href) ? 700 : 500,
+              fontSize: 17, padding: "16px", borderRadius: 12,
+              background: ativo(l.href) ? "#1e293b" : "transparent", display: "block",
+            }}>
+              {l.label}
+            </Link>
+          ))}
+          <div style={{ borderTop: "1px solid #1e293b", marginTop: 8, paddingTop: 8 }}>
+            <Link href="/clientes/novo" onClick={fecharMenu} style={{
+              background: "#16a34a", color: "#fff", fontWeight: 700,
+              fontSize: 16, padding: "16px", borderRadius: 12,
+              display: "block", textAlign: "center",
+            }}>
+              + Novo cliente
+            </Link>
+          </div>
+        </div>
+      )}
     </>
   );
 }
