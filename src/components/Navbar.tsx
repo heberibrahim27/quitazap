@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
 const links = [
@@ -18,10 +18,10 @@ const links = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [menuAberto, setMenuAberto] = useState(false);
 
-  // Fecha o menu sempre que a rota mudar (mais confiável que onClick em mobile)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Fecha o menu sempre que a rota mudar
   useEffect(() => { setMenuAberto(false); }, [pathname]);
 
   if (pathname === "/oferta" || pathname === "/login") return null;
@@ -31,8 +31,10 @@ export function Navbar() {
     return pathname.startsWith(href);
   }
 
-  function fecharMenu() {
+  // Navega e fecha o menu de forma explícita (mais confiável no mobile)
+  function navegar(href: string) {
     setMenuAberto(false);
+    router.push(href);
   }
 
   return (
@@ -113,23 +115,26 @@ export function Navbar() {
           padding: 16, display: "flex", flexDirection: "column", gap: 4, overflowY: "auto",
         }}>
           {links.map((l) => (
-            <Link key={l.href} href={l.href} onClick={fecharMenu} style={{
+            <button key={l.href} onClick={() => navegar(l.href)} style={{
               color: ativo(l.href) ? "#fff" : "#94a3b8",
               fontWeight: ativo(l.href) ? 700 : 500,
               fontSize: 17, padding: "16px", borderRadius: 12,
-              background: ativo(l.href) ? "#1e293b" : "transparent", display: "block",
+              background: ativo(l.href) ? "#1e293b" : "transparent",
+              display: "block", width: "100%", textAlign: "left",
+              border: "none", cursor: "pointer",
             }}>
               {l.label}
-            </Link>
+            </button>
           ))}
           <div style={{ borderTop: "1px solid #1e293b", marginTop: 8, paddingTop: 8 }}>
-            <Link href="/clientes/novo" onClick={fecharMenu} style={{
+            <button onClick={() => navegar("/clientes/novo")} style={{
               background: "#16a34a", color: "#fff", fontWeight: 700,
               fontSize: 16, padding: "16px", borderRadius: 12,
-              display: "block", textAlign: "center",
+              display: "block", width: "100%", textAlign: "center",
+              border: "none", cursor: "pointer",
             }}>
               + Novo cliente
-            </Link>
+            </button>
           </div>
         </div>
       )}
