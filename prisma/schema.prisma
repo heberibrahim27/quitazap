@@ -172,6 +172,133 @@ model Cobranca {
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 }
 
+// ═════════════════════════════════════════
+// QUITAZAP RECEBER — Modelos novos (multi-tenant)
+// Sistema separado dos modelos legados acima
+// ═════════════════════════════════════════
+
+// ─────────────────────────────────────────
+// USUARIO (dono da conta QuitaZAP Receber)
+// ─────────────────────────────────────────
+model Usuario {
+  id                String    @id @default(cuid())
+  nome              String
+  email             String    @unique
+  senhaHash         String
+  telefone          String?
+  // Plano: GRATUITO | RECEBER_BASICO | RECEBER_PRO | RECEBER_PREMIUM | CONTROLE
+  plano             String    @default("GRATUITO")
+  planoPago         Boolean   @default(false)
+  assinaturaId      String?
+  assinaturaVenceEm DateTime?
+  gratuito          Boolean   @default(false)
+  // WhatsApp Business
+  wpInstancia       String?
+  wpConectado       Boolean   @default(false)
+  wpTelefone        String?
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
+
+  contatos      ContatoReceber[]
+  pendencias    Pendencia[]
+  configuracoes ConfigUsuario?
+  enviosBot     EnvioBot[]
+}
+
+// ─────────────────────────────────────────
+// CONTATO (pagador/devedor do usuário)
+// ─────────────────────────────────────────
+model ContatoReceber {
+  id         String      @id @default(cuid())
+  usuarioId  String
+  nome       String
+  telefone   String
+  email      String?
+  documento  String?
+  obs        String?
+  criadoEm   DateTime    @default(now())
+
+  usuario    Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  pendencias Pendencia[]
+
+  @@unique([usuarioId, telefone])
+}
+
+// ─────────────────────────────────────────
+// PENDÊNCIA (cobrança/lembrete de pagamento)
+// ─────────────────────────────────────────
+model Pendencia {
+  id             String    @id @default(cuid())
+  usuarioId      String
+  contatoId      String?
+  // Dados
+  descricao      String
+  // tipo: VENDA_FIADA | SERVICO | PARCELA | MENSALIDADE | ALUGUEL | OUTRO
+  tipo           String    @default("OUTRO")
+  valor          Float
+  vencimento     DateTime
+  // Pagamento
+  // formaPagto: PIX_CHAVE | PIX_QR | PIX_LINK | MANUAL | SEM_PAGAMENTO_ONLINE
+  formaPagto     String?
+  pixChave       String?
+  linkSlug       String?   @unique
+  // Status: RASCUNHO | AGENDADA | ENVIADA | ENTREGUE | LIDA | LINK_ABERTO
+  //         | RESPONDIDA | AGUARDANDO_PAGAMENTO | PAGAMENTO_INICIADO
+  //         | PAGA | PARCIALMENTE_PAGA | VENCIDA | PAUSADA | CANCELADA | FALHOU
+  status         String    @default("RASCUNHO")
+  etapa          Int       @default(1)
+  tentativas     Int       @default(0)
+  enviarEm       DateTime?
+  ultimoEnvio    DateTime?
+  reguaPausada   Boolean   @default(false)
+  // Pagamento registrado
+  valorPago      Float?
+  pagoEm         DateTime?
+  comprovante    String?
+  confirmacaoManual Boolean @default(false)
+  // Mensagem personalizada
+  mensagemCustom String?
+  criadoEm       DateTime  @default(now())
+  atualizadoEm   DateTime  @updatedAt
+
+  usuario  Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  contato  ContatoReceber? @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+  envios   EnvioBot[]
+}
+
+// ─────────────────────────────────────────
+// ENVIO BOT (cada mensagem enviada)
+// ─────────────────────────────────────────
+model EnvioBot {
+  id          String    @id @default(cuid())
+  usuarioId   String
+  pendenciaId String
+  etapa       Int
+  mensagem    String
+  enviadoEm   DateTime  @default(now())
+  // status: ENVIADO | ENTREGUE | LIDO | RESPONDIDO | FALHOU
+  status      String    @default("ENVIADO")
+  resposta    String?
+
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  pendencia Pendencia @relation(fields: [pendenciaId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// CONFIGURAÇÕES DO USUÁRIO
+// ─────────────────────────────────────────
+model ConfigUsuario {
+  id             String  @id @default(cuid())
+  usuarioId      String  @unique
+  nomeNegocio    String?
+  horarioEnvio   String  @default("08:00")
+  fusoHorario    String  @default("America/Bahia")
+  resumoDiario   Boolean @default(true)
+  resumoSemanal  Boolean @default(true)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}
+
 // ─────────────────────────────────────────
 // LOG DE CONSUMO DE IA
 // ─────────────────────────────────────────

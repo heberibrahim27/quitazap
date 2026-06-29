@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+function fecharMenu() {
+  const toggle = document.getElementById("nav-toggle") as HTMLInputElement | null;
+  if (toggle) toggle.checked = false;
+}
+
 const links = [
   { href: "/",              label: "Dashboard"       },
   { href: "/clientes",      label: "Clientes"        },
@@ -79,7 +84,7 @@ export function Navbar() {
 
       <div className="nav-mobile-menu">
         {links.map((l) => (
-          <Link key={l.href} href={l.href} style={{
+          <Link key={l.href} href={l.href} onClick={fecharMenu} style={{
             color: ativo(l.href) ? "#fff" : "#94a3b8",
             fontWeight: ativo(l.href) ? 700 : 500,
             fontSize: 17, padding: "16px", borderRadius: 12,
@@ -89,7 +94,7 @@ export function Navbar() {
           </Link>
         ))}
         <div style={{ borderTop: "1px solid #1e293b", marginTop: 8, paddingTop: 8 }}>
-          <Link href="/clientes/novo" style={{
+          <Link href="/clientes/novo" onClick={fecharMenu} style={{
             background: "#16a34a", color: "#fff", fontWeight: 700,
             fontSize: 16, padding: "16px", borderRadius: 12,
             display: "block", textAlign: "center",

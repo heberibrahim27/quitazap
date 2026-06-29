@@ -433,23 +433,30 @@ CONTRACHEQUE / HOLERITE — REGRAS ESPECIAIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Quando o cliente enviar um contracheque (imagem ou PDF), siga estas regras sem exceção:
 
-1. RENDA = SALÁRIO LÍQUIDO NORMAL (sem verbas extraordinárias).
-   - Nunca use o bruto como renda.
-   - ⚠️ REGRA ABSOLUTA: se o contracheque tiver 13º salário, férias, abono ou qualquer verba extraordinária nas VANTAGENS, DESCONTE esse valor do líquido. O campo salarioLiquido DEVE conter o líquido sem extras.
-   - Exemplo: líquido R$7.140,69 com 13º de R$3.328,01 → salarioLiquido = 3812.68. NUNCA passe 7140.69.
+1. IDENTIFIQUE SALÁRIO NORMAL vs VERBAS EXTRAS
+   - salarioLiquido = salário líquido do mês NORMAL (sem 13°, férias, abono ou outras verbas extraordinárias).
+   - Se o contracheque incluir 13° salário, férias ou abono: separe esses valores.
+     • adiantamento13 = valor do 13°/férias/abono presente no contracheque
+     • salarioLiquidoComExtras = liquido total impresso no contracheque (salário normal + extras)
+   - Exemplo: líquido impresso R$7.140,69 com 13° de R$3.328,01:
+     • salarioLiquido = 3812.68 (salário normal, sem o 13°)
+     • adiantamento13 = 3328.01
+     • salarioLiquidoComExtras = 7140.69
+   - ⚠️ totalFamiliar = salarioLiquido + adiantamento13 (some tudo que entrou no mês).
+     Nunca deixe totalFamiliar igual a salarioLiquido quando há extras — isso gera déficit falso.
 
 2. DESCONTOS EM FOLHA = EMPRÉSTIMOS CONSIGNADOS + ASSOCIAÇÕES (já descontados antes do líquido).
    - Empréstimos consignados: registre como dívida tipo EMPRESTIMO.
    - Associações (ASTEBA, ASSEBA, ASPRA etc — parcela NNN/999 ou NNN/000): registre como tipo ASSOCIACAO, parcelasRestantes: 999.
    - NUNCA coloque consignados ou associações em despesasFixas. Só em dividas.
-   - NUNCA subtraia novamente — já saíram antes do líquido.
+   - NUNCA subtraia consignados do salário — já saíram antes do líquido.
 
 3. OUTROS DESCONTOS EM FOLHA (saúde, previdência, IR) já estão no líquido. Não trate como despesas adicionais.
 
 4. Ao apresentar o diagnóstico com contracheque, informe:
    - Renda mensal normal (líquido sem extras)
+   - Valor extra recebido este mês (13°/férias) e que é pontual
    - Que os consignados são pagos automaticamente em folha
-   - O saldo disponível real = líquido normal (sem subtrair consignados novamente)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SERVIDOR PÚBLICO — ANÁLISE DE MARGEM CONSIGNÁVEL
@@ -583,13 +590,15 @@ export async function processarMensagemIA(
               renda: {
                 type: "object",
                 properties: {
-                  salarioLiquido: { type: "number" },
+                  salarioLiquido: { type: "number", description: "Salário líquido mensal NORMAL, sem 13°/férias/abono" },
+                  salarioLiquidoComExtras: { type: "number", description: "Líquido total do mês quando há 13°/férias/abono incluídos" },
+                  adiantamento13: { type: "number", description: "Valor do 13° salário, férias ou abono incluído no contracheque deste mês" },
                   outrasRendas: { type: "number" },
                   comissoes: { type: "number" },
                   rendaConjuge: { type: "number" },
                   rendaExtra: { type: "number" },
                   beneficios: { type: "number" },
-                  totalFamiliar: { type: "number", description: "Soma de todas as fontes de renda" },
+                  totalFamiliar: { type: "number", description: "Soma de TODAS as fontes de renda do mês (incluindo 13°/férias/abono se houver). NUNCA deixe igual a salarioLiquido quando há extras." },
                 },
                 required: ["salarioLiquido", "totalFamiliar"],
               },

@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
+import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem } from "@/lib/ai-bot";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
@@ -15,9 +15,13 @@ import {
   gerarResumoSemana,
   gerarDespesasMes,
   gerarListaComandos,
+  gerarQuitaScore,
   calcularTotalParcelas,
 } from "@/lib/plano";
 import { urlPainelCobrador } from "@/lib/cobrador-token";
+
+// GIF de celebração quando o cliente avisa que pagou uma dívida
+const GIF_PARABENS = "https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif";
 
 // ── Transcrição de áudio via Whisper ─────
 async function transcreverAudio(audioUrl: string): Promise<string> {
@@ -328,11 +332,13 @@ function detectarComando(msg: string): string | null {
   if (/despesas? do mes|quanto devo por mes|minhas despesas/.test(m)) return "DESPESAS_MES";
   if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar/.test(m)) return "RECEITA_SEMANA";
   if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana/.test(m)) return "GASTAR_SEMANA";
-  if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso perguntar)/.test(m)) return "AJUDA";
+  if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso (perguntar|pedir|fazer|solicitar)|o que (vc|voce) (faz|pode)|quais (sao |são )?(os )?comandos)/.test(m)) return "AJUDA";
   if (/^(resete|resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
   if (/^cobrar?\s+\S/.test(m)) return "COBRAR";
   if (/minhas cobran[cç]as|ver cobran[cç]as|lista de cobran[cç]as|quem me deve/.test(m)) return "VER_COBRANCAS";
   if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel/.test(m)) return "MEU_PAINEL";
+  // Detecta quando o cliente avisa que pagou uma dívida
+  if (/paguei|ja paguei|ja quitei|quitei|paga a|paguei a|terminei de pagar|efetuei o pagamento/.test(m)) return "PAGUEI";
   return null;
 }
 
@@ -625,6 +631,13 @@ export async function POST(req: NextRequest) {
             await new Promise((r) => setTimeout(r, 1200));
           }
 
+          // Envia QuitaScore
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const scoreMsg = gerarQuitaScore(diag);
+            await sendWhatsApp(sessao.telefone, scoreMsg);
+          } catch { /* ignora */ }
+
           // Pergunta follow-up: se tem outras dívidas fora da folha
           await new Promise((r) => setTimeout(r, 2000));
           await sendWhatsApp(sessao.telefone,
@@ -859,6 +872,13 @@ export async function POST(req: NextRequest) {
 
     // ── Comandos rápidos (responde sem reativar sessão) ──
     const comando = detectarComando(mensagem);
+
+    // AJUDA funciona sempre, independente de ter renda ou não
+    if (comando === "AJUDA") {
+      await sendWhatsApp(telefone, gerarListaComandos(sessao.nome ?? "cliente"));
+      return NextResponse.json({ ok: true });
+    }
+
     if (comando && sessao.renda && sessao.renda > 0) {
       const nome = sessao.nome ?? "cliente";
       let resposta = "";
@@ -866,7 +886,7 @@ export async function POST(req: NextRequest) {
       if (sessao.clienteId) {
         const dividasDB = await prisma.divida.findMany({
           where: { clienteId: sessao.clienteId, status: "ATIVA" },
-          select: { credor: true, valorTotal: true, diaVencimento: true, emAtraso: true, obs: true },
+          select: { credor: true, valorTotal: true, diaVencimento: true, emAtraso: true, obs: true, tipo: true },
         });
         const totalParcelas = calcularTotalParcelas(dividasDB);
         const dividasFormatadas = dividasDB.map((d) => ({
@@ -874,6 +894,8 @@ export async function POST(req: NextRequest) {
           valorParcela: calcularTotalParcelas([d]),
           diaVencimento: d.diaVencimento,
           emAtraso: d.emAtraso,
+          tipo: d.tipo,
+          obs: d.obs,
         }));
 
         switch (comando) {
@@ -889,12 +911,19 @@ export async function POST(req: NextRequest) {
           case "GASTAR_SEMANA":
             resposta = gerarResumoSemana(nome, sessao.renda, totalParcelas, "gastar");
             break;
-          case "AJUDA":
-            resposta = gerarListaComandos(nome);
+          case "PAGUEI": {
+            // GIF de celebração + passa para IA processar a atualização
+            try {
+              await sendWhatsAppImage(
+                telefone,
+                GIF_PARABENS,
+                `🎉 *Parabéns, ${nome.split(" ")[0]}!* Cada dívida quitada é uma vitória! 💚`
+              );
+            } catch { /* ignora erro no GIF, continua */ }
+            // Deixa cair para a IA processar (não retorna aqui)
             break;
+          }
         }
-      } else if (comando === "AJUDA") {
-        resposta = gerarListaComandos(nome);
       }
 
       if (resposta) {
@@ -993,7 +1022,14 @@ export async function POST(req: NextRequest) {
         await sendWhatsApp(telefone, relatorio);
       }
 
-      // Envia lista de comandos como segunda mensagem
+      // Envia QuitaScore
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const scoreMsg = gerarQuitaScore(resultado.diagnostico);
+        await sendWhatsApp(telefone, scoreMsg);
+      } catch { /* ignora erro no score */ }
+
+      // Envia lista de comandos como terceira mensagem
       await new Promise((r) => setTimeout(r, 2000));
       await sendWhatsApp(telefone, gerarListaComandos(sessao.nome ?? "cliente"));
 

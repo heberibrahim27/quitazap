@@ -135,8 +135,18 @@ export function gerarDespesasMes(
     valorParcela: number;
     diaVencimento: number | null;
     emAtraso: boolean;
+    tipo?: string | null;
+    obs?: string | null;
   }>
 ): string {
+  // Filtra consignados/associações (descontados em folha — não são despesas manuais)
+  dividas = dividas.filter((d) => {
+    const tipo = (d.tipo ?? "").toUpperCase();
+    if (tipo === "EMPRESTIMO" || tipo === "ASSOCIACAO") return false;
+    // Fallback: obs com "contracheque" também indica consignado
+    if ((d.obs ?? "").toLowerCase().includes("contracheque")) return false;
+    return true;
+  });
   const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long" }).toUpperCase();
   const total = dividas.reduce((t, d) => t + d.valorParcela, 0);
   const emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
@@ -196,6 +206,112 @@ export function calcularTotalParcelas(
   dividas: Array<{ obs: string | null; valorTotal: number }>
 ): number {
   return dividas.reduce((t, d) => t + fmtParcela(d.obs, d.valorTotal), 0);
+}
+
+// ── QuitaScore ────────────────────────────
+export function gerarQuitaScore(diag: DiagnosticoIA): string {
+  const renda = diag.renda?.salarioLiquido ?? diag.renda?.totalFamiliar ?? 0;
+  const dividas = diag.dividas ?? [];
+  const cartoes = diag.cartoes ?? [];
+  const isServidor = (diag.dadosPessoais?.vinculo ?? "").toUpperCase().includes("SERVIDOR_PUBLICO");
+
+  // Para servidor: consignados já saem do líquido, não somam no comprometimento
+  const dividasComprometimento = isServidor
+    ? dividas.filter((d) => d.tipo !== "EMPRESTIMO" && d.tipo !== "ASSOCIACAO")
+    : dividas;
+
+  const totalParcelas = dividasComprometimento.reduce((s, d) => s + (d.valorParcela ?? 0), 0)
+    + cartoes.reduce((s, c) => s + (c.faturaAtual ?? 0), 0);
+  const totalDividas  = dividas.reduce((s, d) => s + (d.saldoAtual ?? 0), 0);
+  const totalFixo     = (diag.despesasFixas ?? []).reduce((s, d) => s + d.valor, 0);
+  const totalVariavel = (diag.despesasVariaveis ?? []).reduce((s, d) => s + d.valor, 0);
+  const sobra         = renda - totalFixo - totalVariavel - totalParcelas;
+  const emAtraso      = dividas.filter((d) => d.emAtraso);
+  const reserva       = diag.patrimonio?.reservaEmergencia ?? 0;
+
+  // 1. Comprometimento (300 pts)
+  const pctComprometimento = renda > 0 ? totalParcelas / renda : 1;
+  const ptComprometimento =
+    pctComprometimento < 0.15 ? 300
+    : pctComprometimento < 0.30 ? 240
+    : pctComprometimento < 0.40 ? 150
+    : pctComprometimento < 0.50 ? 60
+    : 0;
+
+  // 2. Equilíbrio (250 pts)
+  const pctSobra = renda > 0 ? sobra / renda : -1;
+  const ptEquilibrio =
+    pctSobra > 0.20 ? 250
+    : pctSobra > 0.10 ? 200
+    : pctSobra > 0.01 ? 120
+    : pctSobra === 0  ? 60
+    : pctSobra > -0.10 ? 20
+    : 0;
+
+  // 3. Endividamento (200 pts)
+  const multRenda = renda > 0 ? totalDividas / renda : 99;
+  const ptEndividamento =
+    multRenda < 3  ? 200
+    : multRenda < 6  ? 160
+    : multRenda < 12 ? 100
+    : multRenda < 24 ? 40
+    : 0;
+
+  // 4. Adimplência (150 pts — 50% se orçamento negativo)
+  const fatorAdimplencia = sobra < 0 ? 0.5 : 1;
+  const ptAdimplenciaBase =
+    emAtraso.length === 0 ? 150
+    : emAtraso.length === 1 && (emAtraso[0].diasAtraso ?? 31) < 30 ? 90
+    : emAtraso.length === 1 ? 50
+    : 0;
+  const ptAdimplencia = Math.round(ptAdimplenciaBase * fatorAdimplencia);
+
+  // 5. Reserva (100 pts)
+  const mesesReserva = renda > 0 ? reserva / renda : 0;
+  const ptReserva =
+    mesesReserva >= 6 ? 100
+    : mesesReserva >= 3 ? 75
+    : mesesReserva >= 1 ? 50
+    : mesesReserva > 0 ? 20
+    : 0;
+
+  const score = ptComprometimento + ptEquilibrio + ptEndividamento + ptAdimplencia + ptReserva;
+  const emoji =
+    score >= 901 ? "⭐"
+    : score >= 701 ? "🟢"
+    : score >= 501 ? "🟡"
+    : score >= 301 ? "⚠️"
+    : "🔴";
+
+  const faixa =
+    score >= 901 ? "Excelente"
+    : score >= 701 ? "Bom"
+    : score >= 501 ? "Regular"
+    : score >= 301 ? "Atenção"
+    : "Crítico";
+
+  const scoreBar = "█".repeat(Math.round(score / 100)) + "░".repeat(10 - Math.round(score / 100));
+
+  return `💳 *Sua Saúde Financeira — QuitaScore*
+
+\`\`\`
+Score atual    ${score}/1000  ${emoji} ${faixa}
+${scoreBar}
+─────────────────────────────────
+Comprometimento renda  ${ptComprometimento}/300
+Equilíbrio orçamento   ${ptEquilibrio}/250
+Nível endividamento    ${ptEndividamento}/200
+Adimplência            ${ptAdimplencia}/150
+Reserva emergência     ${ptReserva}/100
+\`\`\`
+
+${score >= 700
+    ? `Sua saúde financeira está *boa*! Continue seguindo o plano para chegar à zona Excelente. 💪`
+    : score >= 500
+    ? `Situação *regular* — controlável com disciplina. Siga o plano de quitação. 📋`
+    : score >= 300
+    ? `Situação exige *atenção*. Priorize pagar as dívidas em atraso e evite novos gastos. ⚠️`
+    : `Situação *crítica*. Mas não é o fim — com o plano certo dá para virar o jogo. Vamos juntos! 💚`}`;
 }
 
 // ── Relatório principal ───────────────────

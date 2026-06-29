@@ -217,6 +217,26 @@ export default function CobradorPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#f4f6fb" }}>
 
+      {/* Responsividade mobile */}
+      <style>{`
+        .cobrador-kpi-grid  { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+        .cobrador-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 20px; }
+        .cobrador-hero-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .cobrador-hero-topo { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+        .cobrador-card-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+        @media (max-width: 640px) {
+          .cobrador-kpi-grid  { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+          .cobrador-form-grid { grid-template-columns: 1fr; padding: 16px; }
+          .cobrador-hero-btns button { font-size: 11px !important; padding: 7px 10px !important; }
+          .cobrador-hero-topo { flex-direction: column; }
+          .cobrador-card-actions { flex-direction: row; flex-wrap: wrap; }
+          .cobrador-card-actions button { flex: 1; min-width: 80px; }
+        }
+        @media (max-width: 420px) {
+          .cobrador-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+      `}</style>
+
       {/* Toast */}
       {toast && (
         <div style={{
@@ -234,7 +254,7 @@ export default function CobradorPage() {
       <div style={heroStyle}>
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           {/* Topo */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+          <div className="cobrador-hero-topo">
             <div>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: "#93c5fd", textTransform: "uppercase", marginBottom: 4 }}>QuitaZAP</p>
               <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>💸 Cobrador Automático</h1>
@@ -242,7 +262,7 @@ export default function CobradorPage() {
                 {modoCliente ? "🔐 Seu painel privado — " : ""}{total} cobrança{total !== 1 ? "s" : ""} registradas
               </p>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <div className="cobrador-hero-btns">
               {!modoCliente && (
                 <button onClick={abrirBroadcast}
                   style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
@@ -261,7 +281,7 @@ export default function CobradorPage() {
           </div>
 
           {/* KPI grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+          <div className="cobrador-kpi-grid">
             {kpis.map((k) => (
               <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.border}`, borderRadius: 14, padding: "10px 12px" }}>
                 <div style={{ fontSize: 18, marginBottom: 2 }}>{k.icon}</div>
@@ -316,7 +336,7 @@ export default function CobradorPage() {
               </div>
               <button onClick={() => setMostrarForm(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#9ca3af" }}>✕</button>
             </div>
-            <form onSubmit={criarCobranca} style={{ padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <form onSubmit={criarCobranca} className="cobrador-form-grid">
               {[
                 { field: "devedorNome",   label: "Nome do devedor",      placeholder: "João Silva",        req: true  },
                 { field: "devedorFone",   label: "WhatsApp do devedor",   placeholder: "71999999999",       req: true  },
@@ -458,7 +478,7 @@ export default function CobradorPage() {
                     </div>
 
                     {/* Ações */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                    <div className="cobrador-card-actions">
                       {(c.status === "PENDENTE" || c.status === "ENVIADA") && (
                         <button onClick={() => marcarPaga(c.id)}
                           style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 10, border: "none", background: "#10b981", color: "white", cursor: "pointer", whiteSpace: "nowrap" }}>
