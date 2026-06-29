@@ -31,6 +31,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [carregando, setCarregando] = useState(true);
   const [menuAberto, setMenuAberto] = useState(false);
 
+  // Fecha o menu sempre que a rota mudar (mais confiável que onClick em mobile)
+  useEffect(() => { setMenuAberto(false); }, [pathname]);
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then(async (r) => {

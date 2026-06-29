@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const links = [
   { href: "/",              label: "Dashboard"       },
@@ -19,6 +19,10 @@ const links = [
 export function Navbar() {
   const pathname = usePathname();
   const [menuAberto, setMenuAberto] = useState(false);
+
+  // Fecha o menu sempre que a rota mudar (mais confiável que onClick em mobile)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setMenuAberto(false); }, [pathname]);
 
   if (pathname === "/oferta" || pathname === "/login") return null;
 
