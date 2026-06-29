@@ -215,7 +215,7 @@ export default function CobradorPage() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f4f6fb" }}>
+    <div style={{ minHeight: "100vh", background: "#f4f6fb", overflowX: "hidden" }}>
 
       {/* Responsividade mobile */}
       <style>{`
@@ -224,16 +224,27 @@ export default function CobradorPage() {
         .cobrador-hero-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .cobrador-hero-topo { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
         .cobrador-card-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+        .cobrador-card-details { display: flex; flex-wrap: wrap; gap: 0 12px; font-size: 12px; color: #6b7280; }
+        .cobrador-card-details .fone { word-break: break-all; }
+        .cobrador-como-usar-code { font-size: 11px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 12px; color: #e0e7ff; display: block; font-family: monospace; overflow-x: auto; white-space: nowrap; }
         @media (max-width: 640px) {
           .cobrador-kpi-grid  { grid-template-columns: repeat(3, 1fr); gap: 8px; }
           .cobrador-form-grid { grid-template-columns: 1fr; padding: 16px; }
-          .cobrador-hero-btns button { font-size: 11px !important; padding: 7px 10px !important; }
+          .cobrador-hero-btns { width: 100%; }
+          .cobrador-hero-btns button { font-size: 11px !important; padding: 7px 10px !important; flex: 1; }
           .cobrador-hero-topo { flex-direction: column; }
           .cobrador-card-actions { flex-direction: row; flex-wrap: wrap; }
           .cobrador-card-actions button { flex: 1; min-width: 80px; }
+          .cobrador-card-details { flex-direction: column; gap: 3px; }
+          .cobrador-card-details .fone { font-size: 11px; }
+          .cobrador-avatar { width: 34px !important; height: 34px !important; font-size: 13px !important; }
+          .cobrador-card-inner { padding: 12px !important; gap: 8px !important; }
+          .cobrador-devedor-nome { font-size: 14px !important; }
+          .cobrador-section-body { padding: 16px !important; }
         }
         @media (max-width: 420px) {
           .cobrador-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+          .cobrador-kpi-grid .kpi-val { font-size: 14px !important; }
         }
       `}</style>
 
@@ -285,7 +296,7 @@ export default function CobradorPage() {
             {kpis.map((k) => (
               <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.border}`, borderRadius: 14, padding: "10px 12px" }}>
                 <div style={{ fontSize: 18, marginBottom: 2 }}>{k.icon}</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: k.color, lineHeight: 1.2 }}>{k.val}</div>
+                <div className="kpi-val" style={{ fontSize: 17, fontWeight: 700, color: k.color, lineHeight: 1.2, wordBreak: "break-word" }}>{k.val}</div>
                 <div style={{ fontSize: 10, color: k.color, opacity: 0.85, marginTop: 2 }}>{k.label}</div>
               </div>
             ))}
@@ -427,9 +438,9 @@ export default function CobradorPage() {
                   {/* Barra top colorida */}
                   <div style={{ height: 3, background: barColor }} />
 
-                  <div style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div className="cobrador-card-inner" style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
                     {/* Avatar */}
-                    <div style={{
+                    <div className="cobrador-avatar" style={{
                       width: 40, height: 40, borderRadius: "50%",
                       background: "linear-gradient(135deg, #3b82f6, #6366f1)",
                       display: "flex", alignItems: "center", justifyContent: "center",
@@ -442,7 +453,7 @@ export default function CobradorPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {/* Nome + badges */}
                       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 5 }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{c.devedorNome}</span>
+                        <span className="cobrador-devedor-nome" style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{c.devedorNome}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 10, background: STATUS_BG[c.status], color: STATUS_TEXT[c.status] }}>
                           {STATUS_LABEL[c.status]}
                         </span>
@@ -464,8 +475,8 @@ export default function CobradorPage() {
                       </div>
 
                       {/* Detalhes */}
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0 12px", fontSize: 12, color: "#6b7280" }}>
-                        <span>{c.devedorFone}</span>
+                      <div className="cobrador-card-details">
+                        <span className="fone">{c.devedorFone}</span>
                         <strong style={{ color: "#111827", fontSize: 14 }}>{fmtValor(c.valor)}</strong>
                         <span>📅 {fmtDataCurta(c.vencimento)}</span>
                         {c.pixChave && <span>🔑 Pix: {c.pixChave}</span>}
@@ -519,7 +530,7 @@ export default function CobradorPage() {
                 <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "#bfdbfe", marginBottom: 4 }}>{item.title}</p>
-                  <code style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 12px", color: "#e0e7ff", display: "block", fontFamily: "monospace" }}>
+                  <code className="cobrador-como-usar-code">
                     {item.code}
                   </code>
                 </div>
