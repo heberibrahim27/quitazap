@@ -6,55 +6,215 @@
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
 
 export const metadata = {
-  title: "QuitaZAP — Saia das dívidas com inteligência artificial pelo WhatsApp",
+  title: "QuitaZAP — Organize suas dívidas com IA pelo WhatsApp",
   description:
-    "82,8 milhões de brasileiros estão endividados. O QuitaZAP organiza todas as suas dívidas pelo WhatsApp, usa IA para criar um plano real de quitação e te mostra exatamente o que fazer. Comece agora por R$29,90/mês.",
+    "82,8 milhões de brasileiros estão endividados. O QuitaZAP organiza todas as suas dívidas pelo WhatsApp, calcula seu QuitaScore e monta um plano de quitação simples. A partir de R$29,90/mês.",
   openGraph: {
-    title: "QuitaZAP — Saia das dívidas com inteligência artificial",
-    description: "Organize suas dívidas pelo WhatsApp e receba um plano real de quitação em minutos.",
+    title: "QuitaZAP — Organize suas dívidas com IA pelo WhatsApp",
+    description: "Diagnóstico financeiro, QuitaScore e plano de quitação direto no WhatsApp.",
     type: "website",
   },
 };
 
 const conversa = [
-  { lado: "bot", texto: "Olá, Marcos! 👋 Bem-vindo ao QuitaZAP.\n\nSou sua IA consultora financeira. Vou te ajudar a organizar suas dívidas e criar um plano claro de quitação.\n\nMe conta: qual é sua primeira dívida?" },
+  { lado: "bot", texto: "Olá, Marcos! 👋 Bem-vindo ao QuitaZAP.\n\nSou sua IA de organização financeira. Vou te ajudar a organizar suas dívidas e montar um plano claro de quitação.\n\nMe conta: qual é sua primeira dívida?" },
   { lado: "user", texto: "Cartão de crédito Itaú, uns R$ 4.800" },
   { lado: "bot", texto: "Anotado 📝 Cartão Itaú — R$ 4.800.\n\nEssa é parcelada ou tá acumulando juros rotativos?" },
   { lado: "user", texto: "Rotativo, pago o mínimo todo mês e não cai..." },
-  { lado: "bot", texto: "Entendi. Esse é exatamente o problema do rotativo — os juros chegam a 400% ao ano, você paga mas a dívida cresce. Vamos resolver isso.\n\nTem mais dívidas?" },
+  { lado: "bot", texto: "Entendi. Esse é exatamente o problema do rotativo — os juros chegam a 400% ao ano, você paga mas a dívida cresce. Vamos organizar isso.\n\nTem mais dívidas?" },
   { lado: "user", texto: "Sim. Empréstimo pessoal no banco, R$ 12.000, pago R$ 480/mês" },
-  { lado: "bot", texto: "✅ Plano de Quitação — Marcos\n━━━━━━━━━━━━━━━\n📊 Suas dívidas:\n• Rotativo Itaú → R$ 4.800 (PRIORIDADE)\n• Empréstimo → R$ 12.000 (R$ 480/mês)\n\nTotal: R$ 16.800\n\n🎯 Estratégia:\nZere o rotativo PRIMEIRO. A cada R$ 100 que você não paga no rotativo, perde R$ 33 em juros mensais. É o que mais te sangra.\n\n📅 Com R$ 600/mês no cartão: livre em 8 meses. Depois, todo esse valor vai pro empréstimo e você quita 14 meses antes.\n\nVocê consegue. Vamos juntos. 💪" },
+  { lado: "bot", texto: "✅ Plano de Quitação — Marcos\n━━━━━━━━━━━━━━━\n📊 Suas dívidas:\n• Rotativo Itaú → R$ 4.800 (PRIORIDADE)\n• Empréstimo → R$ 12.000 (R$ 480/mês)\n\nTotal: R$ 16.800\nQuitaScore atual: 340/1000\n\n🎯 Estratégia:\nZere o rotativo PRIMEIRO. A cada R$ 100 que você não paga no rotativo, perde R$ 33 em juros mensais.\n\n📅 Com R$ 600/mês no cartão: livre em 8 meses. Depois, esse valor vai pro empréstimo." },
+];
+
+const relatorioPlano = [
+  "Avaliar assinaturas e gastos recorrentes",
+  "Priorizar dívida menor de R$ 600,00",
+  "Evitar novas compras no cartão este mês",
+  "Acompanhar vencimentos pelo WhatsApp",
+];
+
+const criteriosScore = [
+  { icon: "💰", texto: "Comprometimento da renda" },
+  { icon: "⚖️", texto: "Equilíbrio do orçamento" },
+  { icon: "📉", texto: "Nível de endividamento" },
+  { icon: "✅", texto: "Contas em dia" },
+  { icon: "🛟", texto: "Reserva de emergência" },
+  { icon: "📈", texto: "Evolução mensal" },
+];
+
+const dividasPorCategoria = [
+  { categoria: "Cartão", valor: "R$ 4.800", pct: 100 },
+  { categoria: "Empréstimo", valor: "R$ 3.500", pct: 73 },
+  { categoria: "Loja", valor: "R$ 600", pct: 13 },
+];
+
+const rendaDistribuicao = [
+  { label: "Moradia", pct: 35, cor: "#3b82f6" },
+  { label: "Cartões", pct: 30, cor: "#22c55e" },
+  { label: "Dívidas", pct: 20, cor: "#ef4444" },
+  { label: "Outros", pct: 15, cor: "#94a3b8" },
+];
+
+const painelStats = [
+  { titulo: "Sobra estimada", valor: "-R$ 530,00", valorColor: "#fca5a5", badge: "Atenção", badgeColor: "#f59e0b" },
+  { titulo: "Dívida foco do mês", valor: "Casas Bahia — R$ 600,00", valorColor: "#f8fafc", badge: "Prioridade", badgeColor: "#22c55e" },
+  { titulo: "Próximo vencimento", valor: "Nubank — dia 10", valorColor: "#f8fafc", badge: "R$ 1.200,00", badgeColor: "#f59e0b" },
+];
+
+const scoreMeses = [
+  { mes: "Mês 1", score: 310 },
+  { mes: "Mês 2", score: 360 },
+  { mes: "Mês 3", score: 420 },
+  { mes: "Mês 4", score: 460 },
+];
+const SCORE_MIN = 250;
+const SCORE_MAX = 500;
+const CHART_W = 340;
+const CHART_H = 170;
+const PAD_X = 30;
+const PAD_TOP = 34;
+const PAD_BOTTOM = 26;
+const scorePontos = scoreMeses.map((d, i) => {
+  const x = PAD_X + i * ((CHART_W - PAD_X * 2) / (scoreMeses.length - 1));
+  const y = (CHART_H - PAD_BOTTOM) - ((d.score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * (CHART_H - PAD_BOTTOM - PAD_TOP);
+  return { ...d, x, y };
+});
+
+const incluso = [
+  "Atendimento financeiro com IA pelo WhatsApp",
+  "Diagnóstico financeiro personalizado",
+  "Organização de renda, despesas e dívidas",
+  "QuitaScore de saúde financeira",
+  "Plano de quitação com prioridade",
+  "Estratégia Snowball ou Avalanche",
+  "Sugestões de ajuste no orçamento",
+  "Lembretes de vencimento",
+  "Atualizações ilimitadas do plano",
+  "Relatórios de evolução",
+  "Resumo visual de acompanhamento",
+  "Suporte pelo WhatsApp",
+  "7 dias de garantia",
+  "Cancelamento quando quiser",
 ];
 
 const faq = [
-  { p: "O QuitaZAP é um app que preciso baixar?", r: "Não. Tudo acontece pelo WhatsApp, que você já tem no celular. Não precisa instalar nada, criar conta em nenhum app nem aprender interface nova." },
-  { p: "Como funciona na prática?", r: "Após assinar, você recebe uma mensagem no WhatsApp. Conta suas dívidas em texto natural — sem formato específico. A IA organiza tudo e envia seu plano de quitação em minutos." },
-  { p: "Preciso ter conhecimento financeiro?", r: "Zero. A IA foi projetada para entender linguagem do dia a dia. Você fala como fala com um amigo — 'devo uns 3 mil no cartão' — e ela entende tudo." },
-  { p: "E se eu tiver muitas dívidas?", r: "Quanto mais dívidas, mais o QuitaZAP ajuda. A IA prioriza automaticamente quais pagar primeiro para você perder menos dinheiro em juros." },
-  { p: "O QuitaZAP negocia minha dívida?", r: "Não negociamos com credores. O QuitaZAP organiza suas informações e cria o plano — a decisão e execução são sempre suas." },
-  { p: "Meus dados ficam seguros?", r: "Sim. Usamos criptografia de ponta a ponta, servidores com certificação internacional e seguimos rigorosamente a LGPD. Seus dados nunca são vendidos ou compartilhados." },
-  { p: "O plano funciona para todo tipo de dívida?", r: "Sim — cartão de crédito, cheque especial, empréstimo pessoal, financiamento, boleto em atraso, dívida com familiar, negociação. A IA entende todos os cenários." },
-  { p: "E se eu não gostar?", r: "Garantia incondicional de 7 dias. Se por qualquer motivo não gostar, devolvemos 100% do valor — sem burocracia, sem perguntas." },
-  { p: "Com que frequência posso usar?", r: "Sem limites. Pode conversar com a IA sempre que precisar: atualizar dívidas, tirar dúvidas, revisar o plano, pedir nova análise." },
-  { p: "O preço muda?", r: "R$ 29,90/mês é o preço fixo. Sem taxa de adesão, sem cobrança por dívida, sem surpresas na fatura." },
-  { p: "Posso cancelar quando quiser?", r: "Sim. Cancela com um clique, sem multa, sem período mínimo, sem burocracia. O acesso continua até o fim do período pago." },
-  { p: "E se eu pagar uma dívida — atualizo no QuitaZAP?", r: "Sim. Pode mandar a atualização pelo WhatsApp a qualquer hora e a IA recalcula o plano com os novos números." },
-  { p: "Funciona para pessoa jurídica?", r: "O QuitaZAP é focado em finanças pessoais. Para dívidas empresariais, recomendamos um contador." },
-  { p: "Preciso informar senha ou dados bancários?", r: "Jamais. Nunca pedimos senhas, acesso a conta bancária, CPF completo ou qualquer dado sensível além do que você escolhe compartilhar." },
-  { p: "A IA substitui um consultor financeiro?", r: "Para organizar dívidas e criar um plano inicial, sim — e a uma fração do custo. Consultores humanos cobram R$ 500–800/mês. O QuitaZAP faz o mesmo por R$ 29,90." },
-  { p: "O que é a estratégia Snowball?", r: "É quitar primeiro as menores dívidas para ganhar impulso psicológico. A IA analisa seu perfil e pode recomendar Snowball ou Avalanche (maior juros primeiro) — o que for melhor para você." },
-  { p: "Em quanto tempo recebo meu plano?", r: "Em média, 5 a 15 minutos depois de mandar suas dívidas. A IA processa tudo em tempo real." },
-  { p: "Posso usar no computador também?", r: "O QuitaZAP funciona pelo WhatsApp — seja no celular, tablet ou WhatsApp Web no computador." },
-  { p: "E se eu não tiver renda fixa?", r: "A IA adapta o plano para renda variável. Você informa o mínimo mensal garantido e ela cria um plano conservador e realista." },
-  { p: "O sistema funciona 24 horas?", r: "Sim. A IA não tem horário. Você pode mandar mensagem às 2h da madrugada — quando a ansiedade bate — e ela responde na hora." },
+  { p: "O QuitaZAP é um app que preciso baixar?", r: "Não. Tudo acontece dentro do WhatsApp, que você já usa no dia a dia. Não tem app para baixar nem instalar." },
+  { p: "Preciso criar conta?", r: "Não. Depois de assinar, você já recebe a mensagem da IA no WhatsApp e começa a conversar — sem cadastro, sem senha, sem formulário." },
+  { p: "O QuitaZAP quita minhas dívidas por mim?", r: "Não. O QuitaZAP organiza suas informações, calcula sua situação financeira e monta um plano de prioridades. O pagamento e a quitação continuam sendo feitos por você." },
+  { p: "O resultado é garantido?", r: "Não. O QuitaZAP é uma ferramenta de organização e apoio ao planejamento financeiro. Nenhum resultado é prometido — tudo depende das informações que você envia e das suas ações." },
+  { p: "Posso cancelar?", r: "Sim, a qualquer momento, sem multa e sem burocracia. O acesso continua até o fim do período já pago." },
+  { p: "Tem garantia?", r: "Sim. Você tem 7 dias de garantia incondicional. Se não fizer sentido para você, devolvemos 100% do valor." },
+  { p: "Meus dados ficam seguros?", r: "Sim. Usamos criptografia, seguimos a LGPD e nunca vendemos ou compartilhamos seus dados com terceiros." },
+  { p: "Serve para quem está muito endividado?", r: "Sim. Quanto mais dívidas espalhadas, mais o QuitaZAP ajuda a organizar tudo em um só lugar e definir o que priorizar primeiro." },
+  { p: "Serve para quem só quer organizar as contas?", r: "Sim. Mesmo sem dívidas, dá para usar o QuitaZAP para organizar renda, despesas fixas e acompanhar as finanças com mais clareza." },
+  { p: "O que acontece depois que eu pago?", r: "Você recebe uma mensagem da IA no WhatsApp, conta sua situação financeira e recebe seu diagnóstico, QuitaScore e plano de quitação inicial em poucos minutos." },
 ];
+
+function QuitaScoreGauge({
+  score,
+  max = 1000,
+  statusLabel,
+  statusColor,
+  legenda,
+}: {
+  score: number;
+  max?: number;
+  statusLabel: string;
+  statusColor: string;
+  legenda: string;
+}) {
+  const fraction = Math.min(Math.max(score / max, 0), 1);
+  const arcLength = Math.PI * 80;
+  const offset = arcLength * (1 - fraction);
+  const needleDeg = 180 * fraction - 90;
+  const gradId = `quitascore-grad-${score}`;
+  const glowId = `quitascore-glow-${score}`;
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <div style={{
+      textAlign: "center" as const,
+      background: "linear-gradient(165deg, #0c1f12 0%, #060a07 100%)",
+      border: "1px solid rgba(34,197,94,0.18)",
+      borderRadius: 24,
+      padding: "26px 28px 24px",
+      minWidth: 240,
+      position: "relative" as const,
+      overflow: "hidden" as const,
+      boxShadow: "0 24px 60px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
+    }}>
+      <div style={{
+        position: "absolute" as const, top: -70, left: "50%", transform: "translateX(-50%)",
+        width: 220, height: 220, borderRadius: "50%",
+        background: `radial-gradient(circle, ${statusColor}33 0%, transparent 70%)`,
+        pointerEvents: "none" as const,
+      }} />
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: "#86efac", letterSpacing: "0.08em",
+        textTransform: "uppercase" as const, marginBottom: 10, position: "relative" as const,
+      }}>
+        {legenda}
+      </div>
+      <svg viewBox="0 0 200 130" width="220" height="143" style={{ display: "block", margin: "0 auto", position: "relative" as const }}>
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="33%" stopColor="#f97316" />
+            <stop offset="66%" stopColor="#facc15" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+          <filter id={glowId} x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <path d="M20,100 A80,80 0 0,1 180,100" stroke="rgba(255,255,255,0.08)" strokeWidth="14" fill="none" strokeLinecap="round" />
+        {ticks.map((t) => {
+          const ang = (180 - t * 180) * (Math.PI / 180);
+          const x1 = 100 + 68 * Math.cos(ang), y1 = 100 - 68 * Math.sin(ang);
+          const x2 = 100 + 80 * Math.cos(ang), y2 = 100 - 80 * Math.sin(ang);
+          return <line key={t} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" />;
+        })}
+        <path
+          d="M20,100 A80,80 0 0,1 180,100"
+          stroke={`url(#${gradId})`}
+          strokeWidth="14"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={arcLength}
+          strokeDashoffset={offset}
+          filter={`url(#${glowId})`}
+        />
+        <line
+          x1="100" y1="100" x2="100" y2="34"
+          stroke="#f8fafc" strokeWidth="3" strokeLinecap="round"
+          transform={`rotate(${needleDeg} 100 100)`}
+        />
+        <circle cx="100" cy="100" r="6" fill="#f8fafc" />
+      </svg>
+      <div style={{ fontSize: 34, fontWeight: 800, color: "#fff", marginTop: -4, letterSpacing: "-1px", position: "relative" as const }}>
+        {score}<span style={{ fontSize: 15, color: "#64748b", fontWeight: 600 }}>/{max}</span>
+      </div>
+      <div style={{
+        display: "inline-block", marginTop: 10, padding: "5px 14px", borderRadius: 99,
+        background: `${statusColor}22`, color: statusColor, fontSize: 12, fontWeight: 700,
+        border: `1px solid ${statusColor}55`, position: "relative" as const,
+      }}>
+        {statusLabel}
+      </div>
+    </div>
+  );
+}
 
 export default function OfertaPage() {
   return (
     <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden" }}>
 
       {/* ══════════════════════════════════════ */}
-      {/* HERO */}
+      {/* 1. HERO + 2. MOCKUP WHATSAPP */}
       {/* ══════════════════════════════════════ */}
       <section style={{
         background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)",
@@ -62,14 +222,12 @@ export default function OfertaPage() {
         position: "relative",
         overflow: "hidden",
       }}>
-        {/* Grid decorativo */}
         <div style={{
           position: "absolute", inset: 0, opacity: 0.06,
           backgroundImage: "linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)",
           backgroundSize: "48px 48px",
           pointerEvents: "none",
         }} />
-        {/* Glow */}
         <div style={{
           position: "absolute", top: "-200px", left: "50%", transform: "translateX(-50%)",
           width: "800px", height: "600px",
@@ -107,7 +265,6 @@ export default function OfertaPage() {
         {/* Hero content */}
         <div style={{ maxWidth: 820, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1, paddingTop: 40 }}>
 
-          {/* Badge */}
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 7,
             background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
@@ -128,66 +285,55 @@ export default function OfertaPage() {
             letterSpacing: "-2px",
           }}>
             Pare de perder sono<br />
-            <span style={{ color: "#22c55e" }}>por causa de dívidas.</span>
+            <span style={{ color: "#22c55e" }}>por causa das dívidas.</span>
           </h1>
 
           <p style={{
-            margin: "0 0 16px",
+            margin: "0 0 40px",
             fontSize: "clamp(16px, 2vw, 20px)",
             color: "#94a3b8",
             lineHeight: 1.65,
-            maxWidth: 560,
+            maxWidth: 600,
             marginLeft: "auto",
             marginRight: "auto",
           }}>
-            O QuitaZAP usa inteligência artificial para organizar todas as suas dívidas pelo WhatsApp e criar um plano real e personalizado para você sair do vermelho.
-          </p>
-
-          <p style={{ margin: "0 0 40px", fontSize: 14, color: "#4ade80" }}>
-            82,8 milhões de brasileiros endividados. Você não está sozinho — mas pode estar à frente.
+            O QuitaZAP é uma IA financeira no WhatsApp que organiza suas dívidas, calcula sua situação atual e monta um plano de quitação simples para você saber o que pagar primeiro.
           </p>
 
           {/* CTAs */}
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 40 }}>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
             <a href={CAKTO_URL} style={{
               background: "#22c55e", color: "#000",
               fontWeight: 700, fontSize: 16,
-              padding: "15px 36px", borderRadius: 10,
+              padding: "16px 32px", borderRadius: 10,
               textDecoration: "none", display: "inline-block",
             }}>
-              Quero meu plano agora
+              Quero meu plano agora — R$ 29,90/mês
             </a>
-            <a href="#como-funciona" style={{
+            <a href="#relatorio" style={{
               background: "rgba(255,255,255,0.07)", color: "#fff",
               fontWeight: 600, fontSize: 16,
-              padding: "15px 28px", borderRadius: 10,
+              padding: "16px 28px", borderRadius: 10,
               textDecoration: "none", display: "inline-block",
               border: "1px solid rgba(255,255,255,0.1)",
             }}>
-              Ver como funciona ↓
+              Ver exemplo do relatório
             </a>
           </div>
 
-          {/* Trust indicators */}
-          <div style={{
-            display: "flex", justifyContent: "center", alignItems: "center",
-            gap: 20, flexWrap: "wrap",
-          }}>
-            {["🔒 LGPD compliant", "🛡️ 7 dias de garantia", "⚡ Plano em minutos", "💬 Pelo WhatsApp"].map((item) => (
-              <span key={item} style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>{item}</span>
-            ))}
-          </div>
+          {/* Microcopy */}
+          <p style={{ margin: 0, fontSize: 13, color: "#64748b", fontWeight: 500 }}>
+            7 dias de garantia • Atendimento pelo WhatsApp • Cancele quando quiser • Sem app para baixar
+          </p>
         </div>
 
         {/* Mockup da conversa */}
         <div style={{ maxWidth: 400, margin: "56px auto 0", position: "relative", zIndex: 1 }}>
-          {/* Phone frame */}
           <div style={{
             background: "#1a1a1a", borderRadius: 32, padding: "12px",
             border: "1px solid #2a2a2a",
             boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)",
           }}>
-            {/* Status bar */}
             <div style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
               padding: "8px 16px 4px", color: "#fff", fontSize: 11, fontWeight: 600,
@@ -195,7 +341,6 @@ export default function OfertaPage() {
               <span>23:12</span>
               <span>●●●</span>
             </div>
-            {/* WhatsApp header */}
             <div style={{
               background: "#1f2c34", padding: "10px 14px",
               display: "flex", alignItems: "center", gap: 10,
@@ -216,7 +361,6 @@ export default function OfertaPage() {
                 <div style={{ color: "#4ade80", fontSize: 11 }}>● online agora</div>
               </div>
             </div>
-            {/* Chat */}
             <div style={{
               background: "#0b141a",
               backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 60L60 0H30L0 30M60 60V30L30 60' fill='%23172028' fill-opacity='0.4'/%3E%3C/svg%3E\")",
@@ -250,7 +394,7 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* STATS BAR */}
+      {/* 3. ESTATÍSTICAS DO PROBLEMA */}
       {/* ══════════════════════════════════════ */}
       <section style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "32px 24px" }}>
         <div style={{
@@ -274,7 +418,7 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* PROBLEMA */}
+      {/* 4. PROBLEMA */}
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "96px 24px", background: "#ffffff" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -309,7 +453,7 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* SOLUÇÃO / COMO FUNCIONA */}
+      {/* 5. COMO FUNCIONA */}
       {/* ══════════════════════════════════════ */}
       <section id="como-funciona" style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -339,8 +483,8 @@ export default function OfertaPage() {
               },
               {
                 num: "03",
-                titulo: "Receba seu plano personalizado",
-                texto: "A IA analisa seu perfil, define prioridades e envia um plano claro: o que pagar primeiro, quanto separar e quando você fica livre.",
+                titulo: "Receba seu diagnóstico e plano",
+                texto: "A IA calcula seu QuitaScore, define prioridades e envia um plano claro: o que pagar primeiro, quanto separar e os próximos passos.",
                 cor: "#8b5cf6",
               },
             ].map((step) => (
@@ -369,14 +513,342 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* SEÇÃO IA */}
+      {/* 6. RELATÓRIO FINANCEIRO — DEMONSTRAÇÃO */}
+      {/* ══════════════════════════════════════ */}
+      <section id="relatorio" style={{ padding: "96px 24px", background: "#ffffff" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 40 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>DEMONSTRAÇÃO</p>
+            <h2 style={{ margin: "0 0 12px", fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 800, letterSpacing: "-1px" }}>
+              Veja como o QuitaZAP organiza seus números
+            </h2>
+            <p style={{ margin: 0, fontSize: 16, color: "#64748b", maxWidth: 460, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
+              Você manda as informações pelo WhatsApp. A IA organiza tudo em um resumo claro.
+            </p>
+          </div>
+
+          <div style={{
+            background: "linear-gradient(160deg, #0a0a0a 0%, #0f1a12 100%)", borderRadius: 20, padding: "28px 24px",
+            border: "1px solid #1f2937", boxShadow: "0 24px 60px rgba(0,0,0,0.2)", position: "relative", overflow: "hidden",
+          }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)",
+              borderRadius: 99, padding: "4px 12px", marginBottom: 18,
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+              <span style={{ fontSize: 11, color: "#86efac", fontWeight: 700, letterSpacing: "0.04em" }}>DEMONSTRAÇÃO VISUAL</span>
+            </div>
+            <pre style={{
+              margin: 0, fontFamily: "'Courier New', monospace", fontSize: 13,
+              color: "#e2e8f0", lineHeight: 1.8, whiteSpace: "pre-wrap" as const, overflowX: "auto" as const,
+            }}>
+{`Renda mensal           R$ 3.200,00
+Despesas fixas         R$ 1.750,00
+Cartões                R$   980,00
+Dívidas cadastradas    R$ 4.600,00
+────────────────────────────────
+Sobra estimada         R$  -530,00`}
+            </pre>
+            <div style={{ marginTop: 18, paddingTop: 18, borderTop: "1px solid #1f2937" }}>
+              <span style={{ fontFamily: "'Courier New', monospace", fontSize: 13, color: "#facc15", fontWeight: 700 }}>
+                QuitaScore: 310/1000 ⚠️ Atenção
+              </span>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Resumo</h3>
+            <p style={{ margin: 0, fontSize: 14, color: "#64748b", lineHeight: 1.7 }}>
+              Mariana está gastando mais do que recebe no mês. O primeiro passo sugerido é reduzir gastos variáveis e organizar a menor dívida para tentar liberar parcela mais rápido.
+            </p>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Plano inicial</h3>
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+              {relatorioPlano.map((item, i) => (
+                <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{
+                    flexShrink: 0, width: 22, height: 22, borderRadius: "50%",
+                    background: "#f0fdf4", color: "#16a34a", fontSize: 12, fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{i + 1}</span>
+                  <span style={{ fontSize: 14, color: "#374151", lineHeight: 1.5, paddingTop: 1 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p style={{ marginTop: 24, fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+            Dados demonstrativos. O resultado real depende das informações enviadas pelo usuário.
+          </p>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* 7. QUITASCORE */}
+      {/* ══════════════════════════════════════ */}
+      <section id="quitascore" style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>QUITASCORE</p>
+            <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px" }}>
+              Sua saúde financeira em um número.
+            </h2>
+            <p style={{ margin: 0, fontSize: 16, color: "#64748b", maxWidth: 520, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
+              O QuitaScore ajuda você a visualizar sua saúde financeira e acompanhar sua evolução.
+            </p>
+          </div>
+
+          <div style={{
+            display: "flex", alignItems: "center",
+            justifyContent: "center", gap: 20, flexWrap: "wrap",
+          }}>
+            <QuitaScoreGauge score={310} statusLabel="Atenção" statusColor="#f59e0b" legenda="Antes da organização" />
+            <div style={{
+              display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 6,
+              color: "#22c55e", fontWeight: 800,
+            }}>
+              <span style={{ fontSize: 26 }}>→</span>
+              <span style={{
+                fontSize: 12, background: "#f0fdf4", color: "#16a34a", padding: "4px 12px",
+                borderRadius: 99, whiteSpace: "nowrap" as const, fontWeight: 700,
+                border: "1px solid #bbf7d0",
+              }}>+150 pontos</span>
+            </div>
+            <QuitaScoreGauge score={460} statusLabel="Em evolução" statusColor="#22c55e" legenda="Depois de organizar" />
+          </div>
+
+          <p style={{ marginTop: 20, fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+            Demonstração visual. A evolução real depende das informações e ações do usuário.
+          </p>
+
+          <div style={{ marginTop: 48 }}>
+            <p style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>
+              O QuitaScore é calculado com base em:
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              {criteriosScore.map((c) => (
+                <div key={c.texto} style={{
+                  background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
+                  padding: "14px 16px", display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <span style={{ fontSize: 18 }}>{c.icon}</span>
+                  <span style={{ fontSize: 13, color: "#374151", fontWeight: 600 }}>{c.texto}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* 8. PAINEL — VISÃO GERAL */}
+      {/* ══════════════════════════════════════ */}
+      <section style={{ padding: "96px 24px", background: "#ffffff" }}>
+        <div style={{ maxWidth: 1040, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 40 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>VISÃO GERAL</p>
+            <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px" }}>
+              Seu dinheiro vira um resumo claro.
+            </h2>
+            <p style={{ margin: 0, fontSize: 16, color: "#64748b", maxWidth: 560, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
+              Você manda as informações pelo WhatsApp e o QuitaZAP organiza tudo em um resumo simples de entender.
+            </p>
+          </div>
+
+          {/* Dashboard card */}
+          <div style={{
+            background: "linear-gradient(165deg, #0c1f12 0%, #060a07 100%)",
+            border: "1px solid rgba(34,197,94,0.18)",
+            borderRadius: 28,
+            padding: "32px 24px",
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 30px 70px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}>
+            <div style={{
+              position: "absolute", top: -120, right: -90, width: 320, height: 320, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%)",
+              pointerEvents: "none" as const,
+            }} />
+            <div style={{
+              position: "absolute", bottom: -140, left: -100, width: 320, height: 320, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%)",
+              pointerEvents: "none" as const,
+            }} />
+
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 7,
+              background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
+              borderRadius: 99, padding: "6px 14px", marginBottom: 24, position: "relative" as const,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+              <span style={{ fontSize: 11, color: "#86efac", fontWeight: 700, letterSpacing: "0.05em" }}>RESUMO QUITAZAP — VISÃO ORGANIZADA</span>
+            </div>
+
+            {/* Stat cards */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14,
+              marginBottom: 16, position: "relative" as const,
+            }}>
+              {painelStats.map((s) => (
+                <div key={s.titulo} style={{
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 16, padding: "18px 18px",
+                }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" as const, marginBottom: 10 }}>
+                    {s.titulo}
+                  </div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: s.valorColor, marginBottom: 12, letterSpacing: "-0.3px", lineHeight: 1.3 }}>
+                    {s.valor}
+                  </div>
+                  <div style={{
+                    display: "inline-block", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+                    background: `${s.badgeColor}22`, color: s.badgeColor, border: `1px solid ${s.badgeColor}55`,
+                  }}>
+                    {s.badge}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Gráficos */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14,
+              position: "relative" as const,
+            }}>
+              {/* Barras: dívidas por categoria */}
+              <div style={{ background: "#0c1a11", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: 24 }}>
+                <h3 style={{ margin: "0 0 22px", fontSize: 13, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+                  Dívidas por categoria
+                </h3>
+                {dividasPorCategoria.map((d) => (
+                  <div key={d.categoria} style={{ marginBottom: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+                      <span style={{ fontWeight: 600, color: "#cbd5e1" }}>{d.categoria}</span>
+                      <span style={{ fontWeight: 800, color: "#fff" }}>{d.valor}</span>
+                    </div>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, height: 14, overflow: "hidden" }}>
+                      <div style={{
+                        width: `${d.pct}%`, height: "100%", borderRadius: 8,
+                        background: "linear-gradient(90deg,#16a34a,#4ade80)",
+                        boxShadow: "0 0 14px rgba(34,197,94,0.45)",
+                      }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Donut: para onde vai a renda */}
+              <div style={{ background: "#0c1a11", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: 24 }}>
+                <h3 style={{ margin: "0 0 22px", fontSize: 13, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+                  Para onde vai sua renda
+                </h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" as const }}>
+                  <div style={{
+                    position: "relative", width: 160, height: 160, borderRadius: "50%", flexShrink: 0,
+                    boxShadow: "0 0 30px rgba(34,197,94,0.15)",
+                    background: `conic-gradient(${rendaDistribuicao.map((r, i) => {
+                      const start = rendaDistribuicao.slice(0, i).reduce((acc, x) => acc + x.pct, 0);
+                      return `${r.cor} ${start}% ${start + r.pct}%`;
+                    }).join(", ")})`,
+                  }}>
+                    <div style={{
+                      position: "absolute", inset: 28, background: "#0c1a11", borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" as const,
+                    }}>
+                      <span style={{ fontSize: 10, color: "#94a3b8" }}>Renda</span>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>100%</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                    {rendaDistribuicao.map((r) => (
+                      <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, background: r.cor, flexShrink: 0, boxShadow: `0 0 6px ${r.cor}` }} />
+                        <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{r.label}</span>
+                        <span style={{ color: "#64748b" }}>{r.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Linha: evolução do score */}
+              <div style={{ background: "#0c1a11", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: 24 }}>
+                <h3 style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase" as const, letterSpacing: "0.04em" }}>
+                  QuitaScore mês a mês
+                </h3>
+                <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} width="100%" height="170" style={{ display: "block" }}>
+                  <defs>
+                    <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <polygon
+                    points={`${scorePontos[0].x},${CHART_H - PAD_BOTTOM} ${scorePontos.map((p) => `${p.x},${p.y}`).join(" ")} ${scorePontos[scorePontos.length - 1].x},${CHART_H - PAD_BOTTOM}`}
+                    fill="url(#scoreAreaGrad)"
+                  />
+                  <polyline
+                    points={scorePontos.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill="none" stroke="#22c55e" strokeWidth="3"
+                    strokeLinecap="round" strokeLinejoin="round"
+                  />
+                  {scorePontos.map((p) => (
+                    <g key={p.mes}>
+                      <circle cx={p.x} cy={p.y} r="5" fill="#22c55e" stroke="#0c1a11" strokeWidth="2" />
+                      <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize="11" fontWeight="700" fill="#f8fafc">{p.score}</text>
+                      <text x={p.x} y={CHART_H - 4} textAnchor="middle" fontSize="10" fill="#64748b">{p.mes}</text>
+                    </g>
+                  ))}
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <p style={{ marginTop: 24, fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+            Dados demonstrativos. Os valores reais dependem das informações enviadas pelo usuário.
+          </p>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* 9. O QUE ESTÁ INCLUSO */}
+      {/* ══════════════════════════════════════ */}
+      <section style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+        <div style={{ maxWidth: 820, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>O QUE ESTÁ INCLUSO</p>
+            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px" }}>
+              Tudo no seu plano, sem letra miúda.
+            </h2>
+          </div>
+
+          <div style={{
+            background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, padding: "32px 28px",
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "14px 24px",
+          }}>
+            {incluso.map((item) => (
+              <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, fontSize: 15 }}>✓</span>
+                <span style={{ fontSize: 14, color: "#374151", fontWeight: 500, lineHeight: 1.5 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* 10. IA FINANCEIRA NO BOLSO */}
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "96px 24px", background: "#020d06" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 56 }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>INTELIGÊNCIA ARTIFICIAL</p>
             <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", color: "#fff" }}>
-              Uma consultora financeira no seu bolso.<br />
+              Uma IA de organização financeira no seu bolso.<br />
               <span style={{ color: "#22c55e" }}>Disponível às 3h da manhã.</span>
             </h2>
             <p style={{ margin: 0, fontSize: 16, color: "#64748b", maxWidth: 520, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
@@ -387,10 +859,10 @@ export default function OfertaPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
             {[
               { icon: "🧠", titulo: "Entende linguagem natural", texto: "Fala do jeito que você fala. 'Devo uns 4 mil no banco' já é suficiente — a IA extrai tudo o que precisa." },
-              { icon: "⚡", titulo: "Prioridade inteligente", texto: "Ela compara as taxas de juros de cada dívida e define qual pagar primeiro para você perder menos dinheiro." },
-              { icon: "📊", titulo: "Plano realista", texto: "Leva em conta sua renda e cria um plano que você consegue cumprir — não um que parece bonito mas é impossível na prática." },
+              { icon: "⚡", titulo: "Prioridade inteligente", texto: "Ela compara as taxas de juros de cada dívida e sugere qual priorizar para você perder menos dinheiro." },
+              { icon: "📊", titulo: "Plano realista", texto: "Leva em conta sua renda e monta um plano que você consegue acompanhar — não um que parece bonito mas é impossível na prática." },
               { icon: "🔄", titulo: "Atualiza sempre", texto: "Pagou uma dívida? Mudou a renda? Manda no WhatsApp e a IA recalcula o plano na hora." },
-              { icon: "💬", titulo: "Tira dúvidas", texto: "'Vale a pena parcelar no cartão?' 'Devo quitar o cheque especial primeiro?' — perguntas reais, respostas diretas." },
+              { icon: "💬", titulo: "Tira dúvidas", texto: "'Vale a pena parcelar no cartão?' 'Devo priorizar o cheque especial?' — perguntas reais, respostas diretas." },
               { icon: "🌙", titulo: "24 horas, 7 dias", texto: "Sem agenda, sem lista de espera. Quando a ansiedade bater, a IA está lá para te dar clareza." },
             ].map((item) => (
               <div key={item.titulo} style={{
@@ -408,7 +880,7 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* COMPARATIVO */}
+      {/* 11. COMPARATIVO */}
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "96px 24px", background: "#ffffff" }}>
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
@@ -444,7 +916,7 @@ export default function OfertaPage() {
                   ["Prioridade de pagamento", "❌", "❌", "✅", "✅"],
                   ["Sem app pra baixar", "❌", "❌", "✅", "✅"],
                   ["Preço acessível", "✅", "✅", "❌", "✅"],
-                  ["Plano em minutos", "❌", "❌", "❌", "✅"],
+                  ["QuitaScore incluso", "❌", "❌", "❌", "✅"],
                 ].map((row, ri) => (
                   <tr key={ri} style={{ borderBottom: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "14px 16px", fontSize: 14, color: "#374151", fontWeight: 500 }}>{row[0]}</td>
@@ -463,55 +935,9 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* BENEFÍCIOS */}
+      {/* 12. PREÇO */}
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 56 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>O QUE VOCÊ GANHA</p>
-            <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px" }}>
-              Não é só organização. É liberdade.
-            </h2>
-            <p style={{ margin: 0, fontSize: 16, color: "#64748b", maxWidth: 480, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
-              Cada funcionalidade foi pensada para devolver uma coisa que a dívida rouba: o controle.
-            </p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
-            {[
-              { func: "Plano de quitação personalizado", benef: "Você sabe exatamente o que fazer. Sem achismo, sem tentativa e erro." },
-              { func: "Prioridade inteligente de dívidas", benef: "Para de perder dinheiro em juros que poderiam ser evitados com a ordem certa." },
-              { func: "Estratégia Snowball ou Avalanche", benef: "A IA escolhe a estratégia certa para o seu perfil — mais velocidade ou mais economia." },
-              { func: "Previsão de quitação", benef: "Você vê a luz no fim do túnel. Uma data real, não uma esperança vaga." },
-              { func: "Atualização em tempo real", benef: "Pagou uma conta? O plano se atualiza. Você sempre tem a versão mais precisa." },
-              { func: "IA disponível 24h", benef: "A ansiedade não espera o horário comercial. A IA também não." },
-            ].map((item, i) => (
-              <div key={i} style={{
-                background: "#fff",
-                border: "1px solid #e2e8f0",
-                borderRadius: 16, padding: "24px 22px",
-              }}>
-                <div style={{
-                  display: "inline-block",
-                  background: "#f0fdf4", color: "#15803d",
-                  fontSize: 11, fontWeight: 700, padding: "4px 10px",
-                  borderRadius: 6, marginBottom: 12, letterSpacing: "0.03em",
-                }}>
-                  {item.func}
-                </div>
-                <p style={{ margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.65, fontWeight: 500 }}>
-                  {item.benef}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════ */}
-      {/* PREÇO */}
-      {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "96px 24px", background: "#ffffff" }}>
         <div style={{ maxWidth: 480, margin: "0 auto", textAlign: "center" }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
           <h2 style={{ margin: "0 0 12px", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px" }}>
@@ -542,10 +968,10 @@ export default function OfertaPage() {
 
             <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 24, marginBottom: 28 }}>
               {[
-                "Plano de quitação personalizado",
-                "IA consultora financeira 24h",
-                "Estratégia Snowball ou Avalanche",
-                "Previsão de quitação mês a mês",
+                "Diagnóstico financeiro personalizado",
+                "QuitaScore de saúde financeira",
+                "Plano de quitação com prioridade",
+                "Lembretes de vencimento",
                 "Atualizações ilimitadas do plano",
                 "Suporte pelo próprio WhatsApp",
                 "Cancelamento a qualquer momento",
@@ -570,7 +996,10 @@ export default function OfertaPage() {
               Assinar por R$ 29,90/mês
             </a>
 
-            {/* Garantia */}
+            <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+              7 dias de garantia. Cancele quando quiser.
+            </p>
+
             <div style={{
               marginTop: 16,
               background: "#f8fafc", border: "1px solid #e2e8f0",
@@ -587,8 +1016,7 @@ export default function OfertaPage() {
             </div>
           </div>
 
-          {/* Comparação de valor */}
-          <div style={{ marginTop: 32, padding: "20px 24px", background: "#f8fafc", borderRadius: 14, border: "1px solid #e2e8f0", textAlign: "left" }}>
+          <div style={{ marginTop: 32, padding: "20px 24px", background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", textAlign: "left" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>Compare o custo:</div>
             {[
               { label: "Consultor financeiro humano", valor: "R$ 500–800/mês", strike: true },
@@ -611,9 +1039,9 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* SEGURANÇA */}
+      {/* 13. SEGURANÇA */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "64px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+      <section style={{ padding: "64px 24px", background: "#ffffff" }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
           <h2 style={{ margin: "0 0 12px", fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px" }}>🔒 Seus dados protegidos</h2>
           <p style={{ margin: "0 0 40px", fontSize: 15, color: "#64748b", lineHeight: 1.6 }}>
@@ -629,7 +1057,7 @@ export default function OfertaPage() {
               { icon: "🗑️", texto: "Exclusão de dados a pedido" },
             ].map((item) => (
               <div key={item.texto} style={{
-                background: "#fff", border: "1px solid #e2e8f0",
+                background: "#f8fafc", border: "1px solid #e2e8f0",
                 borderRadius: 12, padding: "18px 14px",
                 display: "flex", flexDirection: "column" as const,
                 alignItems: "center", gap: 8,
@@ -643,9 +1071,9 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* FAQ */}
+      {/* 14. FAQ */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "96px 24px", background: "#ffffff" }}>
+      <section id="faq" style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <div style={{ maxWidth: 700, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 56 }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
@@ -691,7 +1119,7 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* CTA FINAL */}
+      {/* 15. CTA FINAL */}
       {/* ══════════════════════════════════════ */}
       <section style={{
         padding: "96px 24px",
@@ -718,7 +1146,7 @@ export default function OfertaPage() {
             Chega de noites perdidas<br />pensando em dívida.
           </h2>
           <p style={{ margin: "0 0 12px", fontSize: 17, color: "#94a3b8", lineHeight: 1.6 }}>
-            Você merece saber exatamente onde está e o que fazer. O QuitaZAP dá esse mapa.
+            Você merece saber exatamente onde está e o que fazer. O QuitaZAP te dá esse mapa.
           </p>
           <p style={{ margin: "0 0 40px", fontSize: 14, color: "#4ade80" }}>
             Plano em minutos · 7 dias de garantia · Cancele quando quiser
@@ -741,7 +1169,7 @@ export default function OfertaPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* FOOTER */}
+      {/* 16. RODAPÉ */}
       {/* ══════════════════════════════════════ */}
       <footer style={{ background: "#0a0a0a", padding: "40px 24px", borderTop: "1px solid #1a1a1a" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -765,8 +1193,11 @@ export default function OfertaPage() {
             </div>
           </div>
           <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 20 }}>
+            <p style={{ margin: "0 0 8px", fontSize: 12, color: "#374151", lineHeight: 1.7 }}>
+              © 2026 QuitaZAP. Todos os direitos reservados.
+            </p>
             <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.7 }}>
-              © 2026 QuitaZAP. Todos os direitos reservados. · O QuitaZAP não é uma consultoria financeira regulamentada. Não promete limpar nome, reduzir dívida ou garantir desconto. O serviço organiza informações e auxilia no planejamento — a decisão e execução são do usuário. Nenhum resultado financeiro é garantido. Dados: SERASA Experian, Mapa da Inadimplência 2026.
+              O QuitaZAP é uma ferramenta de organização e apoio ao planejamento financeiro. Não é consultoria financeira regulamentada, não promete limpar nome, reduzir dívida ou garantir resultado. As decisões financeiras continuam sendo responsabilidade do usuário.
             </p>
           </div>
         </div>

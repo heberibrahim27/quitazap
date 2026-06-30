@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone } from "@/lib/zapi";
-import { processarMensagemIA, type Mensagem } from "@/lib/ai-bot";
+import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
   gerarRelatorio,
@@ -22,6 +22,14 @@ import { urlPainelCobrador } from "@/lib/cobrador-token";
 
 // GIF de celebração quando o cliente avisa que pagou uma dívida
 const GIF_PARABENS = "https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif";
+
+// Garante que o tipo da dívida seja sempre um valor aceito por DividaIA
+const TIPOS_DIVIDA_IA = ["CARTAO", "EMPRESTIMO", "FINANCIAMENTO", "CHEQUE_ESPECIAL", "CREDIARIO", "LOJA", "IMPOSTO", "ALUGUEL", "ASSOCIACAO", "OUTRO"] as const;
+function normalizarTipoDividaIA(tipo: string | null | undefined): DividaIA["tipo"] {
+  return (TIPOS_DIVIDA_IA as readonly string[]).includes(tipo ?? "")
+    ? (tipo as DividaIA["tipo"])
+    : "OUTRO";
+}
 
 // ── Transcrição de áudio via Whisper ─────
 async function transcreverAudio(audioUrl: string): Promise<string> {
@@ -890,7 +898,7 @@ export async function POST(req: NextRequest) {
           const valorParcela = m ? parseFloat(m[1].replace(",", ".")) : d.valorTotal;
           return {
             credor: d.credor,
-            tipo: d.tipo,
+            tipo: normalizarTipoDividaIA(d.tipo),
             valorOriginal: d.valorTotal,
             saldoAtual: d.valorTotal - d.valorPago,
             valorParcela,
@@ -904,8 +912,9 @@ export async function POST(req: NextRequest) {
         despesasFixas: [],
         despesasVariaveis: [],
         emprestimos: [],
-        patrimonio: { reservaEmergencia: 0, imoveis: 0, veiculos: 0 },
+        patrimonio: { reservaEmergencia: 0 },
         objetivos: { objetivoPrincipal: "" },
+        alertas: {},
       };
       await sendWhatsApp(telefone, gerarQuitaScore(diagParcial));
       return NextResponse.json({ ok: true });
