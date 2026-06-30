@@ -328,18 +328,17 @@ function detectarComando(msg: string): string | null {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
-  if (/resumo|saldo do mes|resumo do mes|resumo simples/.test(m)) return "RESUMO_MES";
-  if (/despesas? do mes|quanto devo por mes|minhas despesas/.test(m)) return "DESPESAS_MES";
-  if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar/.test(m)) return "RECEITA_SEMANA";
-  if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana/.test(m)) return "GASTAR_SEMANA";
-  if (/^(ajuda|comandos|menu|help|o que voce faz|o que posso (perguntar|pedir|fazer|solicitar)|o que (vc|voce) (faz|pode)|quais (sao |são )?(os )?comandos)/.test(m)) return "AJUDA";
-  if (/^(resete|resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar)/.test(m)) return "RESETAR";
+  if (/resumo|saldo do mes|resumo do mes|resumo simples|como (ta|esta|tá|está) (meu )?mes|situacao do mes/.test(m)) return "RESUMO_MES";
+  if (/despesas? do mes|quanto devo por mes|minhas despesas|o que (tenho|preciso) pagar|minhas contas/.test(m)) return "DESPESAS_MES";
+  if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar|meta (da|semanal)/.test(m)) return "RECEITA_SEMANA";
+  if (/posso gastar quanto|quanto posso gastar|quanto sobra essa semana|quanto (tenho|to) livre/.test(m)) return "GASTAR_SEMANA";
+  if (/^(ajuda|comandos|menu|help|oi|ola|o que voce faz|o que posso (perguntar|pedir|fazer|solicitar)|o que (vc|voce) (faz|pode)|quais (sao|são)?(os )?comandos|como (funciona|usar))/.test(m)) return "AJUDA";
+  if (/^(resete|resetar|reiniciar|recomecar|comecar de novo|apagar tudo|novo inicio|limpar|zerar|começar do zero)/.test(m)) return "RESETAR";
   if (/^cobrar?\s+\S/.test(m)) return "COBRAR";
-  if (/minhas cobran[cç]as|ver cobran[cç]as|lista de cobran[cç]as|quem me deve/.test(m)) return "VER_COBRANCAS";
-  if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel/.test(m)) return "MEU_PAINEL";
-  // Detecta quando o cliente avisa que pagou uma dívida
-  if (/paguei|ja paguei|ja quitei|quitei|paga a|paguei a|terminei de pagar|efetuei o pagamento/.test(m)) return "PAGUEI";
-  if (/quitascore|meu score|ver (meu )?score|score financeiro|saude financeira|minha saude financeira/.test(m)) return "QUITASCORE";
+  if (/minhas cobran[cç]as|ver cobran[cç]as|lista de cobran[cç]as|quem me deve|quem nao (pagou|pago)|devedores/.test(m)) return "VER_COBRANCAS";
+  if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel|meu link/.test(m)) return "MEU_PAINEL";
+  if (/paguei|ja paguei|ja quitei|quitei|paga a|paguei a|terminei de pagar|efetuei o pagamento|liquidei|quitando/.test(m)) return "PAGUEI";
+  if (/quita.?score|meu score|ver (meu )?score|score financeiro|saude financeira|minha saude financeira|meu (indice|index|pontu|nota financ)|como (estou|ta|está) (financ|meu score|meu quita)|pontuacao financ/.test(m)) return "QUITASCORE";
   return null;
 }
 
