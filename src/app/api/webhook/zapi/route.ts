@@ -891,6 +891,7 @@ export async function POST(req: NextRequest) {
           return {
             credor: d.credor,
             tipo: d.tipo,
+            valorOriginal: d.valorTotal,
             saldoAtual: d.valorTotal - d.valorPago,
             valorParcela,
             parcelasRestantes: 0,
