@@ -6,7 +6,7 @@
 // Suporta link mágico: /cobrador?id=clienteId&token=hmac
 // ─────────────────────────────────────────
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 interface Cobranca {
@@ -56,7 +56,7 @@ const ETAPA_LABEL: Record<number, string> = { 1: "Amigável", 2: "Firme", 3: "Ú
 const DARK = "#1a1f36";
 const DARK2 = "#2e3a6e";
 
-export default function CobradorPage() {
+function CobradorContent() {
   const searchParams = useSearchParams();
   const clienteIdParam = searchParams.get("id")   ?? "";
   const tokenParam     = searchParams.get("token") ?? "";
@@ -543,5 +543,13 @@ export default function CobradorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CobradorPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#f4f6fb", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>Carregando...</div>}>
+      <CobradorContent />
+    </Suspense>
   );
 }
