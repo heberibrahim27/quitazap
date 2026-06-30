@@ -690,7 +690,7 @@ export async function POST(req: NextRequest) {
         data: { etapa: "COLETANDO_DIVIDAS", dividasTemp: "[]", renda: null },
       });
       await sendWhatsApp(telefone,
-        `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOlá, *${sessao.nome ?? "cliente"}*! 👋 Seja bem-vindo(a) de volta ao *QuitaZAP!*\n\nSou seu consultor financeiro pessoal. Vou te ajudar a sair das dívidas com um plano claro e direto. 💪\n\n*Antes de começar, me conta rapidinho:*\n\n1️⃣ Como você trabalha? CLT, servidor público, autônomo, MEI ou empresário?\n2️⃣ Tem dependentes? Filhos ou alguém que depende de você financeiramente?`
+        `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOlá, *${sessao.nome ?? "cliente"}*! 👋\nSeu acesso ao *QuitaZAP* foi reativado.\n\nEu sou sua IA de organização financeira pelo WhatsApp.\n\nVou te ajudar a entender sua renda, despesas, dívidas e vencimentos para montar um plano de ação mais claro.\n\nPara começar, me diga:\n\nComo você trabalha hoje?\n\n1️⃣ CLT\n2️⃣ Servidor público\n3️⃣ Autônomo\n4️⃣ MEI\n5️⃣ Empresário\n6️⃣ Outro`
       );
       return NextResponse.json({ ok: true });
     }

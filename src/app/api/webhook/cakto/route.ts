@@ -9,16 +9,25 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
 
 function msgBoasVindas(nome: string, oferta: string): string {
-  return `Olá, *${nome}*! 👋 Seja bem-vindo(a) ao *QuitaZAP!*
+  return `Olá, *${nome}*! 👋
+Seu acesso ao *QuitaZAP* foi ativado.
 
 Sua assinatura do *${oferta}* está confirmada ✅
 
-Sou seu consultor financeiro pessoal. Vou te ajudar a sair das dívidas com um plano claro e direto. 💪
+Eu sou sua IA de organização financeira pelo WhatsApp.
 
-*Antes de começar, me conta rapidinho:*
+Vou te ajudar a entender sua renda, despesas, dívidas e vencimentos para montar um plano de ação mais claro.
 
-1️⃣ Como você trabalha? CLT, servidor público, autônomo, MEI ou empresário?
-2️⃣ Tem dependentes? Filhos ou alguém que depende de você financeiramente?`;
+Para começar, me diga:
+
+Como você trabalha hoje?
+
+1️⃣ CLT
+2️⃣ Servidor público
+3️⃣ Autônomo
+4️⃣ MEI
+5️⃣ Empresário
+6️⃣ Outro`;
 }
 
 export async function POST(req: NextRequest) {

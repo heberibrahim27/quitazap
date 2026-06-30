@@ -295,7 +295,7 @@ export function gerarQuitaScore(diag: DiagnosticoIA): string {
 
   const scoreBar = "█".repeat(Math.round(score / 100)) + "░".repeat(10 - Math.round(score / 100));
 
-  return `💳 *Sua Saúde Financeira — QuitaScore*
+  return `💳 *Seu QuitaScore*
 
 \`\`\`
 Score atual    ${score}/1000  ${emoji} ${faixa}
@@ -308,13 +308,15 @@ Adimplência            ${ptAdimplencia}/150
 Reserva emergência     ${ptReserva}/100
 \`\`\`
 
+O QuitaScore mostra seu ponto de partida financeiro. Ele não é um julgamento, é uma forma simples de acompanhar sua evolução.
+
 ${score >= 700
-    ? `Sua saúde financeira está *boa*! Continue seguindo o plano para chegar à zona Excelente. 💪`
+    ? `Sua pontuação está em uma faixa positiva. Continue acompanhando seu plano para manter essa evolução. 💪`
     : score >= 500
-    ? `Situação *regular* — controlável com disciplina. Siga o plano de quitação. 📋`
+    ? `Sua pontuação está em uma faixa regular — com organização e disciplina é possível evoluir mês a mês. 📋`
     : score >= 300
-    ? `Situação exige *atenção*. Priorize pagar as dívidas em atraso e evite novos gastos. ⚠️`
-    : `Situação *crítica*. Mas não é o fim — com o plano certo dá para virar o jogo. Vamos juntos! 💚`}`;
+    ? `Sua pontuação pede atenção. Priorizar as dívidas em atraso e evitar novos compromissos ajuda a melhorar esse cenário. ⚠️`
+    : `Sua pontuação está em uma faixa crítica. Com um plano de ação claro e foco no que pode ser ajustado, é possível melhorar essa situação aos poucos. 💚`}`;
 }
 
 // ── Relatório principal ───────────────────
@@ -696,5 +698,5 @@ ${sugestoesTexto}
 
 ⚠️ _Evite contrair novas dívidas por enquanto. Sua situação pede foco. Um passo de cada vez._
 
-_QuitaZAP — Organize hoje, quite amanhã_ 💚`;
+_QuitaZAP — organização financeira, um passo de cada vez_ 💚`;
 }
