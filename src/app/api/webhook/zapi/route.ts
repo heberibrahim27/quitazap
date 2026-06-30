@@ -339,7 +339,7 @@ function detectarComando(msg: string): string | null {
   if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel/.test(m)) return "MEU_PAINEL";
   // Detecta quando o cliente avisa que pagou uma dívida
   if (/paguei|ja paguei|ja quitei|quitei|paga a|paguei a|terminei de pagar|efetuei o pagamento/.test(m)) return "PAGUEI";
-  if (/^(quitascore|meu score|ver score|meu quitascore|score financeiro|saude financeira|minha saude financeira)/.test(m)) return "QUITASCORE";
+  if (/quitascore|meu score|ver (meu )?score|score financeiro|saude financeira|minha saude financeira/.test(m)) return "QUITASCORE";
   return null;
 }
 
