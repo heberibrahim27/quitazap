@@ -269,12 +269,19 @@ Total     R$ [soma]/mês
 
 Mensagem 2: "Tem mais algum cartão? 💳 Se não, me fala se teve algum gasto variável esse mês: mercado, farmácia, combustível, delivery, qualquer coisa paga em dinheiro ou Pix 😊"
 
-🔒 OBRIGATÓRIO AO CHAMAR gerar_diagnostico: inclua TODOS os cartões de crédito confirmados nesta conversa dentro do array cartoes[] — nunca ignore um cartão já confirmado em mensagens anteriores, mesmo que a confirmação tenha acontecido há várias mensagens. Para cada cartão, preencha:
-- banco (nome do cartão/banco)
-- faturaAtual (valor da fatura)
-- valorMinimo, se informado
-- limite e limiteDisponivel, somente se o cliente informou
-Se o cliente informou o dia de vencimento da fatura, registre TAMBÉM uma entrada correspondente em dividas[] com tipo "CARTAO": credor = banco, valorParcela = faturaAtual, saldoAtual = faturaAtual, parcelasRestantes: 1, diaVencimento = dia informado, emAtraso: false (salvo indicação contrária). Isso garante que o vencimento apareça no diagnóstico, já que cartoes[] não tem campo de data.
+🔒 OBRIGATÓRIO AO CHAMAR gerar_diagnostico: cartão com valor de fatura e dia de vencimento (o caso normal desta etapa) deve ser registrado SOMENTE em dividas[], nunca em cartoes[]. Para cada cartão confirmado nesta conversa, crie uma entrada em dividas[] com:
+- tipo: "CARTAO"
+- credor: banco/nome do cartão
+- saldoAtual: valor da fatura
+- valorParcela: valor da fatura
+- parcelasRestantes: 1
+- diaVencimento: dia informado
+- emAtraso: false (salvo se o cliente disser que está atrasado)
+Nunca ignore um cartão já confirmado em mensagens anteriores, mesmo que a confirmação tenha acontecido há várias mensagens.
+
+⛔ ANTI-DUPLICAÇÃO: nunca contabilize o mesmo cartão duas vezes. Um cartão que já entrou em dividas[] tipo "CARTAO" NÃO deve aparecer também em cartoes[] com a mesma fatura.
+
+Use cartoes[] apenas quando o cliente informar dados de cartão que NÃO são parcela do mês: limite total, limite disponível, valor mínimo ou informações gerais do cartão sem vencimento/fatura atual associada.
 
 ETAPA 7 — GASTOS VARIÁVEIS
 ⛔ REGRA CRÍTICA — ANTI-ALUCINAÇÃO:
@@ -452,7 +459,7 @@ Nubank        R$ 2.000,00   vence dia 01
 PagBank       R$ 1.300,00   vence dia 01
 Mercado Pago  R$ 1.800,00   vence dia 07
 \`\`\`
-então gerar_diagnostico DEVE conter cartoes[] com esses 3 cartões (banco, faturaAtual e, quando houver vencimento, a entrada correspondente em dividas[] tipo "CARTAO" com diaVencimento). NUNCA deixe esses cartões apenas na resposta em texto, e NUNCA omita cartoes[] quando cartões já foram confirmados.
+então gerar_diagnostico DEVE conter esses 3 itens em dividas[] tipo "CARTAO" (credor, saldoAtual, valorParcela, parcelasRestantes: 1, diaVencimento). NÃO preencha cartoes[] com esses mesmos valores — isso duplicaria o valor do cartão no diagnóstico. NUNCA deixe esses cartões apenas na resposta em texto, e NUNCA omita um cartão já confirmado.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 QUANDO CHAMAR gerar_diagnostico
