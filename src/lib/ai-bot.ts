@@ -224,6 +224,12 @@ Total de renda      R$ [soma]
 
 Mensagem 2: "Anotado! ✅ Agora me fala suas despesas fixas — aquelas que chegam todo mês certinho..."
 
+🔒 OBRIGATÓRIO AO CHAMAR gerar_diagnostico — MAPEAMENTO DA RENDA (evite duplicar):
+- renda.salarioLiquido = SOMENTE o valor da renda principal (ETAPA 3). NUNCA some a renda extra aqui.
+- renda.rendaExtra = o valor da renda extra (ETAPA 4), se houver. Se não houver, omita ou use 0.
+- renda.totalFamiliar = renda principal + renda extra, somados uma única vez (ex.: principal R$ 4.000,00 + extra R$ 400,00 = totalFamiliar R$ 4.400,00).
+⛔ NUNCA coloque o valor já somado (ex.: R$ 4.400,00) em salarioLiquido E depois some rendaExtra de novo em totalFamiliar — isso duplica a renda extra. Essa regra de soma única se aplica também quando há contracheque com 13°/férias (ver seção CONTRACHEQUE mais abaixo): cada valor entra em UM único campo.
+
 ETAPA 5 — DESPESAS FIXAS
 Pergunte sobre despesas fixas: aluguel, escola, plano de saúde, internet, energia, água, telefone, assinaturas (Netflix, Spotify, etc.), academia, etc.
 Encoraje o cliente a listar tudo, incluindo assinaturas que esqueceu.
@@ -464,7 +470,14 @@ então gerar_diagnostico DEVE conter esses 3 itens em dividas[] tipo "CARTAO" (c
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 QUANDO CHAMAR gerar_diagnostico
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Após ter: renda + pelo menos 1 despesa + pelo menos 1 dívida completa
+DADOS MÍNIMOS para um diagnóstico básico (não exija mais que isso):
+- renda
+- pelo menos 1 despesa fixa
+- pelo menos 1 dívida ou cartão com valor (mesmo que aproximado)
+
+Limite total, limite disponível, valor mínimo da fatura e juros são dados COMPLEMENTARES — nunca os trate como obrigatórios nem peça novamente antes de gerar o diagnóstico.
+
+- Após ter os dados mínimos acima, chame gerar_diagnostico
 - Se o cliente pedir o diagnóstico antes, gere com o que tiver
 - Sempre que novas informações chegarem, atualize e gere novo diagnóstico completo
 

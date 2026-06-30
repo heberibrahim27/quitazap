@@ -555,7 +555,7 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   if (!diag.renda?.totalFamiliar && !diag.renda?.salarioLiquido) pendentes.push("renda mensal");
   // Servidor público: despesas fixas são os descontos em folha — não pedir
   if (!isServidor && (diag.despesasFixas ?? []).length === 0) pendentes.push("despesas fixas detalhadas");
-  if (cartoes.length === 0 && dividas.some((d) => d.tipo === "CARTAO")) pendentes.push("limite e fatura atual dos cartões");
+  // Limite, valor mínimo e juros do cartão são dados complementares — não são exigidos para o diagnóstico básico
   // Consignados não têm vencimento manual — não reclamar deles
   if (dividasManuais.some((d) => !d.diaVencimento)) pendentes.push("datas de vencimento das dívidas sem data");
 
@@ -665,6 +665,13 @@ Parcelas/mês: *R$ ${fmt(comprometidoMes)}*
 Comprometimento: *${pct(comprometidoMes, renda)}* ${nivelRisco}
 ${sobra >= 0 ? `Sobra mensal: *R$ ${fmt(sobra)}*` : `⚠️ Déficit: *R$ ${fmt(Math.abs(sobra))}* (renda insuficiente)`}`}
 ${listaConsignadosFolha}
+${(diag.despesasFixas ?? []).length > 0 ? `
+━━━━━━━━━━━━━━━━━━━━
+🏠 *DESPESAS FIXAS*
+━━━━━━━━━━━━━━━━━━━━
+${listaDespesas}
+
+Total fixo: *R$ ${fmt(totalFixo)}*` : ""}
 ${comprometidoMes > 0 ? `
 ━━━━━━━━━━━━━━━━━━━━
 🗓️ *O QUE PAGAR EM ${mesAtual}*
