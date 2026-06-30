@@ -198,6 +198,9 @@ export function gerarListaComandos(nome: string): string {
 📋 *"minhas cobranças"*
 ↳ Vê quem ainda não pagou e o status de cada cobrança
 
+⭐ *"quitascore"* ou *"meu score"*
+↳ Consulta seu score de saúde financeira atualizado
+
 É só mandar a mensagem — pode escrever ou mandar áudio do seu jeito! 😊`;
 }
 

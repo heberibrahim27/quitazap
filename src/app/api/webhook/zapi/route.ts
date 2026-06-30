@@ -339,6 +339,7 @@ function detectarComando(msg: string): string | null {
   if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel/.test(m)) return "MEU_PAINEL";
   // Detecta quando o cliente avisa que pagou uma dívida
   if (/paguei|ja paguei|ja quitei|quitei|paga a|paguei a|terminei de pagar|efetuei o pagamento/.test(m)) return "PAGUEI";
+  if (/^(quitascore|meu score|ver score|meu quitascore|score financeiro|saude financeira|minha saude financeira)/.test(m)) return "QUITASCORE";
   return null;
 }
 
@@ -867,6 +868,46 @@ export async function POST(req: NextRequest) {
         `_O link é exclusivo para você e não expira._ 🔐\n\n` +
         `Dica: salve o link nos favoritos do celular para acesso rápido! 📌`
       );
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Comando QUITASCORE ──────────────────────────────────────────────────
+    if (detectarComando(mensagem) === "QUITASCORE") {
+      if (!sessao.clienteId || !sessao.renda) {
+        await sendWhatsApp(telefone,
+          `Ainda não temos seu diagnóstico completo. Me conta sua situação financeira e eu gero seu QuitaScore! 😊`
+        );
+        return NextResponse.json({ ok: true });
+      }
+      const dividasDb = await prisma.divida.findMany({
+        where: { clienteId: sessao.clienteId, status: "ATIVA" },
+        select: { credor: true, valorTotal: true, valorPago: true, tipo: true, emAtraso: true, diasAtraso: true, obs: true },
+      });
+      const diagParcial: import("@/lib/ai-bot").DiagnosticoIA = {
+        dadosPessoais: { nome: sessao.nome ?? "", vinculo: "", dependentes: 0 },
+        renda: { salarioLiquido: sessao.renda, totalFamiliar: sessao.renda },
+        dividas: dividasDb.map((d) => {
+          const m = (d.obs ?? "").match(/R\$(\d+(?:[.,]\d+)?)/);
+          const valorParcela = m ? parseFloat(m[1].replace(",", ".")) : d.valorTotal;
+          return {
+            credor: d.credor,
+            tipo: d.tipo,
+            saldoAtual: d.valorTotal - d.valorPago,
+            valorParcela,
+            parcelasRestantes: 0,
+            emAtraso: d.emAtraso,
+            diasAtraso: d.diasAtraso ?? 0,
+            obs: d.obs ?? "",
+          };
+        }),
+        cartoes: [],
+        despesasFixas: [],
+        despesasVariaveis: [],
+        emprestimos: [],
+        patrimonio: { reservaEmergencia: 0, imoveis: 0, veiculos: 0 },
+        objetivos: { objetivoPrincipal: "" },
+      };
+      await sendWhatsApp(telefone, gerarQuitaScore(diagParcial));
       return NextResponse.json({ ok: true });
     }
 
