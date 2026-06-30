@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { getUsuarioId, erroNaoAutenticado } from "@/lib/get-usuario";
 
 // PATCH /api/pendencias/[id]
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const usuarioId = getUsuarioId(req);
   if (!usuarioId) return erroNaoAutenticado();
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body inválido" }, { status: 400 });
 
@@ -45,11 +45,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/pendencias/[id]
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const usuarioId = getUsuarioId(req);
   if (!usuarioId) return erroNaoAutenticado();
 
-  const { id } = params;
+  const { id } = await params;
   const existente = await prisma.pendencia.findFirst({ where: { id, usuarioId } });
   if (!existente) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
 

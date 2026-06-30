@@ -45,6 +45,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .finally(() => setCarregando(false));
   }, [router]);
 
+  function navegar(href: string) {
+    setMenuAberto(false);
+    setTimeout(() => router.push(href), 50);
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/entrar");
@@ -121,14 +126,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {NAV.map((item) => {
             const active = isActive(item.href);
             return (
-              <Link key={item.href} href={item.href} onClick={() => setMenuAberto(false)}
+              <button key={item.href} onClick={() => navegar(item.href)}
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "10px 12px", borderRadius: 10, marginBottom: 2,
                   background: active ? "#1e293b" : "transparent",
                   color: active ? "white" : "#64748b",
-                  fontWeight: active ? 700 : 500, fontSize: 14, textDecoration: "none",
-                  transition: "all 0.15s",
+                  fontWeight: active ? 700 : 500, fontSize: 14,
+                  transition: "all 0.15s", width: "100%", textAlign: "left",
+                  border: "none", cursor: "pointer", touchAction: "manipulation",
                 }}>
                 <span style={{ fontSize: 16, width: 22, textAlign: "center" }}>{item.icon}</span>
                 {item.label}
@@ -137,7 +143,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     Conectar
                   </span>
                 )}
-              </Link>
+              </button>
             );
           })}
         </nav>

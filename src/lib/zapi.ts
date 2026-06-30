@@ -152,6 +152,46 @@ async function sendImageViaEvolution(phone: string, imageUrl: string, caption?: 
 }
 
 /**
+ * Envia mensagem via WhatsApp usando instância específica (multi-tenant).
+ *
+ * Para Evolution API: usa `instancia` fornecida (por usuário) com a APIKEY global.
+ * Para Z-API ou quando `instancia` é nulo: usa as variáveis de ambiente globais.
+ *
+ * @param phone     Número com DDI: "5511999999999"
+ * @param message   Texto da mensagem
+ * @param instancia Nome da instância Evolution do usuário (wpInstancia do modelo Usuario)
+ */
+export async function sendWhatsAppInstancia(
+  phone: string,
+  message: string,
+  instancia: string | null | undefined,
+) {
+  if (PROVIDER === "evolution" && instancia) {
+    if (!EVO_URL || !EVO_APIKEY) {
+      console.warn("[EVO] Credenciais globais não configuradas — mensagem não enviada.");
+      console.log(`[EVO MOCK] Instância: ${instancia} | Para: ${phone}\n${message}`);
+      return;
+    }
+    const url = `${EVO_URL}/message/sendText/${instancia}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": EVO_APIKEY,
+      },
+      body: JSON.stringify({ number: phone, text: message }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Evolution API (instância=${instancia}) error ${res.status}: ${err}`);
+    }
+    return res.json();
+  }
+  // Fallback: instância global (Z-API ou Evolution sem instância por usuário)
+  return sendWhatsApp(phone, message);
+}
+
+/**
  * Normaliza telefone para formato com DDI 55.
  * Suporta: "11999999999", "5511999999999", "+55 (11) 99999-9999"
  */

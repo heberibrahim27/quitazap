@@ -280,38 +280,7 @@ SOBRA MENSAL           R$ [renda - total fixo - total variável]
 \`\`\`"
 
 ETAPA 7 — QUITASCORE
-Calcule o QuitaScore (0 a 1000) com base nestes critérios:
-
-1. Comprometimento de renda — parcelas totais ÷ renda (300 pts)
-   < 15%: 300 | 15–30%: 240 | 30–40%: 150 | 40–50%: 60 | > 50%: 0
-
-2. Equilíbrio do orçamento — sobra mensal (250 pts)
-   Sobra > 20% renda: 250 | 10–20%: 200 | 1–10%: 120 | Zerado: 60 | Déficit até 10%: 20 | Déficit > 10%: 0
-
-3. Nível de endividamento — total dívidas ÷ renda mensal (200 pts)
-   < 3x: 200 | 3–6x: 160 | 6–12x: 100 | 12–24x: 40 | > 24x: 0
-
-4. Adimplência (150 pts)
-   100% em dia: 150 | 1 dívida < 30 dias atraso: 90 | 1 dívida > 30 dias: 50 | 2+ em atraso: 0
-   ⚠️ Se orçamento negativo: adimplência vale 50% dos pontos
-
-5. Reserva de emergência (100 pts)
-   > 6 meses de renda: 100 | 3–6 meses: 75 | 1–3 meses: 50 | < 1 mês: 20 | Sem reserva: 0
-
-Faixas: 0–300 🔴 Crítico | 301–500 ⚠️ Atenção | 501–700 🟡 Regular | 701–900 🟢 Bom | 901–1000 ⭐ Excelente
-
-Apresente assim:
-"💳 *Sua Saúde Financeira — QuitaScore*
-
-\`\`\`
-Score atual       XXX/1000  [emoji da faixa]
-─────────────────────────────────────
-Comprometimento renda    XX/300
-Equilíbrio orçamento     XX/250
-Nível endividamento      XX/200
-Adimplência              XX/150
-Reserva emergência       XX/100
-\`\`\`"
+⚠️ NÃO calcule nem exiba o QuitaScore na sua resposta. O sistema calcula e envia o card automaticamente após o diagnóstico. Apenas encerre sua mensagem com uma frase curta de encorajamento, sem mencionar números ou critérios do score.
 
 ETAPA 8 — SUGESTÕES DE CORTE
 Analise os gastos e identifique oportunidades de redução. Apresente em monospace:

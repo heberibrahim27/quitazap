@@ -31,10 +31,10 @@ export function Navbar() {
     return pathname.startsWith(href);
   }
 
-  // Navega e fecha o menu de forma explícita (mais confiável no mobile)
+  // Navega e fecha o menu — delay garante que React commita o estado antes de navegar (mobile)
   function navegar(href: string) {
     setMenuAberto(false);
-    router.push(href);
+    setTimeout(() => router.push(href), 50);
   }
 
   return (
@@ -122,6 +122,7 @@ export function Navbar() {
               background: ativo(l.href) ? "#1e293b" : "transparent",
               display: "block", width: "100%", textAlign: "left",
               border: "none", cursor: "pointer",
+              touchAction: "manipulation", WebkitTapHighlightColor: "transparent",
             }}>
               {l.label}
             </button>
