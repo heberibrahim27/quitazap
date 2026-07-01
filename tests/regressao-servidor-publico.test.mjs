@@ -50,6 +50,10 @@ const {
   gerarRespostaDadosFolhaServidor,
 } = loadTsModule("src/lib/servidor-publico-flow.ts");
 const { processarFluxoGasto } = loadTsModule("src/lib/gasto-flow.ts");
+const {
+  mensagemBoasVindasControle,
+  mensagensResetControle,
+} = loadTsModule("src/lib/onboarding-controle.ts");
 
 const mensagemManual = `
 Salario liquido normal: 3812,68
@@ -385,4 +389,31 @@ test("fluxo deterministico de gasto classifica categorias por palavra-chave", ()
   assert.equal(processarFluxoGasto("chatgpt 110", hoje)?.categoria, "Assinaturas");
   assert.equal(processarFluxoGasto("paguei 60 de energia hoje", hoje)?.categoria, "Contas da casa");
   assert.equal(processarFluxoGasto("uber 23,50", hoje)?.categoria, "Transporte");
+});
+
+test("reset usa onboarding do QuitaZAP Controle em duas mensagens", () => {
+  const [mensagem1, mensagem2] = mensagensResetControle("Maria");
+
+  assert.equal(
+    mensagem1,
+    "✅ *Tudo zerado.*\n\nVamos recomeçar seu controle financeiro do zero."
+  );
+  assert.match(mensagem2, /^Olá, Maria! 👋/);
+  assert.match(mensagem2, /QuitaZAP Controle/);
+  assert.match(mensagem2, /Para começar, me diga quanto entra por mês\./);
+  assert.match(mensagem2, /minha renda é 3800/);
+
+  const texto = `${mensagem1}\n${mensagem2}`;
+  assert.doesNotMatch(texto, /Como você trabalha hoje\?/i);
+  assert.doesNotMatch(texto, /1️⃣ CLT|2️⃣ Servidor público|3️⃣ Autônomo|4️⃣ MEI|5️⃣ Empresário|6️⃣ Outro/);
+});
+
+test("boas-vindas de ativacao nao usa onboarding antigo por perfil profissional", () => {
+  const mensagem = mensagemBoasVindasControle("João", "Plano Mensal");
+
+  assert.match(mensagem, /Seu acesso ao \*QuitaZAP Controle\* foi ativado/);
+  assert.match(mensagem, /Sua assinatura do \*Plano Mensal\* está confirmada ✅/);
+  assert.match(mensagem, /renda, despesas, gastos, cartões, dívidas, vencimentos e limites por categoria/);
+  assert.doesNotMatch(mensagem, /Como você trabalha hoje\?/i);
+  assert.doesNotMatch(mensagem, /CLT|Autônomo|MEI|Empresário|Outro/);
 });

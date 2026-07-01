@@ -7,27 +7,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
+import { mensagemBoasVindasControle } from "@/lib/onboarding-controle";
 
 function msgBoasVindas(nome: string, oferta: string): string {
-  return `Olá, *${nome}*! 👋
-Seu acesso ao *QuitaZAP* foi ativado.
-
-Sua assinatura do *${oferta}* está confirmada ✅
-
-Eu sou sua IA de organização financeira pelo WhatsApp.
-
-Vou te ajudar a entender sua renda, despesas, dívidas e vencimentos para montar um plano de ação mais claro.
-
-Para começar, me diga:
-
-Como você trabalha hoje?
-
-1️⃣ CLT
-2️⃣ Servidor público
-3️⃣ Autônomo
-4️⃣ MEI
-5️⃣ Empresário
-6️⃣ Outro`;
+  return mensagemBoasVindasControle(nome, oferta);
 }
 
 export async function POST(req: NextRequest) {

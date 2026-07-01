@@ -11,6 +11,7 @@ import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot"
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { processarFluxoGasto } from "@/lib/gasto-flow";
+import { mensagensResetControle } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
   gerarRelatorio,
@@ -765,15 +766,22 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      const [respostaReset, respostaInicio] = mensagensResetControle(sessao.nome ?? "cliente");
+
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
-        data: { etapa: "COLETANDO_DIVIDAS", dividasTemp: "[]", renda: null },
+        data: {
+          etapa: "CONVERSANDO",
+          renda: null,
+          dividasTemp: JSON.stringify([
+            { role: "assistant", content: respostaReset },
+            { role: "assistant", content: respostaInicio },
+          ]),
+        },
       });
 
-      await sendWhatsApp(
-        telefone,
-        `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOlá, *${sessao.nome ?? "cliente"}*! 👋\nSeu acesso ao *QuitaZAP* foi reativado.\n\nEu sou sua IA de organização financeira pelo WhatsApp.\n\nVou te ajudar a entender sua renda, despesas, dívidas e vencimentos para montar um plano de ação mais claro.\n\nPara começar, me diga:\n\nComo você trabalha hoje?\n\n1️⃣ CLT\n2️⃣ Servidor público\n3️⃣ Autônomo\n4️⃣ MEI\n5️⃣ Empresário\n6️⃣ Outro`
-      );
+      await sendWhatsApp(telefone, respostaReset);
+      await sendWhatsApp(telefone, respostaInicio);
 
       return NextResponse.json({ ok: true });
     }
@@ -809,7 +817,6 @@ export async function POST(req: NextRequest) {
       servidorHistoricoSessao.length === 0;
 
     const servidorEscolheuServidorPublico =
-      servidorMsgNormalizada === "2" ||
       /\bservidor\b|\bservidor publico\b|\bfuncionario publico\b|\bconcursado\b|\bpolicial\b|\bpm\b|\bmunicipal\b|\bestadual\b|\bfederal\b/.test(
         servidorMsgNormalizada
       );
@@ -1358,29 +1365,6 @@ Pode mandar tudo em uma mensagem só.`;
     });
 
     await sendWhatsApp(telefone, resultado.resposta);
-
-    // ── Agenda resumo automático via QStash (10 min) ──
-    const qstashToken = process.env.QSTASH_TOKEN;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    if (qstashToken && siteUrl && sessao.etapa !== "PLANO_GERADO") {
-      try {
-        await fetch(`https://qstash.upstash.io/v2/publish/${siteUrl}/api/cron/resumo`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${qstashToken}`,
-            "Content-Type": "application/json",
-            "Upstash-Delay": "600s",
-          },
-          body: JSON.stringify({
-            telefone: sessao.telefone,
-            agendadoEm: new Date().toISOString(),
-          }),
-        });
-        console.log(`[QSTASH] Resumo agendado para ${sessao.telefone} em 10 min`);
-      } catch (err) {
-        console.error("[QSTASH] Erro ao agendar resumo:", err);
-      }
-    }
 
     return NextResponse.json({ ok: true });
 
