@@ -67,6 +67,7 @@ const {
 const {
   atualizarDespesasFixasControle,
   calcularSaldoDisponivelControle,
+  configurarCartaoControle,
   corrigirOrigemUltimoGastoControle,
   registrarGastoControle,
   totalFaturasAbertasControle,
@@ -598,15 +599,102 @@ test("apos registrar despesas fixas estado libera gasto variavel", () => {
   assert.match(gasto?.resposta ?? "", /✅ \*OK! Registrado\.\*/);
 });
 
-test("controle financeiro calcula saldo inicial apos renda e despesas fixas", () => {
-  const estado = atualizarDespesasFixasControle(
-    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+function estadoControleBase() {
+  return atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [] },
     2040,
     4000
   );
+}
+
+test("controle financeiro calcula saldo inicial apos renda e despesas fixas", () => {
+  const estado = estadoControleBase();
 
   assert.equal(calcularSaldoDisponivelControle(estado), 1960);
   assert.equal(totalFaturasAbertasControle(estado), 0);
+});
+
+test("configuracao de cartao registra fechamento e vencimento sem cair em gasto", () => {
+  const estado = estadoControleBase();
+  const resultado = configurarCartaoControle("Nubank fecha dia 25 e vence dia 01", estado);
+
+  assert.ok(resultado);
+  assert.equal(resultado.atualizouEstado, true);
+  assert.deepEqual(resultado.estado.cartoes, [{ nome: "Nubank", fechamento: 25, vencimento: 1 }]);
+  assert.match(resultado.resposta, /✅ \*Cartão configurado\.\*/);
+  assert.match(resultado.resposta, /💳 \*Cartão:\* Nubank/);
+  assert.match(resultado.resposta, /📅 \*Fechamento:\* dia 25/);
+  assert.match(resultado.resposta, /📆 \*Vencimento:\* dia 01/);
+  assert.doesNotMatch(resultado.resposta, /Qual foi o valor desse gasto\?|✅ \*OK! Registrado\.\*/);
+  assert.equal(registrarGastoControle("Nubank fecha dia 25 e vence dia 01", estado), null);
+  assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("configuracao de cartao aceita somente vencimento ou somente fechamento", () => {
+  const mercadoPago = configurarCartaoControle("Mercado Pago vence dia 07", estadoControleBase());
+  assert.ok(mercadoPago);
+  assert.deepEqual(mercadoPago.estado.cartoes, [{ nome: "Mercado Pago", fechamento: undefined, vencimento: 7 }]);
+  assert.match(mercadoPago.resposta, /📆 \*Vencimento:\* dia 07/);
+  assert.doesNotMatch(mercadoPago.resposta, /📅 \*Fechamento:/);
+  assert.match(mercadoPago.resposta, /Mercado Pago fecha dia 25/);
+
+  const pagBank = configurarCartaoControle("PagBank fecha dia 28", estadoControleBase());
+  assert.ok(pagBank);
+  assert.deepEqual(pagBank.estado.cartoes, [{ nome: "PagBank", fechamento: 28, vencimento: undefined }]);
+  assert.match(pagBank.resposta, /📅 \*Fechamento:\* dia 28/);
+  assert.doesNotMatch(pagBank.resposta, /📆 \*Vencimento:/);
+  assert.match(pagBank.resposta, /PagBank vence dia 10/);
+});
+
+test("configuracao de cartao atualiza sem duplicar e normaliza BB", () => {
+  const inicial = configurarCartaoControle("Nubank fecha dia 25 e vence dia 01", estadoControleBase());
+  assert.ok(inicial);
+
+  const atualizado = configurarCartaoControle("Nubank vence dia 05", inicial.estado);
+  assert.ok(atualizado);
+  assert.equal(atualizado.estado.cartoes.length, 1);
+  assert.deepEqual(atualizado.estado.cartoes, [{ nome: "Nubank", fechamento: 25, vencimento: 5 }]);
+  assert.match(atualizado.resposta, /✅ \*Cartão atualizado\.\*/);
+  assert.match(atualizado.resposta, /📆 \*Vencimento:\* dia 05/);
+  assert.match(atualizado.resposta, /Atualizei os dados desse cartão\./);
+
+  const bb = configurarCartaoControle("BB fecha 20 vence 05", estadoControleBase());
+  assert.ok(bb);
+  assert.deepEqual(bb.estado.cartoes, [{ nome: "Banco do Brasil", fechamento: 20, vencimento: 5 }]);
+  assert.match(bb.resposta, /💳 \*Cartão:\* Banco do Brasil/);
+});
+
+test("configuracao de cartao rejeita dia invalido", () => {
+  const estado = estadoControleBase();
+  const resultado = configurarCartaoControle("Nubank vence dia 40", estado);
+
+  assert.ok(resultado);
+  assert.equal(resultado.atualizouEstado, false);
+  assert.deepEqual(resultado.estado, estado);
+  assert.match(resultado.resposta, /Não consegui salvar esse vencimento\./);
+  assert.match(resultado.resposta, /O dia precisa estar entre 1 e 31\./);
+  assert.match(resultado.resposta, /Nubank vence dia 05/);
+  assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("gasto em cartao configurado continua somando fatura aberta", () => {
+  const configuracao = configurarCartaoControle("Nubank vence dia 05", estadoControleBase());
+  assert.ok(configuracao);
+
+  const gasto = registrarGastoControle(
+    "gastei 65 no Nubank",
+    configuracao.estado,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+
+  assert.ok(gasto);
+  assert.equal(calcularSaldoDisponivelControle(gasto.estado), 1960);
+  assert.deepEqual(gasto.estado.faturas, [{ cartao: "Nubank", valor: 65 }]);
+  assert.deepEqual(gasto.estado.cartoes, [{ nome: "Nubank", fechamento: undefined, vencimento: 5 }]);
+  assert.match(gasto.resposta, /💳 \*Origem:\* Cartão Nubank/);
+  assert.match(gasto.resposta, /💳 \*Fatura Nubank:\* R\$ 65,00/);
+  assert.match(gasto.resposta, /📆 \*Vencimento:\* dia 05/);
+  assert.doesNotMatch(gasto.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
 test("gasto sem cartao sai do saldo do mes e nao entra em fatura", () => {

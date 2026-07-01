@@ -11,6 +11,7 @@ import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot"
 import {
   atualizarDespesasFixasControle,
   carregarEstadoControle,
+  configurarCartaoControle,
   corrigirOrigemUltimoGastoControle,
   criarMensagemEstadoControle,
   registrarGastoControle,
@@ -979,6 +980,25 @@ Pode mandar tudo em uma mensagem só.`;
     }
 
     const estadoAntesGasto = carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda);
+    const configuracaoCartao = configurarCartaoControle(mensagem, estadoAntesGasto);
+    if (configuracaoCartao) {
+      await sendWhatsApp(telefone, configuracaoCartao.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: configuracaoCartao.resposta },
+            ...(configuracaoCartao.atualizouEstado ? [criarMensagemEstadoControle(configuracaoCartao.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
     const correcaoOrigem = corrigirOrigemUltimoGastoControle(mensagem, estadoAntesGasto);
     if (correcaoOrigem) {
       await sendWhatsApp(telefone, correcaoOrigem.resposta);

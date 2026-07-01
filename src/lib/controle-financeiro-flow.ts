@@ -13,6 +13,12 @@ export type FaturaAbertaControle = {
   valor: number;
 };
 
+export type CartaoConfiguradoControle = {
+  nome: string;
+  fechamento?: number;
+  vencimento?: number;
+};
+
 export type UltimoGastoControle = {
   descricao: string;
   valor: number;
@@ -27,6 +33,7 @@ export type EstadoControleFinanceiro = {
   totalDespesasFixas: number;
   totalGastosSaldo: number;
   faturas: FaturaAbertaControle[];
+  cartoes: CartaoConfiguradoControle[];
   ultimoGasto?: UltimoGastoControle;
 };
 
@@ -44,7 +51,7 @@ const CARTOES_CONHECIDOS: Array<{ aliases: string[]; nome: string }> = [
   { aliases: ["inter"], nome: "Inter" },
   { aliases: ["bradesco"], nome: "Bradesco" },
   { aliases: ["itau", "itaú"], nome: "Itaú" },
-  { aliases: ["bb"], nome: "BB" },
+  { aliases: ["bb"], nome: "Banco do Brasil" },
   { aliases: ["c6"], nome: "C6" },
 ];
 
@@ -64,6 +71,7 @@ function estadoVazio(rendaMensal?: number | null): EstadoControleFinanceiro {
     totalDespesasFixas: 0,
     totalGastosSaldo: 0,
     faturas: [],
+    cartoes: [],
   };
 }
 
@@ -80,6 +88,23 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
         }))
         .filter((fatura) => fatura.cartao && Number.isFinite(fatura.valor) && fatura.valor > 0)
     : [];
+  const cartoes = Array.isArray(raw.cartoes)
+    ? raw.cartoes
+        .map((cartao) => {
+          const fechamento = Number(cartao?.fechamento);
+          const vencimento = Number(cartao?.vencimento);
+          return {
+            nome: typeof cartao?.nome === "string" ? cartao.nome : "",
+            fechamento: Number.isInteger(fechamento) && fechamento >= 1 && fechamento <= 31
+              ? fechamento
+              : undefined,
+            vencimento: Number.isInteger(vencimento) && vencimento >= 1 && vencimento <= 31
+              ? vencimento
+              : undefined,
+          };
+        })
+        .filter((cartao) => cartao.nome)
+    : [];
 
   return {
     rendaMensal: Number.isFinite(raw.rendaMensal) && Number(raw.rendaMensal) > 0
@@ -92,6 +117,7 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       ? Number(raw.totalGastosSaldo)
       : 0,
     faturas,
+    cartoes,
     ultimoGasto:
       raw.ultimoGasto &&
       typeof raw.ultimoGasto.descricao === "string" &&
@@ -155,7 +181,7 @@ export function calcularSaldoDisponivelControle(estado: EstadoControleFinanceiro
 }
 
 export function totalFaturasAbertasControle(estado: EstadoControleFinanceiro): number {
-  return estado.faturas.reduce((soma, fatura) => soma + fatura.valor, 0);
+  return (estado.faturas ?? []).reduce((soma, fatura) => soma + fatura.valor, 0);
 }
 
 function detectarCartao(mensagem: string): string | null {
@@ -170,6 +196,142 @@ function detectarCartao(mensagem: string): string | null {
   }
 
   return null;
+}
+
+export function normalizarNomeCartaoControle(mensagem: string): string | null {
+  const texto = normalizarTexto(mensagem);
+
+  for (const cartao of CARTOES_CONHECIDOS) {
+    for (const alias of cartao.aliases) {
+      const aliasNormalizado = normalizarTexto(alias).replace(/\s+/g, "\\s+");
+      const regex = new RegExp(`\\b${aliasNormalizado}\\b`);
+      if (regex.test(texto)) return cartao.nome;
+    }
+  }
+
+  return null;
+}
+
+function extrairDiaCartaoControle(mensagem: string, tipo: "fechamento" | "vencimento"): number | null {
+  const texto = normalizarTexto(mensagem);
+  const regex = tipo === "fechamento"
+    ? /\bfecha(?:mento)?(?:\s+dia)?\s+(\d{1,2})\b/
+    : /\b(?:vence|vencimento)(?:\s+dia)?\s+(\d{1,2})\b/;
+  const match = texto.match(regex);
+  return match ? Number(match[1]) : null;
+}
+
+function contemPedidoConfiguracaoCartao(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return /\b(?:fecha|fechamento|vence|vencimento)\b/.test(texto);
+}
+
+function diaValido(dia: number | null): boolean {
+  return dia === null || (Number.isInteger(dia) && dia >= 1 && dia <= 31);
+}
+
+function formatarDiaCartao(dia: number): string {
+  return dia < 10 ? `0${dia}` : String(dia);
+}
+
+function respostaDiaInvalido(tipo: "fechamento" | "vencimento", cartao: string): string {
+  return (
+    `Não consegui salvar esse ${tipo}.\n\n` +
+    "O dia precisa estar entre 1 e 31.\n\n" +
+    "Exemplo:\n" +
+    `${cartao} ${tipo === "fechamento" ? "fecha" : "vence"} dia 05`
+  );
+}
+
+function obterCartaoConfigurado(
+  estado: EstadoControleFinanceiro,
+  cartao: string | null
+): CartaoConfiguradoControle | undefined {
+  if (!cartao) return undefined;
+  return (estado.cartoes ?? []).find((item) => item.nome === cartao);
+}
+
+export function configurarCartaoControle(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  if (!contemPedidoConfiguracaoCartao(mensagem)) return null;
+
+  const nomeCartao = normalizarNomeCartaoControle(mensagem);
+  if (!nomeCartao) return null;
+
+  const fechamentoInformado = extrairDiaCartaoControle(mensagem, "fechamento");
+  const vencimentoInformado = extrairDiaCartaoControle(mensagem, "vencimento");
+  if (fechamentoInformado === null && vencimentoInformado === null) return null;
+
+  if (!diaValido(fechamentoInformado)) {
+    return {
+      resposta: respostaDiaInvalido("fechamento", nomeCartao),
+      estado: estadoAtual,
+      atualizouEstado: false,
+    };
+  }
+
+  if (!diaValido(vencimentoInformado)) {
+    return {
+      resposta: respostaDiaInvalido("vencimento", nomeCartao),
+      estado: estadoAtual,
+      atualizouEstado: false,
+    };
+  }
+
+  const existente = (estadoAtual.cartoes ?? []).find((cartao) => cartao.nome === nomeCartao);
+  const cartaoAtualizado: CartaoConfiguradoControle = {
+    nome: nomeCartao,
+    fechamento: fechamentoInformado ?? existente?.fechamento,
+    vencimento: vencimentoInformado ?? existente?.vencimento,
+  };
+  const estado: EstadoControleFinanceiro = {
+    ...estadoAtual,
+    faturas: estadoAtual.faturas ?? [],
+    cartoes: [
+      ...(estadoAtual.cartoes ?? []).filter((cartao) => cartao.nome !== nomeCartao),
+      cartaoAtualizado,
+    ],
+  };
+
+  const linhas = [
+    existente ? "✅ *Cartão atualizado.*" : "✅ *Cartão configurado.*",
+    "",
+    `💳 *Cartão:* ${nomeCartao}`,
+  ];
+
+  if (cartaoAtualizado.fechamento) {
+    linhas.push(`📅 *Fechamento:* dia ${formatarDiaCartao(cartaoAtualizado.fechamento)}`);
+  }
+
+  if (cartaoAtualizado.vencimento) {
+    linhas.push(`📆 *Vencimento:* dia ${formatarDiaCartao(cartaoAtualizado.vencimento)}`);
+  }
+
+  linhas.push("");
+
+  if (existente) {
+    linhas.push("Atualizei os dados desse cartão. 👌");
+  } else if (cartaoAtualizado.fechamento && cartaoAtualizado.vencimento) {
+    linhas.push("Vou usar essas datas para organizar as compras no mês certo. 👌");
+  } else if (cartaoAtualizado.vencimento) {
+    linhas.push(
+      "Quando souber o fechamento, pode me dizer assim:\n" +
+      `${nomeCartao} fecha dia 25`
+    );
+  } else {
+    linhas.push(
+      "Quando souber o vencimento, pode me dizer assim:\n" +
+      `${nomeCartao} vence dia 10`
+    );
+  }
+
+  return {
+    resposta: linhas.join("\n"),
+    estado,
+    atualizouEstado: true,
+  };
 }
 
 function removerTrechoCartao(mensagem: string, cartao: string | null): string {
@@ -191,8 +353,9 @@ function somarFatura(
   cartao: string,
   valor: number
 ): FaturaAbertaControle[] {
-  const existentes = faturas.filter((fatura) => fatura.cartao !== cartao);
-  const atual = faturas.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
+  const faturasAtuais = faturas ?? [];
+  const existentes = faturasAtuais.filter((fatura) => fatura.cartao !== cartao);
+  const atual = faturasAtuais.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
   return [...existentes, { cartao, valor: atual + valor }];
 }
 
@@ -201,22 +364,25 @@ function subtrairFatura(
   cartao: string,
   valor: number
 ): FaturaAbertaControle[] {
-  const atual = faturas.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
+  const faturasAtuais = faturas ?? [];
+  const atual = faturasAtuais.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
   const novoValor = Math.max(atual - valor, 0);
-  const outras = faturas.filter((fatura) => fatura.cartao !== cartao);
+  const outras = faturasAtuais.filter((fatura) => fatura.cartao !== cartao);
   return novoValor > 0 ? [...outras, { cartao, valor: novoValor }] : outras;
 }
 
 function linhasFaturas(estado: EstadoControleFinanceiro): string[] {
-  if (estado.faturas.length === 0) {
+  const faturas = estado.faturas ?? [];
+  if (faturas.length === 0) {
     return [`💳 *Faturas em aberto:* ${formatarValorBR(0)}`];
   }
 
-  return estado.faturas.map((fatura) => `💳 *Fatura ${fatura.cartao}:* ${formatarValorBR(fatura.valor)}`);
+  return faturas.map((fatura) => `💳 *Fatura ${fatura.cartao}:* ${formatarValorBR(fatura.valor)}`);
 }
 
 function linhasFaturasComCartoes(estado: EstadoControleFinanceiro, cartoes: string[]): string[] {
-  const nomes = [...estado.faturas.map((fatura) => fatura.cartao)];
+  const faturas = estado.faturas ?? [];
+  const nomes = [...faturas.map((fatura) => fatura.cartao)];
   for (const cartao of cartoes) {
     if (cartao && !nomes.includes(cartao)) nomes.push(cartao);
   }
@@ -224,7 +390,7 @@ function linhasFaturasComCartoes(estado: EstadoControleFinanceiro, cartoes: stri
   if (nomes.length === 0) return [`💳 *Faturas em aberto:* ${formatarValorBR(0)}`];
 
   return nomes.map((cartao) => {
-    const valor = estado.faturas.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
+    const valor = faturas.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
     return `💳 *Fatura ${cartao}:* ${formatarValorBR(valor)}`;
   });
 }
@@ -346,7 +512,8 @@ export function registrarGastoControle(
   const estado = cartao
     ? {
         ...estadoAtual,
-        faturas: somarFatura(estadoAtual.faturas, cartao, gasto.valor),
+        cartoes: estadoAtual.cartoes ?? [],
+        faturas: somarFatura(estadoAtual.faturas ?? [], cartao, gasto.valor),
         ultimoGasto: {
           descricao: gasto.descricao || gasto.categoria,
           valor: gasto.valor,
@@ -358,7 +525,8 @@ export function registrarGastoControle(
       }
     : {
         ...estadoAtual,
-        totalGastosSaldo: estadoAtual.totalGastosSaldo + gasto.valor,
+        cartoes: estadoAtual.cartoes ?? [],
+        totalGastosSaldo: (estadoAtual.totalGastosSaldo ?? 0) + gasto.valor,
         ultimoGasto: {
           descricao: gasto.descricao || gasto.categoria,
           valor: gasto.valor,
@@ -368,10 +536,14 @@ export function registrarGastoControle(
         },
       };
   const origem = cartao ? `Cartão ${cartao}` : "Saldo do mês";
+  const cartaoConfigurado = obterCartaoConfigurado(estado, cartao);
   const linhasAtualizacao = [
     `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelControle(estado))}`,
     ...linhasFaturas(estado),
   ];
+  if (cartaoConfigurado?.vencimento) {
+    linhasAtualizacao.push(`📆 *Vencimento:* dia ${formatarDiaCartao(cartaoConfigurado.vencimento)}`);
+  }
   const final = cartao
     ? "Esse valor será considerado na fatura do cartão. 👌"
     : "Pode mandar mais que eu vou organizando tudo pra você. 👌";
