@@ -683,7 +683,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Comando RESETAR (funciona em qualquer etapa) ──
+        // ── Comando RESETAR (funciona em qualquer etapa) ──
     if (detectarComando(mensagem) === "RESETAR") {
       if (sessao.clienteId) {
         await prisma.divida.deleteMany({ where: { clienteId: sessao.clienteId } });
@@ -693,13 +693,128 @@ export async function POST(req: NextRequest) {
           data: { statusAtendimento: "NOVO", rendaMensal: null },
         });
       }
+
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: { etapa: "COLETANDO_DIVIDAS", dividasTemp: "[]", renda: null },
       });
-      await sendWhatsApp(telefone,
+
+      await sendWhatsApp(
+        telefone,
         `✅ Tudo zerado! Vamos recomeçar do zero.\n\nOlá, *${sessao.nome ?? "cliente"}*! 👋\nSeu acesso ao *QuitaZAP* foi reativado.\n\nEu sou sua IA de organização financeira pelo WhatsApp.\n\nVou te ajudar a entender sua renda, despesas, dívidas e vencimentos para montar um plano de ação mais claro.\n\nPara começar, me diga:\n\nComo você trabalha hoje?\n\n1️⃣ CLT\n2️⃣ Servidor público\n3️⃣ Autônomo\n4️⃣ MEI\n5️⃣ Empresário\n6️⃣ Outro`
       );
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Fluxo fixo: Servidor público / contracheque ───────────────────────
+    const servidorMsgNormalizada = mensagem
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+
+    const servidorHistoricoSessao = (() => {
+      try {
+        return JSON.parse(sessao.dividasTemp ?? "[]") as Array<{
+          role: string;
+          content: string;
+        }>;
+      } catch {
+        return [];
+      }
+    })();
+
+    const servidorHistoricoTexto = servidorHistoricoSessao
+      .map((h) => h.content ?? "")
+      .join("\n")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    const servidorEstaRespondendoPerfilTrabalho =
+      servidorHistoricoTexto.includes("como voce trabalha hoje") ||
+      servidorHistoricoTexto.includes("perfil de trabalho") ||
+      servidorHistoricoSessao.length === 0;
+
+    const servidorEscolheuServidorPublico =
+      servidorMsgNormalizada === "2" ||
+      /\bservidor\b|\bservidor publico\b|\bfuncionario publico\b|\bconcursado\b|\bpolicial\b|\bpm\b|\bmunicipal\b|\bestadual\b|\bfederal\b/.test(
+        servidorMsgNormalizada
+      );
+
+    if (servidorEstaRespondendoPerfilTrabalho && servidorEscolheuServidorPublico) {
+      const respostaServidor = `Perfeito. ✅ Como você é servidor público, consigo analisar melhor sua situação se você enviar seu contracheque em PDF ou imagem.
+
+Assim eu consigo identificar salário líquido, descontos em folha, consignados e margem com mais precisão.
+
+Você prefere:
+
+1️⃣ Enviar o contracheque agora
+2️⃣ Informar os valores manualmente`;
+
+      await sendWhatsApp(telefone, respostaServidor);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaServidor },
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const servidorEstaEscolhendoContracheque =
+      servidorHistoricoTexto.includes("enviar o contracheque agora") &&
+      servidorHistoricoTexto.includes("informar os valores manualmente");
+
+    if (servidorEstaEscolhendoContracheque && servidorMsgNormalizada === "1") {
+      const respostaEnviar =
+        "Perfeito. ✅ Pode enviar aqui o PDF ou a imagem do contracheque.";
+
+      await sendWhatsApp(telefone, respostaEnviar);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaEnviar },
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    if (servidorEstaEscolhendoContracheque && servidorMsgNormalizada === "2") {
+      const respostaManual = `Sem problema. ✅ Vamos informar manualmente.
+
+Você tem alguém que depende financeiramente de você?
+Pode ser filho, esposa/marido, pais ou outra pessoa.
+
+1️⃣ Sim
+2️⃣ Não`;
+
+      await sendWhatsApp(telefone, respostaManual);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaManual },
+          ]),
+        },
+      });
+
       return NextResponse.json({ ok: true });
     }
 
