@@ -12,17 +12,20 @@ export const RESPOSTA_DADOS_FOLHA_SERVIDOR =
   "2️⃣ Não";
 
 function fmt(n: number | undefined): string {
-  return (n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n ?? 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
-function linhaMonospace(nome: string, valor: number | undefined, extra = ""): string {
-  const nomeFmt = nome.length > 28 ? `${nome.slice(0, 25)}...` : nome;
-  const valorFmt = `R$ ${fmt(valor)}`;
-  return `${nomeFmt.padEnd(30)} ${valorFmt.padStart(12)}${extra ? `   ${extra}` : ""}`;
+function itemMobile(nome: string, valor: number | undefined, extra = ""): string {
+  const valorFmt = extra ? `R$ ${fmt(valor)} • ${extra}` : `R$ ${fmt(valor)}`;
+  return `${nome}\n${valorFmt}`;
 }
 
-function linhaRenda(nome: string, valor: number | undefined): string {
-  return `${nome.padEnd(29)} R$ ${fmt(valor)}`;
+function parcelasTexto(parcelaAtual?: number, totalParcelas?: number): string {
+  if (!parcelaAtual || !totalParcelas) return "";
+  return `${parcelaAtual}/${totalParcelas}`;
 }
 
 export function gerarRespostaDadosFolhaServidor(mensagem: string): string {
@@ -30,18 +33,24 @@ export function gerarRespostaDadosFolhaServidor(mensagem: string): string {
   const dadosFolha = extrairDadosServidorPublicoManual(mensagem);
 
   const linhasRenda = [
-    linhaRenda("Salário líquido normal", renda.salarioLiquidoNormal),
-    linhaRenda("Líquido recebido este mês", renda.liquidoRecebidoEsteMes),
-    linhaRenda("13º/verba extra", renda.verbaExtra),
-  ].join("\n");
+    itemMobile("Salário líquido normal", renda.salarioLiquidoNormal),
+    itemMobile("Líquido recebido este mês", renda.liquidoRecebidoEsteMes),
+    itemMobile("13º/verba extra", renda.verbaExtra),
+  ].join("\n\n");
 
   const linhasEmprestimos = dadosFolha.emprestimos
-    .map((d) => linhaMonospace(d.credor, d.valorParcela, d.parcelaAtual && d.totalParcelas ? `${d.parcelaAtual}/${d.totalParcelas}` : ""))
-    .join("\n");
+    .map((d) =>
+      itemMobile(
+        d.credor,
+        d.valorParcela,
+        parcelasTexto(d.parcelaAtual, d.totalParcelas)
+      )
+    )
+    .join("\n\n");
 
   const linhasAssociacoes = dadosFolha.associacoes
-    .map((d) => linhaMonospace(d.credor, d.valorParcela))
-    .join("\n");
+    .map((d) => itemMobile(d.credor, d.valorParcela))
+    .join("\n\n");
 
   return `Perfeito, registrei seus dados de salário, descontos em folha e associações. ✅
 

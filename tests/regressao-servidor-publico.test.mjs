@@ -175,23 +175,34 @@ test("diagnostico manual de servidor publico separa renda recorrente, folha e ca
   assert.ok((relatorio.match(/Neste m.{1,3}s voc/g) ?? []).length <= 1);
 });
 
-test("confirmacao de servidor publico formata renda em bloco monoespacado", () => {
+test("confirmacao de servidor publico formata renda em bloco monoespacado mobile-first", () => {
   const resposta = gerarRespostaDadosFolhaServidor(mensagemManual);
+
   const blocoRenda =
     "💰 *Renda:*\n" +
     "```\n" +
-    "Salário líquido normal        R$ 3.812,68\n" +
-    "Líquido recebido este mês     R$ 7.140,69\n" +
-    "13º/verba extra               R$ 3.328,01\n" +
+    "Salário líquido normal\n" +
+    "R$ 3.812,68\n\n" +
+    "Líquido recebido este mês\n" +
+    "R$ 7.140,69\n\n" +
+    "13º/verba extra\n" +
+    "R$ 3.328,01\n" +
     "```";
 
   assert.ok(resposta.includes(blocoRenda));
+
   assert.doesNotMatch(resposta, /- Sal[aá]rio l[ií]quido normal:/i);
   assert.doesNotMatch(resposta, /💰 Sal[aá]rio l[ií]quido normal:/i);
   assert.doesNotMatch(resposta, /\*\*R\$/);
   assert.doesNotMatch(resposta, /R\$ undefined|R\$ NaN|\bundefined\b|\bnull\b|\bNaN\b/);
-  assert.match(resposta, /Banco Digio\s+R\$ 304,00\s+27\/120/);
-  assert.match(resposta, /Asseba\s+R\$ 80,00/);
+
+ assert.doesNotMatch(resposta, /Sal[aá]rio l[ií]quido normal[ \t]+R\$/i);
+assert.doesNotMatch(resposta, /Banco Digio[ \t]+R\$/i);
+  assert.doesNotMatch(resposta, /R\$\s*\n\s*3\.812,68/);
+  assert.doesNotMatch(resposta, /R\$\s*\n\s*304,00/);
+
+  assert.match(resposta, /Banco Digio\s*\nR\$ 304,00 • 27\/120/);
+  assert.match(resposta, /Asseba\s*\nR\$ 80,00/);
   assert.match(resposta, /depende financeiramente/i);
 });
 
