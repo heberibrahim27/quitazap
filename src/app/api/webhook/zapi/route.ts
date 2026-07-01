@@ -84,46 +84,100 @@ async function analisarImagem(imageUrl: string): Promise<string> {
               type: "text",
               text: `Analise esta imagem financeira. Pode ser:
 - Boleto, fatura de cartão, extrato bancário, comprovante de empréstimo, carnê
-- Contracheque / holerite / comprovante de salário / folha de pagamento (inclusive do Estado/governo)
+- Contracheque, holerite, comprovante de salário ou folha de pagamento
 
-Se for um CONTRACHEQUE ou HOLERITE, extraia:
-- Nome do órgão/empresa pagador
-- Cargo/função
-- Mês/ano de referência
-- Total de vantagens (bruto)
+Se for CONTRACHEQUE ou HOLERITE, extraia:
+- Nome do órgão ou empresa pagadora
+- Cargo ou função
+- Mês e ano de referência
+- Total de vantagens
 - Total de descontos
-- Salário líquido (valor a receber)
-- Se houver 13º salário, abono, férias ou parcela extraordinária nas vantagens, informe o valor e calcule o líquido normal sem esse extra
-- Liste todos os empréstimos consignados com banco, valor da parcela e parcela atual/total (formato NNN/NNN logo após o nome do banco)
-- Liste todas as ASSOCIAÇÕES descontadas em folha (ASTEBA, ASSEBA, ASPRA, etc) — parcela NNN/999 significa mensalidade sem prazo. Informe nome e valor de cada uma.
-- Informe MARGEM COMPROMETIDA = soma de consignados + associações
-- Liste descontos de saúde (plano, Planserv, assistência), previdência (INSS/SPSM/IPREV) e IR
+- Salário líquido
+- Se houver 13º salário, abono, férias ou verba extraordinária, informe o valor e calcule o líquido normal sem esse extra
 
-Responda de forma clara e estruturada assim:
-"Contracheque PM-BA — Soldado — Junho/2026
-💰 Líquido este mês: R$ 7.140,69 (inclui 13º de R$ 3.328,01)
-💰 Líquido normal estimado: R$ 3.812,68
+CLASSIFICAÇÃO DOS DESCONTOS EM FOLHA:
 
-Consignados já descontados na folha (R$ 1.862,65/mês):
-• Banco Digio: R$ 304,00 (27/120)
-• BB: R$ 321,64 (65/96)
-• [etc]
+1. EMPRESTIMOS OU DESCONTOS PARCELADOS
 
-Outros descontos fixos: Saúde R$ XXX | Previdência R$ XXX | IR R$ XXX"
+Liste como emprestimos TODOS os descontos em folha que tenham formato NNN/NNN com total de parcelas menor que 900.
 
-IMPORTANTE: os consignados já estão descontados no líquido — são dívidas automáticas em andamento. Use o líquido NORMAL (sem 13º/férias) como renda base do cliente.
+Isso inclui:
+- Empréstimo comum
+- Consignado
+- Banco
+- Financeira
+- Crédito
+- Benefício assistencial
+- Auxílio assistencial
+- Qualquer desconto parcelado com fim definido
+
+Exemplos:
+- Empréstimo Comum 3 - BANCO DIGIO S.A 027/120 304,00
+  banco: BANCO DIGIO S.A
+  parcelaAtual: 27
+  totalParcelas: 120
+  valorParcela: 304,00
+
+- Benefício Assistencial - ASSEBA 015/036 306,89
+  banco: ASSEBA
+  parcelaAtual: 15
+  totalParcelas: 36
+  valorParcela: 306,89
+
+- Benefício Assistencial - ASTEBA 017/036 320,63
+  banco: ASTEBA
+  parcelaAtual: 17
+  totalParcelas: 36
+  valorParcela: 320,63
+
+2. ASSOCIACOES OU MENSALIDADES RECORRENTES
+
+Liste como associacoes SOMENTE mensalidades ou associações recorrentes com formato NNN/999 ou NNN/000.
+
+Exemplos:
+- Mensalidade Valor - ASSEBA 015/999 80,00
+  nome: ASSEBA
+  valorMensal: 80,00
+
+- Mensalidade Valor - ASTEBA 015/999 80,00
+  nome: ASTEBA
+  valorMensal: 80,00
+
+- Mensalidade Valor - ASPRA-BA 113/999 87,00
+  nome: ASPRA-BA
+  valorMensal: 87,00
+
+REGRA CRITICA:
+- NNN/999 ou NNN/000 significa associação ou mensalidade recorrente
+- NNN/036, NNN/048, NNN/060, NNN/096, NNN/120 ou qualquer total menor que 900 significa empréstimo ou desconto parcelado
+- Nunca classifique Benefício Assistencial 015/036 como associação
+- Benefício Assistencial com prazo finito deve entrar em emprestimos
+
+Informe também:
+- Margem comprometida
+- Descontos de saúde
+- Previdência
+- Imposto de renda
+
+Não inclua saúde, Planserv, assistência médica, previdência, INSS, SPSM, IPREV ou IR nos arrays emprestimos ou associacoes.
+
+IMPORTANTE:
+Os consignados e descontos parcelados já estão descontados no líquido.
+Use o líquido normal sem 13º, férias ou abono como renda mensal recorrente.
+Se houver verba extraordinária no mês, trate como dinheiro extra do mês, não como renda fixa mensal.
 
 Se for BOLETO, FATURA ou DÍVIDA, extraia:
-- Credor / banco / loja
+- Credor, banco ou loja
 - Valor total da dívida ou da fatura
 - Valor da parcela mensal
 - Número de parcelas restantes
 - Data de vencimento
 - Se está em atraso
 
-Responda assim: "Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150."
+Responda assim:
+Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150.
 
-Se a imagem NÃO for financeira (foto de pessoa, paisagem, selfie, etc), responda apenas: [NAO_FINANCEIRA]`,
+Se a imagem NÃO for financeira, responda apenas: [NAO_FINANCEIRA]`,
             },
             {
               type: "image_url",
@@ -132,7 +186,7 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, selfie, etc), respond
           ],
         },
       ],
-      max_tokens: 400,
+      max_tokens: 600,
     }),
   });
 
@@ -144,7 +198,6 @@ Se a imagem NÃO for financeira (foto de pessoa, paisagem, selfie, etc), respond
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
-
 // ── Tipos para extração de PDF ──────────────────────────────────────────
 
 type EmprestimoConsig = {
@@ -163,9 +216,9 @@ type PDFContracheque = {
   tipo: "CONTRACHEQUE";
   orgao: string;
   salarioBruto: number;
-  salarioLiquidoTotal: number;   // líquido que aparece no contracheque (pode incluir 13º)
-  extraOrdinario: number;        // total de 13º + férias + abonos (0 se nenhum)
-  salarioLiquidoNormal: number;  // = salarioLiquidoTotal - extraOrdinario
+  salarioLiquidoTotal: number;   // líquido que aparece no contracheque, pode incluir 13º
+  extraOrdinario: number;        // total de 13º + férias + abonos, 0 se nenhum
+  salarioLiquidoNormal: number;  // salário líquido recorrente sem verba extra
   emprestimos: EmprestimoConsig[];
   associacoes: AssociacaoConsig[];
 };
@@ -176,7 +229,6 @@ type PDFOutro = {
 };
 
 type PDFResult = PDFContracheque | PDFOutro;
-
 // ── Upload de PDF para OpenAI Files API ──────────────────────────────────
 
 async function uploadPDFOpenAI(pdfUrl: string): Promise<{ fileId: string; apiKey: string }> {
