@@ -647,38 +647,42 @@ export async function POST(req: NextRequest) {
             await new Promise((r) => setTimeout(r, 1200));
           }
 
-          // Envia QuitaScore
+                    // Pergunta follow-up: se tem outras dívidas fora da folha
+          // Não envia QuitaScore automaticamente aqui, porque ainda falta saber
+          // se o cliente possui dívidas fora da folha.
           await new Promise((r) => setTimeout(r, 2000));
-          try {
-            const scoreMsg = gerarQuitaScore(diag);
-            await sendWhatsApp(sessao.telefone, scoreMsg);
-          } catch { /* ignora */ }
-
-          // Pergunta follow-up: se tem outras dívidas fora da folha
-          await new Promise((r) => setTimeout(r, 2000));
-          await sendWhatsApp(sessao.telefone,
+          await sendWhatsApp(
+            sessao.telefone,
             `Esse foi o diagnóstico com base no seu contracheque! 📊\n\n` +
-            `Você tem outras dívidas *fora da folha*? Por exemplo:\n` +
-            `• Cartão de crédito\n` +
-            `• Boleto em atraso\n` +
-            `• Financiamento de veículo ou imóvel\n\n` +
-            `Me conta que eu atualizo seu plano! 😊`
+              `Você tem outras dívidas *fora da folha*? Por exemplo:\n` +
+              `• Cartão de crédito\n` +
+              `• Boleto em atraso\n` +
+              `• Financiamento de veículo ou imóvel\n\n` +
+              `Me conta que eu atualizo seu plano! 😊`
           );
+
           return NextResponse.json({ ok: true });
         }
 
         // ── PDF não é contracheque: processa como texto normalmente ──
         const texto = pdfResult.texto;
         if (!texto || texto.length < 30) {
-          await sendWhatsApp(sessao.telefone, "Consegui abrir o PDF mas ele parece ser uma imagem escaneada — não consigo extrair o texto. Pode tirar uma foto do documento e enviar como imagem? 📷");
+          await sendWhatsApp(
+            sessao.telefone,
+            "Consegui abrir o PDF mas ele parece ser uma imagem escaneada — não consigo extrair o texto. Pode tirar uma foto do documento e enviar como imagem? 📷"
+          );
           return NextResponse.json({ ok: true });
         }
+
         console.log(`[Z-API] PDF (outro) extraído (${texto.length} chars)`);
         mensagem = `[Cliente enviou um PDF com este conteúdo:]\n\n${texto.slice(0, 4000)}`;
         tipoEntrada = "texto";
       } catch (err) {
         console.error("[Z-API] Erro ao ler PDF:", err);
-        await sendWhatsApp(sessao.telefone, "Tive dificuldade para ler esse PDF. Pode tirar uma foto e enviar como imagem? 📷");
+        await sendWhatsApp(
+          sessao.telefone,
+          "Tive dificuldade para ler esse PDF. Pode tirar uma foto e enviar como imagem? 📷"
+        );
         return NextResponse.json({ ok: true });
       }
     }
