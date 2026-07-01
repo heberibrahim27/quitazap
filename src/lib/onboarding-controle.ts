@@ -58,9 +58,12 @@ function normalizarTexto(texto: string): string {
 function parseValor(valorTexto: string): number | undefined {
   const limpo = valorTexto.replace(/[R$\s]/gi, "");
   const temCentavos = /,\d{1,2}$|\.\d{1,2}$/.test(limpo);
-  const normalizado = temCentavos
-    ? limpo.replace(/\./g, "").replace(",", ".")
-    : limpo.replace(",", ".");
+  const temMilharComPonto = /^\d{1,3}(?:\.\d{3})+$/.test(limpo);
+  const normalizado = temMilharComPonto
+    ? limpo.replace(/\./g, "")
+    : temCentavos
+      ? limpo.replace(/\./g, "").replace(",", ".")
+      : limpo.replace(",", ".");
   const valor = Number(normalizado);
   return Number.isFinite(valor) && valor > 0 ? valor : undefined;
 }
@@ -125,5 +128,117 @@ export function mensagemExplicarDespesasFixasControle(): string {
     "Empréstimo Banco do Brasil 300 12/120\n" +
     "Financiamento moto 450 8/36\n" +
     "```"
+  );
+}
+
+export type DespesaFixaControle = {
+  descricao: string;
+  valor: number;
+  parcelaAtual?: number;
+  totalParcelas?: number;
+  parcelasRestantes?: number;
+};
+
+function limparDescricao(texto: string): string {
+  return texto
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[-–—:;,.]+|[-–—:;,.]+$/g, "")
+    .trim();
+}
+
+function formatarDescricao(texto: string): string {
+  const descricao = limparDescricao(texto);
+  return descricao
+    .split(" ")
+    .filter(Boolean)
+    .map((parte, index) => {
+      const lower = parte.toLowerCase();
+      const marcas: Record<string, string> = {
+        chatgpt: "ChatGPT",
+      };
+      if (marcas[lower]) return marcas[lower];
+      if (index > 0 && ["de", "do", "da", "dos", "das"].includes(lower)) return lower;
+      if (/^[A-Z]{2,}$/.test(parte)) return parte;
+      return parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+export function parsearDespesasFixasControle(mensagem: string): DespesaFixaControle[] {
+  return mensagem
+    .split(/\r?\n/)
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .map((linha) => {
+      const parcelas = linha.match(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/);
+      const linhaSemParcelas = limparDescricao(linha.replace(/\b\d{1,3}\s*\/\s*\d{1,3}\b/g, " "));
+      const valorMatch = linhaSemParcelas.match(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)?$/i);
+      if (!valorMatch) return null;
+
+      const valor = parseValor(valorMatch[1]);
+      if (!valor) return null;
+
+      const valorIndex = valorMatch.index ?? -1;
+      if (valorIndex < 0) return null;
+
+      const descricaoRaw = limparDescricao(linhaSemParcelas.slice(0, valorIndex));
+      if (!descricaoRaw) return null;
+
+      const despesa: DespesaFixaControle = {
+        descricao: formatarDescricao(descricaoRaw),
+        valor,
+      };
+
+      if (parcelas) {
+        const parcelaAtual = Number(parcelas[1]);
+        const totalParcelas = Number(parcelas[2]);
+        if (
+          Number.isInteger(parcelaAtual) &&
+          Number.isInteger(totalParcelas) &&
+          parcelaAtual >= 0 &&
+          totalParcelas > 0
+        ) {
+          despesa.parcelaAtual = parcelaAtual;
+          despesa.totalParcelas = totalParcelas;
+          despesa.parcelasRestantes = Math.max(totalParcelas - parcelaAtual, 0);
+        }
+      }
+
+      return despesa;
+    })
+    .filter((despesa): despesa is DespesaFixaControle => Boolean(despesa));
+}
+
+export function formatarRespostaDespesasFixasControle(
+  despesas: DespesaFixaControle[],
+  rendaMensal?: number | null
+): string {
+  const despesasValidas = despesas.filter((despesa) => Number.isFinite(despesa.valor) && despesa.valor > 0);
+  const total = despesasValidas.reduce((soma, despesa) => soma + despesa.valor, 0);
+  const temRenda = typeof rendaMensal === "number" && Number.isFinite(rendaMensal) && rendaMensal > 0;
+  const saldo = temRenda ? rendaMensal - total : null;
+
+  const linhas = despesasValidas.map((despesa) => {
+    const parcelas =
+      despesa.parcelaAtual !== undefined &&
+      despesa.totalParcelas !== undefined &&
+      despesa.parcelasRestantes !== undefined
+        ? ` (${despesa.parcelaAtual}/${despesa.totalParcelas}, restam ${despesa.parcelasRestantes})`
+        : "";
+    return `${despesa.descricao} — ${formatarValorControle(despesa.valor)}${parcelas}`;
+  });
+
+  linhas.push("");
+  linhas.push(`Total fixo mensal — ${formatarValorControle(total)}`);
+  if (saldo !== null) {
+    linhas.push(`Saldo antes dos gastos do dia a dia — ${formatarValorControle(saldo)}`);
+  }
+
+  return (
+    "✅ *Despesas fixas registradas.*\n\n" +
+    "```\n" +
+    linhas.join("\n") +
+    "\n```"
   );
 }

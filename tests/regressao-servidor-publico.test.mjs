@@ -52,11 +52,13 @@ const {
 const { processarFluxoGasto } = loadTsModule("src/lib/gasto-flow.ts");
 const {
   extrairRendaControle,
+  formatarRespostaDespesasFixasControle,
   mensagemBoasVindasControle,
   mensagemExplicarDespesasFixasControle,
   mensagemPedidoDespesasFixasControle,
   mensagemRendaRegistradaControle,
   mensagensResetControle,
+  parsearDespesasFixasControle,
 } = loadTsModule("src/lib/onboarding-controle.ts");
 
 const mensagemManual = `
@@ -454,4 +456,79 @@ test("onboarding registra renda em tres mensagens limpas para WhatsApp", () => {
     `${respostaRenda}\n${perguntaDespesas}\n${explicacaoDespesas}`,
     /```(?:text|txt|markdown|ts|js)|^text$|\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/im
   );
+});
+
+test("despesas fixas do onboarding sao registradas por linha antes do gasto comum", () => {
+  const mensagem = `Pensão filhas 900
+Transporte escolar 300
+Mercado 400
+Conta celular 60
+Água 50
+Energia 60
+Internet 50
+ChatGPT 110
+Claude 110`;
+
+  const despesas = parsearDespesasFixasControle(mensagem);
+  assert.equal(despesas.length, 9);
+  assert.deepEqual(
+    despesas.map((d) => `${d.descricao}:${d.valor}`),
+    [
+      "Pensão Filhas:900",
+      "Transporte Escolar:300",
+      "Mercado:400",
+      "Conta Celular:60",
+      "Água:50",
+      "Energia:60",
+      "Internet:50",
+      "ChatGPT:110",
+      "Claude:110",
+    ]
+  );
+
+  const resposta = formatarRespostaDespesasFixasControle(despesas, 4000);
+  assert.match(resposta, /^✅ \*Despesas fixas registradas\.\*/);
+  assert.match(resposta, /Pensão Filhas — R\$ 900,00/);
+  assert.match(resposta, /Transporte Escolar — R\$ 300,00/);
+  assert.match(resposta, /Mercado — R\$ 400,00/);
+  assert.match(resposta, /ChatGPT — R\$ 110,00/);
+  assert.match(resposta, /Claude — R\$ 110,00/);
+  assert.match(resposta, /Total fixo mensal — R\$ 2\.040,00/);
+  assert.match(resposta, /Saldo antes dos gastos do dia a dia — R\$ 1\.960,00/);
+  assert.doesNotMatch(resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN|```(?:text|txt|markdown|ts|js)/i);
+});
+
+test("despesas fixas parceladas capturam parcelas restantes", () => {
+  const despesas = parsearDespesasFixasControle(`Empréstimo Banco do Brasil 300 12/120
+Financiamento moto 450 8/36`);
+
+  assert.deepEqual(
+    despesas.map((d) => ({
+      descricao: d.descricao,
+      valor: d.valor,
+      parcelaAtual: d.parcelaAtual,
+      totalParcelas: d.totalParcelas,
+      parcelasRestantes: d.parcelasRestantes,
+    })),
+    [
+      {
+        descricao: "Empréstimo Banco do Brasil",
+        valor: 300,
+        parcelaAtual: 12,
+        totalParcelas: 120,
+        parcelasRestantes: 108,
+      },
+      {
+        descricao: "Financiamento Moto",
+        valor: 450,
+        parcelaAtual: 8,
+        totalParcelas: 36,
+        parcelasRestantes: 28,
+      },
+    ]
+  );
+
+  const resposta = formatarRespostaDespesasFixasControle(despesas, 3800);
+  assert.match(resposta, /Empréstimo Banco do Brasil — R\$ 300,00 \(12\/120, restam 108\)/);
+  assert.match(resposta, /Financiamento Moto — R\$ 450,00 \(8\/36, restam 28\)/);
 });

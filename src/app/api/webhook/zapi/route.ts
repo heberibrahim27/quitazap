@@ -13,10 +13,12 @@ import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from
 import { processarFluxoGasto } from "@/lib/gasto-flow";
 import {
   extrairRendaControle,
+  formatarRespostaDespesasFixasControle,
   mensagemExplicarDespesasFixasControle,
   mensagemPedidoDespesasFixasControle,
   mensagemRendaRegistradaControle,
   mensagensResetControle,
+  parsearDespesasFixasControle,
 } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
@@ -903,6 +905,48 @@ Pode mandar tudo em uma mensagem só.`;
           ]),
         },
       });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const ultimoIndiceUsuario = servidorHistoricoSessao
+      .map((h, index) => ({ h, index }))
+      .filter(({ h }) => h.role === "user")
+      .map(({ index }) => index)
+      .pop() ?? -1;
+    const ultimoPedidoDespesasFixas = servidorHistoricoSessao
+      .map((h, index) => ({ h, index }))
+      .filter(
+        ({ h }) =>
+          h.role === "assistant" &&
+          (
+            (h.content ?? "").includes("Agora me diga suas despesas fixas.") ||
+            (h.content ?? "").includes("*Despesas fixas*")
+          )
+      )
+      .map(({ index }) => index)
+      .pop() ?? -1;
+    const aguardandoDespesasFixasControle = ultimoPedidoDespesasFixas > ultimoIndiceUsuario;
+
+    if (aguardandoDespesasFixasControle) {
+      const despesasFixas = parsearDespesasFixasControle(mensagem);
+      const respostaDespesasFixas =
+        despesasFixas.length > 0
+          ? formatarRespostaDespesasFixasControle(despesasFixas, sessao.renda)
+          : "Não consegui identificar os valores das despesas fixas.\n\nPode mandar assim:\n\n```\nEnergia 120\nInternet 90\nPensão 900\n```";
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaDespesasFixas },
+          ]),
+        },
+      });
+
+      await sendWhatsApp(telefone, respostaDespesasFixas);
 
       return NextResponse.json({ ok: true });
     }
