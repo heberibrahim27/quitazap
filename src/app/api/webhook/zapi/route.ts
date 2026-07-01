@@ -290,27 +290,58 @@ async function extrairPDF(pdfUrl: string): Promise<PDFResult> {
   "extraOrdinario": 0.00,
   "salarioLiquidoNormal": 0.00,
   "emprestimos": [
-  { "banco": "BANCO DIGIO S.A", "valorParcela": 304.00, "parcelaAtual": 27, "totalParcelas": 120 },
-  { "banco": "ASSEBA - Benefício Assistencial", "valorParcela": 306.89, "parcelaAtual": 15, "totalParcelas": 36 },
-  { "banco": "ASTEBA - Benefício Assistencial", "valorParcela": 320.63, "parcelaAtual": 17, "totalParcelas": 36 }
+  { "banco": "BANCO OU CREDOR 1", "valorParcela": 250.00, "parcelaAtual": 12, "totalParcelas": 60 },
+  { "banco": "BANCO OU CREDOR 2", "valorParcela": 180.50, "parcelaAtual": 8, "totalParcelas": 36 },
+  { "banco": "ASSOCIACAO X - Benefício Assistencial", "valorParcela": 120.00, "parcelaAtual": 10, "totalParcelas": 36 }
 ],
 "associacoes": [
-  { "nome": "ASSEBA", "valorMensal": 80.00 },
-  { "nome": "ASTEBA", "valorMensal": 80.00 },
-  { "nome": "ASPRA-BA", "valorMensal": 87.00 }
+  { "nome": "ASSOCIACAO X", "valorMensal": 80.00 },
+  { "nome": "ASSOCIACAO Y", "valorMensal": 65.00 }
 ]
 }
 
 Regras para o JSON:
-- salarioLiquidoTotal = valor líquido impresso no contracheque (pode incluir 13º/férias)
-- extraOrdinario = soma de 13º salário + férias + abono + qualquer verba eventual presente nas VANTAGENS. Se não houver nenhum, use 0.
-- salarioLiquidoNormal = salarioLiquidoTotal - extraOrdinario (renda mensal real)
-- emprestimos: incluir TODOS os descontos parcelados em folha com formato NNN/NNN quando o total de parcelas for menor que 900. Exemplos: 027/120, 065/096, 003/120, 025/120, 017/096, 028/120, 015/036, 017/036. Isso inclui empréstimos bancários, consignados e também Benefício Assistencial / Auxílio Assistencial quando vier com prazo finito.
-- REGRA CRÍTICA: "Benefício Assistencial - ASSEBA 015/036 306,89" deve entrar em emprestimos com banco = "ASSEBA", parcelaAtual = 15, totalParcelas = 36, valorParcela = 306.89.
-- REGRA CRÍTICA: "Benefício Assistencial - ASTEBA 017/036 320,63" deve entrar em emprestimos com banco = "ASTEBA", parcelaAtual = 17, totalParcelas = 36, valorParcela = 320.63.
-- associacoes: incluir SOMENTE mensalidades/associações recorrentes com parcela NNN/999 ou NNN/000. Exemplo: "Mensalidade Valor - ASSEBA 015/999 80,00".
-- Nunca classifique como associacao um item com prazo finito como 015/036, 017/036, 027/120, 065/096, 017/096 ou 028/120.
-- NÃO incluir INSS, IR, saúde/Planserv nos arrays — esses são descontos, não dívidas.
+- emprestimos: percorra TODAS as linhas de DESCONTOS do contracheque. Sempre que encontrar um padrão de parcela NNN/NNN e o total de parcelas for menor que 900, inclua essa linha em emprestimos.
+
+- O formato NNN/NNN significa:
+  parcelaAtual = os 3 primeiros números antes da barra
+  totalParcelas = os 3 números depois da barra
+
+- O valorParcela é o valor em reais no final da mesma linha.
+
+- Inclua em emprestimos qualquer desconto parcelado com prazo finito, mesmo que o nome não seja banco. Isso inclui descrições como:
+  Empréstimo
+  Emprestimo
+  Consignado
+  Banco
+  Financeira
+  Crédito
+  Credito
+  Benefício Assistencial
+  Beneficio Assistencial
+  Auxílio Assistencial
+  Auxilio Assistencial
+  Desconto parcelado
+
+- Se houver várias linhas com o mesmo banco ou credor, registre TODAS separadamente. Não junte, não some e não omita linhas repetidas.
+
+- associacoes: percorra TODAS as linhas de DESCONTOS do contracheque. Sempre que encontrar mensalidade ou associação com padrão NNN/999 ou NNN/000, inclua em associacoes.
+
+- NNN/999 ou NNN/000 significa mensalidade recorrente ou associação sem prazo definido.
+
+- Nunca classifique como associacao um item com prazo finito, como NNN/012, NNN/024, NNN/036, NNN/048, NNN/060, NNN/072, NNN/096, NNN/120 ou qualquer total menor que 900.
+
+- Regra decisiva:
+  Se totalParcelas < 900 → emprestimos
+  Se totalParcelas = 999 ou 000 → associacoes
+
+- Para definir o nome:
+  Se a linha tiver hífen, use o texto depois do último hífen como credor principal.
+  Exemplo genérico: "Empréstimo Comum - BANCO X 012/060 250,00" → banco = "BANCO X"
+  Exemplo genérico: "Benefício Assistencial - ASSOCIAÇÃO X 010/036 120,00" → banco = "ASSOCIAÇÃO X - Benefício Assistencial"
+  Exemplo genérico: "Mensalidade Valor - ASSOCIAÇÃO X 015/999 80,00" → nome = "ASSOCIAÇÃO X"
+
+- NÃO incluir IR, previdência, INSS, SPSM, IPREV, Planserv, assistência médica, auxílio transporte, auxílio alimentação ou saúde nos arrays emprestimos ou associacoes, a menos que exista claramente padrão parcelado NNN/NNN com prazo finito e seja um desconto parcelado.
 
 Se NÃO for contracheque (for boleto, fatura, extrato, etc), responda com:
 { "tipo": "OUTRO", "texto": "descrição do documento em português" }`,
