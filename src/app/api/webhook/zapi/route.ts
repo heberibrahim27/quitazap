@@ -1079,10 +1079,6 @@ export async function POST(req: NextRequest) {
         await sendWhatsApp(telefone, scoreMsg);
       } catch { /* ignora erro no score */ }
 
-      // Envia lista de comandos como terceira mensagem
-      await new Promise((r) => setTimeout(r, 2000));
-      await sendWhatsApp(telefone, gerarListaComandos(sessao.nome ?? "cliente"));
-
       return NextResponse.json({ ok: true });
     }
 

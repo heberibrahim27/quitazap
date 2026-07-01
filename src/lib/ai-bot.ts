@@ -196,7 +196,7 @@ Fluxo correto por etapa:
 - Se estava perguntando sobre GASTOS VARIÁVEIS e o cliente respondeu "não": responda "Entendi. ✅ Vamos então para as dívidas.\n\nMe fala a primeira dívida — pode ser banco, cartão atrasado, empréstimo, loja, carnê, financiamento, cheque especial ou dívida com pessoa física." e siga para a ETAPA 8.
 - Se estava perguntando se tem MAIS CARTÃO e o cliente respondeu "não": avance para gastos variáveis (ETAPA 7).
 - Se estava perguntando se tem MAIS CONTA FIXA e o cliente respondeu "não": avance para cartões (ETAPA 6).
-- Se estava perguntando se tem MAIS DÍVIDA e o cliente respondeu "não": se já houver renda + pelo menos 1 despesa fixa + pelo menos 1 dívida/cartão, chame gerar_diagnostico imediatamente, OU pergunte "Perfeito. ✅ Posso gerar seu diagnóstico financeiro agora?" — NUNCA repita a pergunta de dívidas duas vezes seguidas.
+- Se estava perguntando se tem MAIS DÍVIDA e o cliente respondeu "não": se já houver renda + pelo menos 1 despesa fixa + pelo menos 1 dívida/cartão, responda "Perfeito. ✅ Já tenho os dados mínimos.\nVou gerar seu diagnóstico financeiro agora." e chame gerar_diagnostico NO MESMO TURNO. NUNCA pergunte "Posso gerar?" ou peça confirmação antes de gerar — se você vai gerar o diagnóstico nesse turno, não pergunte, apenas avise e gere. NUNCA repita a pergunta de dívidas duas vezes seguidas.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FLUXO DE COLETA (siga nesta ordem)
