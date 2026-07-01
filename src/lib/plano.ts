@@ -480,7 +480,14 @@ sugestoes.push(
   if (sobra < 0) {
     sugestoes.push(`⚠️ Suas despesas superam sua renda em *R$ ${fmt(Math.abs(sobra))}/mês*. Duas saídas: cortar gastos variáveis ou buscar uma renda extra. As duas juntas são mais poderosas.`);
   } else if (isServidor && sobra > 0) {
-    sugestoes.push(`💚 Você tem *R$ ${fmt(sobra)}/mês* disponíveis após os descontos automáticos em folha. Suas dívidas já são pagas automaticamente — use esse valor para gastos pessoais, reserva de emergência ou acelerar o pagamento de algum empréstimo com refinanciamento.`);
+    const liquidoMesServidor = diag.renda?.salarioLiquidoComExtras ?? renda;
+const verbaExtraServidor = diag.renda?.adiantamento13 ?? 0;
+
+sugestoes.push(
+  verbaExtraServidor > 0 && liquidoMesServidor > renda
+    ? `💚 Neste mês você tem *R$ ${fmt(liquidoMesServidor)}* líquidos disponíveis na conta, incluindo *R$ ${fmt(verbaExtraServidor)}* de 13°/verba extra. Use essa folga com prioridade: reserva de emergência, quitar ou reduzir dívidas fora da folha e evitar cartão/cheque especial. Para os próximos meses, sua base recorrente volta para *R$ ${fmt(renda)}/mês*.`
+    : `💚 Você tem *R$ ${fmt(renda)}/mês* líquidos disponíveis após os descontos automáticos em folha. Suas dívidas já são pagas automaticamente — use esse valor para gastos pessoais, reserva de emergência ou acelerar o pagamento de algum empréstimo com refinanciamento.`
+);
   } else if (sobra > 200) {
     sugestoes.push(`💚 Sobram *R$ ${fmt(sobra)}/mês* após todas as despesas. Coloque esse valor como pagamento extra na menor dívida — vai encurtar muito o prazo.`);
   }

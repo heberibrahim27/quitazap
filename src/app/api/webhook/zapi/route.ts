@@ -396,8 +396,9 @@ Se NÃO for contracheque (for boleto, fatura, extrato, etc), responda com:
             },
           ],
         }],
-        max_tokens: 1500,
-        response_format: { type: "json_object" },
+       temperature: 0,
+max_tokens: 2000,
+response_format: { type: "json_object" },
       }),
     });
 
