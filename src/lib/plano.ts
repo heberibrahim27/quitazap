@@ -532,15 +532,14 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
       : `Pagar todas as parcelas do mês em dia e não contrair nenhuma dívida nova.`;
 
     const snowballExplicacao = menorDivida
-      ? `Método Bola de Neve: pague o mínimo em todas as dívidas e concentre qualquer dinheiro extra na *${menorDivida.credor}* (R$ ${fmt(menorDivida.saldoAtual)} — a menor). Ao quitar, some o valor da parcela dela na próxima menor.`
-      : `Quite as menores dívidas primeiro e use o valor liberado para acelerar as próximas.`;
+  ? `Plano de prioridade: mantenha os pagamentos essenciais em dia, evite pagar apenas o mínimo do cartão de crédito e tente renegociar antes de entrar no rotativo. Concentre qualquer valor extra na dívida priorizada: *${menorDivida.credor}* (R$ ${fmt(menorDivida.saldoAtual)} — a menor).`
+  : "";
 
-    meta90 = snowballExplicacao;
+meta90 = snowballExplicacao;
 
-    const meta180Base = mesesParaQuitar <= 6
-      ? `Quitar *todas* as dívidas — livre em *${mesQuitacao}* seguindo o plano!`
-      : `Reduzir o total de dívidas em 30% e aplicar a *Regra 50-30-20*: 50% da renda para necessidades fixas, 30% para estilo de vida, 20% para dívidas/reserva.`;
-
+const meta180Base = mesesParaQuitar <= 6
+  ? `Reduzir o saldo das dívidas e revisar o plano mês a mês. Estimativa inicial: *${mesQuitacao}*. Essa previsão pode mudar conforme pagamentos, juros, renegociações e novas despesas.`
+  : `Reduzir o total de dívidas em 30% e aplicar a *Regra 50-30-20*: 50% da renda para necessidades fixas, 30% para escolhas pessoais e 20% para dívidas/reserva.`;
     const meta180Extra = objetivo.includes("RESERVA")
       ? ` Depois, construa sua reserva de emergência (3x sua renda mensal).`
       : objetivo.includes("INVESTIR")

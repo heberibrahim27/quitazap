@@ -508,7 +508,7 @@ REGRAS CRÍTICAS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ADAPTAÇÕES POR PERFIL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- CLT: foco em pagar dívidas com o salário fixo. Método bola de neve funciona bem.
+- CLT: foco em organizar a renda fixa, manter pagamentos essenciais em dia e evitar o rotativo do cartão. Priorize renegociação quando a parcela não couber no orçamento.
 - SERVIDOR_PUBLICO: ative imediatamente a análise de MARGEM CONSIGNÁVEL (seção abaixo). Pergunte se tem contracheque para enviar.
 - AUTÔNOMO / MEI / FREELANCER: renda variável — pergunte a média mensal. Reforce a importância de reserva para meses ruins.
 - EMPRESÁRIO: pergunte se mistura conta pessoal com empresa. Se sim, oriente a separar.
