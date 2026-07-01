@@ -229,6 +229,10 @@ type PDFOutro = {
 };
 
 type PDFResult = PDFContracheque | PDFOutro;
+
+// PDF/contracheque pausado no MVP — manter funções para futura versão beta.
+// uploadPDFOpenAI, deletePDFOpenAI, extrairPDF e buildDiagContracheque continuam definidas
+// abaixo, mas não são mais chamadas automaticamente no fluxo principal do webhook.
 // ── Upload de PDF para OpenAI Files API ──────────────────────────────────
 
 async function uploadPDFOpenAI(pdfUrl: string): Promise<{ fileId: string; apiKey: string }> {
@@ -726,104 +730,25 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Documento (PDF) ──────────────────────
+    // PDF/contracheque pausado no MVP — manter funções para futura versão beta.
+    // extrairPDF / uploadPDFOpenAI / deletePDFOpenAI / buildDiagContracheque seguem definidas acima,
+    // mas não são mais chamadas automaticamente aqui enquanto a leitura de PDF estiver pausada.
     if (tipoEntrada === "documento") {
-      const docUrl = body.document?.documentUrl ?? body.document?.fileUrl ?? "";
-      if (!docUrl) {
-        await sendWhatsApp(sessao.telefone, "Recebi um documento, mas não consegui acessar o arquivo. Pode tirar uma foto e me enviar como imagem?");
-        return NextResponse.json({ ok: true });
-      }
-      try {
-        await sendWhatsApp(sessao.telefone, "📄 Recebi seu PDF! Lendo o documento...");
-        const pdfResult = await extrairPDF(docUrl);
-
-        if (pdfResult.tipo === "CONTRACHEQUE") {
-          // ── Caminho direto: monta diagnóstico sem passar pelo gpt-4o-mini ──
-          const diag = buildDiagContracheque(pdfResult, sessao.nome ?? "cliente");
-          const relatorio = gerarRelatorio(diag);
-          const rendaTotal = diag.renda.salarioLiquido;
-
-          const historicoComRelatorio = [
-            { role: "assistant" as const, content: relatorio },
-          ];
-
-          await prisma.botSessao.updateMany({
-            where: { id: sessao.id },
-            data: {
-              etapa: "PLANO_GERADO",
-              renda: rendaTotal,
-              dividasTemp: JSON.stringify(historicoComRelatorio),
-            },
-          });
-
-          if (sessao.clienteId) {
-            await prisma.cliente.update({
-              where: { id: sessao.clienteId },
-              data: { rendaMensal: rendaTotal, statusAtendimento: "PLANO_GERADO" },
-            });
-            await prisma.divida.deleteMany({ where: { clienteId: sessao.clienteId } });
-            for (const d of diag.dividas) {
-              await prisma.divida.create({
-                data: {
-                  clienteId: sessao.clienteId,
-                  credor: d.credor,
-                  valorTotal: d.saldoAtual ?? 0,
-                  tipo: d.tipo ?? "OUTRO",
-                  status: "ATIVA",
-                  diaVencimento: null,
-                  emAtraso: false,
-                  obs: `${d.parcelasRestantes}x de R$${d.valorParcela} — contracheque`,
-                },
-              });
-            }
-            await prisma.planoEnviado.create({
-              data: { clienteId: sessao.clienteId, texto: relatorio },
-            });
-          }
-
-          const partes = relatorio.length > 3800 ? dividirMensagem(relatorio, 3800) : [relatorio];
-          for (const parte of partes) {
-            await sendWhatsApp(sessao.telefone, parte);
-            await new Promise((r) => setTimeout(r, 1200));
-          }
-
-                    // Pergunta follow-up: se tem outras dívidas fora da folha
-          // Não envia QuitaScore automaticamente aqui, porque ainda falta saber
-          // se o cliente possui dívidas fora da folha.
-          await new Promise((r) => setTimeout(r, 2000));
-          await sendWhatsApp(
-            sessao.telefone,
-            `Esse foi o diagnóstico com base no seu contracheque! 📊\n\n` +
-              `Você tem outras dívidas *fora da folha*? Por exemplo:\n` +
-              `• Cartão de crédito\n` +
-              `• Boleto em atraso\n` +
-              `• Financiamento de veículo ou imóvel\n\n` +
-              `Me conta que eu atualizo seu plano! 😊`
-          );
-
-          return NextResponse.json({ ok: true });
-        }
-
-        // ── PDF não é contracheque: processa como texto normalmente ──
-        const texto = pdfResult.texto;
-        if (!texto || texto.length < 30) {
-          await sendWhatsApp(
-            sessao.telefone,
-            "Consegui abrir o PDF mas ele parece ser uma imagem escaneada — não consigo extrair o texto. Pode tirar uma foto do documento e enviar como imagem? 📷"
-          );
-          return NextResponse.json({ ok: true });
-        }
-
-        console.log(`[Z-API] PDF (outro) extraído (${texto.length} chars)`);
-        mensagem = `[Cliente enviou um PDF com este conteúdo:]\n\n${texto.slice(0, 4000)}`;
-        tipoEntrada = "texto";
-      } catch (err) {
-        console.error("[Z-API] Erro ao ler PDF:", err);
-        await sendWhatsApp(
-          sessao.telefone,
-          "Tive dificuldade para ler esse PDF. Pode tirar uma foto e enviar como imagem? 📷"
-        );
-        return NextResponse.json({ ok: true });
-      }
+      await sendWhatsApp(
+        sessao.telefone,
+        `📄 Recebi seu PDF, mas a leitura automática de contracheque está em beta e foi pausada para evitar erro nos valores.\n\n` +
+          `Para eu montar seu diagnóstico com segurança, me envie os dados principais assim:\n\n` +
+          `Salário líquido normal:\n` +
+          `Líquido recebido este mês:\n` +
+          `13º/férias/verba extra:\n\n` +
+          `Empréstimos em folha:\n` +
+          `BANCO X 250,00 12/60\n` +
+          `BANCO Y 180,00 08/36\n\n` +
+          `Associações:\n` +
+          `ASSEBA 80,00\n` +
+          `ASPRA 87,00`
+      );
+      return NextResponse.json({ ok: true });
     }
 
         // ── Comando RESETAR (funciona em qualquer etapa) ──
@@ -887,14 +812,27 @@ export async function POST(req: NextRequest) {
       );
 
     if (servidorEstaRespondendoPerfilTrabalho && servidorEscolheuServidorPublico) {
-      const respostaServidor = `Perfeito. ✅ Como você é servidor público, consigo analisar melhor sua situação se você enviar seu contracheque em PDF ou imagem.
+      // Leitura automática de contracheque pausada no MVP — pede os dados manualmente.
+      const respostaServidor = `Perfeito. ✅ Como você é servidor público, vou organizar seus descontos em folha manualmente para evitar erro na leitura automática do contracheque.
 
-Assim eu consigo identificar salário líquido, descontos em folha, consignados e margem com mais precisão.
+Me envie assim:
 
-Você prefere:
+1️⃣ Salário líquido normal:
+2️⃣ Líquido recebido este mês:
+3️⃣ Teve 13º, férias ou verba extra? Qual valor?
 
-1️⃣ Enviar o contracheque agora
-2️⃣ Informar os valores manualmente`;
+4️⃣ Empréstimos/consignados/descontos parcelados em folha:
+Exemplo:
+BANCO X 250,00 12/60
+BANCO Y 180,50 08/36
+ASSEBA benefício 120,00 10/36
+
+5️⃣ Associações/mensalidades em folha:
+Exemplo:
+ASSEBA 80,00
+ASPRA 87,00
+
+Pode mandar tudo em uma mensagem só.`;
 
       await sendWhatsApp(telefone, respostaServidor);
 
@@ -905,55 +843,6 @@ Você prefere:
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },
             { role: "assistant", content: respostaServidor },
-          ]),
-        },
-      });
-
-      return NextResponse.json({ ok: true });
-    }
-
-    const servidorEstaEscolhendoContracheque =
-      servidorHistoricoTexto.includes("enviar o contracheque agora") &&
-      servidorHistoricoTexto.includes("informar os valores manualmente");
-
-    if (servidorEstaEscolhendoContracheque && servidorMsgNormalizada === "1") {
-      const respostaEnviar =
-        "Perfeito. ✅ Pode enviar aqui o PDF ou a imagem do contracheque.";
-
-      await sendWhatsApp(telefone, respostaEnviar);
-
-      await prisma.botSessao.updateMany({
-        where: { id: sessao.id },
-        data: {
-          dividasTemp: JSON.stringify([
-            ...servidorHistoricoSessao,
-            { role: "user", content: mensagem },
-            { role: "assistant", content: respostaEnviar },
-          ]),
-        },
-      });
-
-      return NextResponse.json({ ok: true });
-    }
-
-    if (servidorEstaEscolhendoContracheque && servidorMsgNormalizada === "2") {
-      const respostaManual = `Sem problema. ✅ Vamos informar manualmente.
-
-Você tem alguém que depende financeiramente de você?
-Pode ser filho, esposa/marido, pais ou outra pessoa.
-
-1️⃣ Sim
-2️⃣ Não`;
-
-      await sendWhatsApp(telefone, respostaManual);
-
-      await prisma.botSessao.updateMany({
-        where: { id: sessao.id },
-        data: {
-          dividasTemp: JSON.stringify([
-            ...servidorHistoricoSessao,
-            { role: "user", content: mensagem },
-            { role: "assistant", content: respostaManual },
           ]),
         },
       });
