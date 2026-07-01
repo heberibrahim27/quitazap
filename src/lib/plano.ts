@@ -467,7 +467,14 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   }
 
   if (comprometimento > 50) {
-    sugestoes.push(`📉 ${comprometimento.toFixed(0)}% da sua renda vai para dívidas. Tente renegociar as de maior juros para reduzir esse percentual.`);
+ const liquidoMesServidor = diag.renda?.salarioLiquidoComExtras ?? renda;
+const verbaExtraServidor = diag.renda?.adiantamento13 ?? 0;
+
+sugestoes.push(
+  verbaExtraServidor > 0 && liquidoMesServidor > renda
+    ? `💚 Neste mês você tem *R$ ${fmt(liquidoMesServidor)}* líquidos disponíveis na conta, incluindo *R$ ${fmt(verbaExtraServidor)}* de 13°/verba extra. Use essa folga com prioridade: reserva de emergência, quitar ou reduzir dívidas fora da folha e evitar cartão/cheque especial. Para os próximos meses, sua base recorrente volta para *R$ ${fmt(renda)}/mês*.`
+    : `💚 Você tem *R$ ${fmt(renda)}/mês* líquidos disponíveis após os descontos automáticos em folha. Suas dívidas já são pagas automaticamente — use esse valor para gastos pessoais, reserva de emergência ou acelerar o pagamento de algum empréstimo com refinanciamento.`
+);
   }
 
   if (sobra < 0) {
@@ -512,7 +519,9 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
         })()
       : "";
 
-    meta30 = `Organize seus *R$ ${fmt(renda)}/mês* disponíveis. Suas dívidas são descontadas automaticamente em folha — não há parcelas para pagar manualmente. Evite contrair novas dívidas fora da folha.`;
+    meta30 = diag.renda?.adiantamento13 && diag.renda?.salarioLiquidoComExtras
+  ? `Organize os *R$ ${fmt(diag.renda.salarioLiquidoComExtras)}* líquidos disponíveis este mês. Separe mentalmente *R$ ${fmt(renda)}* como renda normal dos próximos meses e trate os *R$ ${fmt(diag.renda.adiantamento13)}* extras como verba pontual. Não assuma compromisso fixo usando o 13° como se fosse salário mensal.`
+  : `Organize seus *R$ ${fmt(renda)}/mês* disponíveis. Suas dívidas são descontadas automaticamente em folha — não há parcelas para pagar manualmente. Evite contrair novas dívidas fora da folha.`;
 
     meta90 = `Pesquise *portabilidade de crédito consignado* — migrar empréstimos para banco com taxa menor (ideal: abaixo de 1,8% a.m.) reduz o valor descontado em folha e aumenta o que cai na sua conta. BB, Caixa e BRB costumam ter boas taxas para servidor público.`;
 
