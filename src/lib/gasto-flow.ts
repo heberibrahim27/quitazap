@@ -8,6 +8,7 @@ export type CategoriaGasto =
   | "Educação"
   | "Filhos/Família"
   | "Assinaturas"
+  | "Apostas"
   | "Lazer"
   | "Beleza/Cuidados"
   | "Trabalho/Negócio"
@@ -35,6 +36,7 @@ const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
   { categoria: "Educação", palavras: ["escola", "curso", "faculdade", "material escolar"] },
   { categoria: "Filhos/Família", palavras: ["filho", "filha", "fralda", "leite", "pensao", "brinquedo"] },
   { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "claude", "assinatura", "prime"] },
+  { categoria: "Apostas", palavras: ["aposta", "apostas", "bet", "betano", "blaze", "tigrinho", "jogo do tigrinho", "cassino", "cassino online", "roleta", "foguetinho", "pix bet", "banca", "casa de aposta", "jogo online"] },
   { categoria: "Lazer", palavras: ["cerveja", "cinema", "festa", "bar", "viagem", "lazer"] },
   { categoria: "Beleza/Cuidados", palavras: ["cabelo", "unha", "perfume", "skincare", "academia", "barbearia"] },
   { categoria: "Trabalho/Negócio", palavras: ["fornecedor", "ferramenta", "anuncio", "trafego", "sistema", "negocio"] },
@@ -44,6 +46,7 @@ const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
 const PALAVRAS_GASTO = [
   "gastei",
   "gasto",
+  "apostei",
   "paguei",
   "pago",
   "comprei",
@@ -61,6 +64,16 @@ const PALAVRAS_GASTO = [
   "claude",
   "netflix",
   "spotify",
+  "aposta",
+  "apostas",
+  "bet",
+  "betano",
+  "blaze",
+  "tigrinho",
+  "cassino",
+  "roleta",
+  "foguetinho",
+  "banca",
 ];
 
 function normalizarTexto(texto: string): string {
@@ -130,7 +143,10 @@ export function definirCategoriaGasto(mensagem: string): CategoriaGasto {
   const texto = normalizarTexto(mensagem);
 
   for (const item of CATEGORIAS) {
-    if (item.palavras.some((palavra) => new RegExp(`(^|\\s)${palavra}(\\s|$)`).test(texto))) {
+    if (item.palavras.some((palavra) => {
+      const escaped = palavra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      return new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(texto);
+    })) {
       return item.categoria;
     }
   }
@@ -145,7 +161,7 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     .replace(/\d{1,3}(?:\.\d{3})*,\d{1,2}\s*(?:reais|real)?/gi, " ")
     .replace(/\d+(?:[.,]\d{1,2})?\s*(?:reais|real)/gi, " ")
     .replace(/\b\d+\b/g, " ")
-    .replace(/\b(gastei|gasto|paguei|pago|comprei|compra|pix|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
+    .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 

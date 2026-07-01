@@ -375,6 +375,9 @@ export function registrarGastoControle(
   const final = cartao
     ? "Esse valor será considerado na fatura do cartão. 👌"
     : "Pode mandar mais que eu vou organizando tudo pra você. 👌";
+  const alertaApostas = gasto.categoria === "Apostas"
+    ? "\n\n⚠️ Atenção: gastos com apostas podem comprometer seu controle financeiro rapidamente."
+    : "";
 
   const resposta =
     "✅ *OK! Registrado.*\n\n" +
@@ -385,7 +388,8 @@ export function registrarGastoControle(
     `📅 *Data:* ${formatarDataBR(gasto.data)}\n\n` +
     "📊 *Atualização do mês*\n\n" +
     `${linhasAtualizacao.join("\n")}\n\n` +
-    final;
+    final +
+    alertaApostas;
 
   return {
     resposta,

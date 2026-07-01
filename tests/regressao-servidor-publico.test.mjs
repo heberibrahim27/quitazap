@@ -408,6 +408,16 @@ test("fluxo deterministico de gasto classifica categorias por palavra-chave", ()
   assert.equal(processarFluxoGasto("uber 23,50", hoje)?.categoria, "Transporte");
 });
 
+test("fluxo deterministico classifica apostas separado de lazer", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+
+  assert.equal(processarFluxoGasto("apostei 50 na betano", hoje)?.categoria, "Apostas");
+  assert.equal(processarFluxoGasto("gastei 30 no tigrinho", hoje)?.categoria, "Apostas");
+  assert.equal(processarFluxoGasto("blaze 40", hoje)?.categoria, "Apostas");
+  assert.equal(processarFluxoGasto("cassino online 80", hoje)?.categoria, "Apostas");
+  assert.equal(processarFluxoGasto("gastei 65 de cerveja no bar", hoje)?.categoria, "Lazer");
+});
+
 test("reset usa onboarding do QuitaZAP Controle em duas mensagens", () => {
   const [mensagem1, mensagem2] = mensagensResetControle("Maria");
 
@@ -660,6 +670,28 @@ test("gasto com cartao soma fatura aberta sem abater saldo", () => {
   assert.match(segundo.resposta, /💳 \*Origem:\* Cartão Nubank/);
   assert.match(segundo.resposta, /💳 \*Fatura Nubank:\* R\$ 88,50/);
   assert.doesNotMatch(`${primeiro.resposta}\n${segundo.resposta}`, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("gasto com apostas mostra alerta e mantem calculo deterministico", () => {
+  const estadoInicial = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+
+  const resultado = registrarGastoControle(
+    "apostei 50 na betano",
+    estadoInicial,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+
+  assert.ok(resultado);
+  assert.equal(calcularSaldoDisponivelControle(resultado.estado), 1910);
+  assert.equal(totalFaturasAbertasControle(resultado.estado), 0);
+  assert.match(resultado.resposta, /✍️ \*Descrição:\* Betano/);
+  assert.match(resultado.resposta, /🏷️ \*Categoria:\* Apostas/);
+  assert.match(resultado.resposta, /⚠️ Atenção: gastos com apostas podem comprometer seu controle financeiro rapidamente\./);
+  assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
 test("correcao posterior move ultimo gasto do saldo para fatura do cartao", () => {
