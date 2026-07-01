@@ -624,41 +624,52 @@ _Seu salário líquido real poderia ser *R$ ${fmt(renda + totalConsignadosMes)}*
   const perfilLinha = [perfilLabel, objetivoLabel].filter(Boolean).join(" · ");
 
   // ── SEÇÃO CONSIGNADOS EM FOLHA (servidor) ──────────────────────────────
+    const fmtLinhaFolha = (nome: string, valor: number, info: string) => {
+    const nomeFmt = nome.length > 30 ? `${nome.slice(0, 27)}...` : nome;
+    return `${nomeFmt.padEnd(32)} R$ ${fmt(valor).padStart(10)}   ${info}`;
+  };
+
   const listaConsignadosFolha = isServidor && consignadosFolha.length > 0
-    ? (() => {
-        const emp = emprestimosConsig.map((d) => {
-          const parc = d.parcelasRestantes > 0 && d.parcelasRestantes < 900
-            ? ` (${d.parcelasRestantes}x restantes)`
-            : "";
-          return `• *${d.credor}*${parc}: R$ ${fmt(d.valorParcela)}/mês`;
-        }).join("\n");
-        const assoc = associacoesFolha.map((d) =>
-          `• *${d.credor}* (associação): R$ ${fmt(d.valorParcela)}/mês`
-        ).join("\n");
-        const partes = [emp, assoc].filter(Boolean).join("\n");
-        return `\n━━━━━━━━━━━━━━━━━━━━
+    ? `
+
+━━━━━━━━━━━━━━━━━━━━
 🏦 *DESCONTOS AUTOMÁTICOS EM FOLHA*
 ━━━━━━━━━━━━━━━━━━━━
 _Pagos direto na folha — não precisa de ação manual:_
-${partes}
-Total descontado em folha: *R$ ${fmt(totalConsignadosMes)}/mês*`;
-      })()
-    : "";
 
-  // ── RELATÓRIO FINAL ───────────────────────
-  return `📊 *DIAGNÓSTICO FINANCEIRO — ${nome.toUpperCase()}*
-${perfilLinha ? `_${perfilLinha}_` : ""}
-${temAlerta ? "\n🚨 *ATENÇÃO: Situação requer ação imediata!*" : ""}
-
+\`\`\`
+${[
+  ...emprestimosConsig.map((d) =>
+    fmtLinhaFolha(
+      d.credor,
+      d.valorParcela,
+      d.parcelasRestantes > 0 && d.parcelasRestantes < 900
+        ? `${d.parcelasRestantes}x restantes`
+        : "parcelado"
+    )
+  ),
+  ...associacoesFolha.map((d) =>
+    fmtLinhaFolha(d.credor, d.valorParcela, "associação")
+  ),
+].join("\n")}
+────────────────────────────────────────────
+${"Total em folha".padEnd(32)} R$ ${fmt(totalConsignadosMes).padStart(10)}
+\`\`\``
+    : "";  return `
 ━━━━━━━━━━━━━━━━━━━━
 💰 *RESUMO FINANCEIRO*
 ━━━━━━━━━━━━━━━━━━━━
-${isServidor && diag.renda?.salarioLiquidoComExtras
-  ? `Salário líquido do mês: *R$ ${fmt(diag.renda.salarioLiquidoComExtras)}*\n  ↳ Salário mensal normal: *R$ ${fmt(renda)}*\n  ↳ Adiantamento 13°: *R$ ${fmt(diag.renda.adiantamento13 ?? 0)}*`
+${isServidor && diag.renda?.salarioLiquidoComExtras && diag.renda?.adiantamento13
+  ? `Salário líquido normal: *R$ ${fmt(renda)}*
+Adiantamento 13°/verba extra: *R$ ${fmt(diag.renda.adiantamento13)}*
+💳 Disponível na conta este mês: *R$ ${fmt(diag.renda.salarioLiquidoComExtras)}*`
   : `Salário líquido mensal: *R$ ${fmt(renda)}*`}
 _↳ Já descontados em folha: R$ ${fmt(totalConsignadosMes)}/mês_
+${isServidor && diag.renda?.adiantamento13 ? `_↳ Base recorrente dos próximos meses: R$ ${fmt(renda)}_` : ""}
 ${totalFixo > 0 ? `Despesas fixas: *R$ ${fmt(totalFixo)}*\n` : ""}${totalVariavel > 0 ? `Gastos variáveis: *R$ ${fmt(totalVariavel)}*\n` : ""}${isServidor
-  ? `💳 Disponível na conta este mês: *R$ ${fmt(diag.renda?.salarioLiquidoComExtras ?? renda)}*${diag.renda?.adiantamento13 ? `\n_↳ Nos demais meses (sem 13°): R$ ${fmt(renda)}_` : ""}`
+  ? !diag.renda?.adiantamento13
+    ? `💳 Disponível na conta: *R$ ${fmt(renda)}*`
+    : ""
   : `Total em dívidas: *R$ ${fmt(totalDividas)}*
 Parcelas/mês: *R$ ${fmt(comprometidoMes)}*
 Comprometimento: *${pct(comprometidoMes, renda)}* ${nivelRisco}
@@ -671,7 +682,7 @@ ${(diag.despesasFixas ?? []).length > 0 ? `
 ${listaDespesas}
 
 Total fixo: *R$ ${fmt(totalFixo)}*` : ""}
-${comprometidoMes > 0 ? `
+${comprometidoMes > 0 && !isServidor ? `
 ━━━━━━━━━━━━━━━━━━━━
 🗓️ *O QUE PAGAR EM ${mesAtual}*
 ━━━━━━━━━━━━━━━━━━━━
