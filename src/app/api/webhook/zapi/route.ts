@@ -12,8 +12,11 @@ import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { processarFluxoGasto } from "@/lib/gasto-flow";
 import {
+  deveAguardarDespesasFixasControle,
+  ETAPA_AGUARDANDO_DESPESAS_FIXAS,
+  ETAPA_AGUARDANDO_GASTOS,
   extrairRendaControle,
-  formatarRespostaDespesasFixasControle,
+  formatarMensagensDespesasFixasControle,
   mensagemExplicarDespesasFixasControle,
   mensagemPedidoDespesasFixasControle,
   mensagemRendaRegistradaControle,
@@ -909,44 +912,55 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const ultimoIndiceUsuario = servidorHistoricoSessao
-      .map((h, index) => ({ h, index }))
-      .filter(({ h }) => h.role === "user")
-      .map(({ index }) => index)
-      .pop() ?? -1;
-    const ultimoPedidoDespesasFixas = servidorHistoricoSessao
-      .map((h, index) => ({ h, index }))
-      .filter(
-        ({ h }) =>
-          h.role === "assistant" &&
-          (
-            (h.content ?? "").includes("Agora me diga suas despesas fixas.") ||
-            (h.content ?? "").includes("*Despesas fixas*")
-          )
-      )
-      .map(({ index }) => index)
-      .pop() ?? -1;
-    const aguardandoDespesasFixasControle = ultimoPedidoDespesasFixas > ultimoIndiceUsuario;
+    const aguardandoDespesasFixasControle = deveAguardarDespesasFixasControle(
+      sessao.etapa,
+      servidorHistoricoSessao
+    );
 
     if (aguardandoDespesasFixasControle) {
       const despesasFixas = parsearDespesasFixasControle(mensagem);
-      const respostaDespesasFixas =
-        despesasFixas.length > 0
-          ? formatarRespostaDespesasFixasControle(despesasFixas, sessao.renda)
-          : "Não consegui identificar os valores das despesas fixas.\n\nPode mandar assim:\n\n```\nEnergia 120\nInternet 90\nPensão 900\n```";
+      if (despesasFixas.length === 0) {
+        const respostaErro = "Não consegui identificar os valores das despesas fixas.\n\nPode mandar assim:\n\n```\nEnergia 120\nInternet 90\nPensão 900\n```";
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaErro },
+            ]),
+          },
+        });
+
+        await sendWhatsApp(telefone, respostaErro);
+
+        return NextResponse.json({ ok: true });
+      }
+
+      const [
+        respostaDespesasFixas,
+        respostaResumoDespesas,
+        respostaProximaEtapa,
+      ] = formatarMensagensDespesasFixasControle(despesasFixas, sessao.renda);
 
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: {
+          etapa: ETAPA_AGUARDANDO_GASTOS,
           dividasTemp: JSON.stringify([
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },
             { role: "assistant", content: respostaDespesasFixas },
+            { role: "assistant", content: respostaResumoDespesas },
+            { role: "assistant", content: respostaProximaEtapa },
           ]),
         },
       });
 
       await sendWhatsApp(telefone, respostaDespesasFixas);
+      await sendWhatsApp(telefone, respostaResumoDespesas);
+      await sendWhatsApp(telefone, respostaProximaEtapa);
 
       return NextResponse.json({ ok: true });
     }
@@ -985,6 +999,7 @@ Pode mandar tudo em uma mensagem só.`;
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: {
+          etapa: ETAPA_AGUARDANDO_DESPESAS_FIXAS,
           renda: rendaControle,
           dividasTemp: JSON.stringify([
             ...servidorHistoricoSessao,

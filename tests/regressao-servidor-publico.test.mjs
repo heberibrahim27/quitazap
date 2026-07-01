@@ -51,7 +51,11 @@ const {
 } = loadTsModule("src/lib/servidor-publico-flow.ts");
 const { processarFluxoGasto } = loadTsModule("src/lib/gasto-flow.ts");
 const {
+  deveAguardarDespesasFixasControle,
+  ETAPA_AGUARDANDO_DESPESAS_FIXAS,
+  ETAPA_AGUARDANDO_GASTOS,
   extrairRendaControle,
+  formatarMensagensDespesasFixasControle,
   formatarRespostaDespesasFixasControle,
   mensagemBoasVindasControle,
   mensagemExplicarDespesasFixasControle,
@@ -474,10 +478,10 @@ Claude 110`;
   assert.deepEqual(
     despesas.map((d) => `${d.descricao}:${d.valor}`),
     [
-      "Pensão Filhas:900",
-      "Transporte Escolar:300",
+      "Pensão filhas:900",
+      "Transporte escolar:300",
       "Mercado:400",
-      "Conta Celular:60",
+      "Conta celular:60",
       "Água:50",
       "Energia:60",
       "Internet:50",
@@ -486,16 +490,32 @@ Claude 110`;
     ]
   );
 
-  const resposta = formatarRespostaDespesasFixasControle(despesas, 4000);
+  const [resposta, resumo, proximaEtapa] = formatarMensagensDespesasFixasControle(despesas, 4000);
   assert.match(resposta, /^✅ \*Despesas fixas registradas\.\*/);
-  assert.match(resposta, /Pensão Filhas — R\$ 900,00/);
-  assert.match(resposta, /Transporte Escolar — R\$ 300,00/);
-  assert.match(resposta, /Mercado — R\$ 400,00/);
-  assert.match(resposta, /ChatGPT — R\$ 110,00/);
-  assert.match(resposta, /Claude — R\$ 110,00/);
-  assert.match(resposta, /Total fixo mensal — R\$ 2\.040,00/);
-  assert.match(resposta, /Saldo antes dos gastos do dia a dia — R\$ 1\.960,00/);
-  assert.doesNotMatch(resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN|```(?:text|txt|markdown|ts|js)/i);
+  assert.match(resposta, /Pensão filhas\nR\$ 900,00/);
+  assert.match(resposta, /Transporte escolar\nR\$ 300,00/);
+  assert.match(resposta, /Mercado\nR\$ 400,00/);
+  assert.match(resposta, /Conta celular\nR\$ 60,00/);
+  assert.match(resposta, /ChatGPT\nR\$ 110,00/);
+  assert.match(resposta, /Claude\nR\$ 110,00/);
+  assert.match(resposta, /Total fixo mensal\nR\$ 2\.040,00/);
+  assert.doesNotMatch(resposta, /Pensão Filhas\s*[–—-]\s*R\$ 900,00/);
+  assert.doesNotMatch(resposta, /—|–/);
+
+  assert.match(resumo, /^📊 \*Resumo simples\*/);
+  assert.match(resumo, /Renda mensal\nR\$ 4\.000,00/);
+  assert.match(resumo, /Despesas fixas\nR\$ 2\.040,00/);
+  assert.match(resumo, /Saldo antes dos gastos do dia a dia\nR\$ 1\.960,00/);
+  assert.notEqual(resposta, resumo);
+
+  assert.match(proximaEtapa, /^Agora você já pode mandar seus gastos do dia a dia\./);
+  assert.match(proximaEtapa, /gastei 45 no mercado/);
+  assert.notEqual(resumo, proximaEtapa);
+
+  assert.doesNotMatch(
+    `${resposta}\n${resumo}\n${proximaEtapa}`,
+    /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN|```(?:text|txt|markdown|ts|js)/i
+  );
 });
 
 test("despesas fixas parceladas capturam parcelas restantes", () => {
@@ -519,7 +539,7 @@ Financiamento moto 450 8/36`);
         parcelasRestantes: 108,
       },
       {
-        descricao: "Financiamento Moto",
+        descricao: "Financiamento moto",
         valor: 450,
         parcelaAtual: 8,
         totalParcelas: 36,
@@ -529,6 +549,34 @@ Financiamento moto 450 8/36`);
   );
 
   const resposta = formatarRespostaDespesasFixasControle(despesas, 3800);
-  assert.match(resposta, /Empréstimo Banco do Brasil — R\$ 300,00 \(12\/120, restam 108\)/);
-  assert.match(resposta, /Financiamento Moto — R\$ 450,00 \(8\/36, restam 28\)/);
+  assert.match(resposta, /Empréstimo Banco do Brasil\nR\$ 300,00\nParcelas 12\/120, restam 108/);
+  assert.match(resposta, /Financiamento moto\nR\$ 450,00\nParcelas 8\/36, restam 28/);
+  assert.doesNotMatch(resposta, /—|–/);
+});
+
+test("apos registrar despesas fixas estado libera gasto variavel", () => {
+  const historicoAguardando = [
+    { role: "assistant", content: "Agora me diga suas despesas fixas." },
+  ];
+  assert.equal(
+    deveAguardarDespesasFixasControle(ETAPA_AGUARDANDO_DESPESAS_FIXAS, historicoAguardando),
+    true
+  );
+
+  const historicoDepois = [
+    ...historicoAguardando,
+    { role: "user", content: "Energia 120" },
+    { role: "assistant", content: "✅ *Despesas fixas registradas.*" },
+    { role: "assistant", content: "📊 *Resumo simples*" },
+    { role: "assistant", content: "Agora você já pode mandar seus gastos do dia a dia." },
+  ];
+
+  assert.equal(
+    deveAguardarDespesasFixasControle(ETAPA_AGUARDANDO_GASTOS, historicoDepois),
+    false
+  );
+
+  const gasto = processarFluxoGasto("gastei 45 no mercado", new Date(2026, 6, 1));
+  assert.equal(gasto?.categoria, "Mercado");
+  assert.match(gasto?.resposta ?? "", /✅ \*OK! Registrado\.\*/);
 });

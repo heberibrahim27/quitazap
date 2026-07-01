@@ -1,6 +1,8 @@
 export const RESET_CONTROLE_MENSAGEM_1 =
   "✅ *Tudo zerado.*\n\n" +
   "Vamos recomeçar seu controle financeiro do zero.";
+export const ETAPA_AGUARDANDO_DESPESAS_FIXAS = "AGUARDANDO_DESPESAS_FIXAS";
+export const ETAPA_AGUARDANDO_GASTOS = "AGUARDANDO_GASTOS";
 
 export function mensagemInicioControle(nome: string): string {
   const nomeSeguro = nome?.trim() || "cliente";
@@ -155,12 +157,17 @@ function formatarDescricao(texto: string): string {
     .map((parte, index) => {
       const lower = parte.toLowerCase();
       const marcas: Record<string, string> = {
+        banco: "Banco",
+        brasil: "Brasil",
+        claude: "Claude",
         chatgpt: "ChatGPT",
       };
       if (marcas[lower]) return marcas[lower];
       if (index > 0 && ["de", "do", "da", "dos", "das"].includes(lower)) return lower;
       if (/^[A-Z]{2,}$/.test(parte)) return parte;
-      return parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase();
+      return index === 0
+        ? parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase()
+        : lower;
     })
     .join(" ");
 }
@@ -214,31 +221,84 @@ export function formatarRespostaDespesasFixasControle(
   despesas: DespesaFixaControle[],
   rendaMensal?: number | null
 ): string {
+  return formatarMensagensDespesasFixasControle(despesas, rendaMensal)[0];
+}
+
+export function formatarMensagensDespesasFixasControle(
+  despesas: DespesaFixaControle[],
+  rendaMensal?: number | null
+): [string, string, string] {
   const despesasValidas = despesas.filter((despesa) => Number.isFinite(despesa.valor) && despesa.valor > 0);
   const total = despesasValidas.reduce((soma, despesa) => soma + despesa.valor, 0);
   const temRenda = typeof rendaMensal === "number" && Number.isFinite(rendaMensal) && rendaMensal > 0;
   const saldo = temRenda ? rendaMensal - total : null;
 
-  const linhas = despesasValidas.map((despesa) => {
+  const linhasDespesas = despesasValidas.flatMap((despesa) => {
     const parcelas =
       despesa.parcelaAtual !== undefined &&
       despesa.totalParcelas !== undefined &&
       despesa.parcelasRestantes !== undefined
-        ? ` (${despesa.parcelaAtual}/${despesa.totalParcelas}, restam ${despesa.parcelasRestantes})`
+        ? `\nParcelas ${despesa.parcelaAtual}/${despesa.totalParcelas}, restam ${despesa.parcelasRestantes}`
         : "";
-    return `${despesa.descricao} — ${formatarValorControle(despesa.valor)}${parcelas}`;
+    return [`${despesa.descricao}\n${formatarValorControle(despesa.valor)}${parcelas}`];
   });
 
-  linhas.push("");
-  linhas.push(`Total fixo mensal — ${formatarValorControle(total)}`);
-  if (saldo !== null) {
-    linhas.push(`Saldo antes dos gastos do dia a dia — ${formatarValorControle(saldo)}`);
-  }
+  linhasDespesas.push(`Total fixo mensal\n${formatarValorControle(total)}`);
 
-  return (
+  const mensagemDespesas =
     "✅ *Despesas fixas registradas.*\n\n" +
     "```\n" +
-    linhas.join("\n") +
-    "\n```"
-  );
+    linhasDespesas.join("\n\n") +
+    "\n```";
+
+  const linhasResumo = [
+    temRenda ? `Renda mensal\n${formatarValorControle(rendaMensal)}` : null,
+    `Despesas fixas\n${formatarValorControle(total)}`,
+    saldo !== null ? `Saldo antes dos gastos do dia a dia\n${formatarValorControle(saldo)}` : null,
+  ].filter((linha): linha is string => Boolean(linha));
+
+  const mensagemResumo =
+    "📊 *Resumo simples*\n\n" +
+    "```\n" +
+    linhasResumo.join("\n\n") +
+    "\n```";
+
+  const mensagemProximaEtapa =
+    "Agora você já pode mandar seus gastos do dia a dia.\n\n" +
+    "Exemplos:\n" +
+    "```\n" +
+    "gastei 45 no mercado\n" +
+    "uber 23,50\n" +
+    "lanche 18\n" +
+    "```";
+
+  return [mensagemDespesas, mensagemResumo, mensagemProximaEtapa];
+}
+
+export function deveAguardarDespesasFixasControle(
+  etapa: string | null | undefined,
+  historico: Array<{ role: string; content?: string | null }>
+): boolean {
+  if (etapa === ETAPA_AGUARDANDO_GASTOS) return false;
+  if (etapa === ETAPA_AGUARDANDO_DESPESAS_FIXAS) return true;
+
+  const ultimoIndiceUsuario = historico
+    .map((h, index) => ({ h, index }))
+    .filter(({ h }) => h.role === "user")
+    .map(({ index }) => index)
+    .pop() ?? -1;
+  const ultimoPedidoDespesasFixas = historico
+    .map((h, index) => ({ h, index }))
+    .filter(
+      ({ h }) =>
+        h.role === "assistant" &&
+        (
+          (h.content ?? "").includes("Agora me diga suas despesas fixas.") ||
+          (h.content ?? "").includes("*Despesas fixas*")
+        )
+    )
+    .map(({ index }) => index)
+    .pop() ?? -1;
+
+  return ultimoPedidoDespesasFixas > ultimoIndiceUsuario;
 }
