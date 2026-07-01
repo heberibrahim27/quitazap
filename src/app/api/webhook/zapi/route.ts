@@ -290,20 +290,27 @@ async function extrairPDF(pdfUrl: string): Promise<PDFResult> {
   "extraOrdinario": 0.00,
   "salarioLiquidoNormal": 0.00,
   "emprestimos": [
-    { "banco": "Nome do banco", "valorParcela": 0.00, "parcelaAtual": 0, "totalParcelas": 0 }
-  ],
-  "associacoes": [
-    { "nome": "Nome da associação", "valorMensal": 0.00 }
-  ]
+  { "banco": "BANCO DIGIO S.A", "valorParcela": 304.00, "parcelaAtual": 27, "totalParcelas": 120 },
+  { "banco": "ASSEBA - Benefício Assistencial", "valorParcela": 306.89, "parcelaAtual": 15, "totalParcelas": 36 },
+  { "banco": "ASTEBA - Benefício Assistencial", "valorParcela": 320.63, "parcelaAtual": 17, "totalParcelas": 36 }
+],
+"associacoes": [
+  { "nome": "ASSEBA", "valorMensal": 80.00 },
+  { "nome": "ASTEBA", "valorMensal": 80.00 },
+  { "nome": "ASPRA-BA", "valorMensal": 87.00 }
+]
 }
 
 Regras para o JSON:
 - salarioLiquidoTotal = valor líquido impresso no contracheque (pode incluir 13º/férias)
 - extraOrdinario = soma de 13º salário + férias + abono + qualquer verba eventual presente nas VANTAGENS. Se não houver nenhum, use 0.
 - salarioLiquidoNormal = salarioLiquidoTotal - extraOrdinario (renda mensal real)
-- emprestimos: o número da parcela aparece como NNN/NNN logo APÓS o nome do banco. "Empréstimo Comum 3" → o "3" é parte do nome, NÃO é a parcela. Leia o número correto.
-- associacoes: incluir ASTEBA, ASSEBA, ASPRA e qualquer outra associação/mensalidade com parcela NNN/999 ou NNN/000
-- NÃO incluir INSS, IR, saúde/Planserv nos arrays — esses são descontos, não dívidas
+- emprestimos: incluir TODOS os descontos parcelados em folha com formato NNN/NNN quando o total de parcelas for menor que 900. Exemplos: 027/120, 065/096, 003/120, 025/120, 017/096, 028/120, 015/036, 017/036. Isso inclui empréstimos bancários, consignados e também Benefício Assistencial / Auxílio Assistencial quando vier com prazo finito.
+- REGRA CRÍTICA: "Benefício Assistencial - ASSEBA 015/036 306,89" deve entrar em emprestimos com banco = "ASSEBA", parcelaAtual = 15, totalParcelas = 36, valorParcela = 306.89.
+- REGRA CRÍTICA: "Benefício Assistencial - ASTEBA 017/036 320,63" deve entrar em emprestimos com banco = "ASTEBA", parcelaAtual = 17, totalParcelas = 36, valorParcela = 320.63.
+- associacoes: incluir SOMENTE mensalidades/associações recorrentes com parcela NNN/999 ou NNN/000. Exemplo: "Mensalidade Valor - ASSEBA 015/999 80,00".
+- Nunca classifique como associacao um item com prazo finito como 015/036, 017/036, 027/120, 065/096, 017/096 ou 028/120.
+- NÃO incluir INSS, IR, saúde/Planserv nos arrays — esses são descontos, não dívidas.
 
 Se NÃO for contracheque (for boleto, fatura, extrato, etc), responda com:
 { "tipo": "OUTRO", "texto": "descrição do documento em português" }`,
