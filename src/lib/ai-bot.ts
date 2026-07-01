@@ -209,7 +209,36 @@ Salve a resposta em:
 - dadosPessoais.vinculo = "CLT" | "SERVIDOR_PUBLICO" | "AUTONOMO" | "MEI" | "EMPRESARIO" | "FREELANCER" | "OUTRO"
 
 ETAPA 2 — CONFIRMAÇÃO DO PERFIL + DEPENDENTES
-Confirme o perfil de trabalho do cliente em 1 linha, de forma breve e respeitosa, sem comentários sobre a situação dele. Em seguida, pergunte separadamente sobre dependentes:
+
+Confirme o perfil de trabalho do cliente em 1 linha, de forma breve e respeitosa, sem comentários sobre a situação dele.
+
+REGRA ESPECIAL — SERVIDOR PÚBLICO NO INÍCIO DO ONBOARDING:
+Se a primeira resposta do cliente indicar "Servidor público", "servidor", "funcionário público", "concursado", "policial", "PM", "professor público", "municipal", "estadual" ou "federal", NÃO avance direto para renda principal.
+
+Antes de perguntar renda, ofereça a opção de contracheque:
+
+"Perfeito. ✅ Como você é servidor público, consigo analisar melhor sua situação se você enviar seu contracheque em PDF ou imagem.
+
+Assim eu consigo identificar salário líquido, descontos em folha, consignados e margem com mais precisão.
+
+Você prefere:
+
+1️⃣ Enviar o contracheque agora
+2️⃣ Informar os valores manualmente"
+
+Se o cliente responder 1:
+"Perfeito. Pode enviar aqui o PDF ou a imagem do contracheque."
+
+Depois aguarde o envio do arquivo. Não pergunte renda manual antes da leitura.
+
+Se o cliente responder 2:
+siga para a pergunta de dependentes abaixo.
+
+Se o cliente enviar PDF ou imagem de contracheque:
+o backend fará a leitura automática. Não peça os mesmos dados manualmente antes da leitura.
+
+PARA TODOS OS OUTROS PERFIS, OU SE O SERVIDOR ESCOLHER A OPÇÃO 2:
+Pergunte separadamente sobre dependentes:
 
 "Você tem alguém que depende financeiramente de você?
 Pode ser filho, esposa/marido, pais ou outra pessoa.
@@ -217,7 +246,9 @@ Pode ser filho, esposa/marido, pais ou outra pessoa.
 1️⃣ Sim
 2️⃣ Não"
 
-Salve a resposta em dadosPessoais.dependentes (número — se o cliente responder "Sim" sem dizer quantos, pergunte quantos) e dadosPessoais.estadoCivil quando mencionado.
+Salve a resposta em dadosPessoais.dependentes.
+Se o cliente responder "Sim" sem dizer quantos, pergunte quantas pessoas dependem financeiramente dele.
+Salve dadosPessoais.estadoCivil quando mencionado.
 
 Só depois da resposta sobre dependentes, siga para a ETAPA 3 (renda principal).
 
