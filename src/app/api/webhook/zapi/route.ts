@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
+import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
+import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
   gerarRelatorio,
@@ -851,6 +853,46 @@ Pode mandar tudo em uma mensagem só.`;
     }
 
     // ── Comando COBRAR ───────────────────────────────────────────────────────
+    if (deveConfirmarDadosFolhaServidor(servidorHistoricoSessao, mensagem)) {
+      const dadosFolhaServidor = extrairDadosServidorPublicoManual(mensagem);
+      if (dadosFolhaServidor.linhasNaoReconhecidas.length > 0) {
+        await sendWhatsApp(
+          telefone,
+          "Consegui registrar parte dos dados, mas preciso confirmar estas linhas antes de continuar:\n\n" +
+            dadosFolhaServidor.linhasNaoReconhecidas.map((linha) => `- ${linha}`).join("\n") +
+            "\n\nMe envie essas linhas no formato: Banco/Nome valor parcelaAtual/totalParcelas ou Associação valor."
+        );
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      const respostaFolhaServidor = gerarRespostaDadosFolhaServidor(mensagem);
+      await sendWhatsApp(telefone, respostaFolhaServidor);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaFolhaServidor },
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
     if (detectarComando(mensagem) === "COBRAR") {
       if (!sessao.clienteId) {
         await sendWhatsApp(telefone,
@@ -1223,9 +1265,15 @@ Pode mandar tudo em uma mensagem só.`;
 
     // ── Gera diagnóstico completo ────────────
     if (resultado.diagnostico) {
-      const diag = resultado.diagnostico;
+      const diag = normalizarDiagnosticoManual(
+        resultado.diagnostico,
+        historicoAtualizado.filter((h) => h.role === "user").map((h) => h.content)
+      );
       const relatorio = gerarRelatorio(diag);
-      const rendaTotal = diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
+      const isServidor = (diag.dadosPessoais?.vinculo ?? "").toUpperCase().includes("SERVIDOR_PUBLICO");
+      const rendaTotal = isServidor
+        ? diag.renda?.salarioLiquido ?? diag.renda?.totalFamiliar ?? 0
+        : diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
 
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
@@ -1275,13 +1323,6 @@ Pode mandar tudo em uma mensagem só.`;
       } else {
         await sendWhatsApp(telefone, relatorio);
       }
-
-      // Envia QuitaScore
-      await new Promise((r) => setTimeout(r, 2000));
-      try {
-        const scoreMsg = gerarQuitaScore(resultado.diagnostico);
-        await sendWhatsApp(telefone, scoreMsg);
-      } catch { /* ignora erro no score */ }
 
       return NextResponse.json({ ok: true });
     }

@@ -322,7 +322,6 @@ ${score >= 700
 // ── Relatório principal ───────────────────
 export function gerarRelatorio(diag: DiagnosticoIA): string {
   const nome = diag.dadosPessoais?.nome ?? "cliente";
-  const renda = diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
 
   // ── Perfil (necessário cedo para ramificações de cálculo)
   const vinculo = (diag.dadosPessoais?.vinculo ?? "").toUpperCase();
@@ -330,6 +329,9 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const dependentes = diag.dadosPessoais?.dependentes ?? 0;
   const isAutonomo = ["AUTONOMO", "MEI", "FREELANCER"].some((v) => vinculo.includes(v));
   const isServidor = vinculo.includes("SERVIDOR_PUBLICO");
+  const renda = isServidor
+    ? diag.renda?.salarioLiquido ?? diag.renda?.totalFamiliar ?? 0
+    : diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
 
   // ── Despesas fixas
   const totalFixo = (diag.despesasFixas ?? []).reduce((s, d) => s + d.valor, 0);
@@ -358,7 +360,6 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   const totalConsignadosMes = consignadosFolha.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
   const totalAssociacoesMes = associacoesFolha.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
   const totalEmprestimosConsigMes = emprestimosConsig.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
-
   // Saldo devedor total: consignados + demais
   const totalDividas = dividas.reduce((s, d) => s + (d.saldoAtual ?? 0), 0);
   const totalSaldoConsignados = emprestimosConsig.reduce((s, d) => s + (d.saldoAtual ?? 0), 0);
@@ -366,6 +367,9 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
   // Para comprometimento: servidor usa apenas dívidas manuais (consignados já estão no líquido)
   const totalParcelasManuais = dividasManuais.reduce((s, d) => s + (d.valorParcela ?? 0), 0);
   const totalFaturas = cartoes.reduce((s, c) => s + (c.faturaAtual ?? 0), 0);
+  const totalCartoesForaFolha = dividasManuais
+    .filter((d) => d.tipo === "CARTAO")
+    .reduce((s, d) => s + (d.valorParcela ?? 0), 0) + totalFaturas;
 
   const comprometidoMes = totalParcelasManuais + totalFaturas;
   const comprometimento = renda > 0 ? (comprometidoMes / renda) * 100 : 0;
@@ -466,7 +470,7 @@ export function gerarRelatorio(diag: DiagnosticoIA): string {
     sugestoes.push(`💡 Desconto para quitar à vista disponível em ${dividasComDesconto.map((d) => d.credor).join(" e ")}. Se tiver como, aproveite — é economia garantida.`);
   }
 
-  if (comprometimento > 50) {
+  if (comprometimento > 50 && !isServidor) {
  const liquidoMesServidor = diag.renda?.salarioLiquidoComExtras ?? renda;
 const verbaExtraServidor = diag.renda?.adiantamento13 ?? 0;
 
@@ -659,7 +663,9 @@ ${[
     fmtLinhaFolha(
       d.credor,
       d.valorParcela,
-      d.parcelasRestantes > 0 && d.parcelasRestantes < 900
+      d.parcelaAtual && d.totalParcelas
+        ? `${d.parcelaAtual}/${d.totalParcelas}`
+        : d.parcelasRestantes > 0 && d.parcelasRestantes < 900
         ? `${d.parcelasRestantes}x restantes`
         : "parcelado"
     )
@@ -669,9 +675,19 @@ ${[
   ),
 ].join("\n")}
 ────────────────────────────────────────────
+${"Emprestimos em folha".padEnd(32)} R$ ${fmt(totalEmprestimosConsigMes).padStart(10)}
+${"Associacoes".padEnd(32)} R$ ${fmt(totalAssociacoesMes).padStart(10)}
 ${"Total em folha".padEnd(32)} R$ ${fmt(totalConsignadosMes).padStart(10)}
 \`\`\``
-    : "";  return `
+    : "";
+
+  const listaCartoesForaFolha = isServidor && totalCartoesForaFolha > 0
+    ? `
+
+Cartoes fora da folha: *R$ ${fmt(totalCartoesForaFolha)}*`
+    : "";
+
+  return `
 ━━━━━━━━━━━━━━━━━━━━
 💰 *RESUMO FINANCEIRO*
 ━━━━━━━━━━━━━━━━━━━━
@@ -691,6 +707,7 @@ Parcelas/mês: *R$ ${fmt(comprometidoMes)}*
 Comprometimento: *${pct(comprometidoMes, renda)}* ${nivelRisco}
 ${sobra >= 0 ? `Sobra mensal: *R$ ${fmt(sobra)}*` : `⚠️ Déficit: *R$ ${fmt(Math.abs(sobra))}* (renda insuficiente)`}`}
 ${listaConsignadosFolha}
+${listaCartoesForaFolha}
 ${(diag.despesasFixas ?? []).length > 0 ? `
 ━━━━━━━━━━━━━━━━━━━━
 🏠 *DESPESAS FIXAS*

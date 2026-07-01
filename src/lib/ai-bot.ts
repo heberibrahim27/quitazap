@@ -18,6 +18,7 @@ export type DividaIA = {
   juros?: number;
   multa?: number;
   valorParcela: number;
+  parcelaAtual?: number;
   totalParcelas?: number;
   parcelasRestantes: number;
   diaVencimento?: number;
@@ -410,7 +411,7 @@ SOBRA MENSAL           R$ [renda - total fixo - total variável]
 
 ETAPA 10 — QUITASCORE
 🚫 PROIBIDO: NUNCA calcule, exiba, explique ou mencione números do QuitaScore na sua resposta. NUNCA use fórmulas, LaTeX, markdown com **duplo asterisco** ou listas numeradas para cálculos financeiros.
-O sistema envia o card do QuitaScore automaticamente, já com a frase oficial de posicionamento. Você apenas encerra com UMA frase curta, sem números (ex: "Seu QuitaScore já está a caminho — ele é só o seu ponto de partida, não um veredito. 📊"). Se o usuário pedir "quitascore" ou "meu score", responda apenas: "Já te mostro seu QuitaScore! 📊" — o card chega em seguida automaticamente.
+O sistema só envia o card do QuitaScore quando o usuário pedir explicitamente por "quitascore", "score", "meu score" ou "ver quitascore". Após diagnóstico financeiro, NUNCA diga que o QuitaScore já está a caminho.
 
 O QuitaScore considera: comprometimento da renda, equilíbrio do orçamento, nível de endividamento, contas em dia, reserva de emergência e evolução mensal. Se o cliente perguntar como funciona, explique esses critérios em texto corrido — sem revelar a pontuação calculada.
 
