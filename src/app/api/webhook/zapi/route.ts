@@ -10,6 +10,7 @@ import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone } from "@/lib/zapi"
 import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
+import { processarFluxoGasto } from "@/lib/gasto-flow";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
   gerarRelatorio,
@@ -886,6 +887,24 @@ Pode mandar tudo em uma mensagem só.`;
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },
             { role: "assistant", content: respostaFolhaServidor },
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const gastoRapido = processarFluxoGasto(mensagem);
+    if (gastoRapido) {
+      await sendWhatsApp(telefone, gastoRapido.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: gastoRapido.resposta },
           ]),
         },
       });

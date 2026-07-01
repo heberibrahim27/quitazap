@@ -49,6 +49,7 @@ const {
   deveConfirmarDadosFolhaServidor,
   gerarRespostaDadosFolhaServidor,
 } = loadTsModule("src/lib/servidor-publico-flow.ts");
+const { processarFluxoGasto } = loadTsModule("src/lib/gasto-flow.ts");
 
 const mensagemManual = `
 Salario liquido normal: 3812,68
@@ -353,4 +354,35 @@ test("resposta intermediaria do servidor publico nao expoe campos tecnicos", () 
   assert.match(RESPOSTA_DADOS_FOLHA_SERVIDOR, /depende financeiramente de você/i);
   assert.match(RESPOSTA_DADOS_FOLHA_SERVIDOR, /1️⃣ Sim/);
   assert.match(RESPOSTA_DADOS_FOLHA_SERVIDOR, /2️⃣ Não/);
+});
+test("fluxo deterministico de gasto registra valor, data e categoria sem IA", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+  const resposta = processarFluxoGasto("gastei 45,90 no mercado", hoje)?.resposta;
+
+  assert.ok(resposta);
+  assert.equal(
+    resposta,
+    "✅ *OK! Registrado.*\n\n" +
+      "✍️ *Descrição:* Mercado\n" +
+      "💰 *Valor:* R$ 45,90\n" +
+      "🏷️ *Categoria:* Mercado\n" +
+      "📅 *Data:* 01/07/2026\n\n" +
+      "Pode mandar mais que eu vou organizando tudo pra você. 👌"
+  );
+
+  assert.match(resposta, /Pode mandar mais que eu vou organizando tudo pra você\. 👌/);
+  assert.doesNotMatch(resposta, /undefined|null|NaN|R\$ undefined|R\$ NaN/);
+});
+
+test("fluxo deterministico de gasto pede valor quando nao encontra numero", () => {
+  const resposta = processarFluxoGasto("gastei no mercado", new Date(2026, 6, 1))?.resposta;
+  assert.equal(resposta, "Qual foi o valor desse gasto?");
+});
+
+test("fluxo deterministico de gasto classifica categorias por palavra-chave", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+
+  assert.equal(processarFluxoGasto("chatgpt 110", hoje)?.categoria, "Assinaturas");
+  assert.equal(processarFluxoGasto("paguei 60 de energia hoje", hoje)?.categoria, "Contas da casa");
+  assert.equal(processarFluxoGasto("uber 23,50", hoje)?.categoria, "Transporte");
 });
