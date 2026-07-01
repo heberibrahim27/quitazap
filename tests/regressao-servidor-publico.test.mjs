@@ -51,7 +51,11 @@ const {
 } = loadTsModule("src/lib/servidor-publico-flow.ts");
 const { processarFluxoGasto } = loadTsModule("src/lib/gasto-flow.ts");
 const {
+  extrairRendaControle,
   mensagemBoasVindasControle,
+  mensagemExplicarDespesasFixasControle,
+  mensagemPedidoDespesasFixasControle,
+  mensagemRendaRegistradaControle,
   mensagensResetControle,
 } = loadTsModule("src/lib/onboarding-controle.ts");
 
@@ -402,6 +406,8 @@ test("reset usa onboarding do QuitaZAP Controle em duas mensagens", () => {
   assert.match(mensagem2, /QuitaZAP Controle/);
   assert.match(mensagem2, /Para começar, me diga quanto entra por mês\./);
   assert.match(mensagem2, /minha renda é 3800/);
+  assert.doesNotMatch(mensagem2, /```text/);
+  assert.doesNotMatch(mensagem2, /^text$/im);
 
   const texto = `${mensagem1}\n${mensagem2}`;
   assert.doesNotMatch(texto, /Como você trabalha hoje\?/i);
@@ -414,6 +420,38 @@ test("boas-vindas de ativacao nao usa onboarding antigo por perfil profissional"
   assert.match(mensagem, /Seu acesso ao \*QuitaZAP Controle\* foi ativado/);
   assert.match(mensagem, /Sua assinatura do \*Plano Mensal\* está confirmada ✅/);
   assert.match(mensagem, /renda, despesas, gastos, cartões, dívidas, vencimentos e limites por categoria/);
+  assert.doesNotMatch(mensagem, /```text/);
+  assert.doesNotMatch(mensagem, /^text$/im);
   assert.doesNotMatch(mensagem, /Como você trabalha hoje\?/i);
   assert.doesNotMatch(mensagem, /CLT|Autônomo|MEI|Empresário|Outro/);
+});
+
+test("onboarding registra renda em tres mensagens limpas para WhatsApp", () => {
+  const renda = extrairRendaControle("4000", true);
+  const respostaRenda = mensagemRendaRegistradaControle(renda);
+  const perguntaDespesas = mensagemPedidoDespesasFixasControle();
+  const explicacaoDespesas = mensagemExplicarDespesasFixasControle();
+
+  assert.equal(renda, 4000);
+  assert.equal(
+    respostaRenda,
+    "✅ *Renda registrada.*\n\n" +
+      "```\n" +
+      "Renda mensal\n" +
+      "R$ 4.000,00\n" +
+      "```"
+  );
+
+  assert.equal(perguntaDespesas, "Agora me diga suas despesas fixas.");
+  assert.notEqual(respostaRenda, perguntaDespesas);
+  assert.notEqual(perguntaDespesas, explicacaoDespesas);
+  assert.match(explicacaoDespesas, /^📌 \*Despesas fixas\*/);
+  for (const item of ["Aluguel", "Energia", "Internet", "Empréstimo", "Consignado", "Parcelamento"]) {
+    assert.match(explicacaoDespesas, new RegExp(item));
+  }
+  assert.match(explicacaoDespesas, /Pode mandar assim:/);
+  assert.doesNotMatch(
+    `${respostaRenda}\n${perguntaDespesas}\n${explicacaoDespesas}`,
+    /```(?:text|txt|markdown|ts|js)|^text$|\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/im
+  );
 });

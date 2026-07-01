@@ -223,16 +223,34 @@ R$ [valor informado]
 \`\`\`"
 
 Mensagem 2:
-"Agora me diga suas despesas fixas.
+"Agora me diga suas despesas fixas."
 
-📌 *Despesas fixas* são gastos que você paga todo mês ou quase todo mês.
+Mensagem 3:
+"📌 *Despesas fixas*
+
+São gastos que você paga todo mês ou quase todo mês.
+
+\`\`\`
+Aluguel
+Energia
+Água
+Internet
+Escola
+Pensão
+Assinaturas
+Academia
+Financiamento
+Empréstimo
+Consignado
+Parcelamento
+\`\`\`
 
 Pode mandar assim:
+
 \`\`\`
 Energia 120
 Internet 90
 Pensão 900
-Academia 80
 Empréstimo Banco do Brasil 300 12/120
 Financiamento moto 450 8/36
 \`\`\`"

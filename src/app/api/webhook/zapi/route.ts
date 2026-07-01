@@ -11,7 +11,13 @@ import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot"
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { processarFluxoGasto } from "@/lib/gasto-flow";
-import { mensagensResetControle } from "@/lib/onboarding-controle";
+import {
+  extrairRendaControle,
+  mensagemExplicarDespesasFixasControle,
+  mensagemPedidoDespesasFixasControle,
+  mensagemRendaRegistradaControle,
+  mensagensResetControle,
+} from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
   gerarRelatorio,
@@ -915,6 +921,40 @@ Pode mandar tudo em uma mensagem só.`;
           ]),
         },
       });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const aguardandoRendaControle =
+      servidorHistoricoSessao.some(
+        (h) =>
+          h.role === "assistant" &&
+          (h.content ?? "").includes("Para começar, me diga quanto entra por mês.")
+      ) && !servidorHistoricoSessao.some((h) => h.role === "user");
+
+    const rendaControle = extrairRendaControle(mensagem, aguardandoRendaControle);
+    if (rendaControle) {
+      const respostaRenda = mensagemRendaRegistradaControle(rendaControle);
+      const perguntaDespesas = mensagemPedidoDespesasFixasControle();
+      const explicacaoDespesas = mensagemExplicarDespesasFixasControle();
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          renda: rendaControle,
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaRenda },
+            { role: "assistant", content: perguntaDespesas },
+            { role: "assistant", content: explicacaoDespesas },
+          ]),
+        },
+      });
+
+      await sendWhatsApp(telefone, respostaRenda);
+      await sendWhatsApp(telefone, perguntaDespesas);
+      await sendWhatsApp(telefone, explicacaoDespesas);
 
       return NextResponse.json({ ok: true });
     }
