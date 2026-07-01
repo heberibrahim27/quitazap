@@ -67,6 +67,7 @@ const {
 const {
   atualizarDespesasFixasControle,
   calcularSaldoDisponivelControle,
+  corrigirOrigemUltimoGastoControle,
   registrarGastoControle,
   totalFaturasAbertasControle,
 } = loadTsModule("src/lib/controle-financeiro-flow.ts");
@@ -659,4 +660,72 @@ test("gasto com cartao soma fatura aberta sem abater saldo", () => {
   assert.match(segundo.resposta, /💳 \*Origem:\* Cartão Nubank/);
   assert.match(segundo.resposta, /💳 \*Fatura Nubank:\* R\$ 88,50/);
   assert.doesNotMatch(`${primeiro.resposta}\n${segundo.resposta}`, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("correcao posterior move ultimo gasto do saldo para fatura do cartao", () => {
+  const estadoInicial = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+  const gasto = registrarGastoControle(
+    "gastei 65 de cerveja no bar",
+    estadoInicial,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(gasto);
+  assert.equal(calcularSaldoDisponivelControle(gasto.estado), 1895);
+
+  const correcao = corrigirOrigemUltimoGastoControle("foi no Nubank", gasto.estado);
+  assert.ok(correcao);
+  assert.equal(calcularSaldoDisponivelControle(correcao.estado), 1960);
+  assert.deepEqual(correcao.estado.faturas, [{ cartao: "Nubank", valor: 65 }]);
+  assert.match(correcao.resposta, /✅ \*Origem atualizada\.\*/);
+  assert.match(correcao.resposta, /✍️ \*Descrição:\* Cerveja Bar/);
+  assert.match(correcao.resposta, /💳 \*Origem anterior:\* Saldo do mês/);
+  assert.match(correcao.resposta, /💳 \*Nova origem:\* Cartão Nubank/);
+  assert.match(correcao.resposta, /💰 \*Saldo disponível:\* R\$ 1\.960,00/);
+  assert.match(correcao.resposta, /💳 \*Fatura Nubank:\* R\$ 65,00/);
+  assert.doesNotMatch(correcao.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("correcao posterior move ultimo gasto de um cartao para outro", () => {
+  const estadoInicial = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+  const gasto = registrarGastoControle(
+    "gastei 65 de cerveja no Nubank",
+    estadoInicial,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(gasto);
+  assert.deepEqual(gasto.estado.faturas, [{ cartao: "Nubank", valor: 65 }]);
+
+  const correcao = corrigirOrigemUltimoGastoControle("foi no Mercado Pago", gasto.estado);
+  assert.ok(correcao);
+  assert.equal(calcularSaldoDisponivelControle(correcao.estado), 1960);
+  assert.deepEqual(correcao.estado.faturas, [{ cartao: "Mercado Pago", valor: 65 }]);
+  assert.match(correcao.resposta, /💳 \*Origem anterior:\* Cartão Nubank/);
+  assert.match(correcao.resposta, /💳 \*Nova origem:\* Cartão Mercado Pago/);
+  assert.match(correcao.resposta, /💳 \*Fatura Mercado Pago:\* R\$ 65,00/);
+  assert.match(correcao.resposta, /💳 \*Fatura Nubank:\* R\$ 0,00/);
+  assert.doesNotMatch(correcao.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("correcao posterior sem gasto recente orienta reenviar gasto", () => {
+  const estadoInicial = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+
+  const correcao = corrigirOrigemUltimoGastoControle("foi no Nubank", estadoInicial);
+  assert.ok(correcao);
+  assert.equal(correcao.atualizouEstado, false);
+  assert.equal(calcularSaldoDisponivelControle(correcao.estado), 1960);
+  assert.match(correcao.resposta, /Não encontrei um gasto recente para atualizar\./);
+  assert.match(correcao.resposta, /gastei 65 de cerveja no Nubank/);
+  assert.doesNotMatch(correcao.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
