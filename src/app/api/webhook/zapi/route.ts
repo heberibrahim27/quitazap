@@ -8,9 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
+import {
+  atualizarDespesasFixasControle,
+  carregarEstadoControle,
+  criarMensagemEstadoControle,
+  registrarGastoControle,
+} from "@/lib/controle-financeiro-flow";
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
-import { processarFluxoGasto } from "@/lib/gasto-flow";
 import {
   deveAguardarDespesasFixasControle,
   ETAPA_AGUARDANDO_DESPESAS_FIXAS,
@@ -943,6 +948,12 @@ Pode mandar tudo em uma mensagem só.`;
         respostaResumoDespesas,
         respostaProximaEtapa,
       ] = formatarMensagensDespesasFixasControle(despesasFixas, sessao.renda);
+      const totalDespesasFixas = despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0);
+      const estadoControle = atualizarDespesasFixasControle(
+        carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda),
+        totalDespesasFixas,
+        sessao.renda
+      );
 
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
@@ -954,6 +965,7 @@ Pode mandar tudo em uma mensagem só.`;
             { role: "assistant", content: respostaDespesasFixas },
             { role: "assistant", content: respostaResumoDespesas },
             { role: "assistant", content: respostaProximaEtapa },
+            criarMensagemEstadoControle(estadoControle),
           ]),
         },
       });
@@ -965,7 +977,8 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const gastoRapido = processarFluxoGasto(mensagem);
+    const estadoAntesGasto = carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda);
+    const gastoRapido = registrarGastoControle(mensagem, estadoAntesGasto);
     if (gastoRapido) {
       await sendWhatsApp(telefone, gastoRapido.resposta);
 
@@ -976,6 +989,7 @@ Pode mandar tudo em uma mensagem só.`;
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },
             { role: "assistant", content: gastoRapido.resposta },
+            ...(gastoRapido.atualizouEstado ? [criarMensagemEstadoControle(gastoRapido.estado)] : []),
           ]),
         },
       });

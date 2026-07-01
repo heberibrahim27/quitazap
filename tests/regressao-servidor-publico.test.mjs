@@ -64,6 +64,12 @@ const {
   mensagensResetControle,
   parsearDespesasFixasControle,
 } = loadTsModule("src/lib/onboarding-controle.ts");
+const {
+  atualizarDespesasFixasControle,
+  calcularSaldoDisponivelControle,
+  registrarGastoControle,
+  totalFaturasAbertasControle,
+} = loadTsModule("src/lib/controle-financeiro-flow.ts");
 
 const mensagemManual = `
 Salario liquido normal: 3812,68
@@ -579,4 +585,78 @@ test("apos registrar despesas fixas estado libera gasto variavel", () => {
   const gasto = processarFluxoGasto("gastei 45 no mercado", new Date(2026, 6, 1));
   assert.equal(gasto?.categoria, "Mercado");
   assert.match(gasto?.resposta ?? "", /✅ \*OK! Registrado\.\*/);
+});
+
+test("controle financeiro calcula saldo inicial apos renda e despesas fixas", () => {
+  const estado = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+
+  assert.equal(calcularSaldoDisponivelControle(estado), 1960);
+  assert.equal(totalFaturasAbertasControle(estado), 0);
+});
+
+test("gasto sem cartao sai do saldo do mes e nao entra em fatura", () => {
+  const estadoInicial = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+
+  const resultado = registrarGastoControle(
+    "gastei 65 de cerveja no bar",
+    estadoInicial,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+
+  assert.ok(resultado);
+  assert.equal(calcularSaldoDisponivelControle(resultado.estado), 1895);
+  assert.equal(totalFaturasAbertasControle(resultado.estado), 0);
+  assert.match(resultado.resposta, /✍️ \*Descrição:\* Cerveja Bar/);
+  assert.match(resultado.resposta, /🏷️ \*Categoria:\* Lazer/);
+  assert.match(resultado.resposta, /💳 \*Origem:\* Saldo do mês/);
+  assert.match(resultado.resposta, /💰 \*Saldo disponível:\* R\$ 1\.895,00/);
+  assert.match(resultado.resposta, /💳 \*Faturas em aberto:\* R\$ 0,00/);
+  assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("gasto com cartao soma fatura aberta sem abater saldo", () => {
+  const estadoInicial = atualizarDespesasFixasControle(
+    { rendaMensal: 4000, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [] },
+    2040,
+    4000
+  );
+
+  const primeiro = registrarGastoControle(
+    "gastei 65 de cerveja no Nubank",
+    estadoInicial,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+
+  assert.ok(primeiro);
+  assert.equal(calcularSaldoDisponivelControle(primeiro.estado), 1960);
+  assert.equal(totalFaturasAbertasControle(primeiro.estado), 65);
+  assert.deepEqual(primeiro.estado.faturas, [{ cartao: "Nubank", valor: 65 }]);
+  assert.match(primeiro.resposta, /✍️ \*Descrição:\* Cerveja Bar/);
+  assert.match(primeiro.resposta, /🏷️ \*Categoria:\* Lazer/);
+  assert.match(primeiro.resposta, /💳 \*Origem:\* Cartão Nubank/);
+  assert.match(primeiro.resposta, /💰 \*Saldo disponível:\* R\$ 1\.960,00/);
+  assert.match(primeiro.resposta, /💳 \*Fatura Nubank:\* R\$ 65,00/);
+  assert.match(primeiro.resposta, /Esse valor será considerado na fatura do cartão\. 👌/);
+
+  const segundo = registrarGastoControle(
+    "uber 23,50 no Nubank",
+    primeiro.estado,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+
+  assert.ok(segundo);
+  assert.equal(calcularSaldoDisponivelControle(segundo.estado), 1960);
+  assert.equal(totalFaturasAbertasControle(segundo.estado), 88.5);
+  assert.deepEqual(segundo.estado.faturas, [{ cartao: "Nubank", valor: 88.5 }]);
+  assert.match(segundo.resposta, /💳 \*Origem:\* Cartão Nubank/);
+  assert.match(segundo.resposta, /💳 \*Fatura Nubank:\* R\$ 88,50/);
+  assert.doesNotMatch(`${primeiro.resposta}\n${segundo.resposta}`, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });

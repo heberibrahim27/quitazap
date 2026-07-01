@@ -35,7 +35,7 @@ const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
   { categoria: "Educação", palavras: ["escola", "curso", "faculdade", "material escolar"] },
   { categoria: "Filhos/Família", palavras: ["filho", "filha", "fralda", "leite", "pensao", "brinquedo"] },
   { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "claude", "assinatura", "prime"] },
-  { categoria: "Lazer", palavras: ["cinema", "festa", "bar", "viagem", "lazer"] },
+  { categoria: "Lazer", palavras: ["cerveja", "cinema", "festa", "bar", "viagem", "lazer"] },
   { categoria: "Beleza/Cuidados", palavras: ["cabelo", "unha", "perfume", "skincare", "academia", "barbearia"] },
   { categoria: "Trabalho/Negócio", palavras: ["fornecedor", "ferramenta", "anuncio", "trafego", "sistema", "negocio"] },
   { categoria: "Dívidas/Cartões", palavras: ["cartao", "nubank", "fatura", "emprestimo", "parcela"] },
