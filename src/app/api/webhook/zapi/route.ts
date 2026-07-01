@@ -301,6 +301,42 @@ async function extrairPDF(pdfUrl: string): Promise<PDFResult> {
 }
 
 Regras para o JSON:
+
+REGRAS DE SALÁRIO, LÍQUIDO E VERBA EXTRA:
+
+- salarioLiquidoTotal = valor líquido final impresso no contracheque. É o valor que caiu ou cairá na conta naquele mês.
+
+- salarioBruto = total de vantagens, vencimentos ou proventos antes dos descontos.
+
+- extraOrdinario = soma dos valores nas VANTAGENS que sejam verba não recorrente, como:
+  13º salário
+  adiantamento de 13º
+  décimo terceiro
+  férias
+  abono
+  diferença eventual
+  parcela única
+  verba extraordinária
+
+- REGRA CRÍTICA DO 13º:
+  Se existir uma linha nas VANTAGENS com "13", "13º", "13°", "décimo terceiro", "decimo terceiro", "adiantamento 13", "1ª parcela 13" ou texto equivalente, use o valor integral dessa linha como extraOrdinario.
+
+- Nunca calcule extraOrdinario por diferença entre bruto, descontos, margem ou líquido.
+
+- O extraOrdinario deve vir diretamente da linha de VANTAGEM extraordinária.
+
+- salarioLiquidoNormal = salarioLiquidoTotal - extraOrdinario.
+
+- Se não houver 13º, férias, abono ou verba extraordinária, então extraOrdinario = 0 e salarioLiquidoNormal = salarioLiquidoTotal.
+
+- Nunca coloque salarioLiquidoNormal igual ao salarioLiquidoTotal quando houver 13º, férias, abono ou verba extraordinária.
+
+- O salarioLiquidoTotal representa o dinheiro disponível somente neste mês.
+
+- O salarioLiquidoNormal representa a base recorrente dos próximos meses.
+
+REGRAS DE EMPRÉSTIMOS E ASSOCIAÇÕES:
+
 - emprestimos: percorra TODAS as linhas de DESCONTOS do contracheque. Sempre que encontrar um padrão de parcela NNN/NNN e o total de parcelas for menor que 900, inclua essa linha em emprestimos.
 
 - O formato NNN/NNN significa:
@@ -341,7 +377,19 @@ Regras para o JSON:
   Exemplo genérico: "Benefício Assistencial - ASSOCIAÇÃO X 010/036 120,00" → banco = "ASSOCIAÇÃO X - Benefício Assistencial"
   Exemplo genérico: "Mensalidade Valor - ASSOCIAÇÃO X 015/999 80,00" → nome = "ASSOCIAÇÃO X"
 
-- NÃO incluir IR, previdência, INSS, SPSM, IPREV, Planserv, assistência médica, auxílio transporte, auxílio alimentação ou saúde nos arrays emprestimos ou associacoes, a menos que exista claramente padrão parcelado NNN/NNN com prazo finito e seja um desconto parcelado.
+- NÃO incluir IR, imposto de renda, previdência, INSS, SPSM, IPREV, Planserv, assistência médica, plano de saúde, auxílio transporte ou auxílio alimentação nos arrays emprestimos ou associacoes.
+
+- Só inclua uma linha nesses arrays se ela for claramente:
+  1. desconto parcelado com NNN/NNN e totalParcelas menor que 900; ou
+  2. mensalidade/associação recorrente com NNN/999 ou NNN/000.
+
+VALIDAÇÃO FINAL ANTES DE RESPONDER:
+
+- Confira se salarioLiquidoNormal + extraOrdinario = salarioLiquidoTotal.
+- Se houver verba extra e essa conta não fechar, revise os valores antes de responder.
+- Confira se todas as linhas de desconto com NNN/NNN e totalParcelas menor que 900 foram incluídas em emprestimos.
+- Confira se todas as linhas com NNN/999 ou NNN/000 foram incluídas em associacoes.
+- Responda somente com JSON válido.
 
 Se NÃO for contracheque (for boleto, fatura, extrato, etc), responda com:
 { "tipo": "OUTRO", "texto": "descrição do documento em português" }`,
