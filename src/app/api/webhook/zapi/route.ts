@@ -335,7 +335,8 @@ function detectarComando(msg: string): string | null {
   const m = msg
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+    .replace(/[\u0300-\u036f]/g, "");
+
   if (/resumo|saldo do mes|resumo do mes|resumo simples|como (ta|esta|tá|está) (meu )?mes|situacao do mes/.test(m)) return "RESUMO_MES";
   if (/despesas? do mes|quanto devo por mes|minhas despesas|o que (tenho|preciso) pagar|minhas contas/.test(m)) return "DESPESAS_MES";
   if (/quanto preciso (ganhar|faturar)|receita da semana|preciso ganhar|quanto tenho que ganhar|meta (da|semanal)/.test(m)) return "RECEITA_SEMANA";
@@ -346,6 +347,13 @@ function detectarComando(msg: string): string | null {
   if (/minhas cobran[cç]as|ver cobran[cç]as|lista de cobran[cç]as|quem me deve|quem nao (pagou|pago)|devedores/.test(m)) return "VER_COBRANCAS";
   if (/meu painel|meu dashboard|abrir painel|painel cobrador|link (do )?painel|meu link/.test(m)) return "MEU_PAINEL";
   if (/paguei|ja paguei|ja quitei|quitei|paga a|paguei a|terminei de pagar|efetuei o pagamento|liquidei|quitando/.test(m)) return "PAGUEI";
+
+  // Diagnóstico / relatório financeiro
+  // Tem que ficar ANTES do QUITASCORE para não confundir diagnóstico com score.
+  if (
+    /diagnostico|meu diagnostico|gerar diagnostico|diagnostico financeiro|relatorio|meu relatorio|relatorio financeiro|meu plano financeiro|plano financeiro|enviar diagnostico|manda meu diagnostico|cad[eê] meu diagnostico/.test(m)
+  ) return "DIAGNOSTICO";
+
   if (/quita.?score|meu score|ver (meu )?score|score financeiro|saude financeira|minha saude financeira|meu (indice|index|pontu|nota financ)|como (estou|ta|está) (financ|meu score|meu quita)|pontuacao financ/.test(m)) return "QUITASCORE";
   return null;
 }
@@ -878,24 +886,72 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+       // ── Comando DIAGNOSTICO ───────────────────────────────────────────────
+    if (detectarComando(mensagem) === "DIAGNOSTICO") {
+      if (!sessao.clienteId) {
+        await sendWhatsApp(
+          telefone,
+          "Ainda não encontrei seu cadastro ativo. Me chame depois da ativação do acesso para eu gerar seu diagnóstico. ✅"
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const ultimoPlano = await prisma.planoEnviado.findFirst({
+        where: { clienteId: sessao.clienteId },
+        orderBy: { id: "desc" },
+      });
+
+      if (!ultimoPlano?.texto) {
+        await sendWhatsApp(
+          telefone,
+          "Ainda não tenho um diagnóstico salvo para você. Vamos completar sua renda, despesas e dívidas para eu gerar seu diagnóstico financeiro. ✅"
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      if (ultimoPlano.texto.length > 3800) {
+        const partes = dividirMensagem(ultimoPlano.texto, 3800);
+        for (const parte of partes) {
+          await sendWhatsApp(telefone, parte);
+          await new Promise((r) => setTimeout(r, 800));
+        }
+      } else {
+        await sendWhatsApp(telefone, ultimoPlano.texto);
+      }
+
+      return NextResponse.json({ ok: true });
+    }
+
     // ── Comando QUITASCORE ──────────────────────────────────────────────────
     if (detectarComando(mensagem) === "QUITASCORE") {
       if (!sessao.clienteId || !sessao.renda) {
-        await sendWhatsApp(telefone,
+        await sendWhatsApp(
+          telefone,
           `Ainda não temos seu diagnóstico completo. Me conta sua situação financeira e eu gero seu QuitaScore! 😊`
         );
         return NextResponse.json({ ok: true });
       }
+
       const dividasDb = await prisma.divida.findMany({
         where: { clienteId: sessao.clienteId, status: "ATIVA" },
-        select: { credor: true, valorTotal: true, valorPago: true, tipo: true, emAtraso: true, diasAtraso: true, obs: true },
+        select: {
+          credor: true,
+          valorTotal: true,
+          valorPago: true,
+          tipo: true,
+          emAtraso: true,
+          diasAtraso: true,
+          obs: true,
+        },
       });
+
       const diagParcial: import("@/lib/ai-bot").DiagnosticoIA = {
         dadosPessoais: { nome: sessao.nome ?? "", vinculo: "", dependentes: 0 },
         renda: { salarioLiquido: sessao.renda, totalFamiliar: sessao.renda },
         dividas: dividasDb.map((d) => {
           const m = (d.obs ?? "").match(/R\$(\d+(?:[.,]\d+)?)/);
           const valorParcela = m ? parseFloat(m[1].replace(",", ".")) : d.valorTotal;
+
           return {
             credor: d.credor,
             tipo: normalizarTipoDividaIA(d.tipo),
@@ -916,6 +972,7 @@ export async function POST(req: NextRequest) {
         objetivos: { objetivoPrincipal: "" },
         alertas: {},
       };
+
       await sendWhatsApp(telefone, gerarQuitaScore(diagParcial));
       return NextResponse.json({ ok: true });
     }
