@@ -785,6 +785,29 @@ function estadoChatGptClaudeBase(valorChatGpt = 110) {
   );
 }
 
+const itensFraseCorridaDespesasFixas = [
+  { descricao: "Internet TIM", valor: 30 },
+  { descricao: "Livros", valor: 140 },
+  { descricao: "Transporte", valor: 180 },
+  { descricao: "Materiais de estudo", valor: 300 },
+];
+
+function estadoComConfirmacaoMultipla(despesasFixas = [], itens = itensFraseCorridaDespesasFixas) {
+  const total = despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0);
+  return {
+    rendaMensal: 7140.69,
+    totalDespesasFixas: total,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas,
+    confirmacaoPendente: {
+      tipo: "cadastrar_despesas_fixas",
+      itens,
+    },
+  };
+}
+
 function chaveTextoTeste(texto) {
   return texto
     .toLowerCase()
@@ -985,6 +1008,98 @@ test("confirmar frase corrida cadastra itens e negar nao altera despesas fixas",
 
   assert.equal(gerenciarDespesasFixasControle("1", estadoSemDespesasFixasBase()), null);
   assert.equal(gerenciarDespesasFixasControle("2", estadoSemDespesasFixasBase()), null);
+});
+
+test("confirmacao multipla em estado limpo processa todos os itens pendentes", () => {
+  const resultado = gerenciarDespesasFixasControle("1", estadoComConfirmacaoMultipla());
+
+  assert.ok(resultado);
+  assert.equal(resultado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(resultado.estado.despesasFixas, itensFraseCorridaDespesasFixas);
+  assert.equal(resultado.estado.totalDespesasFixas, 650);
+  assert.match(resultado.resposta, /Adicionadas/);
+  assert.match(resultado.resposta, /Internet TIM\nR\$ 30,00/);
+  assert.match(resultado.resposta, /Livros\nR\$ 140,00/);
+  assert.match(resultado.resposta, /Transporte\nR\$ 180,00/);
+  assert.match(resultado.resposta, /Materiais de estudo\nR\$ 300,00/);
+  assert.match(resultado.resposta, /Total adicionado\nR\$ 650,00/);
+  assert.match(resultado.resposta, /Despesas fixas\nR\$ 650,00/);
+});
+
+test("confirmacao multipla nao duplica quando todos os itens ja existem", () => {
+  const resultado = gerenciarDespesasFixasControle(
+    "1",
+    estadoComConfirmacaoMultipla(itensFraseCorridaDespesasFixas)
+  );
+
+  assert.ok(resultado);
+  assert.equal(resultado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(resultado.estado.despesasFixas, itensFraseCorridaDespesasFixas);
+  assert.equal(resultado.estado.totalDespesasFixas, 650);
+  assert.match(resultado.resposta, /ℹ️ \*Despesas fixas já cadastradas\.\*/);
+  assert.match(resultado.resposta, /Identifiquei que estes itens já estavam na sua lista:/);
+  assert.match(resultado.resposta, /Internet TIM\nR\$ 30,00/);
+  assert.match(resultado.resposta, /Livros\nR\$ 140,00/);
+  assert.match(resultado.resposta, /Transporte\nR\$ 180,00/);
+  assert.match(resultado.resposta, /Materiais de estudo\nR\$ 300,00/);
+  assert.match(resultado.resposta, /Não dupliquei esses lançamentos\./);
+  assert.match(resultado.resposta, /Despesas fixas\nR\$ 650,00/);
+});
+
+test("confirmacao multipla adiciona novos e informa duplicados ignorados", () => {
+  const resultado = gerenciarDespesasFixasControle(
+    "1",
+    estadoComConfirmacaoMultipla([{ descricao: "Internet TIM", valor: 30 }])
+  );
+
+  assert.ok(resultado);
+  assert.equal(resultado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(resultado.estado.despesasFixas, itensFraseCorridaDespesasFixas);
+  assert.equal(resultado.estado.totalDespesasFixas, 650);
+  assert.match(resultado.resposta, /Adicionadas/);
+  assert.match(resultado.resposta, /Livros\nR\$ 140,00/);
+  assert.match(resultado.resposta, /Transporte\nR\$ 180,00/);
+  assert.match(resultado.resposta, /Materiais de estudo\nR\$ 300,00/);
+  assert.match(resultado.resposta, /Total adicionado\nR\$ 620,00/);
+  assert.match(resultado.resposta, /Duplicadas ignoradas/);
+  assert.match(resultado.resposta, /Internet TIM\nR\$ 30,00/);
+  assert.match(resultado.resposta, /Despesas fixas\nR\$ 650,00/);
+});
+
+test("confirmacao multipla informa conflito sem alterar item existente", () => {
+  const resultado = gerenciarDespesasFixasControle(
+    "1",
+    estadoComConfirmacaoMultipla(
+      [{ descricao: "Internet TIM", valor: 30 }],
+      [
+        { descricao: "Internet TIM", valor: 40 },
+        { descricao: "Livros", valor: 140 },
+      ]
+    )
+  );
+
+  assert.ok(resultado);
+  assert.equal(resultado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(resultado.estado.despesasFixas, [
+    { descricao: "Internet TIM", valor: 30 },
+    { descricao: "Livros", valor: 140 },
+  ]);
+  assert.equal(resultado.estado.totalDespesasFixas, 170);
+  assert.match(resultado.resposta, /Livros\nR\$ 140,00/);
+  assert.match(resultado.resposta, /Total adicionado\nR\$ 140,00/);
+  assert.match(resultado.resposta, /Conflitos não alterados/);
+  assert.match(resultado.resposta, /Internet TIM\nValor cadastrado: R\$ 30,00\nValor informado: R\$ 40,00/);
+  assert.match(resultado.resposta, /Para alterar algum valor, envie uma correção específica\./);
+});
+
+test("confirmacao multipla negada limpa pendencia sem cadastrar", () => {
+  const resultado = gerenciarDespesasFixasControle("2", estadoComConfirmacaoMultipla());
+
+  assert.ok(resultado);
+  assert.equal(resultado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(resultado.estado.despesasFixas, []);
+  assert.equal(resultado.estado.totalDespesasFixas, 0);
+  assert.match(resultado.resposta, /não cadastrei nada/i);
 });
 
 test("gerenciamento nao duplica despesa fixa existente com mesmo valor", () => {

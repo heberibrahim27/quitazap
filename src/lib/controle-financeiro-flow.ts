@@ -468,6 +468,14 @@ function respostaReenviarDespesasFixasEmLista(): string {
   );
 }
 
+function linhasDespesasFixasSimples(itens: DespesaFixaRegistradaControle[]): string[] {
+  return itens.flatMap((item) => [
+    item.descricao,
+    formatarValorBR(item.valor),
+    "",
+  ]);
+}
+
 function valoresIguais(a: number, b: number): boolean {
   return Math.round(a * 100) === Math.round(b * 100);
 }
@@ -577,26 +585,79 @@ function processarConfirmacaoPendenteDespesaFixa(
     const resultadoAdicao = adicionarDespesasFixasSemDuplicar(despesasAtuais, pendente.itens);
     const despesasFixas = resultadoAdicao.lista;
     const totalAdicionado = resultadoAdicao.adicionados.reduce((soma, item) => soma + item.valor, 0);
+    const totalDespesasFixas = recalcularDespesasFixas(despesasFixas);
     const estado = {
       ...estadoAtual,
       despesasFixas,
-      totalDespesasFixas: recalcularDespesasFixas(despesasFixas),
+      totalDespesasFixas,
       confirmacaoPendente: undefined,
       faturas: estadoAtual.faturas ?? [],
       cartoes: estadoAtual.cartoes ?? [],
     };
-    const linhasItens = resultadoAdicao.adicionados.flatMap((item) => [
-      item.descricao,
-      formatarValorBR(item.valor),
-      "",
-    ]);
-    linhasItens.push("Total adicionado", formatarValorBR(totalAdicionado));
+    const linhasResposta: string[] = [];
+
+    if (
+      resultadoAdicao.adicionados.length === 0 &&
+      resultadoAdicao.conflitos.length === 0 &&
+      resultadoAdicao.duplicados.length > 0
+    ) {
+      linhasResposta.push(
+        "ℹ️ *Despesas fixas já cadastradas.*",
+        "",
+        "Identifiquei que estes itens já estavam na sua lista:",
+        "",
+        ...linhasDespesasFixasSimples(resultadoAdicao.duplicados),
+        "Não dupliquei esses lançamentos.",
+        "",
+        resumoDespesasFixasAtualizado(estado)
+      );
+    } else {
+      linhasResposta.push(
+        resultadoAdicao.adicionados.length > 0
+          ? "✅ *Despesas fixas adicionadas.*"
+          : "ℹ️ *Nenhuma despesa fixa nova adicionada.*",
+        ""
+      );
+
+      if (resultadoAdicao.adicionados.length > 0) {
+        linhasResposta.push(
+          "Adicionadas",
+          "",
+          ...linhasDespesasFixasSimples(resultadoAdicao.adicionados),
+          "Total adicionado",
+          formatarValorBR(totalAdicionado),
+          ""
+        );
+      }
+
+      if (resultadoAdicao.duplicados.length > 0) {
+        linhasResposta.push(
+          "Duplicadas ignoradas",
+          "",
+          ...linhasDespesasFixasSimples(resultadoAdicao.duplicados),
+          "Não dupliquei esses lançamentos.",
+          ""
+        );
+      }
+
+      if (resultadoAdicao.conflitos.length > 0) {
+        linhasResposta.push("Conflitos não alterados", "");
+        for (const conflito of resultadoAdicao.conflitos) {
+          linhasResposta.push(
+            conflito.atual.descricao,
+            `Valor cadastrado: ${formatarValorBR(conflito.atual.valor)}`,
+            `Valor informado: ${formatarValorBR(conflito.novo.valor)}`,
+            ""
+          );
+        }
+        linhasResposta.push("Para alterar algum valor, envie uma correção específica.", "");
+      }
+
+      linhasResposta.push(resumoDespesasFixasAtualizado(estado));
+    }
 
     return {
-      resposta:
-        "✅ *Despesas fixas adicionadas.*\n\n" +
-        `${linhasItens.join("\n").trim()}\n\n` +
-        resumoDespesasFixasAtualizado(estado),
+      resposta: linhasResposta.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
       estado,
       atualizouEstado: true,
       etapa: "AGUARDANDO_GASTOS",
