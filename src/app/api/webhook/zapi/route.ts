@@ -15,6 +15,7 @@ import {
   corrigirRendaControle,
   corrigirOrigemUltimoGastoControle,
   criarMensagemEstadoControle,
+  gerenciarDespesasFixasControle,
   registrarGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
@@ -942,6 +943,64 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
+    const gerenciamentoDespesasFixas = gerenciarDespesasFixasControle(mensagem, estadoAntesFluxosControle);
+    if (gerenciamentoDespesasFixas) {
+      await sendWhatsApp(telefone, gerenciamentoDespesasFixas.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: gerenciamentoDespesasFixas.resposta },
+            ...(gerenciamentoDespesasFixas.atualizouEstado ? [criarMensagemEstadoControle(gerenciamentoDespesasFixas.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const estadoAntesGasto = estadoAntesFluxosControle;
+    const correcaoOrigem = corrigirOrigemUltimoGastoControle(mensagem, estadoAntesGasto);
+    if (correcaoOrigem) {
+      await sendWhatsApp(telefone, correcaoOrigem.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: correcaoOrigem.resposta },
+            ...(correcaoOrigem.atualizouEstado ? [criarMensagemEstadoControle(correcaoOrigem.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const configuracaoCartao = configurarCartaoControle(mensagem, estadoAntesGasto);
+    if (configuracaoCartao) {
+      await sendWhatsApp(telefone, configuracaoCartao.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: configuracaoCartao.resposta },
+            ...(configuracaoCartao.atualizouEstado ? [criarMensagemEstadoControle(configuracaoCartao.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
     const aguardandoDespesasFixasControle = deveAguardarDespesasFixasControle(
       sessao.etapa,
       servidorHistoricoSessao
@@ -977,7 +1036,8 @@ Pode mandar tudo em uma mensagem só.`;
       const estadoControle = atualizarDespesasFixasControle(
         estadoAntesFluxosControle,
         totalDespesasFixas,
-        sessao.renda
+        sessao.renda,
+        despesasFixas
       );
 
       await prisma.botSessao.updateMany({
@@ -998,45 +1058,6 @@ Pode mandar tudo em uma mensagem só.`;
       await sendWhatsApp(telefone, respostaDespesasFixas);
       await sendWhatsApp(telefone, respostaResumoDespesas);
       await sendWhatsApp(telefone, respostaProximaEtapa);
-
-      return NextResponse.json({ ok: true });
-    }
-
-    const estadoAntesGasto = estadoAntesFluxosControle;
-    const configuracaoCartao = configurarCartaoControle(mensagem, estadoAntesGasto);
-    if (configuracaoCartao) {
-      await sendWhatsApp(telefone, configuracaoCartao.resposta);
-
-      await prisma.botSessao.updateMany({
-        where: { id: sessao.id },
-        data: {
-          dividasTemp: JSON.stringify([
-            ...servidorHistoricoSessao,
-            { role: "user", content: mensagem },
-            { role: "assistant", content: configuracaoCartao.resposta },
-            ...(configuracaoCartao.atualizouEstado ? [criarMensagemEstadoControle(configuracaoCartao.estado)] : []),
-          ]),
-        },
-      });
-
-      return NextResponse.json({ ok: true });
-    }
-
-    const correcaoOrigem = corrigirOrigemUltimoGastoControle(mensagem, estadoAntesGasto);
-    if (correcaoOrigem) {
-      await sendWhatsApp(telefone, correcaoOrigem.resposta);
-
-      await prisma.botSessao.updateMany({
-        where: { id: sessao.id },
-        data: {
-          dividasTemp: JSON.stringify([
-            ...servidorHistoricoSessao,
-            { role: "user", content: mensagem },
-            { role: "assistant", content: correcaoOrigem.resposta },
-            ...(correcaoOrigem.atualizouEstado ? [criarMensagemEstadoControle(correcaoOrigem.estado)] : []),
-          ]),
-        },
-      });
 
       return NextResponse.json({ ok: true });
     }

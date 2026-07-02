@@ -20,6 +20,11 @@ export type CartaoConfiguradoControle = {
   vencimento?: number;
 };
 
+export type DespesaFixaRegistradaControle = {
+  descricao: string;
+  valor: number;
+};
+
 export type UltimoGastoControle = {
   descricao: string;
   valor: number;
@@ -32,6 +37,7 @@ export type UltimoGastoControle = {
 export type EstadoControleFinanceiro = {
   rendaMensal: number;
   totalDespesasFixas: number;
+  despesasFixas: DespesaFixaRegistradaControle[];
   totalGastosSaldo: number;
   faturas: FaturaAbertaControle[];
   cartoes: CartaoConfiguradoControle[];
@@ -70,6 +76,7 @@ function estadoVazio(rendaMensal?: number | null): EstadoControleFinanceiro {
   return {
     rendaMensal: Number.isFinite(rendaMensal ?? NaN) ? Number(rendaMensal) : 0,
     totalDespesasFixas: 0,
+    despesasFixas: [],
     totalGastosSaldo: 0,
     faturas: [],
     cartoes: [],
@@ -106,6 +113,14 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
         })
         .filter((cartao) => cartao.nome)
     : [];
+  const despesasFixas = Array.isArray(raw.despesasFixas)
+    ? raw.despesasFixas
+        .map((despesa) => ({
+          descricao: typeof despesa?.descricao === "string" ? despesa.descricao : "",
+          valor: Number(despesa?.valor),
+        }))
+        .filter((despesa) => despesa.descricao && Number.isFinite(despesa.valor) && despesa.valor > 0)
+    : [];
 
   return {
     rendaMensal: Number.isFinite(raw.rendaMensal) && Number(raw.rendaMensal) > 0
@@ -113,7 +128,8 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       : base.rendaMensal,
     totalDespesasFixas: Number.isFinite(raw.totalDespesasFixas) && Number(raw.totalDespesasFixas) > 0
       ? Number(raw.totalDespesasFixas)
-      : 0,
+      : despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0),
+    despesasFixas,
     totalGastosSaldo: Number.isFinite(raw.totalGastosSaldo) && Number(raw.totalGastosSaldo) > 0
       ? Number(raw.totalGastosSaldo)
       : 0,
@@ -164,7 +180,8 @@ export function criarMensagemEstadoControle(estado: EstadoControleFinanceiro): M
 export function atualizarDespesasFixasControle(
   estado: EstadoControleFinanceiro,
   totalDespesasFixas: number,
-  rendaMensal?: number | null
+  rendaMensal?: number | null,
+  despesasFixas?: DespesaFixaRegistradaControle[]
 ): EstadoControleFinanceiro {
   return {
     ...estado,
@@ -174,6 +191,7 @@ export function atualizarDespesasFixasControle(
     totalDespesasFixas: Number.isFinite(totalDespesasFixas) && totalDespesasFixas > 0
       ? totalDespesasFixas
       : 0,
+    despesasFixas: despesasFixas ?? estado.despesasFixas ?? [],
   };
 }
 
@@ -183,6 +201,295 @@ export function calcularSaldoDisponivelControle(estado: EstadoControleFinanceiro
 
 export function totalFaturasAbertasControle(estado: EstadoControleFinanceiro): number {
   return (estado.faturas ?? []).reduce((soma, fatura) => soma + fatura.valor, 0);
+}
+
+function formatarDescricaoDespesaFixa(texto: string): string {
+  const marcas: Record<string, string> = {
+    chatgpt: "ChatGPT",
+    claude: "Claude",
+    internet: "Internet",
+    academia: "Academia",
+  };
+
+  return texto
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[-–—:;,.]+|[-–—:;,.]+$/g, "")
+    .replace(/^(de|do|da|dos|das)\s+/i, "")
+    .split(" ")
+    .filter(Boolean)
+    .map((parte, index) => {
+      const lower = parte.toLowerCase();
+      if (marcas[lower]) return marcas[lower];
+      if (index > 0 && ["de", "do", "da", "dos", "das"].includes(lower)) return lower;
+      return index === 0
+        ? parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase()
+        : lower;
+    })
+    .join(" ");
+}
+
+function chaveDespesaFixa(descricao: string): string {
+  return normalizarTexto(descricao);
+}
+
+function recalcularDespesasFixas(despesasFixas: DespesaFixaRegistradaControle[]): number {
+  return despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0);
+}
+
+function resumoDespesasFixasAtualizado(estado: EstadoControleFinanceiro): string {
+  return (
+    "📊 *Resumo atualizado*\n\n" +
+    "Renda mensal\n" +
+    `${formatarValorBR(estado.rendaMensal)}\n\n` +
+    "Despesas fixas\n" +
+    `${formatarValorBR(estado.totalDespesasFixas)}\n\n` +
+    "Saldo antes dos gastos do dia a dia\n" +
+    `${formatarValorBR(estado.rendaMensal - estado.totalDespesasFixas)}`
+  );
+}
+
+function detectarAcaoDespesaFixa(mensagem: string): "adicionar" | "corrigir" | "remover" | "listar" | null {
+  const texto = normalizarTexto(mensagem);
+  const mencionaDespesaFixa = /\bdespesas?\s+fixas?\b/.test(texto);
+  const mencionaRecorrencia =
+    /\btodo\s+mes\b/.test(texto) ||
+    /\bdespesa\s+mensal\b/.test(texto) ||
+    /\bmensalidade\b/.test(texto) ||
+    /\bassinatura\b/.test(texto) ||
+    /\bconta\s+mensal\b/.test(texto) ||
+    /\bpagamento\s+mensal\b/.test(texto) ||
+    /\bgasto\s+fixo\b/.test(texto) ||
+    /\bconta\s+fixa\b/.test(texto);
+
+  if (mencionaDespesaFixa && /\b(listar|mostrar|quais|ver)\b/.test(texto)) return "listar";
+  if (mencionaDespesaFixa && /\b(remover|apagar|excluir|tirar)\b/.test(texto)) return "remover";
+  if (
+    (mencionaDespesaFixa && /\b(corrigir|alterar|mudar|atualizar)\b/.test(texto)) ||
+    (/\b(corrigir|alterar|mudar|atualizar)\b/.test(texto) && /\bnas?\s+despesas?\s+fixas?\b/.test(texto))
+  ) {
+    return "corrigir";
+  }
+  if (
+    (mencionaDespesaFixa && /\b(adicionar|incluir|colocar|cadastrar)\b/.test(texto)) ||
+    /\bcolocar\b.+\bcomo\s+despesa\s+fixa\b/.test(texto) ||
+    /\badicionar\s+nas?\s+despesas?\s+fixas?\b/.test(texto) ||
+    mencionaRecorrencia
+  ) {
+    return "adicionar";
+  }
+
+  return null;
+}
+
+function limparTextoDespesaFixa(linha: string): string {
+  return linha
+    .replace(/\b(adicionar|incluir|colocar|cadastrar|corrigir|alterar|mudar|atualizar|remover|apagar|excluir|tirar)\b/gi, " ")
+    .replace(/\bcomo\s+despesa\s+fixa\b/gi, " ")
+    .replace(/\b(nas?|minhas?)?\s*despesas?\s+fixas?\b/gi, " ")
+    .replace(/\btodo\s+m[eê]s(?:\s+(?:pago|tenho))?\b/gi, " ")
+    .replace(/\b(despesa\s+mensal|mensalidade|assinatura|conta\s+mensal|pagamento\s+mensal|gasto\s+fixo|conta\s+fixa)\b/gi, " ")
+    .replace(/\bpara\b/gi, " ")
+    .replace(/:/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extrairItemDespesaFixa(linha: string): DespesaFixaRegistradaControle | null {
+  const limpa = limparTextoDespesaFixa(linha);
+  const valorMatch = limpa.match(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?/i);
+  if (!valorMatch) return null;
+
+  const valor = parseMoneyBR(valorMatch[0]);
+  if (!valor) return null;
+
+  const descricao = formatarDescricaoDespesaFixa(
+    `${limpa.slice(0, valorMatch.index ?? 0)} ${limpa.slice((valorMatch.index ?? 0) + valorMatch[0].length)}`
+  );
+  if (!descricao) return null;
+
+  return { descricao, valor };
+}
+
+function extrairDescricaoDespesaFixa(mensagem: string): string | null {
+  const limpa = limparTextoDespesaFixa(mensagem);
+  const semValor = limpa.replace(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?/gi, " ");
+  const descricao = formatarDescricaoDespesaFixa(semValor);
+  return descricao || null;
+}
+
+function parsearItensDespesaFixa(mensagem: string): DespesaFixaRegistradaControle[] {
+  return mensagem
+    .split(/\r?\n/)
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .map(extrairItemDespesaFixa)
+    .filter((item): item is DespesaFixaRegistradaControle => Boolean(item));
+}
+
+function atualizarListaDespesasFixas(
+  despesasAtuais: DespesaFixaRegistradaControle[],
+  itens: DespesaFixaRegistradaControle[]
+): DespesaFixaRegistradaControle[] {
+  let lista = [...despesasAtuais];
+
+  for (const item of itens) {
+    const chave = chaveDespesaFixa(item.descricao);
+    const indice = lista.findIndex((despesa) => chaveDespesaFixa(despesa.descricao) === chave);
+    if (indice >= 0) {
+      lista[indice] = item;
+    } else {
+      lista.push(item);
+    }
+  }
+
+  return lista;
+}
+
+export function gerenciarDespesasFixasControle(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  const acao = detectarAcaoDespesaFixa(mensagem);
+  if (!acao) return null;
+
+  const despesasAtuais = estadoAtual.despesasFixas ?? [];
+
+  if (acao === "listar") {
+    const total = recalcularDespesasFixas(despesasAtuais);
+    const linhas = despesasAtuais.flatMap((despesa) => [
+      despesa.descricao,
+      formatarValorBR(despesa.valor),
+      "",
+    ]);
+    linhas.push("Total fixo mensal", formatarValorBR(total));
+
+    return {
+      resposta: "📌 *Suas despesas fixas*\n\n" + linhas.join("\n").trim(),
+      estado: {
+        ...estadoAtual,
+        despesasFixas: despesasAtuais,
+        totalDespesasFixas: total,
+      },
+      atualizouEstado: false,
+    };
+  }
+
+  if (acao === "adicionar") {
+    const itens = parsearItensDespesaFixa(mensagem);
+    if (itens.length === 0) return null;
+
+    const despesasFixas = atualizarListaDespesasFixas(despesasAtuais, itens);
+    const totalDespesasFixas = recalcularDespesasFixas(despesasFixas);
+    const estado = {
+      ...estadoAtual,
+      despesasFixas,
+      totalDespesasFixas,
+      faturas: estadoAtual.faturas ?? [],
+      cartoes: estadoAtual.cartoes ?? [],
+    };
+
+    if (itens.length === 1) {
+      const item = itens[0];
+      return {
+        resposta:
+          "✅ *Despesa fixa adicionada.*\n\n" +
+          "Descrição\n" +
+          `${item.descricao}\n\n` +
+          "Valor mensal\n" +
+          `${formatarValorBR(item.valor)}\n\n` +
+          resumoDespesasFixasAtualizado(estado),
+        estado,
+        atualizouEstado: true,
+      };
+    }
+
+    const totalAdicionado = itens.reduce((soma, item) => soma + item.valor, 0);
+    const linhasItens = itens.flatMap((item) => [
+      item.descricao,
+      formatarValorBR(item.valor),
+      "",
+    ]);
+    linhasItens.push("Total adicionado", formatarValorBR(totalAdicionado));
+
+    return {
+      resposta:
+        "✅ *Despesas fixas adicionadas.*\n\n" +
+        `${linhasItens.join("\n").trim()}\n\n` +
+        resumoDespesasFixasAtualizado(estado),
+      estado,
+      atualizouEstado: true,
+    };
+  }
+
+  if (acao === "corrigir") {
+    const item = extrairItemDespesaFixa(mensagem);
+    if (!item) return null;
+
+    const chave = chaveDespesaFixa(item.descricao);
+    const indice = despesasAtuais.findIndex((despesa) => chaveDespesaFixa(despesa.descricao) === chave);
+    if (indice < 0) {
+      return {
+        resposta: "Não encontrei essa despesa fixa para atualizar.",
+        estado: estadoAtual,
+        atualizouEstado: false,
+      };
+    }
+
+    const anterior = despesasAtuais[indice];
+    const despesasFixas = despesasAtuais.map((despesa, index) => index === indice ? item : despesa);
+    const estado = {
+      ...estadoAtual,
+      despesasFixas,
+      totalDespesasFixas: recalcularDespesasFixas(despesasFixas),
+    };
+
+    return {
+      resposta:
+        "✅ *Despesa fixa atualizada.*\n\n" +
+        "Descrição\n" +
+        `${item.descricao}\n\n` +
+        "Valor anterior\n" +
+        `${formatarValorBR(anterior.valor)}\n\n` +
+        "Novo valor\n" +
+        `${formatarValorBR(item.valor)}\n\n` +
+        resumoDespesasFixasAtualizado(estado),
+      estado,
+      atualizouEstado: true,
+    };
+  }
+
+  const descricao = extrairDescricaoDespesaFixa(mensagem);
+  if (!descricao) return null;
+
+  const chave = chaveDespesaFixa(descricao);
+  const removida = despesasAtuais.find((despesa) => chaveDespesaFixa(despesa.descricao) === chave);
+  if (!removida) {
+    return {
+      resposta: "Não encontrei essa despesa fixa para remover.",
+      estado: estadoAtual,
+      atualizouEstado: false,
+    };
+  }
+
+  const despesasFixas = despesasAtuais.filter((despesa) => chaveDespesaFixa(despesa.descricao) !== chave);
+  const estado = {
+    ...estadoAtual,
+    despesasFixas,
+    totalDespesasFixas: recalcularDespesasFixas(despesasFixas),
+  };
+
+  return {
+    resposta:
+      "✅ *Despesa fixa removida.*\n\n" +
+      "Descrição\n" +
+      `${removida.descricao}\n\n` +
+      "Valor removido\n" +
+      `${formatarValorBR(removida.valor)}\n\n` +
+      resumoDespesasFixasAtualizado(estado),
+    estado,
+    atualizouEstado: true,
+  };
 }
 
 export function corrigirRendaControle(
