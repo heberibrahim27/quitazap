@@ -112,27 +112,22 @@ export function mensagemExplicarDespesasFixasControle(): string {
   return (
     "📌 *Despesas fixas*\n\n" +
     "São gastos que você paga todo mês ou quase todo mês.\n\n" +
+    "Exemplos:\n" +
     "```\n" +
-    "Aluguel\n" +
-    "Energia\n" +
-    "Água\n" +
-    "Internet\n" +
-    "Escola\n" +
-    "Pensão\n" +
-    "Assinaturas\n" +
-    "Academia\n" +
-    "Financiamento\n" +
-    "Empréstimo\n" +
-    "Consignado\n" +
-    "Parcelamento\n" +
-    "```\n\n" +
-    "Pode mandar assim:\n\n" +
-    "```\n" +
-    "Energia 120\n" +
+    "Aluguel 800\n" +
+    "Energia 200\n" +
     "Internet 90\n" +
     "Pensão 900\n" +
-    "Empréstimo Banco do Brasil 300 12/120\n" +
-    "Financiamento moto 450 8/36\n" +
+    "ChatGPT 110\n" +
+    "```\n\n" +
+    "Se não quiser cadastrar agora, digite:\n" +
+    "```\n" +
+    "pular\n" +
+    "```\n\n" +
+    "Você também pode dizer:\n" +
+    "```\n" +
+    "não tenho\n" +
+    "depois cadastro\n" +
     "```"
   );
 }

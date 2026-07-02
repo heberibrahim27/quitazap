@@ -849,10 +849,13 @@ test("onboarding registra renda em tres mensagens limpas para WhatsApp", () => {
   assert.notEqual(respostaRenda, perguntaDespesas);
   assert.notEqual(perguntaDespesas, explicacaoDespesas);
   assert.match(explicacaoDespesas, /^📌 \*Despesas fixas\*/);
-  for (const item of ["Aluguel", "Energia", "Internet", "Empréstimo", "Consignado", "Parcelamento"]) {
+  for (const item of ["Aluguel 800", "Energia 200", "Internet 90", "Pensão 900", "ChatGPT 110"]) {
     assert.match(explicacaoDespesas, new RegExp(item));
   }
-  assert.match(explicacaoDespesas, /Pode mandar assim:/);
+  assert.match(explicacaoDespesas, /pular/);
+  assert.match(explicacaoDespesas, /não tenho/);
+  assert.match(explicacaoDespesas, /depois cadastro/);
+  assert.match(explicacaoDespesas, /Se não quiser cadastrar agora/);
   assert.doesNotMatch(
     `${respostaRenda}\n${perguntaDespesas}\n${explicacaoDespesas}`,
     /```(?:text|txt|markdown|ts|js)|^text$|\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/im
