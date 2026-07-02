@@ -840,6 +840,82 @@ test("interpretador classifica netflix mensal e mercado com previa confirmavel",
   assert.doesNotMatch(previa, /\n\d+\. â€”/);
 });
 
+test("interpretador reconhece lote generico de gastos no cartao", async () => {
+  const mensagem = [
+    "ifood 40 no inter",
+    "uber 30 no banco do brasil",
+    "mercado 100 no mercado pago",
+    "farmacia 55 no cartÃ£o nubank",
+    "gasolina 120 no cartÃ£o caixa",
+  ].join("\n");
+
+  const intent = await resolverIntencaoFinanceiraIA(mensagem, { forcarLocal: true });
+  assert.ok(intent);
+  assert.equal(intentFinanceiroConfirmavel(intent), true);
+  assert.deepEqual(
+    intent.itens.map((item) => [
+      item.descricaoNormalizada,
+      item.tipo,
+      item.origem,
+      item.cartao,
+      item.valor,
+    ]),
+    [
+      ["iFood", "despesa_variavel", "cartao", "Inter", 40],
+      ["Uber", "despesa_variavel", "cartao", "Banco do Brasil", 30],
+      ["Mercado", "despesa_variavel", "cartao", "Mercado Pago", 100],
+      ["Farmácia", "despesa_variavel", "cartao", "Nubank", 55],
+      ["Gasolina", "despesa_variavel", "cartao", "Caixa", 120],
+    ]
+  );
+
+  const previa = formatarPreviaIntentFinanceiro(intent);
+  assert.match(previa, /Entendi estes gastos no cart.o/);
+  assert.match(previa, /iFood .*Cart.o Inter .*R\$ 40,00/);
+  assert.match(previa, /Uber .*Cart.o Banco do Brasil .*R\$ 30,00/);
+  assert.match(previa, /Mercado .*Cart.o Mercado Pago .*R\$ 100,00/);
+  assert.match(previa, /Farm.cia .*Cart.o Nubank .*R\$ 55,00/);
+  assert.match(previa, /Gasolina .*Cart.o Caixa .*R\$ 120,00/);
+  assert.match(previa, /1.+Sim, registrar tudo/);
+  assert.match(previa, /2.+quero corrigir/);
+
+  const estadoBase = {
+    rendaMensal: 3000,
+    totalDespesasFixas: 0,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [],
+  };
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  assert.deepEqual(estadoPendente.faturas, []);
+  assert.equal(estadoPendente.totalGastosSaldo, 0);
+
+  const confirmado = gerenciarDespesasFixasControle("1", estadoPendente);
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.equal(confirmado.estado.totalGastosSaldo, 0);
+  assert.equal(calcularSaldoDisponivelControle(confirmado.estado), 3000);
+  assert.deepEqual(confirmado.estado.faturas, [
+    { cartao: "Inter", valor: 40 },
+    { cartao: "Banco do Brasil", valor: 30 },
+    { cartao: "Mercado Pago", valor: 100 },
+    { cartao: "Nubank", valor: 55 },
+    { cartao: "Caixa", valor: 120 },
+  ]);
+  assert.equal(totalFaturasAbertasControle(confirmado.estado), 345);
+  assert.match(confirmado.resposta, /Gastos no cart.o:/);
+  assert.match(confirmado.resposta, /Gastos no cart.o registrados: R\$ 345,00/);
+
+  const estadoPendenteCancelamento = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  const cancelado = gerenciarDespesasFixasControle("2", estadoPendenteCancelamento);
+  assert.ok(cancelado);
+  assert.equal(cancelado.estado.confirmacaoPendente, undefined);
+  assert.equal(cancelado.estado.totalGastosSaldo, 0);
+  assert.deepEqual(cancelado.estado.faturas, []);
+  assert.match(cancelado.resposta, /Tudo bem, n.o salvei nada\. Pode reenviar os lan.amentos corrigidos\./);
+});
+
 test("previa nao confirmavel nao mostra opcoes 1 e 2", () => {
   const previa = formatarPreviaIntentFinanceiro({
     emEscopo: true,

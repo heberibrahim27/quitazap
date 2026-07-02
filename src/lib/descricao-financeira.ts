@@ -20,6 +20,7 @@ const MARCAS_E_TERMOS: Record<string, string> = {
   netflix: "Netflix",
   tim: "TIM",
   uber: "Uber",
+  farmacia: "Farmácia",
   bar: "Bar",
   banco: "Banco",
   brasil: "Brasil",

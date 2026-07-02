@@ -77,14 +77,20 @@ const ALIASES_CARTAO_ESCOPO = [
   "inter",
   "pagbank",
   "bradesco",
+  "santander",
+  "caixa",
   "itau",
   "itaú",
   "c6",
+  "picpay",
+  "neon",
 ];
 
 function pareceGastoEmCartao(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
   if (!/\b\d[\d.,]*\b/.test(texto)) return false;
+
+  if (/\b(?:no|na|pelo|pela)\s+(?:cart\S*|banco)\s+\S+/.test(texto)) return true;
 
   return ALIASES_CARTAO_ESCOPO.some((alias) => {
     const aliasNormalizado = normalizarTexto(alias).replace(/\s+/g, "\\s+");

@@ -62,6 +62,19 @@ const SERVICOS_ASSINATURA = [
 ];
 const TERMOS_MERCADO = /\b(mercado|supermercado|feira|padaria|acougue)\b/;
 const TERMOS_RECORRENCIA_MENSAL = /\b(mes|mensal|todo mes|por mes)\b/;
+const CARTOES_NORMALIZADOS = [
+  { aliases: ["banco do brasil", "bb"], nome: "Banco do Brasil" },
+  { aliases: ["mercado pago"], nome: "Mercado Pago" },
+  { aliases: ["nubank"], nome: "Nubank" },
+  { aliases: ["inter"], nome: "Inter" },
+  { aliases: ["caixa"], nome: "Caixa" },
+  { aliases: ["bradesco"], nome: "Bradesco" },
+  { aliases: ["santander"], nome: "Santander" },
+  { aliases: ["itau", "itaú"], nome: "Itaú" },
+  { aliases: ["c6"], nome: "C6" },
+  { aliases: ["picpay"], nome: "PicPay" },
+  { aliases: ["neon"], nome: "Neon" },
+];
 
 function criarItem(parcial: Partial<ItemFinanceiroInterpretado>): ItemFinanceiroInterpretado {
   return {
@@ -193,6 +206,72 @@ function limparDescricaoSegmento(segmento: string): string {
     .replace(/\b(reais|real|rs|r\$|conto|contos|mes|mensal|todo mes|por mes|pago|paguei|comprei|gastei|de)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizarNomeCartaoIA(nome: string): string {
+  const texto = normalizarTexto(nome)
+    .replace(/^cartao\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  for (const cartao of CARTOES_NORMALIZADOS) {
+    if (cartao.aliases.some((alias) => normalizarTexto(alias) === texto)) return cartao.nome;
+  }
+
+  return normalizarDescricaoFinanceira(texto);
+}
+
+function categorizarDespesaVariavelCartao(descricao: string): string {
+  const texto = normalizarTexto(descricao);
+  if (/\b(ifood|uber eats|restaurante|almoco|jantar|lanche|padaria)\b/.test(texto)) return "Alimentação";
+  if (/\buber|99|taxi|gasolina|posto|combustivel\b/.test(texto)) return "Transporte";
+  if (/\bmercado|supermercado|feira|acougue\b/.test(texto)) return "Mercado";
+  if (/\bfarmacia|remedio|drogaria\b/.test(texto)) return "Saúde";
+  if (/\bassinatura|netflix|spotify|youtube|prime|icloud|canva|c6\b/.test(texto)) return "Assinaturas";
+  return "Outros";
+}
+
+function extrairGastoCartaoSegmento(segmento: string): ItemFinanceiroInterpretado | null {
+  const match = segmento.match(
+    /^\s*(.+?)\s+(\d[\d.,]*)\s+(?:no|na|pelo|pela)\s+(?:(?:cart\S*)\s+)?(.+?)\s*$/i
+  );
+  if (!match) return null;
+
+  const descricao = normalizarDescricaoFinanceira(match[1]);
+  const valor = extrairPrimeiroValor(match[2]);
+  const cartao = normalizarNomeCartaoIA(match[3]);
+  if (!descricao || !valor || !cartao) return null;
+
+  return criarItem({
+    tipo: "despesa_variavel",
+    descricaoOriginal: match[1].trim(),
+    descricaoNormalizada: descricao,
+    categoria: categorizarDespesaVariavelCartao(descricao),
+    valor,
+    recorrencia: "unica",
+    origem: "cartao",
+    cartao,
+  });
+}
+
+function resolverLoteGastosCartao(mensagem: string): FinanceiroIntent | null {
+  const segmentos = mensagem
+    .split(/[\n;]+/)
+    .map((segmento) => segmento.trim())
+    .filter(Boolean);
+  if (segmentos.length < 2) return null;
+
+  const itens = segmentos.map(extrairGastoCartaoSegmento);
+  if (itens.some((item) => !item)) return null;
+
+  return {
+    emEscopo: true,
+    intencao: "registrar_lote_gastos_cartao",
+    confianca: 0.9,
+    precisaConfirmacao: true,
+    motivoConfirmacao: "Lote de gastos no cartão detectado por padrão descrição, valor e cartão.",
+    itens: itens as ItemFinanceiroInterpretado[],
+  };
 }
 
 function resolverLancamentosSimples(mensagem: string): FinanceiroIntent | null {
@@ -361,6 +440,7 @@ function resolverLocal(mensagem: string): FinanceiroIntent {
   if (!escopo.emEscopo) return escopo;
 
   return resolverMensagemMista(mensagem) ??
+    resolverLoteGastosCartao(mensagem) ??
     resolverLancamentosSimples(mensagem) ??
     resolverReceita(mensagem) ??
     {
@@ -444,7 +524,8 @@ function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
     item.categoria.trim().length > 0 &&
     typeof item.valor === "number" &&
     Number.isFinite(item.valor) &&
-    item.valor > 0
+    item.valor > 0 &&
+    (item.origem !== "cartao" || (typeof item.cartao === "string" && item.cartao.trim().length > 0))
   );
 }
 
@@ -475,6 +556,23 @@ export function formatarPreviaIntentFinanceiro(intent: FinanceiroIntent): string
       "1️⃣ Sim\n" +
       "2️⃣ Não"
     );
+  }
+
+  if (intent.itens.every((item) => item.tipo === "despesa_variavel" && item.origem === "cartao" && item.cartao)) {
+    const linhas = ["Entendi estes gastos no cartão:", ""];
+    intent.itens.forEach((item, index) => {
+      linhas.push(
+        `${index + 1}. ${item.descricaoNormalizada} — Cartão ${item.cartao} — ${formatarValorBR(item.valor ?? 0)}`
+      );
+    });
+    linhas.push(
+      "",
+      "Confirma que posso registrar?",
+      "",
+      "1️⃣ Sim, registrar tudo",
+      "2️⃣ Não, quero corrigir"
+    );
+    return linhas.join("\n");
   }
 
   const variaveis = intent.itens.filter((item) => item.tipo === "despesa_variavel");

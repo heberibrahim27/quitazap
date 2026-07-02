@@ -91,7 +91,11 @@ const CARTOES_CONHECIDOS: Array<{ aliases: string[]; nome: string }> = [
   { aliases: ["pagbank"], nome: "PagBank" },
   { aliases: ["inter"], nome: "Inter" },
   { aliases: ["bradesco"], nome: "Bradesco" },
+  { aliases: ["santander"], nome: "Santander" },
+  { aliases: ["caixa"], nome: "Caixa" },
   { aliases: ["itau", "itaú"], nome: "Itaú" },
+  { aliases: ["picpay"], nome: "PicPay" },
+  { aliases: ["neon"], nome: "Neon" },
   { aliases: ["bb"], nome: "Banco do Brasil" },
   { aliases: ["c6"], nome: "C6" },
 ];
@@ -733,7 +737,23 @@ export function salvarItensConfirmadosIA(
       descricao: descricaoItemFinanceiro(item),
       categoria: item.categoria || "Outros",
       valor: item.valor,
+      origem: item.origem ?? null,
+      cartao: typeof item.cartao === "string" && item.cartao.trim() ? item.cartao.trim() : null,
     }));
+  const variaveisCartao = variaveis.filter((item) => item.origem === "cartao" && item.cartao);
+  const variaveisSaldo = variaveis.filter((item) => item.origem !== "cartao");
+  if (variaveis.some((item) => item.origem === "cartao" && !item.cartao)) {
+    return {
+      resposta:
+        "Não consegui salvar essa confirmação com segurança.\n\n" +
+        "Encontrei gasto de cartão sem nome do cartão. Me envie novamente em lista.",
+      estado: {
+        ...estadoAtual,
+        confirmacaoPendente: undefined,
+      },
+      atualizouEstado: true,
+    };
+  }
   const fixas = itensValidos
     .filter((item) => item.tipo === "despesa_fixa")
     .map((item) => ({
@@ -744,16 +764,22 @@ export function salvarItensConfirmadosIA(
   const despesasAtuais = despesasFixasCompatControle(estadoAtual);
   const resultadoFixas = adicionarDespesasFixasSemDuplicar(despesasAtuais, fixas);
   const totalReceitas = receitas.reduce((soma, item) => soma + item.valor, 0);
-  const totalVariaveis = variaveis.reduce((soma, item) => soma + item.valor, 0);
+  const totalVariaveisSaldo = variaveisSaldo.reduce((soma, item) => soma + item.valor, 0);
+  const totalVariaveisCartao = variaveisCartao.reduce((soma, item) => soma + item.valor, 0);
+  const faturasComVariaveisCartao = variaveisCartao.reduce(
+    (faturas, item) => somarFatura(faturas, item.cartao as string, item.valor),
+    estadoAtual.faturas ?? []
+  );
   const totalFixasAdicionadas = resultadoFixas.adicionados.reduce((soma, item) => soma + item.valor, 0);
   const ultimoVariavel = variaveis.at(-1);
   const estado: EstadoControleFinanceiro = {
     ...estadoAtual,
     totalReceitasAvulsas: (estadoAtual.totalReceitasAvulsas ?? 0) + totalReceitas,
-    totalGastosSaldo: (estadoAtual.totalGastosSaldo ?? 0) + totalVariaveis,
+    totalGastosSaldo: (estadoAtual.totalGastosSaldo ?? 0) + totalVariaveisSaldo,
     despesasFixas: resultadoFixas.lista,
     totalDespesasFixas: recalcularDespesasFixas(resultadoFixas.lista),
-    faturas: estadoAtual.faturas ?? [],
+    faturas: faturasComVariaveisCartao,
+    faturasFechadas: estadoAtual.faturasFechadas ?? [],
     cartoes: estadoAtual.cartoes ?? [],
     confirmacaoPendente: undefined,
     ultimoGasto: ultimoVariavel
@@ -762,7 +788,10 @@ export function salvarItensConfirmadosIA(
           valor: ultimoVariavel.valor,
           categoria: ultimoVariavel.categoria,
           data: formatarDataBR(new Date()),
-          origem: "SALDO" as const,
+          origem: ultimoVariavel.origem === "cartao" ? "CARTAO" as const : "SALDO" as const,
+          ...(ultimoVariavel.origem === "cartao" && ultimoVariavel.cartao
+            ? { cartao: ultimoVariavel.cartao }
+            : {}),
         }
       : estadoAtual.ultimoGasto,
   };
@@ -788,8 +817,18 @@ export function salvarItensConfirmadosIA(
     linhas.push("Receitas:", ...linhasItensFinanceiros(receitas), "");
   }
 
-  if (variaveis.length > 0) {
-    linhas.push("Despesa variável:", ...linhasItensFinanceiros(variaveis), "");
+  if (variaveisSaldo.length > 0) {
+    linhas.push("Despesa variável:", ...linhasItensFinanceiros(variaveisSaldo), "");
+  }
+
+  if (variaveisCartao.length > 0) {
+    linhas.push(
+      "Gastos no cartão:",
+      ...variaveisCartao.map((item, index) =>
+        `${index + 1}. ${item.descricao} — Cartão ${item.cartao} — ${formatarValorBR(item.valor)}`
+      ),
+      ""
+    );
   }
 
   if (resultadoFixas.adicionados.length > 0) {
@@ -831,7 +870,8 @@ export function salvarItensConfirmadosIA(
   linhas.push("Resumo:");
   if (totalReceitas > 0) linhas.push(`Receitas registradas: ${formatarValorBR(totalReceitas)}`);
   if (totalFixasAdicionadas > 0) linhas.push(`Despesas fixas adicionadas: ${formatarValorBR(totalFixasAdicionadas)}`);
-  if (totalVariaveis > 0) linhas.push(`Despesas variáveis registradas: ${formatarValorBR(totalVariaveis)}`);
+  if (totalVariaveisSaldo > 0) linhas.push(`Despesas variáveis registradas: ${formatarValorBR(totalVariaveisSaldo)}`);
+  if (totalVariaveisCartao > 0) linhas.push(`Gastos no cartão registrados: ${formatarValorBR(totalVariaveisCartao)}`);
   if (resultadoFixas.duplicados.length > 0) linhas.push(`Despesas fixas duplicadas ignoradas: ${resultadoFixas.duplicados.length}`);
   if (resultadoFixas.conflitos.length > 0) linhas.push(`Despesas fixas com conflito: ${resultadoFixas.conflitos.length}`);
   linhas.push("", resumoAtualizadoMes(estado));
