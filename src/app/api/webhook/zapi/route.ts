@@ -12,12 +12,14 @@ import {
   atualizarDespesasFixasControle,
   carregarEstadoControle,
   configurarCartaoControle,
+  corrigirRendaControle,
   corrigirOrigemUltimoGastoControle,
   criarMensagemEstadoControle,
   registrarGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
+import { parseMoneyBR } from "@/lib/money";
 import {
   deveAguardarDespesasFixasControle,
   ETAPA_AGUARDANDO_DESPESAS_FIXAS,
@@ -919,6 +921,27 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
+    const estadoAntesFluxosControle = carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda);
+    const correcaoRenda = corrigirRendaControle(mensagem, estadoAntesFluxosControle);
+    if (correcaoRenda) {
+      await sendWhatsApp(telefone, correcaoRenda.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          renda: correcaoRenda.estado.rendaMensal,
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: correcaoRenda.resposta },
+            ...(correcaoRenda.atualizouEstado ? [criarMensagemEstadoControle(correcaoRenda.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
     const aguardandoDespesasFixasControle = deveAguardarDespesasFixasControle(
       sessao.etapa,
       servidorHistoricoSessao
@@ -952,7 +975,7 @@ Pode mandar tudo em uma mensagem só.`;
       ] = formatarMensagensDespesasFixasControle(despesasFixas, sessao.renda);
       const totalDespesasFixas = despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0);
       const estadoControle = atualizarDespesasFixasControle(
-        carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda),
+        estadoAntesFluxosControle,
         totalDespesasFixas,
         sessao.renda
       );
@@ -979,7 +1002,7 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const estadoAntesGasto = carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda);
+    const estadoAntesGasto = estadoAntesFluxosControle;
     const configuracaoCartao = configurarCartaoControle(mensagem, estadoAntesGasto);
     if (configuracaoCartao) {
       await sendWhatsApp(telefone, configuracaoCartao.resposta);
@@ -1317,8 +1340,8 @@ Pode mandar tudo em uma mensagem só.`;
         dadosPessoais: { nome: sessao.nome ?? "", vinculo: "", dependentes: 0 },
         renda: { salarioLiquido: sessao.renda, totalFamiliar: sessao.renda },
         dividas: dividasDb.map((d) => {
-          const m = (d.obs ?? "").match(/R\$(\d+(?:[.,]\d+)?)/);
-          const valorParcela = m ? parseFloat(m[1].replace(",", ".")) : d.valorTotal;
+          const m = (d.obs ?? "").match(/R\$\s*(\d[\d.,]*)/);
+          const valorParcela = m ? parseMoneyBR(m[1]) ?? d.valorTotal : d.valorTotal;
 
           return {
             credor: d.credor,

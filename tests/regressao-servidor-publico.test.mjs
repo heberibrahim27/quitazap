@@ -49,6 +49,7 @@ const {
   deveConfirmarDadosFolhaServidor,
   gerarRespostaDadosFolhaServidor,
 } = loadTsModule("src/lib/servidor-publico-flow.ts");
+const { parseMoneyBR } = loadTsModule("src/lib/money.ts");
 const { processarFluxoGasto } = loadTsModule("src/lib/gasto-flow.ts");
 const {
   deveAguardarDespesasFixasControle,
@@ -68,6 +69,7 @@ const {
   atualizarDespesasFixasControle,
   calcularSaldoDisponivelControle,
   configurarCartaoControle,
+  corrigirRendaControle,
   corrigirOrigemUltimoGastoControle,
   registrarGastoControle,
   totalFaturasAbertasControle,
@@ -419,6 +421,36 @@ test("fluxo deterministico classifica apostas separado de lazer", () => {
   assert.equal(processarFluxoGasto("gastei 65 de cerveja no bar", hoje)?.categoria, "Lazer");
 });
 
+test("parseMoneyBR interpreta valores brasileiros sem cortar digitos", () => {
+  const casos = [
+    ["7140,69", 7140.69],
+    ["7.140,69", 7140.69],
+    ["7140.69", 7140.69],
+    ["R$ 7140,69", 7140.69],
+    ["R$ 7.140,69", 7140.69],
+    ["4000", 4000],
+    ["45,90", 45.9],
+    ["1000,00", 1000],
+    ["10000,50", 10000.5],
+    ["140,69", 140.69],
+  ];
+
+  for (const [entrada, esperado] of casos) {
+    assert.equal(parseMoneyBR(entrada), esperado);
+  }
+});
+
+test("fluxos principais usam parseMoneyBR para nao cortar renda nem gasto", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+
+  assert.equal(extrairRendaControle("minha renda é 7140,69"), 7140.69);
+  assert.equal(processarFluxoGasto("gastei 7140,69 no mercado", hoje)?.valor, 7140.69);
+  assert.match(
+    processarFluxoGasto("gastei 7140,69 no mercado", hoje)?.resposta ?? "",
+    /R\$ 7\.140,69/
+  );
+});
+
 test("reset usa onboarding do QuitaZAP Controle em duas mensagens", () => {
   const [mensagem1, mensagem2] = mensagensResetControle("Maria");
 
@@ -612,6 +644,48 @@ test("controle financeiro calcula saldo inicial apos renda e despesas fixas", ()
 
   assert.equal(calcularSaldoDisponivelControle(estado), 1960);
   assert.equal(totalFaturasAbertasControle(estado), 0);
+});
+
+test("correcao de renda atualiza para 7140,69 e recalcula resumo", () => {
+  const estadoComRendaErrada = atualizarDespesasFixasControle(
+    { rendaMensal: 140.69, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [] },
+    2040,
+    140.69
+  );
+  const comandos = [
+    "corrija minha renda para 7140,69",
+    "conserte minha renda 7140,69",
+    "atualize minha renda para 7140,69",
+    "renda correta é 7140,69",
+  ];
+
+  for (const comando of comandos) {
+    const resultado = corrigirRendaControle(comando, estadoComRendaErrada);
+
+    assert.ok(resultado);
+    assert.equal(resultado.estado.rendaMensal, 7140.69);
+    assert.equal(resultado.estado.totalDespesasFixas, 2040);
+    assert.match(resultado.resposta, /✅ \*Renda atualizada\.\*/);
+    assert.match(resultado.resposta, /Renda anterior\nR\$ 140,69/);
+    assert.match(resultado.resposta, /Nova renda\nR\$ 7\.140,69/);
+    assert.match(resultado.resposta, /📊 \*Resumo atualizado\*/);
+    assert.match(resultado.resposta, /Renda mensal\nR\$ 7\.140,69/);
+    assert.match(resultado.resposta, /Despesas fixas\nR\$ 2\.040,00/);
+    assert.match(resultado.resposta, /Saldo antes dos gastos do dia a dia\nR\$ 5\.100,69/);
+    assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+  }
+});
+
+test("comandos de correcao de renda nao viram despesas fixas", () => {
+  for (const comando of [
+    "corrija minha renda para 7140,69",
+    "corrigir renda 7140,69",
+    "ajuste minha renda para 7140,69",
+    "renda = 7140,69",
+  ]) {
+    assert.deepEqual(parsearDespesasFixasControle(comando), []);
+    assert.equal(corrigirRendaControle(comando, estadoControleBase())?.estado.rendaMensal, 7140.69);
+  }
 });
 
 test("configuracao de cartao registra fechamento e vencimento sem cair em gasto", () => {

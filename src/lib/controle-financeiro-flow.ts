@@ -5,6 +5,7 @@ import {
   processarFluxoGasto,
   type GastoDetectado,
 } from "./gasto-flow";
+import { parseMoneyBR } from "./money";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
 
@@ -182,6 +183,72 @@ export function calcularSaldoDisponivelControle(estado: EstadoControleFinanceiro
 
 export function totalFaturasAbertasControle(estado: EstadoControleFinanceiro): number {
   return (estado.faturas ?? []).reduce((soma, fatura) => soma + fatura.valor, 0);
+}
+
+export function corrigirRendaControle(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  const texto = normalizarTexto(mensagem);
+  const mencionaRenda = /\b(renda|salario|salario liquido|ganho|recebo|entra por mes|entra no mes)\b/.test(texto);
+  const rendaAnterior = Number.isFinite(estadoAtual.rendaMensal) && estadoAtual.rendaMensal > 0
+    ? estadoAtual.rendaMensal
+    : 0;
+  const pareceCorrecao =
+    /\b(corrija|corrigir|conserte|ajuste|atualize|correta)\b/.test(texto) ||
+    /\brenda\s*=/.test(mensagem.toLowerCase()) ||
+    (rendaAnterior > 0 && /\bminha renda\b/.test(texto));
+
+  if (!mencionaRenda || !pareceCorrecao) return null;
+
+  const novaRenda = parseMoneyBR(mensagem);
+  if (!novaRenda) return null;
+
+  const estado: EstadoControleFinanceiro = {
+    ...estadoAtual,
+    faturas: estadoAtual.faturas ?? [],
+    cartoes: estadoAtual.cartoes ?? [],
+    rendaMensal: novaRenda,
+  };
+
+  const linhasResposta = rendaAnterior > 0
+    ? [
+        "✅ *Renda atualizada.*",
+        "",
+        "Renda anterior",
+        formatarValorBR(rendaAnterior),
+        "",
+        "Nova renda",
+        formatarValorBR(novaRenda),
+      ]
+    : [
+        "✅ *Renda registrada.*",
+        "",
+        "Renda mensal",
+        formatarValorBR(novaRenda),
+      ];
+
+  if (estado.totalDespesasFixas > 0) {
+    linhasResposta.push(
+      "",
+      "📊 *Resumo atualizado*",
+      "",
+      "Renda mensal",
+      formatarValorBR(estado.rendaMensal),
+      "",
+      "Despesas fixas",
+      formatarValorBR(estado.totalDespesasFixas),
+      "",
+      "Saldo antes dos gastos do dia a dia",
+      formatarValorBR(estado.rendaMensal - estado.totalDespesasFixas)
+    );
+  }
+
+  return {
+    resposta: linhasResposta.join("\n"),
+    estado,
+    atualizouEstado: true,
+  };
 }
 
 function detectarCartao(mensagem: string): string | null {

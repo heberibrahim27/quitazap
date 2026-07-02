@@ -1,3 +1,5 @@
+import { parseMoneyBR } from "./money";
+
 export type CategoriaGasto =
   | "Mercado"
   | "Alimentação"
@@ -104,35 +106,22 @@ export function detectarMensagemDeGasto(mensagem: string): boolean {
   });
 }
 
-function parseValor(valorTexto: string): number | undefined {
-  const limpo = valorTexto.replace(/[R$\s]/gi, "");
-  const temCentavos = /,\d{1,2}$|\.\d{1,2}$/.test(limpo);
-  const normalizado = temCentavos
-    ? limpo.replace(/\./g, "").replace(",", ".")
-    : limpo.replace(",", ".");
-  const valor = Number(normalizado);
-  return Number.isFinite(valor) && valor > 0 ? valor : undefined;
-}
-
 export function extrairValorGasto(mensagem: string): number | undefined {
   const texto = normalizarTexto(mensagem);
-  const candidatosPrioritarios = [
-    /r\$\s*\d{1,3}(?:\.\d{3})*,\d{1,2}/i,
-    /\d{1,3}(?:\.\d{3})*,\d{1,2}\s*(?:reais|real)?/i,
-    /\d+(?:[.,]\d{1,2})\s*(?:reais|real)/i,
-    /r\$\s*\d+(?:[.,]\d{1,2})?/i,
-  ];
+  const candidatos = texto.match(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?/gi) ?? [];
+  const candidatosComFormatoFinanceiro = candidatos.filter((candidato) =>
+    /r\$|,|\.\d{1,2}\b|\b(reais|real)\b/i.test(candidato)
+  );
 
-  for (const regex of candidatosPrioritarios) {
-    const match = texto.match(regex);
-    if (match) return parseValor(match[0]);
+  for (const candidato of candidatosComFormatoFinanceiro) {
+    const valor = parseMoneyBR(candidato);
+    if (valor) return valor;
   }
 
-  const inteiros = texto.match(/\b\d+\b/g) ?? [];
-  for (const inteiro of inteiros) {
+  for (const inteiro of candidatos) {
     if (inteiro.length >= 5) continue;
     if (inteiro === "99" && /\b99\b/.test(texto)) continue;
-    const valor = parseValor(inteiro);
+    const valor = parseMoneyBR(inteiro);
     if (valor) return valor;
   }
 

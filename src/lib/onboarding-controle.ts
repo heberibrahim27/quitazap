@@ -1,3 +1,5 @@
+import { parseMoneyBR } from "./money";
+
 export const RESET_CONTROLE_MENSAGEM_1 =
   "✅ *Tudo zerado.*\n\n" +
   "Vamos recomeçar seu controle financeiro do zero.";
@@ -57,37 +59,12 @@ function normalizarTexto(texto: string): string {
     .trim();
 }
 
-function parseValor(valorTexto: string): number | undefined {
-  const limpo = valorTexto.replace(/[R$\s]/gi, "");
-  const temCentavos = /,\d{1,2}$|\.\d{1,2}$/.test(limpo);
-  const temMilharComPonto = /^\d{1,3}(?:\.\d{3})+$/.test(limpo);
-  const normalizado = temMilharComPonto
-    ? limpo.replace(/\./g, "")
-    : temCentavos
-      ? limpo.replace(/\./g, "").replace(",", ".")
-      : limpo.replace(",", ".");
-  const valor = Number(normalizado);
-  return Number.isFinite(valor) && valor > 0 ? valor : undefined;
-}
-
 export function extrairRendaControle(mensagem: string, aceitarValorSolto = false): number | undefined {
   const texto = normalizarTexto(mensagem);
   const mencionaRenda = /\b(renda|salario|salario liquido|ganho|recebo|entra por mes|entra no mes)\b/.test(texto);
   if (!mencionaRenda && !aceitarValorSolto) return undefined;
 
-  const candidatos = [
-    /r\$\s*\d{1,3}(?:\.\d{3})*,\d{1,2}/i,
-    /\d{1,3}(?:\.\d{3})*,\d{1,2}/i,
-    /r\$\s*\d+(?:[.,]\d{1,2})?/i,
-    /\b\d{3,6}(?:[.,]\d{1,2})?\b/i,
-  ];
-
-  for (const regex of candidatos) {
-    const match = texto.match(regex);
-    if (match) return parseValor(match[0]);
-  }
-
-  return undefined;
+  return parseMoneyBR(mensagem);
 }
 
 export function mensagemRendaRegistradaControle(valor: number): string {
@@ -172,18 +149,31 @@ function formatarDescricao(texto: string): string {
     .join(" ");
 }
 
+function pareceComandoRenda(textoOriginal: string): boolean {
+  const texto = normalizarTexto(textoOriginal);
+  return (
+    /\b(renda|salario|salario liquido)\b/.test(texto) &&
+    (
+      /\b(corrija|corrigir|conserte|ajuste|atualize|correta|minha renda)\b/.test(texto) ||
+      /\brenda\s*=/.test(textoOriginal.toLowerCase())
+    )
+  );
+}
+
 export function parsearDespesasFixasControle(mensagem: string): DespesaFixaControle[] {
   return mensagem
     .split(/\r?\n/)
     .map((linha) => linha.trim())
     .filter(Boolean)
     .map((linha) => {
+      if (pareceComandoRenda(linha)) return null;
+
       const parcelas = linha.match(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/);
       const linhaSemParcelas = limparDescricao(linha.replace(/\b\d{1,3}\s*\/\s*\d{1,3}\b/g, " "));
       const valorMatch = linhaSemParcelas.match(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)?$/i);
       if (!valorMatch) return null;
 
-      const valor = parseValor(valorMatch[1]);
+      const valor = parseMoneyBR(valorMatch[1]);
       if (!valor) return null;
 
       const valorIndex = valorMatch.index ?? -1;
