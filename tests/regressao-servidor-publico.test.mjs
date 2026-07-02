@@ -63,7 +63,11 @@ const {
   mensagemPedidoDespesasFixasControle,
   mensagemRendaRegistradaControle,
   mensagensResetControle,
+  pareceForaEscopoControle,
+  pareceGastoVariavelControle,
+  pareceReceitaAvulsaControle,
   parsearDespesasFixasControle,
+  devePularDespesasFixasControle,
 } = loadTsModule("src/lib/onboarding-controle.ts");
 const {
   atualizarDespesasFixasControle,
@@ -777,6 +781,33 @@ test("onboarding registra renda em tres mensagens limpas para WhatsApp", () => {
   );
 });
 
+test("validacao contextual da etapa de renda aceita numero puro e bloqueia receita/fora de escopo", () => {
+  assert.equal(extrairRendaControle("3000", true), 3000);
+  assert.equal(extrairRendaControle("3.000", true), 3000);
+  assert.equal(extrairRendaControle("3000,00", true), 3000);
+  assert.equal(extrairRendaControle("minha renda é 3000", true), 3000);
+  assert.equal(extrairRendaControle("recebo 3000", true), 3000);
+  assert.equal(extrairRendaControle("salário 3000", true), 3000);
+  assert.equal(extrairRendaControle("renda 3000", true), 3000);
+
+  assert.equal(pareceForaEscopoControle("me conta uma piada"), true);
+  assert.equal(pareceForaEscopoControle("quem descobriu o Brasil?"), true);
+  assert.equal(pareceForaEscopoControle("faça um texto de namoro"), true);
+  assert.equal(pareceReceitaAvulsaControle("cliente pagou 200"), true);
+  assert.equal(pareceReceitaAvulsaControle("recebi pix 150"), true);
+});
+
+test("validacao contextual da etapa de despesas fixas separa pular receita e gasto", () => {
+  assert.equal(devePularDespesasFixasControle("pular"), true);
+  assert.equal(devePularDespesasFixasControle("não tenho"), true);
+  assert.equal(devePularDespesasFixasControle("sem despesas fixas"), true);
+  assert.equal(devePularDespesasFixasControle("depois cadastro"), true);
+
+  assert.equal(pareceForaEscopoControle("me conta uma piada"), true);
+  assert.equal(pareceReceitaAvulsaControle("anota pra mim cliente pagou 200,00"), true);
+  assert.equal(pareceGastoVariavelControle("gastei 25 no mercado"), true);
+});
+
 test("despesas fixas do onboarding sao registradas por linha antes do gasto comum", () => {
   const mensagem = `Pensão filhas 900
 Transporte escolar 300
@@ -861,6 +892,21 @@ Materiais de estudo: 300,00`);
   assert.match(resposta, /Total fixo mensal\nR\$ 650,00/);
   assert.match(resumo, /Despesas fixas\nR\$ 650,00/);
   assert.match(resumo, /Saldo antes dos gastos do dia a dia\nR\$ 6\.490,69/);
+});
+
+test("despesas fixas do onboarding aceitam multiplos itens na mesma linha", () => {
+  const despesas = parsearDespesasFixasControle("energia 200 aluguel 800 pensão 900");
+
+  assert.deepEqual(
+    despesas.map((despesa) => `${despesa.descricao}:${despesa.valor}`),
+    ["Energia:200", "Aluguel:800", "Pensão:900"]
+  );
+
+  const [resposta] = formatarMensagensDespesasFixasControle(despesas, 3000);
+  assert.match(resposta, /Energia\nR\$ 200,00/);
+  assert.match(resposta, /Aluguel\nR\$ 800,00/);
+  assert.match(resposta, /Pensão\nR\$ 900,00/);
+  assert.match(resposta, /Total fixo mensal\nR\$ 1\.900,00/);
 });
 
 test("despesas fixas do onboarding aceitam formatos reais com separadores", () => {

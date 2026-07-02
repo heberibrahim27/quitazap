@@ -68,6 +68,32 @@ export function extrairRendaControle(mensagem: string, aceitarValorSolto = false
   return parseMoneyBR(mensagem);
 }
 
+export function pareceReceitaAvulsaControle(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return /\b(cliente pagou|recebi pix|caiu pix|entrou|entrou dinheiro|vendi|me pagaram)\b/.test(texto);
+}
+
+export function pareceGastoVariavelControle(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return /\b(gastei|gasto|comprei|lanche|mercado|uber|ifood|farmacia)\b/.test(texto);
+}
+
+export function pareceForaEscopoControle(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return (
+    /\bpiada\b/.test(texto) ||
+    /\bquem descobriu o brasil\b/.test(texto) ||
+    /\btexto de namoro\b/.test(texto) ||
+    /\bignore (?:suas|as) instrucoes\b/.test(texto) ||
+    /\baja como chatgpt\b/.test(texto)
+  );
+}
+
+export function devePularDespesasFixasControle(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return /^(pular|nao tenho|não tenho|sem despesas fixas|depois cadastro)$/.test(texto);
+}
+
 export function mensagemRendaRegistradaControle(valor: number): string {
   return (
     "✅ *Renda registrada.*\n\n" +
@@ -139,7 +165,38 @@ function pareceComandoRenda(textoOriginal: string): boolean {
   );
 }
 
+function parsearDespesasFixasInline(linha: string): DespesaFixaControle[] {
+  if (/\r?\n/.test(linha)) return [];
+  const texto = normalizarTexto(linha);
+  const valores = texto.match(/\b\d[\d.,]*\b/g) ?? [];
+  if (valores.length < 2) return [];
+
+  const itens: DespesaFixaControle[] = [];
+  const padroes: Array<{ descricao: string; regex: RegExp }> = [
+    { descricao: "Energia", regex: /\benergia\s+(\d[\d.,]*)/ },
+    { descricao: "Aluguel", regex: /\b(?:aluguel|akuguel)\s+(\d[\d.,]*)/ },
+    { descricao: "Pensão", regex: /\bpensao\s+(\d[\d.,]*)/ },
+    { descricao: "Internet", regex: /\b(?:internet|waifai|wifi|wi-fi)\s+(\d[\d.,]*)/ },
+    { descricao: "ChatGPT", regex: /\bchat\s*gpt(?:\s+mes)?\s+(\d[\d.,]*)|\bchatgpt(?:\s+mes)?\s+(\d[\d.,]*)/ },
+  ];
+
+  for (const padrao of padroes) {
+    const match = texto.match(padrao.regex);
+    const valorTexto = match?.[1] ?? match?.[2];
+    if (!valorTexto) continue;
+    const valor = parseMoneyBR(valorTexto);
+    if (valor) {
+      itens.push({ descricao: normalizarDescricaoFinanceira(padrao.descricao), valor });
+    }
+  }
+
+  return itens;
+}
+
 export function parsearDespesasFixasControle(mensagem: string): DespesaFixaControle[] {
+  const itensInline = parsearDespesasFixasInline(mensagem);
+  if (itensInline.length > 1) return itensInline;
+
   return mensagem
     .split(/\r?\n/)
     .map((linha) => linha.trim())

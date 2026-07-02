@@ -23,6 +23,7 @@ import {
   formatarPreviaIntentFinanceiro,
   resolverIntencaoFinanceiraIA,
 } from "@/lib/ia/financeiro-intent-resolver";
+import { MENSAGEM_FORA_ESCOPO_FINANCEIRO } from "@/lib/ia/financeiro-intent-schema";
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { parseMoneyBR } from "@/lib/money";
@@ -36,7 +37,11 @@ import {
   mensagemPedidoDespesasFixasControle,
   mensagemRendaRegistradaControle,
   mensagensResetControle,
+  pareceForaEscopoControle,
+  pareceGastoVariavelControle,
+  pareceReceitaAvulsaControle,
   parsearDespesasFixasControle,
+  devePularDespesasFixasControle,
 } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import {
@@ -1007,12 +1012,194 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
+    const aguardandoRendaControle =
+      servidorHistoricoSessao.some(
+        (h) =>
+          h.role === "assistant" &&
+          (h.content ?? "").includes("Para começar, me diga quanto entra por mês.")
+      ) && !servidorHistoricoSessao.some((h) => h.role === "user");
+
+    if (aguardandoRendaControle) {
+      if (pareceForaEscopoControle(mensagem)) {
+        await sendWhatsApp(telefone, MENSAGEM_FORA_ESCOPO_FINANCEIRO);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: MENSAGEM_FORA_ESCOPO_FINANCEIRO },
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      if (pareceReceitaAvulsaControle(mensagem)) {
+        const respostaReceitaNaRenda =
+          "Isso parece uma receita/entrada avulsa, não sua renda mensal. Para começar, me informe sua renda mensal. Exemplo: 3000.";
+        await sendWhatsApp(telefone, respostaReceitaNaRenda);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaReceitaNaRenda },
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      const rendaControle = extrairRendaControle(mensagem, true);
+      if (rendaControle) {
+        const respostaRenda = mensagemRendaRegistradaControle(rendaControle);
+        const perguntaDespesas = mensagemPedidoDespesasFixasControle();
+        const explicacaoDespesas = mensagemExplicarDespesasFixasControle();
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            etapa: ETAPA_AGUARDANDO_DESPESAS_FIXAS,
+            renda: rendaControle,
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaRenda },
+              { role: "assistant", content: perguntaDespesas },
+              { role: "assistant", content: explicacaoDespesas },
+            ]),
+          },
+        });
+
+        await sendWhatsApp(telefone, respostaRenda);
+        await sendWhatsApp(telefone, perguntaDespesas);
+        await sendWhatsApp(telefone, explicacaoDespesas);
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     const aguardandoDespesasFixasControle = deveAguardarDespesasFixasControle(
       sessao.etapa,
       servidorHistoricoSessao
     );
 
     if (aguardandoDespesasFixasControle) {
+      if (devePularDespesasFixasControle(mensagem)) {
+        const [
+          respostaDespesasFixas,
+          respostaResumoDespesas,
+          respostaProximaEtapa,
+        ] = formatarMensagensDespesasFixasControle([], sessao.renda);
+        const estadoControle = atualizarDespesasFixasControle(
+          estadoAntesFluxosControle,
+          0,
+          sessao.renda,
+          []
+        );
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            etapa: ETAPA_AGUARDANDO_GASTOS,
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaDespesasFixas },
+              { role: "assistant", content: respostaResumoDespesas },
+              { role: "assistant", content: respostaProximaEtapa },
+              criarMensagemEstadoControle(estadoControle),
+            ]),
+          },
+        });
+
+        await sendWhatsApp(telefone, respostaDespesasFixas);
+        await sendWhatsApp(telefone, respostaResumoDespesas);
+        await sendWhatsApp(telefone, respostaProximaEtapa);
+
+        return NextResponse.json({ ok: true });
+      }
+
+      if (pareceForaEscopoControle(mensagem)) {
+        await sendWhatsApp(telefone, MENSAGEM_FORA_ESCOPO_FINANCEIRO);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: MENSAGEM_FORA_ESCOPO_FINANCEIRO },
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      if (pareceReceitaAvulsaControle(mensagem)) {
+        const respostaReceitaNasFixas =
+          "Isso parece uma receita/entrada, não uma despesa fixa mensal. Primeiro vamos concluir suas despesas fixas. Envie aluguel, energia, internet, pensão, assinaturas etc., ou digite 'pular'.";
+        await sendWhatsApp(telefone, respostaReceitaNasFixas);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaReceitaNasFixas },
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      const intentOnboardingDespesas = await resolverIntencaoFinanceiraIA(mensagem, {
+        forcarLocal: true,
+      });
+      if (
+        intentOnboardingDespesas?.emEscopo &&
+        intentOnboardingDespesas.itens.length > 1 &&
+        intentOnboardingDespesas.itens.some((item) => item.tipo !== "despesa_fixa")
+      ) {
+        const respostaIntent = formatarPreviaIntentFinanceiro(intentOnboardingDespesas);
+        const estadoComIntent = criarEstadoComConfirmacaoInterpretacaoFinanceira(
+          estadoAntesFluxosControle,
+          intentOnboardingDespesas
+        );
+
+        await sendWhatsApp(telefone, respostaIntent);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaIntent },
+              criarMensagemEstadoControle(estadoComIntent),
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      if (pareceGastoVariavelControle(mensagem)) {
+        const respostaGastoNasFixas =
+          "Isso parece um gasto do dia a dia, não uma despesa fixa mensal. Primeiro vamos concluir suas despesas fixas ou digite 'pular'.";
+        await sendWhatsApp(telefone, respostaGastoNasFixas);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaGastoNasFixas },
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
       const despesasFixas = parsearDespesasFixasControle(mensagem);
       if (despesasFixas.length === 0) {
         const respostaErro = "Não consegui identificar os valores das despesas fixas.\n\nPode mandar assim:\n\n```\nEnergia 120\nInternet 90\nPensão 900\n```";
@@ -1115,14 +1302,14 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const aguardandoRendaControle =
+    const aguardandoRendaControleDepoisDoGasto =
       servidorHistoricoSessao.some(
         (h) =>
           h.role === "assistant" &&
           (h.content ?? "").includes("Para começar, me diga quanto entra por mês.")
       ) && !servidorHistoricoSessao.some((h) => h.role === "user");
 
-    const rendaControle = extrairRendaControle(mensagem, aguardandoRendaControle);
+    const rendaControle = extrairRendaControle(mensagem, aguardandoRendaControleDepoisDoGasto);
     if (rendaControle) {
       const respostaRenda = mensagemRendaRegistradaControle(rendaControle);
       const perguntaDespesas = mensagemPedidoDespesasFixasControle();
