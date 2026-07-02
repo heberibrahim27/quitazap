@@ -38,6 +38,7 @@ const PADROES_ESCOPO = [
   /\bsalario\b/,
   /\brecebi\b/,
   /\bcliente pagou\b/,
+  /\bcaiu pix\b/,
   /\bpagaram\b/,
   /\bentrou\b/,
   /\bvendi\b/,
@@ -110,7 +111,19 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   if (mensagem.length > 1000) return false;
   if ((texto.match(/\b\d[\d.,]*\b/g) ?? []).length >= 2) return true;
   if (/[.?!].+\b\d[\d.,]*\b/.test(texto)) return true;
-  if (/\b(?:anota pra mim|cliente pagou|recebi pix|entrou dinheiro|me pagaram|vendi)\b/.test(texto)) return true;
+  if (/\b(?:anota pra mim|cliente pagou|recebi pix|caiu pix|entrou|entrou dinheiro|me pagaram|vendi)\b/.test(texto)) return true;
   if (/\b(?:akuguel|waifai|conto|mes|tambem|umas coisa)\b/.test(texto)) return true;
   return false;
+}
+
+export function deveUsarInterpretadorFinanceiroIA(
+  mensagem: string,
+  temConfirmacaoPendente = false
+): boolean {
+  if (devePularInterpretadorFinanceiroIA(mensagem, temConfirmacaoPendente)) return false;
+
+  const escopo = avaliarEscopoFinanceiro(mensagem);
+  if (!escopo.emEscopo) return true;
+
+  return deveChamarInterpretadorFinanceiroIA(mensagem);
 }

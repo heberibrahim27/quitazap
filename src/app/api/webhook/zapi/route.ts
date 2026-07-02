@@ -1068,6 +1068,34 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
+    const intentFinanceiro = await resolverIntencaoFinanceiraIA(mensagem, {
+      temConfirmacaoPendente: Boolean(estadoAntesGasto.confirmacaoPendente),
+    });
+    if (intentFinanceiro) {
+      const respostaIntent = formatarPreviaIntentFinanceiro(intentFinanceiro);
+      const estadoComIntent = intentFinanceiro.emEscopo && intentFinanceiro.precisaConfirmacao
+        ? criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoAntesGasto, intentFinanceiro)
+        : estadoAntesGasto;
+
+      await sendWhatsApp(telefone, respostaIntent);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaIntent },
+            ...(intentFinanceiro.emEscopo && intentFinanceiro.precisaConfirmacao
+              ? [criarMensagemEstadoControle(estadoComIntent)]
+              : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
     const gastoRapido = registrarGastoControle(mensagem, estadoAntesGasto);
     if (gastoRapido) {
       await sendWhatsApp(telefone, gastoRapido.resposta);
@@ -1467,36 +1495,6 @@ Pode mandar tudo em uma mensagem só.`;
     }
 
     // ── Processa com IA ──────────────────────
-    const historicoInterpretador: Mensagem[] = JSON.parse(sessao.dividasTemp || "[]");
-    const estadoAntesInterpretador = carregarEstadoControle(historicoInterpretador, sessao.renda);
-    const intentFinanceiro = await resolverIntencaoFinanceiraIA(mensagem, {
-      temConfirmacaoPendente: Boolean(estadoAntesInterpretador.confirmacaoPendente),
-    });
-    if (intentFinanceiro) {
-      const respostaIntent = formatarPreviaIntentFinanceiro(intentFinanceiro);
-      const estadoComIntent = intentFinanceiro.emEscopo && intentFinanceiro.precisaConfirmacao
-        ? criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoAntesInterpretador, intentFinanceiro)
-        : estadoAntesInterpretador;
-
-      await sendWhatsApp(telefone, respostaIntent);
-
-      await prisma.botSessao.updateMany({
-        where: { id: sessao.id },
-        data: {
-          dividasTemp: JSON.stringify([
-            ...historicoInterpretador,
-            { role: "user", content: mensagem },
-            { role: "assistant", content: respostaIntent },
-            ...(intentFinanceiro.emEscopo && intentFinanceiro.precisaConfirmacao
-              ? [criarMensagemEstadoControle(estadoComIntent)]
-              : []),
-          ]),
-        },
-      });
-
-      return NextResponse.json({ ok: true });
-    }
-
     const historico: Mensagem[] = JSON.parse(sessao.dividasTemp || "[]");
 
     // Busca se cliente é gratuito para log de IA

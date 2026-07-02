@@ -1251,6 +1251,14 @@ function removerTrechoCartao(mensagem: string, cartao: string | null): string {
   return limpa.replace(/\s+/g, " ").trim();
 }
 
+function deveBloquearGastoUnicoPorMultiplosValores(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  const valores = texto.match(/\b\d[\d.,]*\b/g) ?? [];
+  if (valores.length < 2) return false;
+  if (/\b(?:cada|cada uma|cada um|unidade|por unidade|a unidade)\b/.test(texto)) return false;
+  return true;
+}
+
 function somarFatura(
   faturas: FaturaAbertaControle[],
   cartao: string,
@@ -1397,6 +1405,8 @@ export function registrarGastoControle(
   estadoAtual: EstadoControleFinanceiro,
   agora = new Date()
 ): ResultadoGastoControle | null {
+  if (deveBloquearGastoUnicoPorMultiplosValores(mensagem)) return null;
+
   const cartao = detectarCartao(mensagem);
   const mensagemSemCartao = removerTrechoCartao(mensagem, cartao);
   const gastoDetectado = processarFluxoGasto(mensagemSemCartao, agora);

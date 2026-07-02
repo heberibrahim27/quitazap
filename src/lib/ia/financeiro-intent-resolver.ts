@@ -3,8 +3,8 @@ import { parseMoneyBR } from "../money";
 import { normalizarDescricaoFinanceira } from "../descricao-financeira";
 import {
   avaliarEscopoFinanceiro,
-  deveChamarInterpretadorFinanceiroIA,
   devePularInterpretadorFinanceiroIA,
+  deveUsarInterpretadorFinanceiroIA,
 } from "./financeiro-scope-guard";
 import {
   criarIntentForaEscopo,
@@ -90,7 +90,7 @@ function resolverReceita(mensagem: string): FinanceiroIntent | null {
     };
   }
 
-  if (/\brecebi pix\b/.test(texto)) {
+  if (/\b(?:recebi pix|caiu pix)\b/.test(texto)) {
     return {
       emEscopo: true,
       intencao: "registrar_receita",
@@ -103,6 +103,48 @@ function resolverReceita(mensagem: string): FinanceiroIntent | null {
           descricaoOriginal: "recebi pix",
           descricaoNormalizada: "Pix recebido",
           categoria: "Pix recebido",
+          valor,
+          recorrencia: "unica",
+          origem: "saldo",
+        }),
+      ],
+    };
+  }
+
+  if (/\bvendi\b/.test(texto)) {
+    return {
+      emEscopo: true,
+      intencao: "registrar_receita",
+      confianca: 0.88,
+      precisaConfirmacao: true,
+      motivoConfirmacao: "Venda avulsa detectada por linguagem natural.",
+      itens: [
+        criarItem({
+          tipo: "receita",
+          descricaoOriginal: "vendi",
+          descricaoNormalizada: "Venda",
+          categoria: "Venda",
+          valor,
+          recorrencia: "unica",
+          origem: "saldo",
+        }),
+      ],
+    };
+  }
+
+  if (/\b(?:entrou|entrou dinheiro|me pagaram)\b/.test(texto)) {
+    return {
+      emEscopo: true,
+      intencao: "registrar_receita",
+      confianca: 0.86,
+      precisaConfirmacao: true,
+      motivoConfirmacao: "Entrada avulsa detectada por linguagem natural.",
+      itens: [
+        criarItem({
+          tipo: "receita",
+          descricaoOriginal: "entrada",
+          descricaoNormalizada: "Entrada recebida",
+          categoria: "Entrada extra",
           valor,
           recorrencia: "unica",
           origem: "saldo",
@@ -290,14 +332,17 @@ export async function resolverIntencaoFinanceiraIA(
   const escopo = avaliarEscopoFinanceiro(mensagem);
   if (!escopo.emEscopo) return criarIntentForaEscopo();
 
-  if (!deveChamarInterpretadorFinanceiroIA(mensagem)) return null;
+  if (!deveUsarInterpretadorFinanceiroIA(mensagem, opts.temConfirmacaoPendente)) return null;
+
+  const local = resolverLocal(mensagem);
+  if (!local.emEscopo || local.itens.length > 0) return local;
 
   if (!opts.forcarLocal) {
     const remoto = await chamarOpenAIInterpretador(mensagem);
     if (remoto) return remoto;
   }
 
-  return resolverLocal(mensagem);
+  return local;
 }
 
 export function formatarPreviaIntentFinanceiro(intent: FinanceiroIntent): string {

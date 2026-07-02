@@ -82,6 +82,7 @@ const {
 const {
   avaliarEscopoFinanceiro,
   devePularInterpretadorFinanceiroIA,
+  deveUsarInterpretadorFinanceiroIA,
 } = loadTsModule("src/lib/ia/financeiro-scope-guard.ts");
 const {
   formatarPreviaIntentFinanceiro,
@@ -579,6 +580,60 @@ test("interpretador financeiro local diferencia receita de renda", async () => {
   assert.equal(pix.itens[0].valor, 150);
 });
 
+test("interpretador financeiro prioriza receitas deterministicas mesmo com OpenAI configurada", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  let chamouFetch = false;
+  globalThis.fetch = async () => {
+    chamouFetch = true;
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({
+          emEscopo: true,
+          intencao: "generico",
+          confianca: 0.4,
+          precisaConfirmacao: true,
+          itens: [{ tipo: "desconhecido", descricaoOriginal: "", descricaoNormalizada: "", categoria: "Outros", valor: 200 }],
+        }) } }],
+      }),
+    };
+  };
+
+  try {
+    const resultado = await resolverIntencaoFinanceiraIA("anota pra mim cliente pagou 200,00");
+    assert.ok(resultado);
+    assert.equal(chamouFetch, false);
+    assert.equal(resultado.itens[0].tipo, "receita");
+    assert.equal(resultado.itens[0].descricaoNormalizada, "Cliente pagou");
+    assert.equal(resultado.itens[0].categoria, "Recebimento de cliente");
+    assert.equal(resultado.itens[0].valor, 200);
+    assert.doesNotMatch(formatarPreviaIntentFinanceiro(resultado), /Outros lançamentos|Outros/);
+    assert.match(formatarPreviaIntentFinanceiro(resultado), /Entendi como receita:/);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("interpretador financeiro reconhece receitas basicas sem cair em outros", async () => {
+  const casos = [
+    ["cliente pagou 200", "Recebimento de cliente", 200],
+    ["caiu pix 90", "Pix recebido", 90],
+    ["vendi 80", "Venda", 80],
+    ["entrou 300", "Entrada extra", 300],
+  ];
+
+  for (const [mensagem, categoria, valor] of casos) {
+    const resultado = await resolverIntencaoFinanceiraIA(mensagem, { forcarLocal: true });
+    assert.ok(resultado, mensagem);
+    assert.equal(resultado.itens[0].tipo, "receita", mensagem);
+    assert.equal(resultado.itens[0].categoria, categoria, mensagem);
+    assert.equal(resultado.itens[0].valor, valor, mensagem);
+  }
+});
+
 test("interpretador financeiro estrutura mensagem mista com confirmacao", async () => {
   const resultado = await resolverIntencaoFinanceiraIA(
     "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900",
@@ -606,6 +661,17 @@ test("interpretador financeiro estrutura mensagem mista com confirmacao", async 
   assert.match(previa, /Despesas fixas mensais:/);
   assert.match(previa, /Aluguel — Moradia — R\$ 800,00/);
   assert.match(previa, /1️⃣ Sim, registrar tudo/);
+});
+
+test("mensagem mista deve usar interpretador antes do gasto comum e nao salvar como gasto unico", async () => {
+  const mensagem = "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900";
+
+  assert.equal(deveUsarInterpretadorFinanceiroIA(mensagem), true);
+  const intent = await resolverIntencaoFinanceiraIA(mensagem, { forcarLocal: true });
+  assert.ok(intent);
+  assert.equal(intent.itens.length, 5);
+  assert.equal(registrarGastoControle(mensagem, estadoControleBase(), new Date(2026, 6, 1)), null);
+  assert.doesNotMatch(formatarPreviaIntentFinanceiro(intent), /R\$ 250,00[\s\S]*Conta da casa/i);
 });
 
 test("interpretador financeiro estrutura despesas fixas em frase natural", async () => {
