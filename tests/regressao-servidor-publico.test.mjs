@@ -653,6 +653,25 @@ function estadoComDespesasFixasBase() {
   );
 }
 
+function estadoSemDespesasFixasBase() {
+  return {
+    rendaMensal: 7140.69,
+    totalDespesasFixas: 0,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [],
+  };
+}
+
+function chaveTextoTeste(texto) {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "");
+}
+
 test("controle financeiro calcula saldo inicial apos renda e despesas fixas", () => {
   const estado = estadoControleBase();
 
@@ -734,11 +753,13 @@ test("gerenciamento adiciona despesas fixas por sinonimos e multiplas linhas", (
     estadoComDespesasFixasBase()
   );
   assert.ok(internet);
-  assert.equal(internet.estado.totalDespesasFixas, 1120);
+  assert.equal(internet.estado.totalDespesasFixas, 1110);
   assert.deepEqual(internet.estado.despesasFixas.find((d) => d.descricao === "Internet"), {
     descricao: "Internet",
-    valor: 100,
+    valor: 90,
   });
+  assert.equal(internet.atualizouEstado, false);
+  assert.match(internet.resposta, /⚠️ \*Despesa fixa já existe\.\*/);
 
   const multiplas = gerenciarDespesasFixasControle(
     `adicionar nas despesas fixas:
@@ -770,7 +791,7 @@ test("gerenciamento reconhece recorrencia natural como despesa fixa", () => {
   ];
 
   for (const comando of casos) {
-    const resultado = gerenciarDespesasFixasControle(comando, estadoComDespesasFixasBase());
+    const resultado = gerenciarDespesasFixasControle(comando, estadoSemDespesasFixasBase());
     assert.ok(resultado, comando);
     assert.equal(resultado.atualizouEstado, true);
     assert.match(resultado.resposta, /Despesa fixa adicionada/);
@@ -778,10 +799,78 @@ test("gerenciamento reconhece recorrencia natural como despesa fixa", () => {
 
   const todoMesComValorAntes = gerenciarDespesasFixasControle(
     "todo mês pago 110 de ChatGPT",
-    estadoComDespesasFixasBase()
+    estadoSemDespesasFixasBase()
   );
   assert.ok(todoMesComValorAntes);
   assert.deepEqual(todoMesComValorAntes.estado.despesasFixas.at(-1), { descricao: "ChatGPT", valor: 110 });
+});
+
+test("gerenciamento nao duplica despesa fixa existente com mesmo valor", () => {
+  const estado = atualizarDespesasFixasControle(
+    { rendaMensal: 7140.69, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [], despesasFixas: [] },
+    110,
+    7140.69,
+    [{ descricao: "ChatGPT", valor: 110 }]
+  );
+
+  const duplicada = gerenciarDespesasFixasControle("todo mês 110 ChatGPT", estado);
+  assert.ok(duplicada);
+  assert.equal(duplicada.atualizouEstado, false);
+  assert.equal(duplicada.estado.totalDespesasFixas, 110);
+  assert.deepEqual(duplicada.estado.despesasFixas, [{ descricao: "ChatGPT", valor: 110 }]);
+  assert.match(duplicada.resposta, /ℹ️ \*Despesa fixa já cadastrada\.\*/);
+  assert.match(duplicada.resposta, /ChatGPT\nR\$ 110,00/);
+  assert.match(duplicada.resposta, /Não dupliquei esse lançamento\./);
+
+  const duplicadaComEspaco = gerenciarDespesasFixasControle("todo mês 110 chat gpt", estado);
+  assert.ok(duplicadaComEspaco);
+  assert.equal(duplicadaComEspaco.atualizouEstado, false);
+  assert.equal(duplicadaComEspaco.estado.totalDespesasFixas, 110);
+  assert.deepEqual(duplicadaComEspaco.estado.despesasFixas, [{ descricao: "ChatGPT", valor: 110 }]);
+});
+
+test("gerenciamento nao altera automaticamente quando valor existente e diferente", () => {
+  const estado = atualizarDespesasFixasControle(
+    { rendaMensal: 7140.69, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [], despesasFixas: [] },
+    120,
+    7140.69,
+    [{ descricao: "ChatGPT", valor: 120 }]
+  );
+
+  const conflito = gerenciarDespesasFixasControle("todo mês 110 ChatGPT", estado);
+  assert.ok(conflito);
+  assert.equal(conflito.atualizouEstado, false);
+  assert.equal(conflito.estado.totalDespesasFixas, 120);
+  assert.deepEqual(conflito.estado.despesasFixas, [{ descricao: "ChatGPT", valor: 120 }]);
+  assert.match(conflito.resposta, /⚠️ \*Despesa fixa já existe\.\*/);
+  assert.match(conflito.resposta, /ChatGPT está cadastrada por R\$ 120,00\./);
+  assert.match(conflito.resposta, /Você quis atualizar para R\$ 110,00\?/);
+  assert.match(conflito.resposta, /1️⃣ Sim, atualizar/);
+
+  const corrigida = gerenciarDespesasFixasControle("corrigir despesa fixa ChatGPT para 110", estado);
+  assert.ok(corrigida);
+  assert.equal(corrigida.atualizouEstado, true);
+  assert.equal(corrigida.estado.totalDespesasFixas, 110);
+  assert.deepEqual(corrigida.estado.despesasFixas, [{ descricao: "ChatGPT", valor: 110 }]);
+});
+
+test("gerenciamento em multiplas linhas ignora duplicadas normalizadas", () => {
+  const resultado = gerenciarDespesasFixasControle(
+    `adicionar despesas fixas:
+ChatGPT 110
+Claude 110
+Chat GPT 110`,
+    estadoComDespesasFixasBase()
+  );
+
+  assert.ok(resultado);
+  assert.equal(resultado.atualizouEstado, true);
+  assert.equal(resultado.estado.totalDespesasFixas, 1330);
+  assert.equal(resultado.estado.despesasFixas.filter((d) => chaveTextoTeste(d.descricao) === "chatgpt").length, 1);
+  assert.match(resultado.resposta, /ChatGPT\nR\$ 110,00/);
+  assert.match(resultado.resposta, /Claude\nR\$ 110,00/);
+  assert.match(resultado.resposta, /Duplicadas ignoradas/);
+  assert.match(resultado.resposta, /Total adicionado\nR\$ 220,00/);
 });
 
 test("gerenciamento preserva total legado sem lista detalhada ao adicionar nova despesa fixa", () => {

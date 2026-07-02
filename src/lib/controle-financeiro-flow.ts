@@ -50,6 +50,8 @@ export type ResultadoGastoControle = {
   atualizouEstado: boolean;
 };
 
+const DESPESAS_FIXAS_ANTERIORES = "Despesas fixas anteriores";
+
 const CARTOES_CONHECIDOS: Array<{ aliases: string[]; nome: string }> = [
   { aliases: ["mercado pago"], nome: "Mercado Pago" },
   { aliases: ["banco do brasil"], nome: "Banco do Brasil" },
@@ -238,7 +240,11 @@ function formatarDescricaoDespesaFixa(texto: string): string {
 }
 
 function chaveDespesaFixa(descricao: string): string {
-  return normalizarTexto(descricao);
+  return normalizarTexto(descricao).replace(/\s+/g, "");
+}
+
+function ehDespesaFixaCompatibilidade(despesa: DespesaFixaRegistradaControle): boolean {
+  return chaveDespesaFixa(despesa.descricao) === chaveDespesaFixa(DESPESAS_FIXAS_ANTERIORES);
 }
 
 function recalcularDespesasFixas(despesasFixas: DespesaFixaRegistradaControle[]): number {
@@ -250,7 +256,7 @@ function despesasFixasCompatControle(estado: EstadoControleFinanceiro): DespesaF
   if (despesasFixas.length > 0) return despesasFixas;
 
   return Number.isFinite(estado.totalDespesasFixas) && estado.totalDespesasFixas > 0
-    ? [{ descricao: "Despesas fixas anteriores", valor: estado.totalDespesasFixas }]
+    ? [{ descricao: DESPESAS_FIXAS_ANTERIORES, valor: estado.totalDespesasFixas }]
     : [];
 }
 
@@ -344,23 +350,51 @@ function parsearItensDespesaFixa(mensagem: string): DespesaFixaRegistradaControl
     .filter((item): item is DespesaFixaRegistradaControle => Boolean(item));
 }
 
-function atualizarListaDespesasFixas(
+function valoresIguais(a: number, b: number): boolean {
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+function encontrarIndiceDespesaFixa(
+  despesas: DespesaFixaRegistradaControle[],
+  item: DespesaFixaRegistradaControle
+): number {
+  const chave = chaveDespesaFixa(item.descricao);
+  return despesas.findIndex((despesa) =>
+    !ehDespesaFixaCompatibilidade(despesa) && chaveDespesaFixa(despesa.descricao) === chave
+  );
+}
+
+function adicionarDespesasFixasSemDuplicar(
   despesasAtuais: DespesaFixaRegistradaControle[],
   itens: DespesaFixaRegistradaControle[]
-): DespesaFixaRegistradaControle[] {
+): {
+  lista: DespesaFixaRegistradaControle[];
+  adicionados: DespesaFixaRegistradaControle[];
+  duplicados: DespesaFixaRegistradaControle[];
+  conflitos: Array<{ atual: DespesaFixaRegistradaControle; novo: DespesaFixaRegistradaControle }>;
+} {
   let lista = [...despesasAtuais];
+  const adicionados: DespesaFixaRegistradaControle[] = [];
+  const duplicados: DespesaFixaRegistradaControle[] = [];
+  const conflitos: Array<{ atual: DespesaFixaRegistradaControle; novo: DespesaFixaRegistradaControle }> = [];
 
   for (const item of itens) {
-    const chave = chaveDespesaFixa(item.descricao);
-    const indice = lista.findIndex((despesa) => chaveDespesaFixa(despesa.descricao) === chave);
+    const indice = encontrarIndiceDespesaFixa(lista, item);
     if (indice >= 0) {
-      lista[indice] = item;
-    } else {
-      lista.push(item);
+      const atual = lista[indice];
+      if (valoresIguais(atual.valor, item.valor)) {
+        duplicados.push(atual);
+      } else {
+        conflitos.push({ atual, novo: item });
+      }
+      continue;
     }
+
+    lista.push(item);
+    adicionados.push(item);
   }
 
-  return lista;
+  return { lista, adicionados, duplicados, conflitos };
 }
 
 export function gerenciarDespesasFixasControle(
@@ -396,7 +430,8 @@ export function gerenciarDespesasFixasControle(
     const itens = parsearItensDespesaFixa(mensagem);
     if (itens.length === 0) return null;
 
-    const despesasFixas = atualizarListaDespesasFixas(despesasAtuais, itens);
+    const resultadoAdicao = adicionarDespesasFixasSemDuplicar(despesasAtuais, itens);
+    const despesasFixas = resultadoAdicao.lista;
     const totalDespesasFixas = recalcularDespesasFixas(despesasFixas);
     const estado = {
       ...estadoAtual,
@@ -406,8 +441,36 @@ export function gerenciarDespesasFixasControle(
       cartoes: estadoAtual.cartoes ?? [],
     };
 
-    if (itens.length === 1) {
-      const item = itens[0];
+    if (resultadoAdicao.adicionados.length === 0 && resultadoAdicao.conflitos.length === 0 && resultadoAdicao.duplicados.length > 0) {
+      const duplicado = resultadoAdicao.duplicados[0];
+      return {
+        resposta:
+          "ℹ️ *Despesa fixa já cadastrada.*\n\n" +
+          `${duplicado.descricao}\n` +
+          `${formatarValorBR(duplicado.valor)}\n\n` +
+          "Não dupliquei esse lançamento.",
+        estado: estadoAtual,
+        atualizouEstado: false,
+      };
+    }
+
+    if (resultadoAdicao.adicionados.length === 0 && resultadoAdicao.conflitos.length > 0) {
+      const conflito = resultadoAdicao.conflitos[0];
+      return {
+        resposta:
+          "⚠️ *Despesa fixa já existe.*\n\n" +
+          `${conflito.atual.descricao} está cadastrada por ${formatarValorBR(conflito.atual.valor)}.\n\n` +
+          `Você quis atualizar para ${formatarValorBR(conflito.novo.valor)}?\n\n` +
+          "Responda:\n" +
+          "1️⃣ Sim, atualizar\n" +
+          "2️⃣ Não, manter como está",
+        estado: estadoAtual,
+        atualizouEstado: false,
+      };
+    }
+
+    if (resultadoAdicao.adicionados.length === 1 && resultadoAdicao.duplicados.length === 0 && resultadoAdicao.conflitos.length === 0) {
+      const item = resultadoAdicao.adicionados[0];
       return {
         resposta:
           "✅ *Despesa fixa adicionada.*\n\n" +
@@ -421,21 +484,41 @@ export function gerenciarDespesasFixasControle(
       };
     }
 
-    const totalAdicionado = itens.reduce((soma, item) => soma + item.valor, 0);
-    const linhasItens = itens.flatMap((item) => [
+    const totalAdicionado = resultadoAdicao.adicionados.reduce((soma, item) => soma + item.valor, 0);
+    const linhasItens = resultadoAdicao.adicionados.flatMap((item) => [
       item.descricao,
       formatarValorBR(item.valor),
       "",
     ]);
     linhasItens.push("Total adicionado", formatarValorBR(totalAdicionado));
+    if (resultadoAdicao.duplicados.length > 0) {
+      linhasItens.push(
+        "",
+        "Duplicadas ignoradas",
+        ...resultadoAdicao.duplicados.flatMap((item) => [item.descricao, formatarValorBR(item.valor), ""])
+      );
+    }
+    if (resultadoAdicao.conflitos.length > 0) {
+      linhasItens.push(
+        "",
+        "Conflitos não alterados",
+        ...resultadoAdicao.conflitos.flatMap((conflito) => [
+          `${conflito.atual.descricao} atual`,
+          formatarValorBR(conflito.atual.valor),
+          `${conflito.atual.descricao} informado`,
+          formatarValorBR(conflito.novo.valor),
+          "",
+        ])
+      );
+    }
 
     return {
       resposta:
-        "✅ *Despesas fixas adicionadas.*\n\n" +
+        `${resultadoAdicao.adicionados.length > 0 ? "✅ *Despesas fixas adicionadas.*" : "ℹ️ *Nenhuma despesa fixa nova adicionada.*"}\n\n` +
         `${linhasItens.join("\n").trim()}\n\n` +
         resumoDespesasFixasAtualizado(estado),
       estado,
-      atualizouEstado: true,
+      atualizouEstado: resultadoAdicao.adicionados.length > 0,
     };
   }
 
@@ -443,8 +526,7 @@ export function gerenciarDespesasFixasControle(
     const item = extrairItemDespesaFixa(mensagem);
     if (!item) return null;
 
-    const chave = chaveDespesaFixa(item.descricao);
-    const indice = despesasAtuais.findIndex((despesa) => chaveDespesaFixa(despesa.descricao) === chave);
+    const indice = encontrarIndiceDespesaFixa(despesasAtuais, item);
     if (indice < 0) {
       return {
         resposta: "Não encontrei essa despesa fixa para atualizar.",
@@ -480,7 +562,9 @@ export function gerenciarDespesasFixasControle(
   if (!descricao) return null;
 
   const chave = chaveDespesaFixa(descricao);
-  const removida = despesasAtuais.find((despesa) => chaveDespesaFixa(despesa.descricao) === chave);
+  const removida = despesasAtuais.find((despesa) =>
+    !ehDespesaFixaCompatibilidade(despesa) && chaveDespesaFixa(despesa.descricao) === chave
+  );
   if (!removida) {
     return {
       resposta: "Não encontrei essa despesa fixa para remover.",
@@ -489,7 +573,9 @@ export function gerenciarDespesasFixasControle(
     };
   }
 
-  const despesasFixas = despesasAtuais.filter((despesa) => chaveDespesaFixa(despesa.descricao) !== chave);
+  const despesasFixas = despesasAtuais.filter((despesa) =>
+    ehDespesaFixaCompatibilidade(despesa) || chaveDespesaFixa(despesa.descricao) !== chave
+  );
   const estado = {
     ...estadoAtual,
     despesasFixas,
