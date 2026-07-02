@@ -412,6 +412,46 @@ test("fluxo deterministico de gasto classifica categorias por palavra-chave", ()
   assert.equal(processarFluxoGasto("uber 23,50", hoje)?.categoria, "Transporte");
 });
 
+test("fluxo deterministico calcula quantidade vezes valor unitario", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+  const agua = processarFluxoGasto(
+    "Água, comprei 3 águas, uma pra mim e mais duas pra dois amigos. Custou 2,50 cada",
+    hoje
+  );
+
+  assert.ok(agua);
+  assert.equal(agua.descricao, "Água — 3 unidades");
+  assert.equal(agua.valor, 7.5);
+  assert.equal(agua.quantidade, 3);
+  assert.equal(agua.valorUnitario, 2.5);
+  assert.match(agua.resposta, /Água — 3 unidades/);
+  assert.match(agua.resposta, /Quantidade:\* 3/);
+  assert.match(agua.resposta, /Valor unitário:\* R\$ 2,50/);
+  assert.match(agua.resposta, /Valor:\* R\$ 7,50/);
+
+  assert.equal(processarFluxoGasto("2 lanches 18 cada", hoje)?.valor, 36);
+  assert.equal(processarFluxoGasto("2 lanches 18 cada", hoje)?.descricao, "Lanches — 2 unidades");
+  assert.equal(processarFluxoGasto("4 pães 1,50 cada", hoje)?.valor, 6);
+  assert.equal(processarFluxoGasto("4 pães 1,50 cada", hoje)?.descricao, "Pães — 4 unidades");
+  assert.equal(processarFluxoGasto("3 coca 6 cada", hoje)?.valor, 18);
+  assert.equal(processarFluxoGasto("3 coca 6 cada", hoje)?.descricao, "Coca — 3 unidades");
+});
+
+test("descricoes financeiras corrigem grafia e preservam marcas", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+
+  assert.equal(processarFluxoGasto("agua 5", hoje)?.descricao, "Água");
+  assert.equal(processarFluxoGasto("aguas 10", hoje)?.descricao, "Águas");
+  assert.equal(processarFluxoGasto("mercado 45", hoje)?.descricao, "Mercado");
+  assert.equal(processarFluxoGasto("trasporte 20", hoje)?.descricao, "Transporte");
+  assert.equal(processarFluxoGasto("tranporte 20", hoje)?.descricao, "Transporte");
+  assert.equal(processarFluxoGasto("chat gpt 110", hoje)?.descricao, "ChatGPT");
+  assert.equal(processarFluxoGasto("nubank 35", hoje)?.descricao, "Nubank");
+  assert.equal(processarFluxoGasto("ifood 30", hoje)?.descricao, "iFood");
+  assert.equal(processarFluxoGasto("netflix 25", hoje)?.descricao, "Netflix");
+  assert.equal(processarFluxoGasto("uber 23,50", hoje)?.descricao, "Uber");
+});
+
 test("fluxo deterministico classifica apostas separado de lazer", () => {
   const hoje = new Date(2026, 6, 1, 12, 0, 0);
 
@@ -566,6 +606,47 @@ Claude 110`;
   assert.doesNotMatch(
     `${resposta}\n${resumo}\n${proximaEtapa}`,
     /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN|```(?:text|txt|markdown|ts|js)/i
+  );
+});
+
+test("despesas fixas do onboarding aceitam dois pontos, reais e observacoes", () => {
+  const despesas = parsearDespesasFixasControle(`Internet: 30,00 (plano tim)
+Livros: 140,00
+Transporte: 180,00
+Materiais de estudo: 300,00`);
+
+  assert.deepEqual(
+    despesas.map((d) => ({
+      descricao: d.descricao,
+      valor: d.valor,
+      observacao: d.observacao,
+    })),
+    [
+      { descricao: "Internet", valor: 30, observacao: "plano tim" },
+      { descricao: "Livros", valor: 140, observacao: undefined },
+      { descricao: "Transporte", valor: 180, observacao: undefined },
+      { descricao: "Materiais de estudo", valor: 300, observacao: undefined },
+    ]
+  );
+
+  const [resposta, resumo] = formatarMensagensDespesasFixasControle(despesas, 7140.69);
+  assert.match(resposta, /Internet\nR\$ 30,00/);
+  assert.match(resposta, /Livros\nR\$ 140,00/);
+  assert.match(resposta, /Transporte\nR\$ 180,00/);
+  assert.match(resposta, /Materiais de estudo\nR\$ 300,00/);
+  assert.match(resposta, /Total fixo mensal\nR\$ 650,00/);
+  assert.match(resumo, /Despesas fixas\nR\$ 650,00/);
+  assert.match(resumo, /Saldo antes dos gastos do dia a dia\nR\$ 6\.490,69/);
+});
+
+test("despesas fixas do onboarding aceitam formatos reais com separadores", () => {
+  const despesas = parsearDespesasFixasControle(`ChatGPT: R$ 110,00
+Claude: R$ 110,00
+Academia - 90`);
+
+  assert.deepEqual(
+    despesas.map((d) => `${d.descricao}:${d.valor}`),
+    ["ChatGPT:110", "Claude:110", "Academia:90"]
   );
 });
 
@@ -1172,6 +1253,24 @@ test("gasto sem cartao sai do saldo do mes e nao entra em fatura", () => {
   assert.match(resultado.resposta, /💳 \*Origem:\* Saldo do mês/);
   assert.match(resultado.resposta, /💰 \*Saldo disponível:\* R\$ 1\.895,00/);
   assert.match(resultado.resposta, /💳 \*Faturas em aberto:\* R\$ 0,00/);
+  assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("gasto comum com valor unitario mostra quantidade, total e atualiza saldo", () => {
+  const resultado = registrarGastoControle(
+    "Água, comprei 3 águas, uma pra mim e mais duas pra dois amigos. Custou 2,50 cada",
+    estadoControleBase(),
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+
+  assert.ok(resultado);
+  assert.equal(resultado.estado.totalGastosSaldo, 7.5);
+  assert.equal(calcularSaldoDisponivelControle(resultado.estado), 1952.5);
+  assert.match(resultado.resposta, /Descrição:\* Água — 3 unidades/);
+  assert.match(resultado.resposta, /Quantidade:\* 3/);
+  assert.match(resultado.resposta, /Valor unitário:\* R\$ 2,50/);
+  assert.match(resultado.resposta, /Valor:\* R\$ 7,50/);
+  assert.match(resultado.resposta, /Saldo disponível:\* R\$ 1\.952,50/);
   assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 

@@ -1,4 +1,5 @@
 import { parseMoneyBR } from "./money";
+import { normalizarDescricaoFinanceira } from "./descricao-financeira";
 
 export type CategoriaGasto =
   | "Mercado"
@@ -20,6 +21,8 @@ export type CategoriaGasto =
 export type GastoDetectado = {
   pareceGasto: boolean;
   valor?: number;
+  quantidade?: number;
+  valorUnitario?: number;
   descricao: string;
   categoria: CategoriaGasto;
   data: Date;
@@ -30,14 +33,14 @@ const PERGUNTA_VALOR = "Qual foi o valor desse gasto?";
 
 const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
   { categoria: "Mercado", palavras: ["mercado", "supermercado", "atacadao", "assai", "atacarejo"] },
-  { categoria: "Alimentação", palavras: ["ifood", "lanche", "restaurante", "pizza", "almoco", "comida"] },
-  { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "combustivel", "transporte"] },
+  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanches", "restaurante", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
+  { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "combustivel", "transporte", "trasporte", "tranporte"] },
   { categoria: "Moradia", palavras: ["aluguel", "condominio", "prestacao da casa"] },
   { categoria: "Contas da casa", palavras: ["energia", "luz", "agua", "internet", "celular", "gas"] },
   { categoria: "Saúde/Farmácia", palavras: ["remedio", "farmacia", "consulta", "exame", "medico"] },
   { categoria: "Educação", palavras: ["escola", "curso", "faculdade", "material escolar"] },
   { categoria: "Filhos/Família", palavras: ["filho", "filha", "fralda", "leite", "pensao", "brinquedo"] },
-  { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "claude", "assinatura", "prime"] },
+  { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "chat gpt", "claude", "assinatura", "prime"] },
   { categoria: "Apostas", palavras: ["aposta", "apostas", "bet", "betano", "blaze", "tigrinho", "jogo do tigrinho", "cassino", "cassino online", "roleta", "foguetinho", "pix bet", "banca", "casa de aposta", "jogo online"] },
   { categoria: "Lazer", palavras: ["cerveja", "cinema", "festa", "bar", "viagem", "lazer"] },
   { categoria: "Beleza/Cuidados", palavras: ["cabelo", "unha", "perfume", "skincare", "academia", "barbearia"] },
@@ -56,14 +59,31 @@ const PALAVRAS_GASTO = [
   "pix",
   "uber",
   "ifood",
+  "lanche",
+  "lanches",
+  "agua",
+  "aguas",
+  "pao",
+  "paes",
+  "coca",
+  "transporte",
+  "trasporte",
+  "tranporte",
   "mercado",
   "supermercado",
   "farmacia",
   "remedio",
   "aluguel",
   "energia",
+  "internet",
+  "net",
   "chatgpt",
+  "chat gpt",
   "claude",
+  "nubank",
+  "cartao",
+  "credito",
+  "debito",
   "netflix",
   "spotify",
   "aposta",
@@ -89,16 +109,13 @@ function normalizarTexto(texto: string): string {
 }
 
 function capitalizar(texto: string): string {
-  return texto
-    .split(" ")
-    .filter(Boolean)
-    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase())
-    .join(" ");
+  return normalizarDescricaoFinanceira(texto);
 }
 
 export function detectarMensagemDeGasto(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
   if (!texto) return false;
+  if (/\b(?:fecha|fechamento|vence|vencimento)\b/.test(texto)) return false;
 
   return PALAVRAS_GASTO.some((palavra) => {
     const escaped = palavra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -128,6 +145,59 @@ export function extrairValorGasto(mensagem: string): number | undefined {
   return undefined;
 }
 
+function extrairDescricaoQuantidade(
+  mensagem: string,
+  quantidade: number,
+  indiceValorUnitario: number
+): string {
+  const primeiraParte = /[,.]\s/.test(mensagem) ? mensagem.split(/[,.]\s/)[0]?.trim() : "";
+  const primeiraParteLimpa = primeiraParte && !/\b(comprei|paguei|gastei|custou)\b/i.test(primeiraParte)
+    ? primeiraParte
+    : "";
+  const base = primeiraParteLimpa || mensagem.slice(0, indiceValorUnitario);
+  const semRuido = base
+    .replace(new RegExp(`\\b${quantidade}\\b`, "g"), " ")
+    .replace(
+      /\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|de|do|da|no|na|em|com|pra|para|mim|mais|uma|um|duas|dois|amigos?|cada|unidade)\b/gi,
+      " "
+    )
+    .replace(/[,.]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalizarDescricaoFinanceira(semRuido) || "Item";
+}
+
+function detectarQuantidadeValorUnitario(mensagem: string): {
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  descricao: string;
+} | null {
+  const texto = normalizarTexto(mensagem);
+  const unitarioMatch = texto.match(/\b(\d[\d.,]*)\s*(?:reais?\s*)?(?:cada uma|cada um|cada|a unidade|por unidade|unidade)\b/i);
+  if (!unitarioMatch || unitarioMatch.index === undefined) return null;
+
+  const valorUnitario = parseMoneyBR(unitarioMatch[1]);
+  if (!valorUnitario) return null;
+
+  const trechoAntesValorUnitario = texto.slice(0, unitarioMatch.index);
+  const quantidade = [...trechoAntesValorUnitario.matchAll(/\b\d+\b/g)]
+    .map((match) => Number(match[0]))
+    .find((valor) => Number.isInteger(valor) && valor > 0 && valor < 100);
+  if (!quantidade) return null;
+
+  const valorTotal = Math.round(quantidade * valorUnitario * 100) / 100;
+  const descricaoBase = extrairDescricaoQuantidade(mensagem, quantidade, unitarioMatch.index);
+
+  return {
+    quantidade,
+    valorUnitario,
+    valorTotal,
+    descricao: `${descricaoBase} — ${quantidade} ${quantidade === 1 ? "unidade" : "unidades"}`,
+  };
+}
+
 export function definirCategoriaGasto(mensagem: string): CategoriaGasto {
   const texto = normalizarTexto(mensagem);
 
@@ -150,7 +220,7 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     .replace(/\d{1,3}(?:\.\d{3})*,\d{1,2}\s*(?:reais|real)?/gi, " ")
     .replace(/\d+(?:[.,]\d{1,2})?\s*(?:reais|real)/gi, " ")
     .replace(/\b\d+\b/g, " ")
-    .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
+    .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|cada|unidade|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -206,12 +276,20 @@ export function formatarDataBR(data: Date): string {
 export function formatarRespostaGasto(opts: {
   descricao: string;
   valor: number;
+  quantidade?: number;
+  valorUnitario?: number;
   categoria: CategoriaGasto;
   data: Date;
 }): string {
+  const linhasQuantidade = opts.quantidade && opts.valorUnitario
+    ? `🔢 *Quantidade:* ${opts.quantidade}\n` +
+      `💵 *Valor unitário:* ${formatarValorBR(opts.valorUnitario)}\n`
+    : "";
+
   return (
     "✅ *OK! Registrado.*\n\n" +
     `✍️ *Descrição:* ${opts.descricao || opts.categoria}\n` +
+    linhasQuantidade +
     `💰 *Valor:* ${formatarValorBR(opts.valor)}\n` +
     `🏷️ *Categoria:* ${opts.categoria}\n` +
     `📅 *Data:* ${formatarDataBR(opts.data)}\n\n` +
@@ -222,10 +300,11 @@ export function formatarRespostaGasto(opts: {
 export function processarFluxoGasto(mensagem: string, agora = new Date()): GastoDetectado | null {
   if (!detectarMensagemDeGasto(mensagem)) return null;
 
+  const quantidadeUnitario = detectarQuantidadeValorUnitario(mensagem);
   const categoria = definirCategoriaGasto(mensagem);
-  const descricao = extrairDescricaoGasto(mensagem, categoria);
+  const descricao = quantidadeUnitario?.descricao ?? extrairDescricaoGasto(mensagem, categoria);
   const data = definirDataGasto(mensagem, agora);
-  const valor = extrairValorGasto(mensagem);
+  const valor = quantidadeUnitario?.valorTotal ?? extrairValorGasto(mensagem);
 
   if (!valor) {
     return {
@@ -240,9 +319,18 @@ export function processarFluxoGasto(mensagem: string, agora = new Date()): Gasto
   return {
     pareceGasto: true,
     valor,
+    quantidade: quantidadeUnitario?.quantidade,
+    valorUnitario: quantidadeUnitario?.valorUnitario,
     descricao,
     categoria,
     data,
-    resposta: formatarRespostaGasto({ descricao, valor, categoria, data }),
+    resposta: formatarRespostaGasto({
+      descricao,
+      valor,
+      quantidade: quantidadeUnitario?.quantidade,
+      valorUnitario: quantidadeUnitario?.valorUnitario,
+      categoria,
+      data,
+    }),
   };
 }

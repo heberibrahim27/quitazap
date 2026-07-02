@@ -6,6 +6,7 @@ import {
   type GastoDetectado,
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
+import { normalizarDescricaoFinanceira } from "./descricao-financeira";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
 
@@ -241,29 +242,12 @@ export function totalFaturasAbertasControle(estado: EstadoControleFinanceiro): n
 }
 
 function formatarDescricaoDespesaFixa(texto: string): string {
-  const marcas: Record<string, string> = {
-    chatgpt: "ChatGPT",
-    claude: "Claude",
-    internet: "Internet",
-    academia: "Academia",
-  };
-
-  return texto
+  const limpo = texto
     .replace(/\s+/g, " ")
     .trim()
     .replace(/^[-–—:;,.]+|[-–—:;,.]+$/g, "")
-    .replace(/^(de|do|da|dos|das)\s+/i, "")
-    .split(" ")
-    .filter(Boolean)
-    .map((parte, index) => {
-      const lower = parte.toLowerCase();
-      if (marcas[lower]) return marcas[lower];
-      if (index > 0 && ["de", "do", "da", "dos", "das"].includes(lower)) return lower;
-      return index === 0
-        ? parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase()
-        : lower;
-    })
-    .join(" ");
+    .replace(/^(de|do|da|dos|das)\s+/i, "");
+  return normalizarDescricaoFinanceira(limpo);
 }
 
 function chaveDespesaFixa(descricao: string): string {
@@ -1166,10 +1150,15 @@ export function registrarGastoControle(
   const alertaApostas = gasto.categoria === "Apostas"
     ? "\n\n⚠️ Atenção: gastos com apostas podem comprometer seu controle financeiro rapidamente."
     : "";
+  const linhasQuantidade = gasto.quantidade && gasto.valorUnitario
+    ? `🔢 *Quantidade:* ${gasto.quantidade}\n` +
+      `💵 *Valor unitário:* ${formatarValorBR(gasto.valorUnitario)}\n`
+    : "";
 
   const resposta =
     "✅ *OK! Registrado.*\n\n" +
     `✍️ *Descrição:* ${gasto.descricao || gasto.categoria}\n` +
+    linhasQuantidade +
     `💰 *Valor:* ${formatarValorBR(gasto.valor)}\n` +
     `🏷️ *Categoria:* ${gasto.categoria}\n` +
     `💳 *Origem:* ${origem}\n` +

@@ -1,4 +1,5 @@
 import { parseMoneyBR } from "./money";
+import { normalizarDescricaoFinanceira } from "./descricao-financeira";
 
 export const RESET_CONTROLE_MENSAGEM_1 =
   "✅ *Tudo zerado.*\n\n" +
@@ -113,6 +114,7 @@ export function mensagemExplicarDespesasFixasControle(): string {
 export type DespesaFixaControle = {
   descricao: string;
   valor: number;
+  observacao?: string;
   parcelaAtual?: number;
   totalParcelas?: number;
   parcelasRestantes?: number;
@@ -124,29 +126,6 @@ function limparDescricao(texto: string): string {
     .trim()
     .replace(/^[-–—:;,.]+|[-–—:;,.]+$/g, "")
     .trim();
-}
-
-function formatarDescricao(texto: string): string {
-  const descricao = limparDescricao(texto);
-  return descricao
-    .split(" ")
-    .filter(Boolean)
-    .map((parte, index) => {
-      const lower = parte.toLowerCase();
-      const marcas: Record<string, string> = {
-        banco: "Banco",
-        brasil: "Brasil",
-        claude: "Claude",
-        chatgpt: "ChatGPT",
-      };
-      if (marcas[lower]) return marcas[lower];
-      if (index > 0 && ["de", "do", "da", "dos", "das"].includes(lower)) return lower;
-      if (/^[A-Z]{2,}$/.test(parte)) return parte;
-      return index === 0
-        ? parte.charAt(0).toUpperCase() + parte.slice(1).toLowerCase()
-        : lower;
-    })
-    .join(" ");
 }
 
 function pareceComandoRenda(textoOriginal: string): boolean {
@@ -168,23 +147,31 @@ export function parsearDespesasFixasControle(mensagem: string): DespesaFixaContr
     .map((linha) => {
       if (pareceComandoRenda(linha)) return null;
 
+      const observacao = linha.match(/\(([^)]*)\)/)?.[1]?.trim();
       const parcelas = linha.match(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/);
       const linhaSemParcelas = limparDescricao(linha.replace(/\b\d{1,3}\s*\/\s*\d{1,3}\b/g, " "));
-      const valorMatch = linhaSemParcelas.match(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)?$/i);
+      const valorMatches = [...linhaSemParcelas.matchAll(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?/gi)];
+      const valorMatch = valorMatches.at(-1);
       if (!valorMatch) return null;
 
-      const valor = parseMoneyBR(valorMatch[1]);
+      const valor = parseMoneyBR(valorMatch[0]);
       if (!valor) return null;
 
       const valorIndex = valorMatch.index ?? -1;
       if (valorIndex < 0) return null;
 
-      const descricaoRaw = limparDescricao(linhaSemParcelas.slice(0, valorIndex));
+      const descricaoRaw = limparDescricao(
+        linhaSemParcelas
+          .slice(0, valorIndex)
+          .replace(/\([^)]*\)/g, " ")
+          .replace(/[-–—:]+$/g, " ")
+      );
       if (!descricaoRaw) return null;
 
       const despesa: DespesaFixaControle = {
-        descricao: formatarDescricao(descricaoRaw),
+        descricao: normalizarDescricaoFinanceira(descricaoRaw),
         valor,
+        observacao: observacao || undefined,
       };
 
       if (parcelas) {
