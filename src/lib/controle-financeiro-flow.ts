@@ -32,6 +32,9 @@ export type ConfirmacaoPendenteControle = {
   nomeExibido: string;
   valorAnterior: number;
   novoValor: number;
+} | {
+  tipo: "cadastrar_despesas_fixas";
+  itens: Array<{ descricao: string; valor: number }>;
 };
 
 export type UltimoGastoControle = {
@@ -58,6 +61,7 @@ export type ResultadoGastoControle = {
   resposta: string;
   estado: EstadoControleFinanceiro;
   atualizouEstado: boolean;
+  etapa?: string;
 };
 
 const DESPESAS_FIXAS_ANTERIORES = "Despesas fixas anteriores";
@@ -143,7 +147,8 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       ? [{ descricao: "Despesas fixas anteriores", valor: totalLegadoDespesasFixas }]
       : [];
   const totalDespesasFixas = despesasFixasCompat.reduce((soma, despesa) => soma + despesa.valor, 0);
-  const confirmacaoPendente =
+  let confirmacaoPendente: ConfirmacaoPendenteControle | undefined;
+  if (
     raw.confirmacaoPendente &&
     raw.confirmacaoPendente.tipo === "atualizar_despesa_fixa" &&
     typeof raw.confirmacaoPendente.nomeNormalizado === "string" &&
@@ -152,14 +157,29 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
     Number.isFinite(raw.confirmacaoPendente.novoValor) &&
     raw.confirmacaoPendente.valorAnterior > 0 &&
     raw.confirmacaoPendente.novoValor > 0
-      ? {
-          tipo: "atualizar_despesa_fixa" as const,
-          nomeNormalizado: raw.confirmacaoPendente.nomeNormalizado,
-          nomeExibido: raw.confirmacaoPendente.nomeExibido,
-          valorAnterior: Number(raw.confirmacaoPendente.valorAnterior),
-          novoValor: Number(raw.confirmacaoPendente.novoValor),
-        }
+  ) {
+    confirmacaoPendente = {
+      tipo: "atualizar_despesa_fixa",
+      nomeNormalizado: raw.confirmacaoPendente.nomeNormalizado,
+      nomeExibido: raw.confirmacaoPendente.nomeExibido,
+      valorAnterior: Number(raw.confirmacaoPendente.valorAnterior),
+      novoValor: Number(raw.confirmacaoPendente.novoValor),
+    };
+  } else if (
+    raw.confirmacaoPendente &&
+    raw.confirmacaoPendente.tipo === "cadastrar_despesas_fixas" &&
+    Array.isArray(raw.confirmacaoPendente.itens)
+  ) {
+    const itens = raw.confirmacaoPendente.itens
+      .map((item) => ({
+        descricao: typeof item?.descricao === "string" ? item.descricao : "",
+        valor: Number(item?.valor),
+      }))
+      .filter((item) => item.descricao && Number.isFinite(item.valor) && item.valor > 0);
+    confirmacaoPendente = itens.length > 0
+      ? { tipo: "cadastrar_despesas_fixas", itens }
       : undefined;
+  }
 
   return {
     rendaMensal: Number.isFinite(raw.rendaMensal) && Number(raw.rendaMensal) > 0
@@ -361,6 +381,93 @@ function parsearItensDespesaFixa(mensagem: string): DespesaFixaRegistradaControl
     .filter((item): item is DespesaFixaRegistradaControle => Boolean(item));
 }
 
+function adicionarItemDetectado(
+  itens: DespesaFixaRegistradaControle[],
+  descricao: string,
+  valorTexto: string | undefined
+): void {
+  if (!valorTexto) return;
+  const valor = parseMoneyBR(valorTexto);
+  if (!valor) return;
+
+  const item = {
+    descricao: formatarDescricaoDespesaFixa(descricao),
+    valor,
+  };
+  if (!item.descricao) return;
+
+  const chave = chaveDespesaFixa(item.descricao);
+  if (!itens.some((existente) => chaveDespesaFixa(existente.descricao) === chave)) {
+    itens.push(item);
+  }
+}
+
+function contarValoresFinanceirosNaMensagem(mensagem: string): number {
+  const texto = normalizarTexto(mensagem);
+  return [...texto.matchAll(/\b\d[\d.,]*\s*(?:conto|contos|real|reais)?\b/g)].length;
+}
+
+function parsearDespesasFixasFraseCorrida(mensagem: string): DespesaFixaRegistradaControle[] {
+  if (/\r?\n/.test(mensagem)) return [];
+
+  const texto = normalizarTexto(mensagem);
+  if (contarValoresFinanceirosNaMensagem(mensagem) < 2) return [];
+
+  const itens: DespesaFixaRegistradaControle[] = [];
+  const valor = "(\\d[\\d.,]*)\\s*(?:conto|contos|real|reais)?";
+
+  const internet = texto.match(new RegExp(`\\b(?:waifai|wifi|wi-fi|internet)(?:\\s+(?:da|de))?\\s*(tim)?[^.?!]*?\\b${valor}\\b`));
+  if (internet) {
+    adicionarItemDetectado(itens, internet[1] ? "Internet TIM" : "Internet", internet[2]);
+  }
+
+  const livros =
+    texto.match(new RegExp(`\\b${valor}\\s+de\\s+livros?\\b`)) ??
+    texto.match(new RegExp(`\\blivros?[^.?!]*?\\b${valor}\\b`));
+  if (livros) {
+    adicionarItemDetectado(itens, "Livros", livros[1]);
+  }
+
+  const transporte = texto.match(new RegExp(`\\btransporte[^.?!]*?(?:de\\s+)?\\b${valor}\\b`));
+  if (transporte) {
+    adicionarItemDetectado(itens, "Transporte", transporte[1]);
+  }
+
+  const materiais = texto.match(new RegExp(`\\b(?:coisas?|materiais?)[^.?!]*(?:estudar|estudo)[^.?!]*?\\b${valor}\\b`));
+  if (materiais) {
+    adicionarItemDetectado(itens, "Materiais de estudo", materiais[1]);
+  }
+
+  return itens;
+}
+
+function respostaConfirmarDespesasFixasDetectadas(itens: DespesaFixaRegistradaControle[]): string {
+  const linhas = itens.map((item, index) =>
+    `${index + 1}. ${item.descricao} — ${formatarValorBR(item.valor)}`
+  );
+
+  return (
+    "Entendi que você quer cadastrar estas despesas fixas:\n\n" +
+    `${linhas.join("\n")}\n\n` +
+    "Confirma que todas são despesas fixas mensais?\n\n" +
+    "1️⃣ Sim, cadastrar tudo\n" +
+    "2️⃣ Não, quero corrigir"
+  );
+}
+
+function respostaReenviarDespesasFixasEmLista(): string {
+  return (
+    "Identifiquei vários valores na sua mensagem, mas não tenho certeza de todos os itens.\n\n" +
+    "Pode me mandar em lista, assim?\n\n" +
+    "```\n" +
+    "Internet 30\n" +
+    "Livros 140\n" +
+    "Transporte 180\n" +
+    "Materiais de estudo 300\n" +
+    "```"
+  );
+}
+
 function valoresIguais(a: number, b: number): boolean {
   return Math.round(a * 100) === Math.round(b * 100);
 }
@@ -410,8 +517,8 @@ function adicionarDespesasFixasSemDuplicar(
 
 function detectarRespostaConfirmacaoDespesaFixa(mensagem: string): "confirmar" | "negar" | null {
   const texto = normalizarTexto(mensagem);
-  if (/^(1|sim|confirmar|atualizar)$/.test(texto)) return "confirmar";
-  if (/^(2|nao|manter)$/.test(texto)) return "negar";
+  if (/^(1|sim|confirmar|atualizar|cadastrar)$/.test(texto)) return "confirmar";
+  if (/^(2|nao|manter|corrigir)$/.test(texto)) return "negar";
   return null;
 }
 
@@ -438,12 +545,63 @@ function processarConfirmacaoPendenteDespesaFixa(
   estadoAtual: EstadoControleFinanceiro
 ): ResultadoGastoControle | null {
   const pendente = estadoAtual.confirmacaoPendente;
-  if (!pendente || pendente.tipo !== "atualizar_despesa_fixa") return null;
+  if (!pendente) return null;
 
   const resposta = detectarRespostaConfirmacaoDespesaFixa(mensagem);
   if (!resposta) return null;
 
   const despesasAtuais = despesasFixasCompatControle(estadoAtual);
+
+  if (pendente.tipo === "cadastrar_despesas_fixas") {
+    if (resposta === "negar") {
+      return {
+        resposta:
+          "Tudo bem, não cadastrei nada.\n\n" +
+          "Pode me mandar a lista corrigida assim:\n\n" +
+          "```\n" +
+          "Internet 30\n" +
+          "Livros 140\n" +
+          "Transporte 180\n" +
+          "Materiais de estudo 300\n" +
+          "```",
+        estado: {
+          ...estadoAtual,
+          despesasFixas: despesasAtuais,
+          totalDespesasFixas: recalcularDespesasFixas(despesasAtuais),
+          confirmacaoPendente: undefined,
+        },
+        atualizouEstado: true,
+      };
+    }
+
+    const resultadoAdicao = adicionarDespesasFixasSemDuplicar(despesasAtuais, pendente.itens);
+    const despesasFixas = resultadoAdicao.lista;
+    const totalAdicionado = resultadoAdicao.adicionados.reduce((soma, item) => soma + item.valor, 0);
+    const estado = {
+      ...estadoAtual,
+      despesasFixas,
+      totalDespesasFixas: recalcularDespesasFixas(despesasFixas),
+      confirmacaoPendente: undefined,
+      faturas: estadoAtual.faturas ?? [],
+      cartoes: estadoAtual.cartoes ?? [],
+    };
+    const linhasItens = resultadoAdicao.adicionados.flatMap((item) => [
+      item.descricao,
+      formatarValorBR(item.valor),
+      "",
+    ]);
+    linhasItens.push("Total adicionado", formatarValorBR(totalAdicionado));
+
+    return {
+      resposta:
+        "✅ *Despesas fixas adicionadas.*\n\n" +
+        `${linhasItens.join("\n").trim()}\n\n` +
+        resumoDespesasFixasAtualizado(estado),
+      estado,
+      atualizouEstado: true,
+      etapa: "AGUARDANDO_GASTOS",
+    };
+  }
 
   if (resposta === "negar") {
     const estado = {
@@ -536,6 +694,33 @@ export function gerenciarDespesasFixasControle(
   }
 
   if (acao === "adicionar") {
+    const itensFraseCorrida = parsearDespesasFixasFraseCorrida(mensagem);
+    if (itensFraseCorrida.length >= 2) {
+      return {
+        resposta: respostaConfirmarDespesasFixasDetectadas(itensFraseCorrida),
+        estado: {
+          ...estadoAtual,
+          despesasFixas: despesasAtuais,
+          totalDespesasFixas: recalcularDespesasFixas(despesasAtuais),
+          confirmacaoPendente: {
+            tipo: "cadastrar_despesas_fixas",
+            itens: itensFraseCorrida,
+          },
+          faturas: estadoAtual.faturas ?? [],
+          cartoes: estadoAtual.cartoes ?? [],
+        },
+        atualizouEstado: true,
+      };
+    }
+
+    if (!/\r?\n/.test(mensagem) && contarValoresFinanceirosNaMensagem(mensagem) >= 2) {
+      return {
+        resposta: respostaReenviarDespesasFixasEmLista(),
+        estado: estadoAtual,
+        atualizouEstado: false,
+      };
+    }
+
     const itens = parsearItensDespesaFixa(mensagem);
     if (itens.length === 0) return null;
 

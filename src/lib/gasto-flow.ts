@@ -33,7 +33,7 @@ const PERGUNTA_VALOR = "Qual foi o valor desse gasto?";
 
 const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
   { categoria: "Mercado", palavras: ["mercado", "supermercado", "atacadao", "assai", "atacarejo"] },
-  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanches", "restaurante", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
+  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanxe", "lanches", "restaurante", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
   { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "combustivel", "transporte", "trasporte", "tranporte"] },
   { categoria: "Moradia", palavras: ["aluguel", "condominio", "prestacao da casa"] },
   { categoria: "Contas da casa", palavras: ["energia", "luz", "agua", "internet", "celular", "gas"] },
@@ -60,6 +60,7 @@ const PALAVRAS_GASTO = [
   "uber",
   "ifood",
   "lanche",
+  "lanxe",
   "lanches",
   "agua",
   "aguas",
@@ -119,7 +120,7 @@ export function detectarMensagemDeGasto(mensagem: string): boolean {
 
   return PALAVRAS_GASTO.some((palavra) => {
     const escaped = palavra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(texto);
+    return new RegExp(`(^|\\s)${escaped}(\\s|$|[,.])`).test(texto);
   });
 }
 
@@ -165,6 +166,12 @@ function extrairDescricaoQuantidade(
     .replace(/\s+/g, " ")
     .trim();
 
+  const textoBusca = normalizarTexto(semRuido);
+  if (/\baguas?\b/.test(textoBusca)) return "Água";
+  if (/\blanxes?\b|\blanches?\b/.test(textoBusca)) return "Lanches";
+  if (/\bpaes?\b|\bpao\b/.test(textoBusca)) return "Pães";
+  if (/\bcoca\b/.test(textoBusca)) return "Coca";
+
   return normalizarDescricaoFinanceira(semRuido) || "Item";
 }
 
@@ -175,10 +182,13 @@ function detectarQuantidadeValorUnitario(mensagem: string): {
   descricao: string;
 } | null {
   const texto = normalizarTexto(mensagem);
-  const unitarioMatch = texto.match(/\b(\d[\d.,]*)\s*(?:reais?\s*)?(?:cada uma|cada um|cada|a unidade|por unidade|unidade)\b/i);
-  if (!unitarioMatch || unitarioMatch.index === undefined) return null;
+  const valorAntes = texto.match(/\b(\d[\d.,]*)\s*(?:reais?\s*)?(?:cada uma|cada um|cada|a unidade|por unidade|unidade)\b/i);
+  const valorDepois = texto.match(/\b(?:cada uma|cada um|cada)\s+(?:foi|saiu|custou|deu|ficou)\s+(\d[\d.,]*)\b/i);
+  const unitarioMatch = valorAntes ?? valorDepois;
+  const valorUnitarioTexto = valorAntes?.[1] ?? valorDepois?.[1];
+  if (!unitarioMatch || unitarioMatch.index === undefined || !valorUnitarioTexto) return null;
 
-  const valorUnitario = parseMoneyBR(unitarioMatch[1]);
+  const valorUnitario = parseMoneyBR(valorUnitarioTexto);
   if (!valorUnitario) return null;
 
   const trechoAntesValorUnitario = texto.slice(0, unitarioMatch.index);
@@ -200,6 +210,15 @@ function detectarQuantidadeValorUnitario(mensagem: string): {
 
 export function definirCategoriaGasto(mensagem: string): CategoriaGasto {
   const texto = normalizarTexto(mensagem);
+
+  if (/\baguas?\b/.test(texto)) {
+    if (/\b(conta|boleto|embasa|servico|residencial|casa|energia|despesa fixa|todo mes)\b/.test(texto)) {
+      return "Contas da casa";
+    }
+    if (/\b(comprei|comprada|comprar|garrafa|beber|bebida|cada|unidade|mercado|lanche|amigo|amigos|mim)\b/.test(texto)) {
+      return "Alimentação";
+    }
+  }
 
   for (const item of CATEGORIAS) {
     if (item.palavras.some((palavra) => {

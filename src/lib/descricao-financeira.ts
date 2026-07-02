@@ -2,6 +2,9 @@ const MARCAS_E_TERMOS: Record<string, string> = {
   agua: "Água",
   aguas: "Águas",
   mercado: "Mercado",
+  waifai: "Internet",
+  wifi: "Internet",
+  "wi-fi": "Internet",
   trasporte: "Transporte",
   tranporte: "Transporte",
   transporte: "Transporte",
@@ -15,6 +18,7 @@ const MARCAS_E_TERMOS: Record<string, string> = {
   nubank: "Nubank",
   ifood: "iFood",
   netflix: "Netflix",
+  tim: "TIM",
   uber: "Uber",
   bar: "Bar",
   banco: "Banco",
@@ -25,6 +29,8 @@ const MARCAS_E_TERMOS: Record<string, string> = {
   paes: "Pães",
   pao: "Pão",
   coca: "Coca",
+  lanxe: "Lanche",
+  lanche: "Lanche",
   lanches: "Lanches",
 };
 

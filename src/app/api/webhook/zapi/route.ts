@@ -950,6 +950,7 @@ Pode mandar tudo em uma mensagem só.`;
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: {
+          ...(gerenciamentoDespesasFixas.etapa ? { etapa: gerenciamentoDespesasFixas.etapa } : {}),
           dividasTemp: JSON.stringify([
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },

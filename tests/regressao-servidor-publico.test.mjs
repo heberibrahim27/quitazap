@@ -431,10 +431,27 @@ test("fluxo deterministico calcula quantidade vezes valor unitario", () => {
 
   assert.equal(processarFluxoGasto("2 lanches 18 cada", hoje)?.valor, 36);
   assert.equal(processarFluxoGasto("2 lanches 18 cada", hoje)?.descricao, "Lanches — 2 unidades");
+  assert.equal(processarFluxoGasto("2 lanches, cada foi 18", hoje)?.valor, 36);
   assert.equal(processarFluxoGasto("4 pães 1,50 cada", hoje)?.valor, 6);
   assert.equal(processarFluxoGasto("4 pães 1,50 cada", hoje)?.descricao, "Pães — 4 unidades");
+  assert.equal(processarFluxoGasto("4 pães, cada saiu 1,50", hoje)?.valor, 6);
   assert.equal(processarFluxoGasto("3 coca 6 cada", hoje)?.valor, 18);
   assert.equal(processarFluxoGasto("3 coca 6 cada", hoje)?.descricao, "Coca — 3 unidades");
+  assert.equal(processarFluxoGasto("3 coca, cada custou 6", hoje)?.valor, 18);
+
+  for (const mensagem of [
+    "Agua comprei 3 aguas custou 2,50 cada",
+    "Aguá comprei 3 agua pra mim e meus amigo, cada foi 2,50",
+    "comprei 3 águas, cada foi 2,50",
+    "comprei 3 águas, cada saiu 2,50",
+    "comprei 3 águas, cada custou 2,50",
+  ]) {
+    const gasto = processarFluxoGasto(mensagem, hoje);
+    assert.ok(gasto, mensagem);
+    assert.equal(gasto.valor, 7.5, mensagem);
+    assert.equal(gasto.descricao, "Água — 3 unidades", mensagem);
+    assert.equal(gasto.categoria, "Alimentação", mensagem);
+  }
 });
 
 test("descricoes financeiras corrigem grafia e preservam marcas", () => {
@@ -445,11 +462,22 @@ test("descricoes financeiras corrigem grafia e preservam marcas", () => {
   assert.equal(processarFluxoGasto("mercado 45", hoje)?.descricao, "Mercado");
   assert.equal(processarFluxoGasto("trasporte 20", hoje)?.descricao, "Transporte");
   assert.equal(processarFluxoGasto("tranporte 20", hoje)?.descricao, "Transporte");
+  assert.equal(processarFluxoGasto("lanxe 18", hoje)?.descricao, "Lanche");
   assert.equal(processarFluxoGasto("chat gpt 110", hoje)?.descricao, "ChatGPT");
   assert.equal(processarFluxoGasto("nubank 35", hoje)?.descricao, "Nubank");
   assert.equal(processarFluxoGasto("ifood 30", hoje)?.descricao, "iFood");
   assert.equal(processarFluxoGasto("netflix 25", hoje)?.descricao, "Netflix");
   assert.equal(processarFluxoGasto("uber 23,50", hoje)?.descricao, "Uber");
+});
+
+test("agua comprada vira alimentacao e conta de agua vira contas da casa", () => {
+  const hoje = new Date(2026, 6, 1, 12, 0, 0);
+
+  assert.equal(processarFluxoGasto("Água comprei 3 aguas custou 2,50 cada", hoje)?.categoria, "Alimentação");
+  assert.equal(processarFluxoGasto("Aguá comprei 3 agua pra mim e meus amigo, cada foi 2,50", hoje)?.categoria, "Alimentação");
+  assert.equal(processarFluxoGasto("garrafa de água 2,50", hoje)?.categoria, "Alimentação");
+  assert.equal(processarFluxoGasto("conta de água 50", hoje)?.categoria, "Contas da casa");
+  assert.equal(processarFluxoGasto("água Embasa 50", hoje)?.categoria, "Contas da casa");
 });
 
 test("fluxo deterministico classifica apostas separado de lazer", () => {
@@ -898,6 +926,65 @@ test("gerenciamento reconhece recorrencia natural como despesa fixa", () => {
   );
   assert.ok(todoMesComValorAntes);
   assert.deepEqual(todoMesComValorAntes.estado.despesasFixas.at(-1), { descricao: "ChatGPT", valor: 110 });
+});
+
+test("frase corrida com multiplas despesas fixas pede confirmacao antes de cadastrar", () => {
+  const mensagem =
+    "Waifai da tim pago 30 conto todo mes. Compro 140 real de livro. Pago transporte tambem de 180 e umas coisa pra estudar pago 300 real";
+  const resultado = gerenciarDespesasFixasControle(mensagem, estadoSemDespesasFixasBase());
+
+  assert.ok(resultado);
+  assert.equal(resultado.atualizouEstado, true);
+  assert.equal(resultado.estado.totalDespesasFixas, 0);
+  assert.deepEqual(resultado.estado.despesasFixas, []);
+  assert.equal(resultado.estado.confirmacaoPendente?.tipo, "cadastrar_despesas_fixas");
+  assert.deepEqual(resultado.estado.confirmacaoPendente?.itens, [
+    { descricao: "Internet TIM", valor: 30 },
+    { descricao: "Livros", valor: 140 },
+    { descricao: "Transporte", valor: 180 },
+    { descricao: "Materiais de estudo", valor: 300 },
+  ]);
+  assert.match(resultado.resposta, /Entendi que você quer cadastrar estas despesas fixas:/);
+  assert.match(resultado.resposta, /1\. Internet TIM — R\$ 30,00/);
+  assert.match(resultado.resposta, /2\. Livros — R\$ 140,00/);
+  assert.match(resultado.resposta, /3\. Transporte — R\$ 180,00/);
+  assert.match(resultado.resposta, /4\. Materiais de estudo — R\$ 300,00/);
+  assert.match(resultado.resposta, /1️⃣ Sim, cadastrar tudo/);
+  assert.match(resultado.resposta, /2️⃣ Não, quero corrigir/);
+});
+
+test("confirmar frase corrida cadastra itens e negar nao altera despesas fixas", () => {
+  const mensagem =
+    "Waifai da tim pago 30 conto todo mes. Compro 140 real de livro. Pago transporte tambem de 180 e umas coisa pra estudar pago 300 real";
+  const pendente = gerenciarDespesasFixasControle(mensagem, estadoSemDespesasFixasBase());
+  assert.ok(pendente);
+
+  const confirmado = gerenciarDespesasFixasControle("1", pendente.estado);
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.equal(confirmado.estado.totalDespesasFixas, 650);
+  assert.equal(confirmado.etapa, "AGUARDANDO_GASTOS");
+  assert.deepEqual(confirmado.estado.despesasFixas, [
+    { descricao: "Internet TIM", valor: 30 },
+    { descricao: "Livros", valor: 140 },
+    { descricao: "Transporte", valor: 180 },
+    { descricao: "Materiais de estudo", valor: 300 },
+  ]);
+  assert.match(confirmado.resposta, /✅ \*Despesas fixas adicionadas\.\*/);
+  assert.match(confirmado.resposta, /Total adicionado\nR\$ 650,00/);
+  assert.match(confirmado.resposta, /Despesas fixas\nR\$ 650,00/);
+
+  const pendenteNegacao = gerenciarDespesasFixasControle(mensagem, estadoSemDespesasFixasBase());
+  assert.ok(pendenteNegacao);
+  const negado = gerenciarDespesasFixasControle("2", pendenteNegacao.estado);
+  assert.ok(negado);
+  assert.equal(negado.estado.confirmacaoPendente, undefined);
+  assert.equal(negado.estado.totalDespesasFixas, 0);
+  assert.deepEqual(negado.estado.despesasFixas, []);
+  assert.match(negado.resposta, /não cadastrei nada/i);
+
+  assert.equal(gerenciarDespesasFixasControle("1", estadoSemDespesasFixasBase()), null);
+  assert.equal(gerenciarDespesasFixasControle("2", estadoSemDespesasFixasBase()), null);
 });
 
 test("gerenciamento nao duplica despesa fixa existente com mesmo valor", () => {
