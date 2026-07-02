@@ -439,7 +439,7 @@ function respostaDespesaFixaAtualizada(
 ): string {
   return (
     "✅ *Despesa fixa atualizada.*\n\n" +
-    "DescriÃ§Ã£o\n" +
+    "Descrição\n" +
     `${descricao}\n\n` +
     "Valor anterior\n" +
     `${formatarValorBR(valorAnterior)}\n\n` +
@@ -471,7 +471,7 @@ function processarConfirmacaoPendenteDespesaFixa(
 
     return {
       resposta:
-        "Tudo bem, mantive como estÃ¡.\n\n" +
+        "Tudo bem, mantive como está.\n\n" +
         `${pendente.nomeExibido}\n` +
         `${formatarValorBR(pendente.valorAnterior)}`,
       estado,
@@ -485,7 +485,7 @@ function processarConfirmacaoPendenteDespesaFixa(
 
   if (indice < 0) {
     return {
-      resposta: "NÃ£o encontrei essa despesa fixa para atualizar.",
+      resposta: "Não encontrei essa despesa fixa para atualizar.",
       estado: {
         ...estadoAtual,
         despesasFixas: despesasAtuais,
