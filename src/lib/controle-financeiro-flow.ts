@@ -7,6 +7,7 @@ import {
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
 import { normalizarDescricaoFinanceira } from "./descricao-financeira";
+import type { FinanceiroIntent } from "./ia/financeiro-intent-schema";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
 
@@ -35,6 +36,9 @@ export type ConfirmacaoPendenteControle = {
 } | {
   tipo: "cadastrar_despesas_fixas";
   itens: Array<{ descricao: string; valor: number }>;
+} | {
+  tipo: "interpretacao_financeira";
+  intent: FinanceiroIntent;
 };
 
 export type UltimoGastoControle = {
@@ -179,6 +183,16 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
     confirmacaoPendente = itens.length > 0
       ? { tipo: "cadastrar_despesas_fixas", itens }
       : undefined;
+  } else if (
+    raw.confirmacaoPendente &&
+    raw.confirmacaoPendente.tipo === "interpretacao_financeira" &&
+    raw.confirmacaoPendente.intent &&
+    typeof raw.confirmacaoPendente.intent === "object"
+  ) {
+    confirmacaoPendente = {
+      tipo: "interpretacao_financeira",
+      intent: raw.confirmacaoPendente.intent as FinanceiroIntent,
+    };
   }
 
   return {
@@ -250,6 +264,22 @@ export function atualizarDespesasFixasControle(
       ? totalDespesasFixas
       : 0,
     despesasFixas: despesasFixas ?? estado.despesasFixas ?? [],
+  };
+}
+
+export function criarEstadoComConfirmacaoInterpretacaoFinanceira(
+  estado: EstadoControleFinanceiro,
+  intent: FinanceiroIntent
+): EstadoControleFinanceiro {
+  return {
+    ...estado,
+    faturas: estado.faturas ?? [],
+    cartoes: estado.cartoes ?? [],
+    despesasFixas: estado.despesasFixas ?? [],
+    confirmacaoPendente: {
+      tipo: "interpretacao_financeira",
+      intent,
+    },
   };
 }
 
@@ -661,6 +691,33 @@ function processarConfirmacaoPendenteDespesaFixa(
       estado,
       atualizouEstado: true,
       etapa: "AGUARDANDO_GASTOS",
+    };
+  }
+
+  if (pendente.tipo === "interpretacao_financeira") {
+    const estado = {
+      ...estadoAtual,
+      despesasFixas: despesasAtuais,
+      totalDespesasFixas: recalcularDespesasFixas(despesasAtuais),
+      confirmacaoPendente: undefined,
+    };
+
+    if (resposta === "negar") {
+      return {
+        resposta:
+          "Tudo bem, não registrei nada.\n\n" +
+          "Pode me enviar novamente com os itens corrigidos.",
+        estado,
+        atualizouEstado: true,
+      };
+    }
+
+    return {
+      resposta:
+        "Entendi a confirmação, mas nesta versão ainda não vou salvar esse lote automaticamente.\n\n" +
+        "Para evitar erro com dinheiro, me envie os lançamentos em lista ou separadamente.",
+      estado,
+      atualizouEstado: true,
     };
   }
 
