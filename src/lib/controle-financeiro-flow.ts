@@ -121,15 +121,23 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
         }))
         .filter((despesa) => despesa.descricao && Number.isFinite(despesa.valor) && despesa.valor > 0)
     : [];
+  const totalLegadoDespesasFixas =
+    Number.isFinite(raw.totalDespesasFixas) && Number(raw.totalDespesasFixas) > 0
+      ? Number(raw.totalDespesasFixas)
+      : 0;
+  const despesasFixasCompat = despesasFixas.length > 0
+    ? despesasFixas
+    : totalLegadoDespesasFixas > 0
+      ? [{ descricao: "Despesas fixas anteriores", valor: totalLegadoDespesasFixas }]
+      : [];
+  const totalDespesasFixas = despesasFixasCompat.reduce((soma, despesa) => soma + despesa.valor, 0);
 
   return {
     rendaMensal: Number.isFinite(raw.rendaMensal) && Number(raw.rendaMensal) > 0
       ? Number(raw.rendaMensal)
       : base.rendaMensal,
-    totalDespesasFixas: Number.isFinite(raw.totalDespesasFixas) && Number(raw.totalDespesasFixas) > 0
-      ? Number(raw.totalDespesasFixas)
-      : despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0),
-    despesasFixas,
+    totalDespesasFixas,
+    despesasFixas: despesasFixasCompat,
     totalGastosSaldo: Number.isFinite(raw.totalGastosSaldo) && Number(raw.totalGastosSaldo) > 0
       ? Number(raw.totalGastosSaldo)
       : 0,
@@ -235,6 +243,15 @@ function chaveDespesaFixa(descricao: string): string {
 
 function recalcularDespesasFixas(despesasFixas: DespesaFixaRegistradaControle[]): number {
   return despesasFixas.reduce((soma, despesa) => soma + despesa.valor, 0);
+}
+
+function despesasFixasCompatControle(estado: EstadoControleFinanceiro): DespesaFixaRegistradaControle[] {
+  const despesasFixas = estado.despesasFixas ?? [];
+  if (despesasFixas.length > 0) return despesasFixas;
+
+  return Number.isFinite(estado.totalDespesasFixas) && estado.totalDespesasFixas > 0
+    ? [{ descricao: "Despesas fixas anteriores", valor: estado.totalDespesasFixas }]
+    : [];
 }
 
 function resumoDespesasFixasAtualizado(estado: EstadoControleFinanceiro): string {
@@ -353,7 +370,7 @@ export function gerenciarDespesasFixasControle(
   const acao = detectarAcaoDespesaFixa(mensagem);
   if (!acao) return null;
 
-  const despesasAtuais = estadoAtual.despesasFixas ?? [];
+  const despesasAtuais = despesasFixasCompatControle(estadoAtual);
 
   if (acao === "listar") {
     const total = recalcularDespesasFixas(despesasAtuais);

@@ -784,6 +784,59 @@ test("gerenciamento reconhece recorrencia natural como despesa fixa", () => {
   assert.deepEqual(todoMesComValorAntes.estado.despesasFixas.at(-1), { descricao: "ChatGPT", valor: 110 });
 });
 
+test("gerenciamento preserva total legado sem lista detalhada ao adicionar nova despesa fixa", () => {
+  const estadoLegado = {
+    rendaMensal: 7140.69,
+    totalDespesasFixas: 1110,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+  };
+
+  const resultado = gerenciarDespesasFixasControle("todo mês 110 ChatGPT", estadoLegado);
+  assert.ok(resultado);
+  assert.equal(resultado.estado.totalDespesasFixas, 1220);
+  assert.deepEqual(resultado.estado.despesasFixas, [
+    { descricao: "Despesas fixas anteriores", valor: 1110 },
+    { descricao: "ChatGPT", valor: 110 },
+  ]);
+  assert.match(resultado.resposta, /Despesas fixas\nR\$ 1\.220,00/);
+  assert.match(resultado.resposta, /Saldo antes dos gastos do dia a dia\nR\$ 5\.920,69/);
+
+  const lista = gerenciarDespesasFixasControle("listar despesas fixas", resultado.estado);
+  assert.ok(lista);
+  assert.match(lista.resposta, /Despesas fixas anteriores\nR\$ 1\.110,00/);
+  assert.match(lista.resposta, /ChatGPT\nR\$ 110,00/);
+  assert.match(lista.resposta, /Total fixo mensal\nR\$ 1\.220,00/);
+});
+
+test("onboarding novo salva lista detalhada e gerenciamento soma depois", () => {
+  const despesas = parsearDespesasFixasControle(`Energia 120
+Internet 90
+Pensão 900`);
+  const total = despesas.reduce((soma, despesa) => soma + despesa.valor, 0);
+  const estadoOnboarding = atualizarDespesasFixasControle(
+    { rendaMensal: 7140.69, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [], despesasFixas: [] },
+    total,
+    7140.69,
+    despesas
+  );
+
+  assert.deepEqual(
+    estadoOnboarding.despesasFixas.map((despesa) => `${despesa.descricao}:${despesa.valor}`),
+    ["Energia:120", "Internet:90", "Pensão:900"]
+  );
+  assert.equal(estadoOnboarding.totalDespesasFixas, 1110);
+
+  const resultado = gerenciarDespesasFixasControle("despesa mensal Claude 110", estadoOnboarding);
+  assert.ok(resultado);
+  assert.equal(resultado.estado.totalDespesasFixas, 1220);
+  assert.deepEqual(
+    resultado.estado.despesasFixas.map((despesa) => `${despesa.descricao}:${despesa.valor}`),
+    ["Energia:120", "Internet:90", "Pensão:900", "Claude:110"]
+  );
+});
+
 test("gerenciamento corrige remove e lista despesas fixas", () => {
   const corrigida = gerenciarDespesasFixasControle(
     "corrigir despesa fixa internet para 100",
