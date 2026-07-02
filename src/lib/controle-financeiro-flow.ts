@@ -70,6 +70,8 @@ export type ResultadoGastoControle = {
 };
 
 const DESPESAS_FIXAS_ANTERIORES = "Despesas fixas anteriores";
+const RESPOSTA_SEM_CONFIRMACAO_PENDENTE =
+  "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo.";
 
 const CARTOES_CONHECIDOS: Array<{ aliases: string[]; nome: string }> = [
   { aliases: ["mercado pago"], nome: "Mercado Pago" },
@@ -565,6 +567,10 @@ function detectarRespostaConfirmacaoDespesaFixa(mensagem: string): "confirmar" |
   return null;
 }
 
+function ehRespostaConfirmacaoSolta(mensagem: string): boolean {
+  return /^(1|2|sim|nao|confirmar|corrigir)$/.test(normalizarTexto(mensagem));
+}
+
 function respostaDespesaFixaAtualizada(
   descricao: string,
   valorAnterior: number,
@@ -800,7 +806,15 @@ function processarConfirmacaoPendenteDespesaFixa(
   estadoAtual: EstadoControleFinanceiro
 ): ResultadoGastoControle | null {
   const pendente = estadoAtual.confirmacaoPendente;
-  if (!pendente) return null;
+  if (!pendente) {
+    if (!ehRespostaConfirmacaoSolta(mensagem)) return null;
+
+    return {
+      resposta: RESPOSTA_SEM_CONFIRMACAO_PENDENTE,
+      estado: estadoAtual,
+      atualizouEstado: false,
+    };
+  }
 
   const resposta = detectarRespostaConfirmacaoDespesaFixa(mensagem);
   if (!resposta) return null;
@@ -921,9 +935,7 @@ function processarConfirmacaoPendenteDespesaFixa(
 
     if (resposta === "negar") {
       return {
-        resposta:
-          "Tudo bem, não registrei nada.\n\n" +
-          "Pode me enviar novamente com os itens corrigidos.",
+        resposta: "Tudo bem, não salvei nada. Pode reenviar os lançamentos corrigidos.",
         estado,
         atualizouEstado: true,
       };

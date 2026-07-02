@@ -762,14 +762,75 @@ test("confirmacao de interpretacao financeira salva lote misto com seguranca", a
   assert.match(confirmado.resposta, /Despesas fixas mensais:/);
   assert.match(confirmado.resposta, /Despesas fixas adicionadas: R\$ 2\.010,00/);
   assert.match(confirmado.resposta, /Despesas variáveis registradas: R\$ 2,50/);
-  assert.equal(gerenciarDespesasFixasControle("1", confirmado.estado), null);
+  const confirmacaoSoltaAposSalvar = gerenciarDespesasFixasControle("1", confirmado.estado);
+  assert.ok(confirmacaoSoltaAposSalvar);
+  assert.equal(
+    confirmacaoSoltaAposSalvar.resposta,
+    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
+  );
+  assert.equal(confirmacaoSoltaAposSalvar.atualizouEstado, false);
 
   const estadoPendente2 = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoSemDespesasFixasBase(), intent);
   const negado = gerenciarDespesasFixasControle("2", estadoPendente2);
   assert.ok(negado);
   assert.equal(negado.estado.confirmacaoPendente, undefined);
   assert.equal(negado.estado.totalDespesasFixas, 0);
-  assert.match(negado.resposta, /não registrei nada/i);
+  assert.equal(negado.resposta, "Tudo bem, não salvei nada. Pode reenviar os lançamentos corrigidos.");
+});
+
+test("confirmacao de interpretacao financeira cancela previa e libera fluxo", () => {
+  const intent = {
+    emEscopo: true,
+    precisaConfirmacao: true,
+    itens: [
+      {
+        tipo: "despesa_fixa",
+        descricaoOriginal: "netflix mes",
+        descricaoNormalizada: "Netflix",
+        categoria: "Assinaturas",
+        valor: 39.9,
+      },
+      {
+        tipo: "despesa_variavel",
+        descricaoOriginal: "mercado",
+        descricaoNormalizada: "Mercado",
+        categoria: "Mercado",
+        valor: 25,
+      },
+    ],
+  };
+  const estadoBase = {
+    rendaMensal: 3000,
+    totalDespesasFixas: 0,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [],
+  };
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  const cancelado = gerenciarDespesasFixasControle("2", estadoPendente);
+
+  assert.ok(cancelado);
+  assert.equal(cancelado.resposta, "Tudo bem, não salvei nada. Pode reenviar os lançamentos corrigidos.");
+  assert.equal(cancelado.estado.confirmacaoPendente, undefined);
+  assert.equal(cancelado.estado.totalGastosSaldo, 0);
+  assert.equal(cancelado.estado.totalDespesasFixas, 0);
+  assert.deepEqual(cancelado.estado.despesasFixas, []);
+
+  const listagem = gerenciarDespesasFixasControle("listar despesas fixas", cancelado.estado);
+  assert.ok(listagem);
+  assert.match(listagem.resposta, /Suas despesas fixas/);
+  assert.equal(listagem.estado.confirmacaoPendente, undefined);
+
+  const confirmacaoSolta = gerenciarDespesasFixasControle("1", listagem.estado);
+  assert.ok(confirmacaoSolta);
+  assert.equal(
+    confirmacaoSolta.resposta,
+    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
+  );
+  assert.equal(confirmacaoSolta.atualizouEstado, false);
+  assert.equal(confirmacaoSolta.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(confirmacaoSolta.estado.despesasFixas, []);
 });
 
 test("confirmacao de interpretacao financeira nao duplica despesa fixa existente", async () => {
@@ -1329,8 +1390,23 @@ test("confirmar frase corrida cadastra itens e negar nao altera despesas fixas",
   assert.deepEqual(negado.estado.despesasFixas, []);
   assert.match(negado.resposta, /não cadastrei nada/i);
 
-  assert.equal(gerenciarDespesasFixasControle("1", estadoSemDespesasFixasBase()), null);
-  assert.equal(gerenciarDespesasFixasControle("2", estadoSemDespesasFixasBase()), null);
+  const confirmacaoUmSolta = gerenciarDespesasFixasControle("1", estadoSemDespesasFixasBase());
+  assert.ok(confirmacaoUmSolta);
+  assert.equal(
+    confirmacaoUmSolta.resposta,
+    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
+  );
+  assert.equal(confirmacaoUmSolta.atualizouEstado, false);
+  assert.deepEqual(confirmacaoUmSolta.estado, estadoSemDespesasFixasBase());
+
+  const confirmacaoDoisSolta = gerenciarDespesasFixasControle("2", estadoSemDespesasFixasBase());
+  assert.ok(confirmacaoDoisSolta);
+  assert.equal(
+    confirmacaoDoisSolta.resposta,
+    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
+  );
+  assert.equal(confirmacaoDoisSolta.atualizouEstado, false);
+  assert.deepEqual(confirmacaoDoisSolta.estado, estadoSemDespesasFixasBase());
 });
 
 test("confirmacao multipla em estado limpo processa todos os itens pendentes", () => {
@@ -1569,8 +1645,21 @@ test("confirmacao pendente aceita sinonimos e resposta solta sem pendencia nao a
     assert.equal(negado.estado.confirmacaoPendente, undefined);
   }
 
-  assert.equal(gerenciarDespesasFixasControle("1", estadoChatGptClaudeBase(110)), null);
-  assert.equal(gerenciarDespesasFixasControle("2", estadoChatGptClaudeBase(110)), null);
+  const confirmacaoUmSolta = gerenciarDespesasFixasControle("1", estadoChatGptClaudeBase(110));
+  assert.ok(confirmacaoUmSolta);
+  assert.equal(
+    confirmacaoUmSolta.resposta,
+    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
+  );
+  assert.equal(confirmacaoUmSolta.atualizouEstado, false);
+
+  const confirmacaoDoisSolta = gerenciarDespesasFixasControle("2", estadoChatGptClaudeBase(110));
+  assert.ok(confirmacaoDoisSolta);
+  assert.equal(
+    confirmacaoDoisSolta.resposta,
+    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
+  );
+  assert.equal(confirmacaoDoisSolta.atualizouEstado, false);
 });
 
 test("gerenciamento preserva total legado sem lista detalhada ao adicionar nova despesa fixa", () => {
