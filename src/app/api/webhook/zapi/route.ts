@@ -16,6 +16,7 @@ import {
   corrigirOrigemUltimoGastoControle,
   criarEstadoComConfirmacaoInterpretacaoFinanceira,
   criarMensagemEstadoControle,
+  gerenciarFaturaCartaoControle,
   gerenciarDespesasFixasControle,
   registrarGastoControle,
 } from "@/lib/controle-financeiro-flow";
@@ -987,6 +988,25 @@ Pode mandar tudo em uma mensagem só.`;
             { role: "user", content: mensagem },
             { role: "assistant", content: correcaoOrigem.resposta },
             ...(correcaoOrigem.atualizouEstado ? [criarMensagemEstadoControle(correcaoOrigem.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const gerenciamentoFaturaCartao = gerenciarFaturaCartaoControle(mensagem, estadoAntesGasto);
+    if (gerenciamentoFaturaCartao) {
+      await sendWhatsApp(telefone, gerenciamentoFaturaCartao.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: gerenciamentoFaturaCartao.resposta },
+            ...(gerenciamentoFaturaCartao.atualizouEstado ? [criarMensagemEstadoControle(gerenciamentoFaturaCartao.estado)] : []),
           ]),
         },
       });

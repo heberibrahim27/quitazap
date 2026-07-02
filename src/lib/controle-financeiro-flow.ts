@@ -16,6 +16,11 @@ export type FaturaAbertaControle = {
   valor: number;
 };
 
+export type FaturaFechadaControle = {
+  cartao: string;
+  valor: number;
+};
+
 export type CartaoConfiguradoControle = {
   nome: string;
   fechamento?: number;
@@ -39,6 +44,11 @@ export type ConfirmacaoPendenteControle = {
 } | {
   tipo: "interpretacao_financeira";
   intent: FinanceiroIntent;
+} | {
+  tipo: "substituir_fatura_fechada";
+  cartao: string;
+  valorAnterior: number;
+  novoValor: number;
 };
 
 export type UltimoGastoControle = {
@@ -57,6 +67,7 @@ export type EstadoControleFinanceiro = {
   despesasFixas: DespesaFixaRegistradaControle[];
   totalGastosSaldo: number;
   faturas: FaturaAbertaControle[];
+  faturasFechadas: FaturaFechadaControle[];
   cartoes: CartaoConfiguradoControle[];
   confirmacaoPendente?: ConfirmacaoPendenteControle;
   ultimoGasto?: UltimoGastoControle;
@@ -103,6 +114,7 @@ function estadoVazio(rendaMensal?: number | null): EstadoControleFinanceiro {
     despesasFixas: [],
     totalGastosSaldo: 0,
     faturas: [],
+    faturasFechadas: [],
     cartoes: [],
   };
 }
@@ -114,6 +126,14 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
   const raw = valor as Partial<EstadoControleFinanceiro>;
   const faturas = Array.isArray(raw.faturas)
     ? raw.faturas
+        .map((fatura) => ({
+          cartao: typeof fatura?.cartao === "string" ? fatura.cartao : "",
+          valor: Number(fatura?.valor),
+        }))
+        .filter((fatura) => fatura.cartao && Number.isFinite(fatura.valor) && fatura.valor > 0)
+    : [];
+  const faturasFechadas = Array.isArray(raw.faturasFechadas)
+    ? raw.faturasFechadas
         .map((fatura) => ({
           cartao: typeof fatura?.cartao === "string" ? fatura.cartao : "",
           valor: Number(fatura?.valor),
@@ -197,6 +217,21 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       tipo: "interpretacao_financeira",
       intent: raw.confirmacaoPendente.intent as FinanceiroIntent,
     };
+  } else if (
+    raw.confirmacaoPendente &&
+    raw.confirmacaoPendente.tipo === "substituir_fatura_fechada" &&
+    typeof raw.confirmacaoPendente.cartao === "string" &&
+    Number.isFinite(raw.confirmacaoPendente.valorAnterior) &&
+    Number.isFinite(raw.confirmacaoPendente.novoValor) &&
+    raw.confirmacaoPendente.valorAnterior > 0 &&
+    raw.confirmacaoPendente.novoValor > 0
+  ) {
+    confirmacaoPendente = {
+      tipo: "substituir_fatura_fechada",
+      cartao: raw.confirmacaoPendente.cartao,
+      valorAnterior: Number(raw.confirmacaoPendente.valorAnterior),
+      novoValor: Number(raw.confirmacaoPendente.novoValor),
+    };
   }
 
   return {
@@ -212,6 +247,7 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       ? Number(raw.totalGastosSaldo)
       : 0,
     faturas,
+    faturasFechadas,
     cartoes,
     confirmacaoPendente,
     ultimoGasto:
@@ -281,6 +317,7 @@ export function criarEstadoComConfirmacaoInterpretacaoFinanceira(
   return {
     ...estado,
     faturas: estado.faturas ?? [],
+    faturasFechadas: estado.faturasFechadas ?? [],
     cartoes: estado.cartoes ?? [],
     despesasFixas: estado.despesasFixas ?? [],
     confirmacaoPendente: {
@@ -296,6 +333,10 @@ export function calcularSaldoDisponivelControle(estado: EstadoControleFinanceiro
 
 export function totalFaturasAbertasControle(estado: EstadoControleFinanceiro): number {
   return (estado.faturas ?? []).reduce((soma, fatura) => soma + fatura.valor, 0);
+}
+
+export function totalFaturasFechadasControle(estado: EstadoControleFinanceiro): number {
+  return (estado.faturasFechadas ?? []).reduce((soma, fatura) => soma + fatura.valor, 0);
 }
 
 function formatarDescricaoDespesaFixa(texto: string): string {
@@ -613,6 +654,7 @@ function resumoAtualizadoMes(estado: EstadoControleFinanceiro): string {
     "📊 *Resumo atualizado do mês*\n\n" +
     `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelControle(estado))}\n` +
     `📌 *Despesas fixas:* ${formatarValorBR(estado.totalDespesasFixas)}\n` +
+    `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}\n` +
     `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`
   );
 }
@@ -943,6 +985,8 @@ function processarConfirmacaoPendenteDespesaFixa(
 
     return salvarItensConfirmadosIA(estado, pendente.intent);
   }
+
+  if (pendente.tipo !== "atualizar_despesa_fixa") return null;
 
   if (resposta === "negar") {
     const estado = {
@@ -1377,6 +1421,186 @@ function obterCartaoConfigurado(
   return (estado.cartoes ?? []).find((item) => item.nome === cartao);
 }
 
+function removerFaturaAbertaCartao(
+  faturas: FaturaAbertaControle[],
+  cartao: string
+): FaturaAbertaControle[] {
+  return (faturas ?? []).filter((fatura) => fatura.cartao !== cartao);
+}
+
+function substituirFaturaFechada(
+  faturasFechadas: FaturaFechadaControle[],
+  cartao: string,
+  valor: number
+): FaturaFechadaControle[] {
+  return [
+    ...(faturasFechadas ?? []).filter((fatura) => fatura.cartao !== cartao),
+    { cartao, valor },
+  ];
+}
+
+function detectarPagamentoFaturaCartao(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return /\b(?:paguei|pagar|paga|quitei|quitar|pagamento)\b/.test(texto) && /\bfatura\b/.test(texto);
+}
+
+function detectarFechamentoFaturaCartao(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return /\bfatura\b/.test(texto) && /\b(?:fechou|fechada|fechar)\b/.test(texto);
+}
+
+function respostaPagamentoFaturaNaoImplementado(): string {
+  return (
+    "Entendi que você quer registrar pagamento de fatura, mas esse fluxo ainda será conectado. " +
+    "Por enquanto, posso registrar a fatura fechada ou gastos no cartão."
+  );
+}
+
+function respostaFaturaFechadaRegistrada(
+  estado: EstadoControleFinanceiro,
+  cartao: string,
+  valor: number
+): string {
+  const cartaoConfigurado = obterCartaoConfigurado(estado, cartao);
+  const linhas = [
+    "✅ *Fatura fechada registrada.*",
+    "",
+    `Cartão: ${cartao}`,
+    `Valor fechado: ${formatarValorBR(valor)}`,
+  ];
+
+  if (cartaoConfigurado?.vencimento) {
+    linhas.push(`Vencimento: dia ${formatarDiaCartao(cartaoConfigurado.vencimento)}`);
+  } else {
+    linhas.push(`Vencimento ainda não informado. Para configurar, envie: ${cartao} vence dia 05`);
+  }
+
+  linhas.push("", `Nova fatura aberta: ${formatarValorBR(estado.faturas.find((fatura) => fatura.cartao === cartao)?.valor ?? 0)}`);
+
+  return linhas.join("\n");
+}
+
+export function gerenciarFaturaCartaoControle(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  const pendente = estadoAtual.confirmacaoPendente;
+  const respostaConfirmacao = detectarRespostaConfirmacaoDespesaFixa(mensagem);
+
+  if (pendente?.tipo === "substituir_fatura_fechada") {
+    if (!respostaConfirmacao) return null;
+
+    const estadoBase = {
+      ...estadoAtual,
+      faturas: estadoAtual.faturas ?? [],
+      faturasFechadas: estadoAtual.faturasFechadas ?? [],
+      cartoes: estadoAtual.cartoes ?? [],
+      confirmacaoPendente: undefined,
+    };
+
+    if (respostaConfirmacao === "negar") {
+      return {
+        resposta:
+          "Tudo bem, mantive a fatura fechada como está.\n\n" +
+          `Cartão: ${pendente.cartao}\n` +
+          `Valor fechado: ${formatarValorBR(pendente.valorAnterior)}`,
+        estado: estadoBase,
+        atualizouEstado: true,
+      };
+    }
+
+    const estado = {
+      ...estadoBase,
+      faturasFechadas: substituirFaturaFechada(
+        estadoBase.faturasFechadas,
+        pendente.cartao,
+        pendente.novoValor
+      ),
+    };
+
+    return {
+      resposta:
+        "✅ *Fatura fechada substituída.*\n\n" +
+        `Cartão: ${pendente.cartao}\n` +
+        `Valor anterior: ${formatarValorBR(pendente.valorAnterior)}\n` +
+        `Novo valor fechado: ${formatarValorBR(pendente.novoValor)}`,
+      estado,
+      atualizouEstado: true,
+    };
+  }
+
+  if (detectarPagamentoFaturaCartao(mensagem)) {
+    return {
+      resposta: respostaPagamentoFaturaNaoImplementado(),
+      estado: estadoAtual,
+      atualizouEstado: false,
+    };
+  }
+
+  if (!detectarFechamentoFaturaCartao(mensagem)) return null;
+
+  const cartao = normalizarNomeCartaoControle(mensagem);
+  const valor = parseMoneyBR(mensagem);
+  if (!cartao || !valor) return null;
+
+  const faturasFechadasAtuais = estadoAtual.faturasFechadas ?? [];
+  const existente = faturasFechadasAtuais.find((fatura) => fatura.cartao === cartao);
+
+  if (existente) {
+    if (valoresIguais(existente.valor, valor)) {
+      return {
+        resposta:
+          "ℹ️ *Fatura fechada já registrada.*\n\n" +
+          `Cartão: ${cartao}\n` +
+          `Valor fechado: ${formatarValorBR(existente.valor)}\n\n` +
+          "Não dupliquei esse registro.",
+        estado: {
+          ...estadoAtual,
+          faturas: estadoAtual.faturas ?? [],
+          faturasFechadas: faturasFechadasAtuais,
+          cartoes: estadoAtual.cartoes ?? [],
+        },
+        atualizouEstado: false,
+      };
+    }
+
+    return {
+      resposta:
+        `Já existe uma fatura fechada do ${cartao} por ${formatarValorBR(existente.valor)}.\n` +
+        `Você quer substituir por ${formatarValorBR(valor)}?\n\n` +
+        "1️⃣ Sim, substituir\n" +
+        "2️⃣ Não, manter como está",
+      estado: {
+        ...estadoAtual,
+        faturas: estadoAtual.faturas ?? [],
+        faturasFechadas: faturasFechadasAtuais,
+        cartoes: estadoAtual.cartoes ?? [],
+        confirmacaoPendente: {
+          tipo: "substituir_fatura_fechada",
+          cartao,
+          valorAnterior: existente.valor,
+          novoValor: valor,
+        },
+      },
+      atualizouEstado: true,
+    };
+  }
+
+  const estado = {
+    ...estadoAtual,
+    faturas: removerFaturaAbertaCartao(estadoAtual.faturas ?? [], cartao),
+    faturasFechadas: substituirFaturaFechada(faturasFechadasAtuais, cartao, valor),
+    cartoes: estadoAtual.cartoes ?? [],
+    confirmacaoPendente: undefined,
+  };
+
+  return {
+    resposta: respostaFaturaFechadaRegistrada(estado, cartao, valor),
+    estado,
+    atualizouEstado: true,
+  };
+}
+
 export function configurarCartaoControle(
   mensagem: string,
   estadoAtual: EstadoControleFinanceiro
@@ -1415,6 +1639,7 @@ export function configurarCartaoControle(
   const estado: EstadoControleFinanceiro = {
     ...estadoAtual,
     faturas: estadoAtual.faturas ?? [],
+    faturasFechadas: estadoAtual.faturasFechadas ?? [],
     cartoes: [
       ...(estadoAtual.cartoes ?? []).filter((cartao) => cartao.nome !== nomeCartao),
       cartaoAtualizado,
@@ -1507,11 +1732,18 @@ function subtrairFatura(
 
 function linhasFaturas(estado: EstadoControleFinanceiro): string[] {
   const faturas = estado.faturas ?? [];
+  const linhas = [
+    `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}`,
+    `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`,
+  ];
   if (faturas.length === 0) {
-    return [`💳 *Faturas em aberto:* ${formatarValorBR(0)}`];
+    return linhas;
   }
 
-  return faturas.map((fatura) => `💳 *Fatura ${fatura.cartao}:* ${formatarValorBR(fatura.valor)}`);
+  return [
+    ...linhas,
+    ...faturas.map((fatura) => `💳 *Fatura ${fatura.cartao}:* ${formatarValorBR(fatura.valor)}`),
+  ];
 }
 
 function linhasFaturasComCartoes(estado: EstadoControleFinanceiro, cartoes: string[]): string[] {
@@ -1521,12 +1753,17 @@ function linhasFaturasComCartoes(estado: EstadoControleFinanceiro, cartoes: stri
     if (cartao && !nomes.includes(cartao)) nomes.push(cartao);
   }
 
-  if (nomes.length === 0) return [`💳 *Faturas em aberto:* ${formatarValorBR(0)}`];
+  const linhas = [
+    `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}`,
+    `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`,
+  ];
 
-  return nomes.map((cartao) => {
+  if (nomes.length === 0) return linhas;
+
+  return [...linhas, ...nomes.map((cartao) => {
     const valor = faturas.find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
     return `💳 *Fatura ${cartao}:* ${formatarValorBR(valor)}`;
-  });
+  })];
 }
 
 function ajustarDescricaoControle(gasto: GastoDetectado): GastoDetectado {
@@ -1587,12 +1824,14 @@ export function corrigirOrigemUltimoGastoControle(
     estado = {
       ...estado,
       faturas: subtrairFatura(estado.faturas, ultimo.cartao, ultimo.valor),
+      faturasFechadas: estado.faturasFechadas ?? [],
     };
   }
 
   estado = {
     ...estado,
     faturas: somarFatura(estado.faturas, novoCartao, ultimo.valor),
+    faturasFechadas: estado.faturasFechadas ?? [],
     ultimoGasto: {
       ...ultimo,
       origem: "CARTAO",
@@ -1628,6 +1867,7 @@ export function registrarGastoControle(
   estadoAtual: EstadoControleFinanceiro,
   agora = new Date()
 ): ResultadoGastoControle | null {
+  if (detectarPagamentoFaturaCartao(mensagem) || detectarFechamentoFaturaCartao(mensagem)) return null;
   if (deveBloquearGastoUnicoPorMultiplosValores(mensagem)) return null;
 
   const cartao = detectarCartao(mensagem);
@@ -1649,6 +1889,7 @@ export function registrarGastoControle(
     ? {
         ...estadoAtual,
         cartoes: estadoAtual.cartoes ?? [],
+        faturasFechadas: estadoAtual.faturasFechadas ?? [],
         faturas: somarFatura(estadoAtual.faturas ?? [], cartao, gasto.valor),
         ultimoGasto: {
           descricao: gasto.descricao || gasto.categoria,
@@ -1662,6 +1903,8 @@ export function registrarGastoControle(
     : {
         ...estadoAtual,
         cartoes: estadoAtual.cartoes ?? [],
+        faturas: estadoAtual.faturas ?? [],
+        faturasFechadas: estadoAtual.faturasFechadas ?? [],
         totalGastosSaldo: (estadoAtual.totalGastosSaldo ?? 0) + gasto.valor,
         ultimoGasto: {
           descricao: gasto.descricao || gasto.categoria,

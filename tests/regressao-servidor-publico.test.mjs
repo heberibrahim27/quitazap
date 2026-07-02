@@ -76,9 +76,11 @@ const {
   corrigirRendaControle,
   corrigirOrigemUltimoGastoControle,
   criarEstadoComConfirmacaoInterpretacaoFinanceira,
+  gerenciarFaturaCartaoControle,
   gerenciarDespesasFixasControle,
   registrarGastoControle,
   totalFaturasAbertasControle,
+  totalFaturasFechadasControle,
 } = loadTsModule("src/lib/controle-financeiro-flow.ts");
 const {
   MENSAGEM_FORA_ESCOPO_FINANCEIRO,
@@ -1998,6 +2000,110 @@ test("gasto com cartao soma fatura aberta sem abater saldo", () => {
   assert.match(segundo.resposta, /💳 \*Origem:\* Cartão Nubank/);
   assert.match(segundo.resposta, /💳 \*Fatura Nubank:\* R\$ 88,50/);
   assert.doesNotMatch(`${primeiro.resposta}\n${segundo.resposta}`, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("fatura fechada separa valor fechado da nova fatura aberta", () => {
+  const configuracao = configurarCartaoControle("Nubank fecha dia 25 e vence dia 05", estadoControleBase());
+  assert.ok(configuracao);
+  assert.deepEqual(configuracao.estado.cartoes, [{ nome: "Nubank", fechamento: 25, vencimento: 5 }]);
+
+  const ifood = registrarGastoControle(
+    "ifood 40 no nubank",
+    configuracao.estado,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(ifood);
+  const uber = registrarGastoControle(
+    "uber 30 no nubank",
+    ifood.estado,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(uber);
+  assert.equal(totalFaturasAbertasControle(uber.estado), 70);
+  assert.deepEqual(uber.estado.faturas, [{ cartao: "Nubank", valor: 70 }]);
+  assert.equal(calcularSaldoDisponivelControle(uber.estado), 1960);
+
+  const fechamento = gerenciarFaturaCartaoControle("fatura nubank fechou em 70", uber.estado);
+  assert.ok(fechamento);
+  assert.equal(totalFaturasFechadasControle(fechamento.estado), 70);
+  assert.equal(totalFaturasAbertasControle(fechamento.estado), 0);
+  assert.deepEqual(fechamento.estado.faturasFechadas, [{ cartao: "Nubank", valor: 70 }]);
+  assert.deepEqual(fechamento.estado.faturas, []);
+  assert.equal(calcularSaldoDisponivelControle(fechamento.estado), 1960);
+  assert.match(fechamento.resposta, /Fatura fechada registrada/);
+  assert.match(fechamento.resposta, /Cart.o: Nubank/);
+  assert.match(fechamento.resposta, /Valor fechado: R\$ 70,00/);
+  assert.match(fechamento.resposta, /Vencimento: dia 05/);
+  assert.match(fechamento.resposta, /Nova fatura aberta: R\$ 0,00/);
+
+  const mercado = registrarGastoControle(
+    "mercado 100 no nubank",
+    fechamento.estado,
+    new Date(2026, 6, 2, 12, 0, 0)
+  );
+  assert.ok(mercado);
+  assert.equal(totalFaturasFechadasControle(mercado.estado), 70);
+  assert.equal(totalFaturasAbertasControle(mercado.estado), 100);
+  assert.deepEqual(mercado.estado.faturasFechadas, [{ cartao: "Nubank", valor: 70 }]);
+  assert.deepEqual(mercado.estado.faturas, [{ cartao: "Nubank", valor: 100 }]);
+  assert.equal(calcularSaldoDisponivelControle(mercado.estado), 1960);
+  assert.match(mercado.resposta, /Faturas fechadas:\* R\$ 70,00/);
+  assert.match(mercado.resposta, /Faturas em aberto:\* R\$ 100,00/);
+  assert.match(mercado.resposta, /Fatura Nubank:\* R\$ 100,00/);
+});
+
+test("fatura fechada sem vencimento orienta configuracao", () => {
+  const estado = estadoControleBase();
+  const fechamento = gerenciarFaturaCartaoControle("fatura inter fechou em 130", estado);
+
+  assert.ok(fechamento);
+  assert.deepEqual(fechamento.estado.faturasFechadas, [{ cartao: "Inter", valor: 130 }]);
+  assert.match(fechamento.resposta, /Vencimento ainda n.o informado/);
+  assert.match(fechamento.resposta, /Inter vence dia 05/);
+});
+
+test("fatura fechada duplicada nao duplica e substituicao usa confirmacao", () => {
+  const configuracao = configurarCartaoControle("Nubank vence dia 05", estadoControleBase());
+  assert.ok(configuracao);
+  const fechamento = gerenciarFaturaCartaoControle("fatura nubank fechou em 70", configuracao.estado);
+  assert.ok(fechamento);
+
+  const duplicada = gerenciarFaturaCartaoControle("fatura nubank fechou em 70", fechamento.estado);
+  assert.ok(duplicada);
+  assert.equal(duplicada.atualizouEstado, false);
+  assert.deepEqual(duplicada.estado.faturasFechadas, [{ cartao: "Nubank", valor: 70 }]);
+  assert.match(duplicada.resposta, /j. registrada/);
+  assert.match(duplicada.resposta, /N.o dupliquei/);
+
+  const conflito = gerenciarFaturaCartaoControle("fatura nubank fechou em 90", fechamento.estado);
+  assert.ok(conflito);
+  assert.equal(conflito.estado.confirmacaoPendente?.tipo, "substituir_fatura_fechada");
+  assert.match(conflito.resposta, /J. existe uma fatura fechada do Nubank por R\$ 70,00/);
+  assert.match(conflito.resposta, /substituir por R\$ 90,00/);
+
+  const confirmado = gerenciarFaturaCartaoControle("1", conflito.estado);
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(confirmado.estado.faturasFechadas, [{ cartao: "Nubank", valor: 90 }]);
+
+  const conflitoNegado = gerenciarFaturaCartaoControle("fatura nubank fechou em 110", fechamento.estado);
+  assert.ok(conflitoNegado);
+  const negado = gerenciarFaturaCartaoControle("2", conflitoNegado.estado);
+  assert.ok(negado);
+  assert.equal(negado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(negado.estado.faturasFechadas, [{ cartao: "Nubank", valor: 70 }]);
+});
+
+test("pagamento de fatura ainda nao implementado nao vira gasto comum", () => {
+  const estado = estadoControleBase();
+  const pagamento = gerenciarFaturaCartaoControle("paguei fatura nubank 70", estado);
+
+  assert.ok(pagamento);
+  assert.equal(pagamento.atualizouEstado, false);
+  assert.deepEqual(pagamento.estado, estado);
+  assert.match(pagamento.resposta, /pagamento de fatura/);
+  assert.match(pagamento.resposta, /ainda ser. conectado/);
+  assert.equal(registrarGastoControle("paguei fatura nubank 70", estado), null);
 });
 
 test("gasto com apostas mostra alerta e mantem calculo deterministico", () => {
