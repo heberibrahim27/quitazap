@@ -664,6 +664,18 @@ function estadoSemDespesasFixasBase() {
   };
 }
 
+function estadoChatGptClaudeBase(valorChatGpt = 110) {
+  return atualizarDespesasFixasControle(
+    { rendaMensal: 7140.69, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [], despesasFixas: [] },
+    valorChatGpt + 110,
+    7140.69,
+    [
+      { descricao: "ChatGPT", valor: valorChatGpt },
+      { descricao: "Claude", valor: 110 },
+    ]
+  );
+}
+
 function chaveTextoTeste(texto) {
   return texto
     .toLowerCase()
@@ -758,7 +770,9 @@ test("gerenciamento adiciona despesas fixas por sinonimos e multiplas linhas", (
     descricao: "Internet",
     valor: 90,
   });
-  assert.equal(internet.atualizouEstado, false);
+  assert.equal(internet.atualizouEstado, true);
+  assert.equal(internet.estado.confirmacaoPendente?.nomeNormalizado, "internet");
+  assert.equal(internet.estado.confirmacaoPendente?.novoValor, 100);
   assert.match(internet.resposta, /⚠️ \*Despesa fixa já existe\.\*/);
 
   const multiplas = gerenciarDespesasFixasControle(
@@ -839,9 +853,16 @@ test("gerenciamento nao altera automaticamente quando valor existente e diferent
 
   const conflito = gerenciarDespesasFixasControle("todo mês 110 ChatGPT", estado);
   assert.ok(conflito);
-  assert.equal(conflito.atualizouEstado, false);
+  assert.equal(conflito.atualizouEstado, true);
   assert.equal(conflito.estado.totalDespesasFixas, 120);
   assert.deepEqual(conflito.estado.despesasFixas, [{ descricao: "ChatGPT", valor: 120 }]);
+  assert.deepEqual(conflito.estado.confirmacaoPendente, {
+    tipo: "atualizar_despesa_fixa",
+    nomeNormalizado: "chatgpt",
+    nomeExibido: "ChatGPT",
+    valorAnterior: 120,
+    novoValor: 110,
+  });
   assert.match(conflito.resposta, /⚠️ \*Despesa fixa já existe\.\*/);
   assert.match(conflito.resposta, /ChatGPT está cadastrada por R\$ 120,00\./);
   assert.match(conflito.resposta, /Você quis atualizar para R\$ 110,00\?/);
@@ -871,6 +892,79 @@ Chat GPT 110`,
   assert.match(resultado.resposta, /Claude\nR\$ 110,00/);
   assert.match(resultado.resposta, /Duplicadas ignoradas/);
   assert.match(resultado.resposta, /Total adicionado\nR\$ 220,00/);
+});
+
+test("confirmacao pendente atualiza despesa fixa e persiste para listagem", () => {
+  const conflito = gerenciarDespesasFixasControle("todo mês 120 chat gpt", estadoChatGptClaudeBase(110));
+  assert.ok(conflito);
+  assert.equal(conflito.estado.totalDespesasFixas, 220);
+  assert.equal(conflito.estado.despesasFixas.find((d) => d.descricao === "ChatGPT")?.valor, 110);
+  assert.equal(conflito.estado.confirmacaoPendente?.novoValor, 120);
+
+  const confirmado = gerenciarDespesasFixasControle("1", conflito.estado);
+  assert.ok(confirmado);
+  assert.equal(confirmado.atualizouEstado, true);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(confirmado.estado.despesasFixas, [
+    { descricao: "ChatGPT", valor: 120 },
+    { descricao: "Claude", valor: 110 },
+  ]);
+  assert.equal(confirmado.estado.totalDespesasFixas, 230);
+  assert.match(confirmado.resposta, /✅ \*Despesa fixa atualizada\.\*/);
+  assert.match(confirmado.resposta, /Novo valor\nR\$ 120,00/);
+  assert.match(confirmado.resposta, /Despesas fixas\nR\$ 230,00/);
+
+  const lista = gerenciarDespesasFixasControle("listar despesas fixas", confirmado.estado);
+  assert.ok(lista);
+  assert.match(lista.resposta, /ChatGPT\nR\$ 120,00/);
+  assert.match(lista.resposta, /Claude\nR\$ 110,00/);
+  assert.match(lista.resposta, /Total fixo mensal\nR\$ 230,00/);
+});
+
+test("confirmacao pendente negada preserva valores e persiste para listagem", () => {
+  const conflito = gerenciarDespesasFixasControle("todo mês 120 chat gpt", estadoChatGptClaudeBase(110));
+  assert.ok(conflito);
+
+  const negado = gerenciarDespesasFixasControle("2", conflito.estado);
+  assert.ok(negado);
+  assert.equal(negado.atualizouEstado, true);
+  assert.equal(negado.estado.confirmacaoPendente, undefined);
+  assert.deepEqual(negado.estado.despesasFixas, [
+    { descricao: "ChatGPT", valor: 110 },
+    { descricao: "Claude", valor: 110 },
+  ]);
+  assert.equal(negado.estado.totalDespesasFixas, 220);
+
+  const lista = gerenciarDespesasFixasControle("listar despesas fixas", negado.estado);
+  assert.ok(lista);
+  assert.match(lista.resposta, /ChatGPT\nR\$ 110,00/);
+  assert.match(lista.resposta, /Claude\nR\$ 110,00/);
+  assert.match(lista.resposta, /Total fixo mensal\nR\$ 220,00/);
+});
+
+test("confirmacao pendente aceita sinonimos e resposta solta sem pendencia nao altera", () => {
+  const confirmacoes = ["1", "sim", "confirmar", "atualizar"];
+  for (const resposta of confirmacoes) {
+    const conflito = gerenciarDespesasFixasControle("todo mês 120 chat gpt", estadoChatGptClaudeBase(110));
+    assert.ok(conflito);
+    const confirmado = gerenciarDespesasFixasControle(resposta, conflito.estado);
+    assert.ok(confirmado, resposta);
+    assert.equal(confirmado.estado.totalDespesasFixas, 230);
+    assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  }
+
+  const negacoes = ["2", "não", "nao", "manter"];
+  for (const resposta of negacoes) {
+    const conflito = gerenciarDespesasFixasControle("todo mês 120 chat gpt", estadoChatGptClaudeBase(110));
+    assert.ok(conflito);
+    const negado = gerenciarDespesasFixasControle(resposta, conflito.estado);
+    assert.ok(negado, resposta);
+    assert.equal(negado.estado.totalDespesasFixas, 220);
+    assert.equal(negado.estado.confirmacaoPendente, undefined);
+  }
+
+  assert.equal(gerenciarDespesasFixasControle("1", estadoChatGptClaudeBase(110)), null);
+  assert.equal(gerenciarDespesasFixasControle("2", estadoChatGptClaudeBase(110)), null);
 });
 
 test("gerenciamento preserva total legado sem lista detalhada ao adicionar nova despesa fixa", () => {

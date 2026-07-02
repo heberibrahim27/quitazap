@@ -25,6 +25,14 @@ export type DespesaFixaRegistradaControle = {
   valor: number;
 };
 
+export type ConfirmacaoPendenteControle = {
+  tipo: "atualizar_despesa_fixa";
+  nomeNormalizado: string;
+  nomeExibido: string;
+  valorAnterior: number;
+  novoValor: number;
+};
+
 export type UltimoGastoControle = {
   descricao: string;
   valor: number;
@@ -41,6 +49,7 @@ export type EstadoControleFinanceiro = {
   totalGastosSaldo: number;
   faturas: FaturaAbertaControle[];
   cartoes: CartaoConfiguradoControle[];
+  confirmacaoPendente?: ConfirmacaoPendenteControle;
   ultimoGasto?: UltimoGastoControle;
 };
 
@@ -133,6 +142,23 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       ? [{ descricao: "Despesas fixas anteriores", valor: totalLegadoDespesasFixas }]
       : [];
   const totalDespesasFixas = despesasFixasCompat.reduce((soma, despesa) => soma + despesa.valor, 0);
+  const confirmacaoPendente =
+    raw.confirmacaoPendente &&
+    raw.confirmacaoPendente.tipo === "atualizar_despesa_fixa" &&
+    typeof raw.confirmacaoPendente.nomeNormalizado === "string" &&
+    typeof raw.confirmacaoPendente.nomeExibido === "string" &&
+    Number.isFinite(raw.confirmacaoPendente.valorAnterior) &&
+    Number.isFinite(raw.confirmacaoPendente.novoValor) &&
+    raw.confirmacaoPendente.valorAnterior > 0 &&
+    raw.confirmacaoPendente.novoValor > 0
+      ? {
+          tipo: "atualizar_despesa_fixa" as const,
+          nomeNormalizado: raw.confirmacaoPendente.nomeNormalizado,
+          nomeExibido: raw.confirmacaoPendente.nomeExibido,
+          valorAnterior: Number(raw.confirmacaoPendente.valorAnterior),
+          novoValor: Number(raw.confirmacaoPendente.novoValor),
+        }
+      : undefined;
 
   return {
     rendaMensal: Number.isFinite(raw.rendaMensal) && Number(raw.rendaMensal) > 0
@@ -145,6 +171,7 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       : 0,
     faturas,
     cartoes,
+    confirmacaoPendente,
     ultimoGasto:
       raw.ultimoGasto &&
       typeof raw.ultimoGasto.descricao === "string" &&
@@ -397,10 +424,108 @@ function adicionarDespesasFixasSemDuplicar(
   return { lista, adicionados, duplicados, conflitos };
 }
 
+function detectarRespostaConfirmacaoDespesaFixa(mensagem: string): "confirmar" | "negar" | null {
+  const texto = normalizarTexto(mensagem);
+  if (/^(1|sim|confirmar|atualizar)$/.test(texto)) return "confirmar";
+  if (/^(2|nao|manter)$/.test(texto)) return "negar";
+  return null;
+}
+
+function respostaDespesaFixaAtualizada(
+  descricao: string,
+  valorAnterior: number,
+  novoValor: number,
+  estado: EstadoControleFinanceiro
+): string {
+  return (
+    "✅ *Despesa fixa atualizada.*\n\n" +
+    "DescriÃ§Ã£o\n" +
+    `${descricao}\n\n` +
+    "Valor anterior\n" +
+    `${formatarValorBR(valorAnterior)}\n\n` +
+    "Novo valor\n" +
+    `${formatarValorBR(novoValor)}\n\n` +
+    resumoDespesasFixasAtualizado(estado)
+  );
+}
+
+function processarConfirmacaoPendenteDespesaFixa(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  const pendente = estadoAtual.confirmacaoPendente;
+  if (!pendente || pendente.tipo !== "atualizar_despesa_fixa") return null;
+
+  const resposta = detectarRespostaConfirmacaoDespesaFixa(mensagem);
+  if (!resposta) return null;
+
+  const despesasAtuais = despesasFixasCompatControle(estadoAtual);
+
+  if (resposta === "negar") {
+    const estado = {
+      ...estadoAtual,
+      despesasFixas: despesasAtuais,
+      totalDespesasFixas: recalcularDespesasFixas(despesasAtuais),
+      confirmacaoPendente: undefined,
+    };
+
+    return {
+      resposta:
+        "Tudo bem, mantive como estÃ¡.\n\n" +
+        `${pendente.nomeExibido}\n` +
+        `${formatarValorBR(pendente.valorAnterior)}`,
+      estado,
+      atualizouEstado: true,
+    };
+  }
+
+  const indice = despesasAtuais.findIndex((despesa) =>
+    !ehDespesaFixaCompatibilidade(despesa) && chaveDespesaFixa(despesa.descricao) === pendente.nomeNormalizado
+  );
+
+  if (indice < 0) {
+    return {
+      resposta: "NÃ£o encontrei essa despesa fixa para atualizar.",
+      estado: {
+        ...estadoAtual,
+        despesasFixas: despesasAtuais,
+        totalDespesasFixas: recalcularDespesasFixas(despesasAtuais),
+        confirmacaoPendente: undefined,
+      },
+      atualizouEstado: true,
+    };
+  }
+
+  const anterior = despesasAtuais[indice];
+  const despesasFixas = despesasAtuais.map((despesa, index) =>
+    index === indice ? { ...despesa, valor: pendente.novoValor } : despesa
+  );
+  const estado = {
+    ...estadoAtual,
+    despesasFixas,
+    totalDespesasFixas: recalcularDespesasFixas(despesasFixas),
+    confirmacaoPendente: undefined,
+  };
+
+  return {
+    resposta: respostaDespesaFixaAtualizada(
+      anterior.descricao,
+      anterior.valor,
+      pendente.novoValor,
+      estado
+    ),
+    estado,
+    atualizouEstado: true,
+  };
+}
+
 export function gerenciarDespesasFixasControle(
   mensagem: string,
   estadoAtual: EstadoControleFinanceiro
 ): ResultadoGastoControle | null {
+  const confirmacao = processarConfirmacaoPendenteDespesaFixa(mensagem, estadoAtual);
+  if (confirmacao) return confirmacao;
+
   const acao = detectarAcaoDespesaFixa(mensagem);
   if (!acao) return null;
 
@@ -456,6 +581,20 @@ export function gerenciarDespesasFixasControle(
 
     if (resultadoAdicao.adicionados.length === 0 && resultadoAdicao.conflitos.length > 0) {
       const conflito = resultadoAdicao.conflitos[0];
+      const estadoComPendencia = {
+        ...estadoAtual,
+        despesasFixas: despesasAtuais,
+        totalDespesasFixas: recalcularDespesasFixas(despesasAtuais),
+        faturas: estadoAtual.faturas ?? [],
+        cartoes: estadoAtual.cartoes ?? [],
+        confirmacaoPendente: {
+          tipo: "atualizar_despesa_fixa" as const,
+          nomeNormalizado: chaveDespesaFixa(conflito.atual.descricao),
+          nomeExibido: conflito.atual.descricao,
+          valorAnterior: conflito.atual.valor,
+          novoValor: conflito.novo.valor,
+        },
+      };
       return {
         resposta:
           "⚠️ *Despesa fixa já existe.*\n\n" +
@@ -464,8 +603,8 @@ export function gerenciarDespesasFixasControle(
           "Responda:\n" +
           "1️⃣ Sim, atualizar\n" +
           "2️⃣ Não, manter como está",
-        estado: estadoAtual,
-        atualizouEstado: false,
+        estado: estadoComPendencia,
+        atualizouEstado: true,
       };
     }
 
