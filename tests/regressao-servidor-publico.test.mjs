@@ -90,6 +90,7 @@ const {
 } = loadTsModule("src/lib/ia/financeiro-scope-guard.ts");
 const {
   formatarPreviaIntentFinanceiro,
+  intentFinanceiroConfirmavel,
   resolverIntencaoFinanceiraIA,
 } = loadTsModule("src/lib/ia/financeiro-intent-resolver.ts");
 
@@ -778,27 +779,68 @@ test("confirmacao de interpretacao financeira salva lote misto com seguranca", a
   assert.equal(negado.resposta, "Tudo bem, não salvei nada. Pode reenviar os lançamentos corrigidos.");
 });
 
-test("confirmacao de interpretacao financeira cancela previa e libera fluxo", () => {
-  const intent = {
+test("interpretador classifica netflix mensal e mercado com previa confirmavel", async () => {
+  const intent = await resolverIntencaoFinanceiraIA("netflix mes 39,90. mercado 25,00", {
+    forcarLocal: true,
+  });
+  assert.ok(intent);
+  assert.equal(intentFinanceiroConfirmavel(intent), true);
+  assert.deepEqual(
+    intent.itens.map((item) => [item.descricaoNormalizada, item.tipo, item.categoria, item.valor, item.recorrencia]),
+    [
+      ["Netflix", "despesa_fixa", "Assinaturas", 39.9, "mensal"],
+      ["Mercado", "despesa_variavel", "Mercado", 25, "unica"],
+    ]
+  );
+
+  const previa = formatarPreviaIntentFinanceiro(intent);
+  assert.match(previa, /Despesas fixas mensais:/);
+  assert.match(previa, /Netflix .*Assinaturas .*R\$ 39,90/);
+  assert.match(previa, /Despesa vari.vel:/);
+  assert.match(previa, /Mercado .*Mercado .*R\$ 25,00/);
+  assert.match(previa, /1.+Sim, registrar tudo/);
+  assert.match(previa, /2.+quero corrigir/);
+  assert.doesNotMatch(previa, /Outros lan.amentos/);
+  assert.doesNotMatch(previa, /\n\d+\. â€”/);
+});
+
+test("previa nao confirmavel nao mostra opcoes 1 e 2", () => {
+  const previa = formatarPreviaIntentFinanceiro({
     emEscopo: true,
-    precisaConfirmacao: true,
+    intencao: "registrar_multiplos_lancamentos",
+    confianca: 0.6,
+    precisaConfirmacao: false,
     itens: [
       {
-        tipo: "despesa_fixa",
-        descricaoOriginal: "netflix mes",
-        descricaoNormalizada: "Netflix",
-        categoria: "Assinaturas",
+        tipo: "desconhecido",
+        descricaoOriginal: "",
+        descricaoNormalizada: "",
+        categoria: "Outros",
         valor: 39.9,
       },
       {
-        tipo: "despesa_variavel",
-        descricaoOriginal: "mercado",
-        descricaoNormalizada: "Mercado",
-        categoria: "Mercado",
+        tipo: "desconhecido",
+        descricaoOriginal: "",
+        descricaoNormalizada: "",
+        categoria: "Outros",
         valor: 25,
       },
     ],
-  };
+  });
+
+  assert.match(previa, /Identifiquei valores, mas n.o consegui classificar com seguran.a/);
+  assert.doesNotMatch(previa, /Confirma que posso registrar assim\?/);
+  assert.doesNotMatch(previa, /1ï¸âƒ£/);
+  assert.doesNotMatch(previa, /2ï¸âƒ£/);
+});
+
+test("confirmacao de interpretacao financeira cancela previa e libera fluxo", async () => {
+  const intent = await resolverIntencaoFinanceiraIA("netflix mes 39,90. mercado 25,00", {
+    forcarLocal: true,
+  });
+  assert.ok(intent);
+  assert.equal(intentFinanceiroConfirmavel(intent), true);
+
   const estadoBase = {
     rendaMensal: 3000,
     totalDespesasFixas: 0,
@@ -831,6 +873,37 @@ test("confirmacao de interpretacao financeira cancela previa e libera fluxo", ()
   assert.equal(confirmacaoSolta.atualizouEstado, false);
   assert.equal(confirmacaoSolta.estado.confirmacaoPendente, undefined);
   assert.deepEqual(confirmacaoSolta.estado.despesasFixas, []);
+});
+
+test("confirmacao de interpretacao financeira salva netflix fixa e mercado variavel", async () => {
+  const intent = await resolverIntencaoFinanceiraIA("netflix mes 39,90. mercado 25,00", {
+    forcarLocal: true,
+  });
+  assert.ok(intent);
+
+  const estadoBase = {
+    rendaMensal: 3000,
+    totalDespesasFixas: 0,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [],
+  };
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  const confirmado = gerenciarDespesasFixasControle("1", estadoPendente);
+
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.equal(confirmado.estado.totalDespesasFixas, 39.9);
+  assert.equal(confirmado.estado.totalGastosSaldo, 25);
+  assert.deepEqual(confirmado.estado.despesasFixas, [{ descricao: "Netflix", valor: 39.9 }]);
+  assert.equal(confirmado.estado.ultimoGasto?.descricao, "Mercado");
+  assert.equal(confirmado.estado.ultimoGasto?.categoria, "Mercado");
+  assert.match(confirmado.resposta, /Lan.amentos registrados/);
+  assert.match(confirmado.resposta, /Netflix .*R\$ 39,90/);
+  assert.match(confirmado.resposta, /Mercado .*Mercado .*R\$ 25,00/);
+  assert.doesNotMatch(confirmado.resposta, /Outros/);
+  assert.doesNotMatch(confirmado.resposta, /\n\d+\. â€”/);
 });
 
 test("confirmacao de interpretacao financeira nao duplica despesa fixa existente", async () => {

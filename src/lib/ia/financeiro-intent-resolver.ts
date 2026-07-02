@@ -11,6 +11,7 @@ import {
   MENSAGEM_FORA_ESCOPO_FINANCEIRO,
   type FinanceiroIntent,
   type ItemFinanceiroInterpretado,
+  type TipoItemFinanceiro,
   validarFinanceiroIntent,
 } from "./financeiro-intent-schema";
 
@@ -41,6 +42,26 @@ function normalizarTexto(texto: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+export const MENSAGEM_REENVIAR_LANCAMENTOS_COM_CLAREZA =
+  "Identifiquei valores, mas não consegui classificar com segurança. Pode reenviar em lista?\n" +
+  "Exemplo:\n" +
+  "Netflix 39,90 por mês\n" +
+  "Mercado 25,00";
+
+const TIPOS_CONFIRMAVEIS = new Set<TipoItemFinanceiro>(["receita", "despesa_variavel", "despesa_fixa"]);
+const SERVICOS_ASSINATURA = [
+  { regex: /\bnetflix\b/, nome: "Netflix" },
+  { regex: /\bchat ?gpt\b/, nome: "ChatGPT" },
+  { regex: /\bclaude\b/, nome: "Claude" },
+  { regex: /\bspotify\b/, nome: "Spotify" },
+  { regex: /\byou ?tube\b|\byoutube\b/, nome: "YouTube" },
+  { regex: /\bprime\b|\bamazon prime\b/, nome: "Prime" },
+  { regex: /\bicloud\b/, nome: "iCloud" },
+  { regex: /\bcanva\b/, nome: "Canva" },
+];
+const TERMOS_MERCADO = /\b(mercado|supermercado|feira|padaria|acougue)\b/;
+const TERMOS_RECORRENCIA_MENSAL = /\b(mes|mensal|todo mes|por mes)\b/;
 
 function criarItem(parcial: Partial<ItemFinanceiroInterpretado>): ItemFinanceiroInterpretado {
   return {
@@ -160,6 +181,74 @@ function valorDoMatch(match: RegExpMatchArray | null, indice = 1): number | null
   return match?.[indice] ? extrairPrimeiroValor(match[indice]) : null;
 }
 
+function valorDoSegmento(segmento: string): number | null {
+  const valores = segmento.match(/\d[\d.,]*/g);
+  if (!valores?.length) return null;
+  return extrairPrimeiroValor(valores.at(-1) ?? "");
+}
+
+function limparDescricaoSegmento(segmento: string): string {
+  return segmento
+    .replace(/\d[\d.,]*/g, " ")
+    .replace(/\b(reais|real|rs|r\$|conto|contos|mes|mensal|todo mes|por mes|pago|paguei|comprei|gastei|de)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolverLancamentosSimples(mensagem: string): FinanceiroIntent | null {
+  const texto = normalizarTexto(mensagem);
+  const segmentos = texto
+    .split(/[.;\n]+/)
+    .map((segmento) => segmento.trim())
+    .filter(Boolean);
+  if (segmentos.length < 2) return null;
+
+  const itens: ItemFinanceiroInterpretado[] = [];
+
+  for (const segmento of segmentos) {
+    const valor = valorDoSegmento(segmento);
+    if (!valor) continue;
+
+    const servico = SERVICOS_ASSINATURA.find((assinatura) => assinatura.regex.test(segmento));
+    const recorrente = TERMOS_RECORRENCIA_MENSAL.test(segmento);
+    if (servico && recorrente) {
+      itens.push(criarItem({
+        tipo: "despesa_fixa",
+        descricaoOriginal: limparDescricaoSegmento(segmento) || servico.nome,
+        descricaoNormalizada: servico.nome,
+        categoria: "Assinaturas",
+        valor,
+        recorrencia: "mensal",
+      }));
+      continue;
+    }
+
+    if (TERMOS_MERCADO.test(segmento) && !recorrente) {
+      itens.push(criarItem({
+        tipo: "despesa_variavel",
+        descricaoOriginal: limparDescricaoSegmento(segmento) || "mercado",
+        descricaoNormalizada: "Mercado",
+        categoria: "Mercado",
+        valor,
+        recorrencia: "unica",
+        origem: "saldo",
+      }));
+      continue;
+    }
+  }
+
+  if (itens.length !== segmentos.length || itens.length < 2) return null;
+
+  return {
+    emEscopo: true,
+    intencao: "registrar_multiplos_lancamentos",
+    confianca: 0.84,
+    precisaConfirmacao: true,
+    motivoConfirmacao: "Mensagem com lançamentos simples classificados por recorrência e categoria.",
+    itens,
+  };
+}
+
 function resolverMensagemMista(mensagem: string): FinanceiroIntent | null {
   const texto = normalizarTexto(mensagem);
 
@@ -272,6 +361,7 @@ function resolverLocal(mensagem: string): FinanceiroIntent {
   if (!escopo.emEscopo) return escopo;
 
   return resolverMensagemMista(mensagem) ??
+    resolverLancamentosSimples(mensagem) ??
     resolverReceita(mensagem) ??
     {
       emEscopo: true,
@@ -345,10 +435,35 @@ export async function resolverIntencaoFinanceiraIA(
   return local;
 }
 
+function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
+  return (
+    TIPOS_CONFIRMAVEIS.has(item.tipo) &&
+    typeof item.descricaoNormalizada === "string" &&
+    item.descricaoNormalizada.trim().length > 0 &&
+    typeof item.categoria === "string" &&
+    item.categoria.trim().length > 0 &&
+    typeof item.valor === "number" &&
+    Number.isFinite(item.valor) &&
+    item.valor > 0
+  );
+}
+
+export function intentFinanceiroConfirmavel(intent: FinanceiroIntent): boolean {
+  return (
+    intent.emEscopo &&
+    intent.itens.length > 0 &&
+    intent.itens.every(itemFinanceiroConfirmavel)
+  );
+}
+
 export function formatarPreviaIntentFinanceiro(intent: FinanceiroIntent): string {
   if (!intent.emEscopo) return intent.mensagemForaEscopo || MENSAGEM_FORA_ESCOPO_FINANCEIRO;
   if (intent.itens.length === 0) {
     return "Entendi que isso é sobre sua organização financeira, mas preciso de mais detalhes para registrar com segurança.";
+  }
+
+  if (!intentFinanceiroConfirmavel(intent)) {
+    return MENSAGEM_REENVIAR_LANCAMENTOS_COM_CLAREZA;
   }
 
   if (intent.itens.length === 1 && intent.itens[0].tipo === "receita") {

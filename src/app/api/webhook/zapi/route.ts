@@ -21,6 +21,7 @@ import {
 } from "@/lib/controle-financeiro-flow";
 import {
   formatarPreviaIntentFinanceiro,
+  intentFinanceiroConfirmavel,
   resolverIntencaoFinanceiraIA,
 } from "@/lib/ia/financeiro-intent-resolver";
 import { MENSAGEM_FORA_ESCOPO_FINANCEIRO } from "@/lib/ia/financeiro-intent-schema";
@@ -1259,8 +1260,9 @@ Pode mandar tudo em uma mensagem só.`;
       temConfirmacaoPendente: Boolean(estadoAntesGasto.confirmacaoPendente),
     });
     if (intentFinanceiro) {
+      const intentConfirmavel = intentFinanceiroConfirmavel(intentFinanceiro);
       const respostaIntent = formatarPreviaIntentFinanceiro(intentFinanceiro);
-      const estadoComIntent = intentFinanceiro.emEscopo && intentFinanceiro.precisaConfirmacao
+      const estadoComIntent = intentConfirmavel
         ? criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoAntesGasto, intentFinanceiro)
         : estadoAntesGasto;
 
@@ -1273,7 +1275,7 @@ Pode mandar tudo em uma mensagem só.`;
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },
             { role: "assistant", content: respostaIntent },
-            ...(intentFinanceiro.emEscopo && intentFinanceiro.precisaConfirmacao
+            ...(intentConfirmavel
               ? [criarMensagemEstadoControle(estadoComIntent)]
               : []),
           ]),
