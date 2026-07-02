@@ -454,11 +454,25 @@ function extrairDescricaoDespesaFixa(mensagem: string): string | null {
   return descricao || null;
 }
 
+function pareceLinhaGastoCartaoControle(linha: string): boolean {
+  const texto = normalizarTexto(linha);
+  return /\b\d[\d.,]*\b/.test(texto) && /\b(?:no|na|pelo|pela)\s+(?:cart\S*|banco\s+)?\S+/.test(texto);
+}
+
+function pareceLoteGastosCartaoControle(mensagem: string): boolean {
+  const linhas = mensagem
+    .split(/\r?\n|;/)
+    .map((linha) => linha.trim())
+    .filter(Boolean);
+  return linhas.length >= 2 && linhas.every(pareceLinhaGastoCartaoControle);
+}
+
 function parsearItensDespesaFixa(mensagem: string): DespesaFixaRegistradaControle[] {
   return mensagem
     .split(/\r?\n/)
     .map((linha) => linha.trim())
     .filter(Boolean)
+    .filter((linha) => !pareceLinhaGastoCartaoControle(linha))
     .map(extrairItemDespesaFixa)
     .filter((item): item is DespesaFixaRegistradaControle => Boolean(item));
 }
@@ -1092,6 +1106,7 @@ export function gerenciarDespesasFixasControle(
 ): ResultadoGastoControle | null {
   const confirmacao = processarConfirmacaoPendenteDespesaFixa(mensagem, estadoAtual);
   if (confirmacao) return confirmacao;
+  if (pareceLoteGastosCartaoControle(mensagem)) return null;
 
   const acao = detectarAcaoDespesaFixa(mensagem);
   if (!acao) return null;

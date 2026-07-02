@@ -254,7 +254,7 @@ function extrairGastoCartaoSegmento(segmento: string): ItemFinanceiroInterpretad
   });
 }
 
-function resolverLoteGastosCartao(mensagem: string): FinanceiroIntent | null {
+export function resolverLoteGastosCartao(mensagem: string): FinanceiroIntent | null {
   const segmentos = mensagem
     .split(/[\n;]+/)
     .map((segmento) => segmento.trim())

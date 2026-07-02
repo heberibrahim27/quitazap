@@ -23,6 +23,7 @@ import {
 import {
   formatarPreviaIntentFinanceiro,
   intentFinanceiroConfirmavel,
+  resolverLoteGastosCartao,
   resolverIntencaoFinanceiraIA,
 } from "@/lib/ia/financeiro-intent-resolver";
 import { MENSAGEM_FORA_ESCOPO_FINANCEIRO } from "@/lib/ia/financeiro-intent-schema";
@@ -948,6 +949,31 @@ Pode mandar tudo em uma mensagem só.`;
             { role: "user", content: mensagem },
             { role: "assistant", content: correcaoRenda.resposta },
             ...(correcaoRenda.atualizouEstado ? [criarMensagemEstadoControle(correcaoRenda.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const loteGastosCartao = resolverLoteGastosCartao(mensagem);
+    if (loteGastosCartao) {
+      const respostaIntent = formatarPreviaIntentFinanceiro(loteGastosCartao);
+      const estadoComIntent = criarEstadoComConfirmacaoInterpretacaoFinanceira(
+        estadoAntesFluxosControle,
+        loteGastosCartao
+      );
+
+      await sendWhatsApp(telefone, respostaIntent);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaIntent },
+            criarMensagemEstadoControle(estadoComIntent),
           ]),
         },
       });

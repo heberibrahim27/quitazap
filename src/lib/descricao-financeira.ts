@@ -33,6 +33,7 @@ const MARCAS_E_TERMOS: Record<string, string> = {
   lanxe: "Lanche",
   lanche: "Lanche",
   lanches: "Lanches",
+  almoco: "Almoço",
 };
 
 const CONECTORES = new Set(["de", "do", "da", "dos", "das", "e"]);

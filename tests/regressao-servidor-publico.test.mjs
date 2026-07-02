@@ -916,6 +916,72 @@ test("interpretador reconhece lote generico de gastos no cartao", async () => {
   assert.match(cancelado.resposta, /Tudo bem, n.o salvei nada\. Pode reenviar os lan.amentos corrigidos\./);
 });
 
+test("lote de cartao nao cai como despesa fixa antes da confirmacao", async () => {
+  const mensagem = [
+    "posto 150 no santander",
+    "almoco 35 no picpay",
+    "assinatura 29,90 no c6",
+    "compra 80 no bradesco",
+  ].join("\n");
+  const estadoBase = {
+    rendaMensal: 3000,
+    totalDespesasFixas: 0,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [],
+  };
+
+  assert.equal(gerenciarDespesasFixasControle(mensagem, estadoBase), null);
+
+  const intent = await resolverIntencaoFinanceiraIA(mensagem, { forcarLocal: true });
+  assert.ok(intent);
+  assert.equal(intentFinanceiroConfirmavel(intent), true);
+  assert.deepEqual(
+    intent.itens.map((item) => [item.descricaoNormalizada, item.origem, item.cartao, item.valor]),
+    [
+      ["Posto", "cartao", "Santander", 150],
+      ["Almoço", "cartao", "PicPay", 35],
+      ["Assinatura", "cartao", "C6", 29.9],
+      ["Compra", "cartao", "Bradesco", 80],
+    ]
+  );
+
+  const previa = formatarPreviaIntentFinanceiro(intent);
+  assert.match(previa, /Entendi estes gastos no cart.o/);
+  assert.match(previa, /Posto .*Cart.o Santander .*R\$ 150,00/);
+  assert.match(previa, /Almo.o .*Cart.o PicPay .*R\$ 35,00/);
+  assert.match(previa, /Assinatura .*Cart.o C6 .*R\$ 29,90/);
+  assert.match(previa, /Compra .*Cart.o Bradesco .*R\$ 80,00/);
+  assert.match(previa, /1.+Sim, registrar tudo/);
+
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  assert.equal(estadoPendente.confirmacaoPendente?.tipo, "interpretacao_financeira");
+  assert.deepEqual(estadoPendente.despesasFixas, []);
+  assert.deepEqual(estadoPendente.faturas, []);
+
+  const confirmado = gerenciarDespesasFixasControle("1", estadoPendente);
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.equal(confirmado.estado.totalDespesasFixas, 0);
+  assert.deepEqual(confirmado.estado.despesasFixas, []);
+  assert.equal(confirmado.estado.totalGastosSaldo, 0);
+  assert.equal(calcularSaldoDisponivelControle(confirmado.estado), 3000);
+  assert.deepEqual(confirmado.estado.faturas, [
+    { cartao: "Santander", valor: 150 },
+    { cartao: "PicPay", valor: 35 },
+    { cartao: "C6", valor: 29.9 },
+    { cartao: "Bradesco", valor: 80 },
+  ]);
+
+  const cancelado = gerenciarDespesasFixasControle("2", estadoPendente);
+  assert.ok(cancelado);
+  assert.equal(cancelado.estado.confirmacaoPendente, undefined);
+  assert.equal(cancelado.estado.totalDespesasFixas, 0);
+  assert.deepEqual(cancelado.estado.despesasFixas, []);
+  assert.deepEqual(cancelado.estado.faturas, []);
+});
+
 test("previa nao confirmavel nao mostra opcoes 1 e 2", () => {
   const previa = formatarPreviaIntentFinanceiro({
     emEscopo: true,
