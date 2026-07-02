@@ -69,6 +69,29 @@ const PADROES_ESCOPO = [
   /\bchat ?gpt\b/,
 ];
 
+const ALIASES_CARTAO_ESCOPO = [
+  "nubank",
+  "bb",
+  "banco do brasil",
+  "mercado pago",
+  "inter",
+  "pagbank",
+  "bradesco",
+  "itau",
+  "itaú",
+  "c6",
+];
+
+function pareceGastoEmCartao(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  if (!/\b\d[\d.,]*\b/.test(texto)) return false;
+
+  return ALIASES_CARTAO_ESCOPO.some((alias) => {
+    const aliasNormalizado = normalizarTexto(alias).replace(/\s+/g, "\\s+");
+    return new RegExp(`\\b(?:no|na|pelo|pela)\\s+(?:cartao|cartão|banco)?\\s*${aliasNormalizado}\\b`).test(texto);
+  });
+}
+
 export function avaliarEscopoFinanceiro(mensagem: string): FinanceiroIntent {
   const texto = normalizarTexto(mensagem);
   if (!texto) return criarIntentForaEscopo();
@@ -81,7 +104,10 @@ export function avaliarEscopoFinanceiro(mensagem: string): FinanceiroIntent {
     return criarIntentForaEscopo();
   }
 
-  const emEscopo = PADROES_ESCOPO.some((regex) => regex.test(texto)) || /\br\$\s*\d/.test(texto);
+  const emEscopo =
+    PADROES_ESCOPO.some((regex) => regex.test(texto)) ||
+    pareceGastoEmCartao(mensagem) ||
+    /\br\$\s*\d/.test(texto);
 
   return emEscopo
     ? {

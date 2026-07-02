@@ -559,6 +559,11 @@ test("guardiao reconhece mensagens financeiras e evita custo em comandos curtos"
     "gastei 25 no mercado",
     "cliente pagou 200",
     "recebi pix de 150",
+    "ifood 40 no nubank",
+    "uber 30 no nubank",
+    "mercado 100 no cartÃ£o nubank",
+    "farmacia 55 no banco do brasil",
+    "gasolina 120 no mercado pago",
   ]) {
     assert.equal(avaliarEscopoFinanceiro(mensagem).emEscopo, true, mensagem);
   }
@@ -566,6 +571,35 @@ test("guardiao reconhece mensagens financeiras e evita custo em comandos curtos"
   for (const mensagem of ["1", "2", "sim", "não", "resetar", "listar despesas fixas"]) {
     assert.equal(devePularInterpretadorFinanceiroIA(mensagem), true, mensagem);
   }
+});
+
+test("guardiao deixa gasto simples em cartao seguir para fluxo deterministico", async () => {
+  const intent = await resolverIntencaoFinanceiraIA("ifood 40 no nubank", { forcarLocal: true });
+  assert.equal(intent, null);
+
+  const estado = configurarCartaoControle("Nubank fecha dia 25 e vence dia 05", estadoControleBase());
+  assert.ok(estado);
+
+  const ifood = registrarGastoControle(
+    "ifood 40 no nubank",
+    estado.estado,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(ifood);
+  assert.equal(calcularSaldoDisponivelControle(ifood.estado), 1960);
+  assert.deepEqual(ifood.estado.faturas, [{ cartao: "Nubank", valor: 40 }]);
+  assert.match(ifood.resposta, /Descri..o:\* iFood/);
+  assert.match(ifood.resposta, /Origem:\* Cart.o Nubank/);
+  assert.match(ifood.resposta, /Fatura Nubank:\* R\$ 40,00/);
+
+  const uber = registrarGastoControle(
+    "uber 30 no nubank",
+    ifood.estado,
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(uber);
+  assert.equal(calcularSaldoDisponivelControle(uber.estado), 1960);
+  assert.deepEqual(uber.estado.faturas, [{ cartao: "Nubank", valor: 70 }]);
 });
 
 test("interpretador financeiro local diferencia receita de renda", async () => {
