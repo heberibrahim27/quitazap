@@ -698,19 +698,71 @@ test("interpretador financeiro estrutura despesas fixas em frase natural", async
   );
 });
 
-test("confirmacao de interpretacao financeira v1 nao salva lote automaticamente", async () => {
+test("confirmacao de receita interpretada salva entrada avulsa e limpa pendencia", async () => {
+  const intent = await resolverIntencaoFinanceiraIA(
+    "anota pra mim cliente pagou 200,00",
+    { forcarLocal: true }
+  );
+  assert.ok(intent);
+
+  const estadoBase = {
+    rendaMensal: 3000,
+    totalDespesasFixas: 0,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [],
+  };
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  const confirmado = gerenciarDespesasFixasControle("1", estadoPendente);
+
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.equal(confirmado.estado.totalReceitasAvulsas, 200);
+  assert.equal(confirmado.estado.totalDespesasFixas, 0);
+  assert.equal(confirmado.estado.totalGastosSaldo, 0);
+  assert.equal(calcularSaldoDisponivelControle(confirmado.estado), 3200);
+  assert.match(confirmado.resposta, /Receita registrada/);
+  assert.match(confirmado.resposta, /Esse valor foi somado ao seu saldo do mês/);
+});
+
+test("confirmacao de interpretacao financeira salva lote misto com seguranca", async () => {
   const intent = await resolverIntencaoFinanceiraIA(
     "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900",
     { forcarLocal: true }
   );
   assert.ok(intent);
 
-  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoSemDespesasFixasBase(), intent);
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(
+    {
+      rendaMensal: 3000,
+      totalDespesasFixas: 0,
+      totalGastosSaldo: 0,
+      faturas: [],
+      cartoes: [],
+      despesasFixas: [],
+    },
+    intent
+  );
   const confirmado = gerenciarDespesasFixasControle("1", estadoPendente);
   assert.ok(confirmado);
   assert.equal(confirmado.estado.confirmacaoPendente, undefined);
-  assert.equal(confirmado.estado.totalDespesasFixas, 0);
-  assert.match(confirmado.resposta, /ainda não vou salvar esse lote automaticamente/i);
+  assert.equal(confirmado.estado.totalGastosSaldo, 2.5);
+  assert.equal(confirmado.estado.totalDespesasFixas, 2010);
+  assert.deepEqual(confirmado.estado.despesasFixas, [
+    { descricao: "ChatGPT", valor: 110 },
+    { descricao: "Energia", valor: 200 },
+    { descricao: "Aluguel", valor: 800 },
+    { descricao: "Pensão", valor: 900 },
+  ]);
+  assert.equal(calcularSaldoDisponivelControle(confirmado.estado), 987.5);
+  assert.match(confirmado.resposta, /Lançamentos registrados/);
+  assert.match(confirmado.resposta, /Despesa variável:/);
+  assert.match(confirmado.resposta, /Água na rua .*R\$ 2,50/);
+  assert.match(confirmado.resposta, /Despesas fixas mensais:/);
+  assert.match(confirmado.resposta, /Despesas fixas adicionadas: R\$ 2\.010,00/);
+  assert.match(confirmado.resposta, /Despesas variáveis registradas: R\$ 2,50/);
+  assert.equal(gerenciarDespesasFixasControle("1", confirmado.estado), null);
 
   const estadoPendente2 = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoSemDespesasFixasBase(), intent);
   const negado = gerenciarDespesasFixasControle("2", estadoPendente2);
@@ -718,6 +770,32 @@ test("confirmacao de interpretacao financeira v1 nao salva lote automaticamente"
   assert.equal(negado.estado.confirmacaoPendente, undefined);
   assert.equal(negado.estado.totalDespesasFixas, 0);
   assert.match(negado.resposta, /não registrei nada/i);
+});
+
+test("confirmacao de interpretacao financeira nao duplica despesa fixa existente", async () => {
+  const intent = await resolverIntencaoFinanceiraIA(
+    "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900",
+    { forcarLocal: true }
+  );
+  assert.ok(intent);
+
+  const estadoBase = {
+    rendaMensal: 3000,
+    totalDespesasFixas: 110,
+    totalGastosSaldo: 0,
+    faturas: [],
+    cartoes: [],
+    despesasFixas: [{ descricao: "ChatGPT", valor: 110 }],
+  };
+  const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoBase, intent);
+  const confirmado = gerenciarDespesasFixasControle("1", estadoPendente);
+
+  assert.ok(confirmado);
+  assert.equal(confirmado.estado.confirmacaoPendente, undefined);
+  assert.equal(confirmado.estado.totalDespesasFixas, 2010);
+  assert.equal(confirmado.estado.despesasFixas.filter((item) => chaveTextoTeste(item.descricao) === "chatgpt").length, 1);
+  assert.match(confirmado.resposta, /Despesas fixas já cadastradas:/);
+  assert.match(confirmado.resposta, /Não dupliquei esses lançamentos/);
 });
 
 test("reset usa onboarding do QuitaZAP Controle em duas mensagens", () => {

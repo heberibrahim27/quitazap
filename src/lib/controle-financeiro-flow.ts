@@ -7,7 +7,7 @@ import {
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
 import { normalizarDescricaoFinanceira } from "./descricao-financeira";
-import type { FinanceiroIntent } from "./ia/financeiro-intent-schema";
+import type { FinanceiroIntent, ItemFinanceiroInterpretado } from "./ia/financeiro-intent-schema";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
 
@@ -52,6 +52,7 @@ export type UltimoGastoControle = {
 
 export type EstadoControleFinanceiro = {
   rendaMensal: number;
+  totalReceitasAvulsas: number;
   totalDespesasFixas: number;
   despesasFixas: DespesaFixaRegistradaControle[];
   totalGastosSaldo: number;
@@ -95,6 +96,7 @@ function normalizarTexto(texto: string): string {
 function estadoVazio(rendaMensal?: number | null): EstadoControleFinanceiro {
   return {
     rendaMensal: Number.isFinite(rendaMensal ?? NaN) ? Number(rendaMensal) : 0,
+    totalReceitasAvulsas: 0,
     totalDespesasFixas: 0,
     despesasFixas: [],
     totalGastosSaldo: 0,
@@ -199,6 +201,9 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
     rendaMensal: Number.isFinite(raw.rendaMensal) && Number(raw.rendaMensal) > 0
       ? Number(raw.rendaMensal)
       : base.rendaMensal,
+    totalReceitasAvulsas: Number.isFinite(raw.totalReceitasAvulsas) && Number(raw.totalReceitasAvulsas) > 0
+      ? Number(raw.totalReceitasAvulsas)
+      : 0,
     totalDespesasFixas,
     despesasFixas: despesasFixasCompat,
     totalGastosSaldo: Number.isFinite(raw.totalGastosSaldo) && Number(raw.totalGastosSaldo) > 0
@@ -284,7 +289,7 @@ export function criarEstadoComConfirmacaoInterpretacaoFinanceira(
 }
 
 export function calcularSaldoDisponivelControle(estado: EstadoControleFinanceiro): number {
-  return estado.rendaMensal - estado.totalDespesasFixas - estado.totalGastosSaldo;
+  return estado.rendaMensal + (estado.totalReceitasAvulsas ?? 0) - estado.totalDespesasFixas - estado.totalGastosSaldo;
 }
 
 export function totalFaturasAbertasControle(estado: EstadoControleFinanceiro): number {
@@ -578,6 +583,218 @@ function respostaDespesaFixaAtualizada(
   );
 }
 
+function descricaoItemFinanceiro(item: ItemFinanceiroInterpretado): string {
+  return normalizarDescricaoFinanceira(
+    item.descricaoNormalizada || item.descricaoOriginal || item.categoria || "Lançamento"
+  );
+}
+
+function valorValidoItemFinanceiro(item: ItemFinanceiroInterpretado): number | null {
+  const valor = Number(item.valor);
+  return Number.isFinite(valor) && valor > 0 ? valor : null;
+}
+
+function linhasItensFinanceiros(
+  itens: Array<{ descricao: string; categoria?: string; valor: number }>
+): string[] {
+  return itens.map((item, index) =>
+    `${index + 1}. ${item.descricao}${item.categoria ? ` — ${item.categoria}` : ""} — ${formatarValorBR(item.valor)}`
+  );
+}
+
+function resumoAtualizadoMes(estado: EstadoControleFinanceiro): string {
+  return (
+    "📊 *Resumo atualizado do mês*\n\n" +
+    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelControle(estado))}\n` +
+    `📌 *Despesas fixas:* ${formatarValorBR(estado.totalDespesasFixas)}\n` +
+    `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`
+  );
+}
+
+export function salvarItensConfirmadosIA(
+  estadoAtual: EstadoControleFinanceiro,
+  intent: FinanceiroIntent
+): ResultadoGastoControle {
+  const itens = Array.isArray(intent.itens) ? intent.itens : [];
+  const tiposPermitidos = new Set(["receita", "despesa_variavel", "despesa_fixa"]);
+  const itensValidos: Array<ItemFinanceiroInterpretado & { valor: number }> = [];
+  const tiposBloqueados = new Set<string>();
+
+  for (const item of itens) {
+    if (!tiposPermitidos.has(item.tipo)) {
+      tiposBloqueados.add(item.tipo || "desconhecido");
+      continue;
+    }
+
+    const valor = valorValidoItemFinanceiro(item);
+    const descricao = descricaoItemFinanceiro(item);
+    if (!valor || !descricao) {
+      return {
+        resposta:
+          "Não consegui salvar essa confirmação com segurança.\n\n" +
+          "Encontrei um item sem valor ou descrição válida. Me envie novamente em lista.",
+        estado: {
+          ...estadoAtual,
+          confirmacaoPendente: undefined,
+        },
+        atualizouEstado: true,
+      };
+    }
+
+    itensValidos.push({ ...item, valor });
+  }
+
+  if (tiposBloqueados.size > 0) {
+    return {
+      resposta:
+        "Ainda não salvei essa confirmação.\n\n" +
+        "Ela tem tipo financeiro que precisa de tratamento específico: " +
+        `${[...tiposBloqueados].join(", ")}.\n\n` +
+        "Me envie esse item separadamente para eu registrar com segurança.",
+      estado: {
+        ...estadoAtual,
+        confirmacaoPendente: undefined,
+      },
+      atualizouEstado: true,
+    };
+  }
+
+  if (itensValidos.length === 0) {
+    return {
+      resposta:
+        "Não encontrei lançamentos válidos para salvar.\n\n" +
+        "Me envie novamente em lista.",
+      estado: {
+        ...estadoAtual,
+        confirmacaoPendente: undefined,
+      },
+      atualizouEstado: true,
+    };
+  }
+
+  const receitas = itensValidos
+    .filter((item) => item.tipo === "receita")
+    .map((item) => ({
+      descricao: descricaoItemFinanceiro(item),
+      categoria: item.categoria || "Receita",
+      valor: item.valor,
+    }));
+  const variaveis = itensValidos
+    .filter((item) => item.tipo === "despesa_variavel")
+    .map((item) => ({
+      descricao: descricaoItemFinanceiro(item),
+      categoria: item.categoria || "Outros",
+      valor: item.valor,
+    }));
+  const fixas = itensValidos
+    .filter((item) => item.tipo === "despesa_fixa")
+    .map((item) => ({
+      descricao: descricaoItemFinanceiro(item),
+      valor: item.valor,
+    }));
+
+  const despesasAtuais = despesasFixasCompatControle(estadoAtual);
+  const resultadoFixas = adicionarDespesasFixasSemDuplicar(despesasAtuais, fixas);
+  const totalReceitas = receitas.reduce((soma, item) => soma + item.valor, 0);
+  const totalVariaveis = variaveis.reduce((soma, item) => soma + item.valor, 0);
+  const totalFixasAdicionadas = resultadoFixas.adicionados.reduce((soma, item) => soma + item.valor, 0);
+  const ultimoVariavel = variaveis.at(-1);
+  const estado: EstadoControleFinanceiro = {
+    ...estadoAtual,
+    totalReceitasAvulsas: (estadoAtual.totalReceitasAvulsas ?? 0) + totalReceitas,
+    totalGastosSaldo: (estadoAtual.totalGastosSaldo ?? 0) + totalVariaveis,
+    despesasFixas: resultadoFixas.lista,
+    totalDespesasFixas: recalcularDespesasFixas(resultadoFixas.lista),
+    faturas: estadoAtual.faturas ?? [],
+    cartoes: estadoAtual.cartoes ?? [],
+    confirmacaoPendente: undefined,
+    ultimoGasto: ultimoVariavel
+      ? {
+          descricao: ultimoVariavel.descricao,
+          valor: ultimoVariavel.valor,
+          categoria: ultimoVariavel.categoria,
+          data: formatarDataBR(new Date()),
+          origem: "SALDO" as const,
+        }
+      : estadoAtual.ultimoGasto,
+  };
+
+  if (receitas.length === 1 && variaveis.length === 0 && fixas.length === 0) {
+    const receita = receitas[0];
+    return {
+      resposta:
+        "✅ *Receita registrada.*\n\n" +
+        `Descrição: ${receita.descricao}\n` +
+        `Categoria: ${receita.categoria}\n` +
+        `Valor: ${formatarValorBR(receita.valor)}\n\n` +
+        "Esse valor foi somado ao seu saldo do mês.\n\n" +
+        resumoAtualizadoMes(estado),
+      estado,
+      atualizouEstado: true,
+    };
+  }
+
+  const linhas: string[] = ["✅ *Lançamentos registrados.*", ""];
+
+  if (receitas.length > 0) {
+    linhas.push("Receitas:", ...linhasItensFinanceiros(receitas), "");
+  }
+
+  if (variaveis.length > 0) {
+    linhas.push("Despesa variável:", ...linhasItensFinanceiros(variaveis), "");
+  }
+
+  if (resultadoFixas.adicionados.length > 0) {
+    linhas.push(
+      "Despesas fixas mensais:",
+      ...linhasItensFinanceiros(resultadoFixas.adicionados.map((item) => ({
+        descricao: item.descricao,
+        valor: item.valor,
+      }))),
+      ""
+    );
+  }
+
+  if (resultadoFixas.duplicados.length > 0) {
+    linhas.push(
+      "Despesas fixas já cadastradas:",
+      ...linhasItensFinanceiros(resultadoFixas.duplicados.map((item) => ({
+        descricao: item.descricao,
+        valor: item.valor,
+      }))),
+      "Não dupliquei esses lançamentos.",
+      ""
+    );
+  }
+
+  if (resultadoFixas.conflitos.length > 0) {
+    linhas.push("Despesas fixas com conflito:", "");
+    for (const conflito of resultadoFixas.conflitos) {
+      linhas.push(
+        conflito.atual.descricao,
+        `Valor cadastrado: ${formatarValorBR(conflito.atual.valor)}`,
+        `Valor informado: ${formatarValorBR(conflito.novo.valor)}`,
+        ""
+      );
+    }
+    linhas.push("Não alterei esses itens automaticamente. Envie uma correção específica para atualizar.", "");
+  }
+
+  linhas.push("Resumo:");
+  if (totalReceitas > 0) linhas.push(`Receitas registradas: ${formatarValorBR(totalReceitas)}`);
+  if (totalFixasAdicionadas > 0) linhas.push(`Despesas fixas adicionadas: ${formatarValorBR(totalFixasAdicionadas)}`);
+  if (totalVariaveis > 0) linhas.push(`Despesas variáveis registradas: ${formatarValorBR(totalVariaveis)}`);
+  if (resultadoFixas.duplicados.length > 0) linhas.push(`Despesas fixas duplicadas ignoradas: ${resultadoFixas.duplicados.length}`);
+  if (resultadoFixas.conflitos.length > 0) linhas.push(`Despesas fixas com conflito: ${resultadoFixas.conflitos.length}`);
+  linhas.push("", resumoAtualizadoMes(estado));
+
+  return {
+    resposta: linhas.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
+    estado,
+    atualizouEstado: true,
+  };
+}
+
 function processarConfirmacaoPendenteDespesaFixa(
   mensagem: string,
   estadoAtual: EstadoControleFinanceiro
@@ -712,13 +929,7 @@ function processarConfirmacaoPendenteDespesaFixa(
       };
     }
 
-    return {
-      resposta:
-        "Entendi a confirmação, mas nesta versão ainda não vou salvar esse lote automaticamente.\n\n" +
-        "Para evitar erro com dinheiro, me envie os lançamentos em lista ou separadamente.",
-      estado,
-      atualizouEstado: true,
-    };
+    return salvarItensConfirmadosIA(estado, pendente.intent);
   }
 
   if (resposta === "negar") {
