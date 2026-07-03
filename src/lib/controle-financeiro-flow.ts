@@ -354,6 +354,16 @@ export function calcularSaldoEstimadoControle(estado: EstadoControleFinanceiro):
   );
 }
 
+export function calcularSaldoDisponivelAgoraControle(estado: EstadoControleFinanceiro): number {
+  return (
+    estado.rendaMensal +
+    (estado.totalReceitasAvulsas ?? 0) -
+    estado.totalDespesasFixas -
+    (estado.totalGastosSaldo ?? 0) -
+    totalFaturasFechadasControle(estado)
+  );
+}
+
 function formatarDescricaoDespesaFixa(texto: string): string {
   const limpo = texto
     .replace(/\s+/g, " ")
@@ -1540,21 +1550,33 @@ export function consultarCartoesControle(
     };
   }
 
-  const linhas = ["💳 *Meus cartões*", ""];
+  const linhasDados: string[] = [];
+  let primeiroCartao = true;
   for (const nome of nomesCartoes.values()) {
     const configuracao = obterCartaoConfigurado(estadoAtual, nome);
-    linhas.push(
-      `Cartão: ${nome}`,
-      `Fechamento: ${configuracao?.fechamento ? `dia ${formatarDiaCartao(configuracao.fechamento)}` : "não informado"}`,
-      `Vencimento: ${configuracao?.vencimento ? `dia ${formatarDiaCartao(configuracao.vencimento)}` : "não informado"}`,
-      `Fatura aberta: ${formatarValorBR(valorFaturaAbertaCartao(estadoAtual, nome))}`,
-      `Fatura fechada: ${formatarValorBR(valorFaturaFechadaCartao(estadoAtual, nome))}`,
+    if (!primeiroCartao) linhasDados.push("");
+    primeiroCartao = false;
+    linhasDados.push(
+      "💳 Cartão",
+      nome,
+      "",
+      "📅 Fechamento",
+      configuracao?.fechamento ? `dia ${formatarDiaCartao(configuracao.fechamento)}` : "não informado",
+      "",
+      "📆 Vencimento",
+      configuracao?.vencimento ? `dia ${formatarDiaCartao(configuracao.vencimento)}` : "não informado",
+      "",
+      "💳 Fatura aberta",
+      formatarValorBR(valorFaturaAbertaCartao(estadoAtual, nome)),
+      "",
+      "✅ Fatura fechada",
+      formatarValorBR(valorFaturaFechadaCartao(estadoAtual, nome)),
       ""
     );
   }
 
   return {
-    resposta: linhas.join("\n").trimEnd(),
+    resposta: ["💳 *Meus cartões*", "", "```", ...linhasDados, "```"].join("\n"),
     estado: estadoAtual,
     atualizouEstado: false,
   };
@@ -1568,16 +1590,35 @@ export function consultarSaldoControle(
 
   const faturasFechadas = totalFaturasFechadasControle(estadoAtual);
   const faturasAbertas = totalFaturasAbertasControle(estadoAtual);
+  const saldoDisponivelAgora = calcularSaldoDisponivelAgoraControle(estadoAtual);
+  const saldoSeguroMes = calcularSaldoEstimadoControle(estadoAtual);
   const linhas = [
     "📊 *Resumo do mês*",
     "",
-    `Renda mensal: ${formatarValorBR(estadoAtual.rendaMensal)}`,
-    `Despesas fixas: ${formatarValorBR(estadoAtual.totalDespesasFixas)}`,
-    `Gastos do mês: ${formatarValorBR(estadoAtual.totalGastosSaldo ?? 0)}`,
-    `Faturas fechadas: ${formatarValorBR(faturasFechadas)}`,
-    `Faturas em aberto: ${formatarValorBR(faturasAbertas)}`,
+    "```",
+    "💰 Renda mensal",
+    formatarValorBR(estadoAtual.rendaMensal),
     "",
-    `Saldo estimado disponível: ${formatarValorBR(calcularSaldoEstimadoControle(estadoAtual))}`,
+    "🏠 Despesas fixas",
+    formatarValorBR(estadoAtual.totalDespesasFixas),
+    "",
+    "🧾 Gastos do mês",
+    formatarValorBR(estadoAtual.totalGastosSaldo ?? 0),
+    "",
+    "💳 Faturas fechadas",
+    formatarValorBR(faturasFechadas),
+    "",
+    "💳 Faturas em aberto",
+    formatarValorBR(faturasAbertas),
+    "",
+    "💰 Saldo disponível agora",
+    formatarValorBR(saldoDisponivelAgora),
+    "",
+    "🛡️ Saldo seguro do mês",
+    formatarValorBR(saldoSeguroMes),
+    "```",
+    "",
+    "O saldo seguro já separa o valor das faturas em aberto para evitar surpresa no cartão.",
   ];
 
   return {

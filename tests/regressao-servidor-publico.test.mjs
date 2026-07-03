@@ -71,6 +71,7 @@ const {
 } = loadTsModule("src/lib/onboarding-controle.ts");
 const {
   atualizarDespesasFixasControle,
+  calcularSaldoDisponivelAgoraControle,
   calcularSaldoEstimadoControle,
   calcularSaldoDisponivelControle,
   configurarCartaoControle,
@@ -2292,39 +2293,64 @@ test("consulta meus cartoes usa dados do Controle e mostra faturas abertas e fec
   const consultaAntes = consultarCartoesControle("meus cartões", antesFechamento);
   assert.ok(consultaAntes);
   assert.equal(consultaAntes.atualizouEstado, false);
-  assert.match(consultaAntes.resposta, /Cart.o: Nubank/);
-  assert.match(consultaAntes.resposta, /Fechamento: dia 25/);
-  assert.match(consultaAntes.resposta, /Vencimento: dia 05/);
-  assert.match(consultaAntes.resposta, /Fatura aberta: R\$ 63,50/);
-  assert.match(consultaAntes.resposta, /Fatura fechada: R\$ 0,00/);
+  assert.match(consultaAntes.resposta, /```[\s\S]*```/);
+  assert.match(consultaAntes.resposta, /💳 Cart.o\nNubank/);
+  assert.match(consultaAntes.resposta, /📅 Fechamento\ndia 25/);
+  assert.match(consultaAntes.resposta, /📆 Vencimento\ndia 05/);
+  assert.match(consultaAntes.resposta, /💳 Fatura aberta\nR\$ 63,50/);
+  assert.match(consultaAntes.resposta, /✅ Fatura fechada\nR\$ 0,00/);
   assert.doesNotMatch(consultaAntes.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
   assert.doesNotMatch(consultaAntes.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 
   const consultaDepois = consultarCartoesControle("meus cartoes", depoisFechamento);
   assert.ok(consultaDepois);
   assert.equal(consultaDepois.atualizouEstado, false);
-  assert.match(consultaDepois.resposta, /Cart.o: Nubank/);
-  assert.match(consultaDepois.resposta, /Fechamento: dia 25/);
-  assert.match(consultaDepois.resposta, /Vencimento: dia 05/);
-  assert.match(consultaDepois.resposta, /Fatura aberta: R\$ 0,00/);
-  assert.match(consultaDepois.resposta, /Fatura fechada: R\$ 63,50/);
+  assert.match(consultaDepois.resposta, /```[\s\S]*```/);
+  assert.match(consultaDepois.resposta, /💳 Cart.o\nNubank/);
+  assert.match(consultaDepois.resposta, /📅 Fechamento\ndia 25/);
+  assert.match(consultaDepois.resposta, /📆 Vencimento\ndia 05/);
+  assert.match(consultaDepois.resposta, /💳 Fatura aberta\nR\$ 0,00/);
+  assert.match(consultaDepois.resposta, /✅ Fatura fechada\nR\$ 63,50/);
   assert.doesNotMatch(consultaDepois.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
   assert.doesNotMatch(consultaDepois.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
-test("consulta saldo usa motor do Controle e desconta fatura fechada", () => {
+test("consulta saldo mostra disponivel agora e seguro com fatura aberta", () => {
+  const { antesFechamento } = montarCenarioConsultasControle();
+  const consulta = consultarSaldoControle("como está meu saldo?", antesFechamento);
+
+  assert.ok(consulta);
+  assert.equal(consulta.atualizouEstado, false);
+  assert.equal(calcularSaldoDisponivelAgoraControle(antesFechamento), 1855);
+  assert.equal(calcularSaldoEstimadoControle(antesFechamento), 1791.5);
+  assert.match(consulta.resposta, /```[\s\S]*```/);
+  assert.match(consulta.resposta, /💰 Renda mensal\nR\$ 4\.000,00/);
+  assert.match(consulta.resposta, /🏠 Despesas fixas\nR\$ 2\.100,00/);
+  assert.match(consulta.resposta, /🧾 Gastos do m.s\nR\$ 45,00/);
+  assert.match(consulta.resposta, /💳 Faturas fechadas\nR\$ 0,00/);
+  assert.match(consulta.resposta, /💳 Faturas em aberto\nR\$ 63,50/);
+  assert.match(consulta.resposta, /💰 Saldo dispon.vel agora\nR\$ 1\.855,00/);
+  assert.match(consulta.resposta, /🛡️ Saldo seguro do m.s\nR\$ 1\.791,50/);
+  assert.match(consulta.resposta, /O saldo seguro j. separa o valor das faturas em aberto para evitar surpresa no cart.o\./);
+  assert.doesNotMatch(consulta.resposta, /provisionar|livre para gastar/i);
+  assert.doesNotMatch(consulta.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
+  assert.doesNotMatch(consulta.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("consulta saldo iguala disponivel e seguro depois de fechar fatura", () => {
   const { depoisFechamento } = montarCenarioConsultasControle();
   const consulta = consultarSaldoControle("como está meu saldo?", depoisFechamento);
 
   assert.ok(consulta);
   assert.equal(consulta.atualizouEstado, false);
+  assert.equal(calcularSaldoDisponivelAgoraControle(depoisFechamento), 1791.5);
   assert.equal(calcularSaldoEstimadoControle(depoisFechamento), 1791.5);
-  assert.match(consulta.resposta, /Renda mensal: R\$ 4\.000,00/);
-  assert.match(consulta.resposta, /Despesas fixas: R\$ 2\.100,00/);
-  assert.match(consulta.resposta, /Gastos do m.s: R\$ 45,00/);
-  assert.match(consulta.resposta, /Faturas fechadas: R\$ 63,50/);
-  assert.match(consulta.resposta, /Faturas em aberto: R\$ 0,00/);
-  assert.match(consulta.resposta, /Saldo estimado dispon.vel: R\$ 1\.791,50/);
+  assert.match(consulta.resposta, /```[\s\S]*```/);
+  assert.match(consulta.resposta, /💳 Faturas fechadas\nR\$ 63,50/);
+  assert.match(consulta.resposta, /💳 Faturas em aberto\nR\$ 0,00/);
+  assert.match(consulta.resposta, /💰 Saldo dispon.vel agora\nR\$ 1\.791,50/);
+  assert.match(consulta.resposta, /🛡️ Saldo seguro do m.s\nR\$ 1\.791,50/);
+  assert.doesNotMatch(consulta.resposta, /provisionar|livre para gastar/i);
   assert.doesNotMatch(consulta.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
   assert.doesNotMatch(consulta.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
