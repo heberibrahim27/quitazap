@@ -2355,6 +2355,43 @@ test("consulta saldo iguala disponivel e seguro depois de fechar fatura", () => 
   assert.doesNotMatch(consulta.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
+test("mensagem automatica de gasto no saldo desconta fatura fechada no saldo disponivel", () => {
+  const { depoisFechamento } = montarCenarioConsultasControle();
+  const padaria = registrarGastoControle(
+    "gastei 10 na padaria",
+    depoisFechamento,
+    new Date(2026, 6, 2, 12, 0, 0)
+  );
+
+  assert.ok(padaria);
+  assert.equal(calcularSaldoDisponivelAgoraControle(padaria.estado), 1781.5);
+  assert.equal(calcularSaldoDisponivelControle(padaria.estado), 1845);
+  assert.equal(totalFaturasFechadasControle(padaria.estado), 63.5);
+  assert.equal(totalFaturasAbertasControle(padaria.estado), 0);
+  assert.match(padaria.resposta, /💰 \*Saldo disponível:\* R\$ 1\.781,50/);
+  assert.match(padaria.resposta, /💳 \*Faturas fechadas:\* R\$ 63,50/);
+  assert.match(padaria.resposta, /💳 \*Faturas em aberto:\* R\$ 0,00/);
+  assert.doesNotMatch(padaria.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("mensagem automatica de gasto em cartao aberto nao reduz saldo disponivel", () => {
+  const { antesFechamento } = montarCenarioConsultasControle();
+  const farmacia = registrarGastoControle(
+    "farmacia 20 no nubank",
+    antesFechamento,
+    new Date(2026, 6, 2, 12, 0, 0)
+  );
+
+  assert.ok(farmacia);
+  assert.equal(calcularSaldoDisponivelAgoraControle(farmacia.estado), 1855);
+  assert.equal(totalFaturasAbertasControle(farmacia.estado), 83.5);
+  assert.equal(totalFaturasFechadasControle(farmacia.estado), 0);
+  assert.match(farmacia.resposta, /💰 \*Saldo disponível:\* R\$ 1\.855,00/);
+  assert.match(farmacia.resposta, /💳 \*Faturas em aberto:\* R\$ 83,50/);
+  assert.match(farmacia.resposta, /💳 \*Fatura Nubank:\* R\$ 83,50/);
+  assert.doesNotMatch(farmacia.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
 test("fatura fechada sem vencimento orienta configuracao", () => {
   const estado = estadoControleBase();
   const fechamento = gerenciarFaturaCartaoControle("fatura inter fechou em 130", estado);

@@ -691,7 +691,7 @@ function linhasItensFinanceiros(
 function resumoAtualizadoMes(estado: EstadoControleFinanceiro): string {
   return (
     "📊 *Resumo atualizado do mês*\n\n" +
-    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelControle(estado))}\n` +
+    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelAgoraControle(estado))}\n` +
     `📌 *Despesas fixas:* ${formatarValorBR(estado.totalDespesasFixas)}\n` +
     `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}\n` +
     `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`
@@ -2048,7 +2048,7 @@ export function corrigirOrigemUltimoGastoControle(
 
   const cartoesParaMostrar = [ultimo.cartao, novoCartao].filter((cartao): cartao is string => Boolean(cartao));
   const linhasAtualizacao = [
-    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelControle(estado))}`,
+    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelAgoraControle(estado))}`,
     ...linhasFaturasComCartoes(estado, cartoesParaMostrar),
   ];
 
@@ -2124,7 +2124,7 @@ export function registrarGastoControle(
   const origem = cartao ? `Cartão ${cartao}` : "Saldo do mês";
   const cartaoConfigurado = obterCartaoConfigurado(estado, cartao);
   const linhasAtualizacao = [
-    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelControle(estado))}`,
+    `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelAgoraControle(estado))}`,
     ...linhasFaturas(estado),
   ];
   if (cartaoConfigurado?.vencimento) {
