@@ -12,6 +12,8 @@ import {
   atualizarDespesasFixasControle,
   carregarEstadoControle,
   configurarCartaoControle,
+  consultarCartoesControle,
+  consultarSaldoControle,
   corrigirRendaControle,
   corrigirOrigemUltimoGastoControle,
   criarEstadoComConfirmacaoInterpretacaoFinanceira,
@@ -949,6 +951,42 @@ Pode mandar tudo em uma mensagem só.`;
             { role: "user", content: mensagem },
             { role: "assistant", content: correcaoRenda.resposta },
             ...(correcaoRenda.atualizouEstado ? [criarMensagemEstadoControle(correcaoRenda.estado)] : []),
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const resultadoConsultaCartoesControle = consultarCartoesControle(mensagem, estadoAntesFluxosControle);
+    if (resultadoConsultaCartoesControle) {
+      await sendWhatsApp(telefone, resultadoConsultaCartoesControle.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: resultadoConsultaCartoesControle.resposta },
+          ]),
+        },
+      });
+
+      return NextResponse.json({ ok: true });
+    }
+
+    const resultadoConsultaSaldoControle = consultarSaldoControle(mensagem, estadoAntesFluxosControle);
+    if (resultadoConsultaSaldoControle) {
+      await sendWhatsApp(telefone, resultadoConsultaSaldoControle.resposta);
+
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...servidorHistoricoSessao,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: resultadoConsultaSaldoControle.resposta },
           ]),
         },
       });

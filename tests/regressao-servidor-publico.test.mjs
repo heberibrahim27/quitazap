@@ -71,8 +71,11 @@ const {
 } = loadTsModule("src/lib/onboarding-controle.ts");
 const {
   atualizarDespesasFixasControle,
+  calcularSaldoEstimadoControle,
   calcularSaldoDisponivelControle,
   configurarCartaoControle,
+  consultarCartoesControle,
+  consultarSaldoControle,
   corrigirRendaControle,
   corrigirOrigemUltimoGastoControle,
   criarEstadoComConfirmacaoInterpretacaoFinanceira,
@@ -564,6 +567,12 @@ test("guardiao reconhece mensagens financeiras e evita custo em comandos curtos"
     "mercado 100 no cartÃ£o nubank",
     "farmacia 55 no banco do brasil",
     "gasolina 120 no mercado pago",
+    "meus cartões",
+    "meus cartoes",
+    "cartão",
+    "como está meu saldo?",
+    "como está o meu saldo?",
+    "resumo do mês",
   ]) {
     assert.equal(avaliarEscopoFinanceiro(mensagem).emEscopo, true, mensagem);
   }
@@ -1408,6 +1417,55 @@ function estadoSemDespesasFixasBase() {
   };
 }
 
+function montarCenarioConsultasControle() {
+  let estado = atualizarDespesasFixasControle(
+    {
+      rendaMensal: 4000,
+      totalReceitasAvulsas: 0,
+      totalDespesasFixas: 0,
+      totalGastosSaldo: 0,
+      faturas: [],
+      faturasFechadas: [],
+      cartoes: [],
+      despesasFixas: [],
+    },
+    2100,
+    4000,
+    [
+      { descricao: "Aluguel", valor: 800 },
+      { descricao: "Energia", valor: 200 },
+      { descricao: "Internet", valor: 90 },
+      { descricao: "Pensão", valor: 900 },
+      { descricao: "ChatGPT", valor: 110 },
+    ]
+  );
+
+  const mercado = registrarGastoControle("gastei 45 no mercado", estado, new Date(2026, 6, 1, 12, 0, 0));
+  assert.ok(mercado);
+  estado = mercado.estado;
+
+  const uber = registrarGastoControle("uber 23,50 no nubank", estado, new Date(2026, 6, 1, 13, 0, 0));
+  assert.ok(uber);
+  estado = uber.estado;
+
+  const ifood = registrarGastoControle("ifood 40 no nubank", estado, new Date(2026, 6, 1, 14, 0, 0));
+  assert.ok(ifood);
+  estado = ifood.estado;
+
+  const configuracao = configurarCartaoControle("Nubank fecha dia 25 e vence dia 05", estado);
+  assert.ok(configuracao);
+  estado = configuracao.estado;
+
+  const antesFechamento = estado;
+  const fechamento = gerenciarFaturaCartaoControle("fatura nubank fechou em 63,50", estado);
+  assert.ok(fechamento);
+
+  return {
+    antesFechamento,
+    depoisFechamento: fechamento.estado,
+  };
+}
+
 function estadoChatGptClaudeBase(valorChatGpt = 110) {
   return atualizarDespesasFixasControle(
     { rendaMensal: 7140.69, totalDespesasFixas: 0, totalGastosSaldo: 0, faturas: [], cartoes: [], despesasFixas: [] },
@@ -2226,6 +2284,49 @@ test("fatura fechada separa valor fechado da nova fatura aberta", () => {
   assert.match(mercado.resposta, /Faturas fechadas:\* R\$ 70,00/);
   assert.match(mercado.resposta, /Faturas em aberto:\* R\$ 100,00/);
   assert.match(mercado.resposta, /Fatura Nubank:\* R\$ 100,00/);
+});
+
+test("consulta meus cartoes usa dados do Controle e mostra faturas abertas e fechadas", () => {
+  const { antesFechamento, depoisFechamento } = montarCenarioConsultasControle();
+
+  const consultaAntes = consultarCartoesControle("meus cartões", antesFechamento);
+  assert.ok(consultaAntes);
+  assert.equal(consultaAntes.atualizouEstado, false);
+  assert.match(consultaAntes.resposta, /Cart.o: Nubank/);
+  assert.match(consultaAntes.resposta, /Fechamento: dia 25/);
+  assert.match(consultaAntes.resposta, /Vencimento: dia 05/);
+  assert.match(consultaAntes.resposta, /Fatura aberta: R\$ 63,50/);
+  assert.match(consultaAntes.resposta, /Fatura fechada: R\$ 0,00/);
+  assert.doesNotMatch(consultaAntes.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
+  assert.doesNotMatch(consultaAntes.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+
+  const consultaDepois = consultarCartoesControle("meus cartoes", depoisFechamento);
+  assert.ok(consultaDepois);
+  assert.equal(consultaDepois.atualizouEstado, false);
+  assert.match(consultaDepois.resposta, /Cart.o: Nubank/);
+  assert.match(consultaDepois.resposta, /Fechamento: dia 25/);
+  assert.match(consultaDepois.resposta, /Vencimento: dia 05/);
+  assert.match(consultaDepois.resposta, /Fatura aberta: R\$ 0,00/);
+  assert.match(consultaDepois.resposta, /Fatura fechada: R\$ 63,50/);
+  assert.doesNotMatch(consultaDepois.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
+  assert.doesNotMatch(consultaDepois.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("consulta saldo usa motor do Controle e desconta fatura fechada", () => {
+  const { depoisFechamento } = montarCenarioConsultasControle();
+  const consulta = consultarSaldoControle("como está meu saldo?", depoisFechamento);
+
+  assert.ok(consulta);
+  assert.equal(consulta.atualizouEstado, false);
+  assert.equal(calcularSaldoEstimadoControle(depoisFechamento), 1791.5);
+  assert.match(consulta.resposta, /Renda mensal: R\$ 4\.000,00/);
+  assert.match(consulta.resposta, /Despesas fixas: R\$ 2\.100,00/);
+  assert.match(consulta.resposta, /Gastos do m.s: R\$ 45,00/);
+  assert.match(consulta.resposta, /Faturas fechadas: R\$ 63,50/);
+  assert.match(consulta.resposta, /Faturas em aberto: R\$ 0,00/);
+  assert.match(consulta.resposta, /Saldo estimado dispon.vel: R\$ 1\.791,50/);
+  assert.doesNotMatch(consulta.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
+  assert.doesNotMatch(consulta.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
 test("fatura fechada sem vencimento orienta configuracao", () => {

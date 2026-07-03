@@ -343,6 +343,17 @@ export function totalFaturasFechadasControle(estado: EstadoControleFinanceiro): 
   return (estado.faturasFechadas ?? []).reduce((soma, fatura) => soma + fatura.valor, 0);
 }
 
+export function calcularSaldoEstimadoControle(estado: EstadoControleFinanceiro): number {
+  return (
+    estado.rendaMensal +
+    (estado.totalReceitasAvulsas ?? 0) -
+    estado.totalDespesasFixas -
+    (estado.totalGastosSaldo ?? 0) -
+    totalFaturasFechadasControle(estado) -
+    totalFaturasAbertasControle(estado)
+  );
+}
+
 function formatarDescricaoDespesaFixa(texto: string): string {
   const limpo = texto
     .replace(/\s+/g, " ")
@@ -1474,6 +1485,106 @@ function obterCartaoConfigurado(
 ): CartaoConfiguradoControle | undefined {
   if (!cartao) return undefined;
   return (estado.cartoes ?? []).find((item) => item.nome === cartao);
+}
+
+function ehConsultaCartoesControle(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return (
+    /^(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(texto) ||
+    /^quais\s+(?:sao\s+)?(?:os\s+)?meus\s+cartoes$/.test(texto) ||
+    /^ver\s+(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(texto) ||
+    /^mostrar\s+(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(texto)
+  );
+}
+
+function ehConsultaSaldoControle(mensagem: string): boolean {
+  const texto = normalizarTexto(mensagem);
+  return (
+    /^saldo$/.test(texto) ||
+    /^meu\s+saldo$/.test(texto) ||
+    /^saldo\s+do\s+mes$/.test(texto) ||
+    /^como\s+(?:esta|ta)\s+(?:o\s+)?(?:meu\s+)?saldo$/.test(texto) ||
+    /^quanto\s+(?:sobrou|tenho)(?:\s+no\s+mes)?$/.test(texto) ||
+    /^resumo(?:\s+do\s+mes)?$/.test(texto) ||
+    /^resumo\s+financeiro$/.test(texto)
+  );
+}
+
+function valorFaturaAbertaCartao(estado: EstadoControleFinanceiro, cartao: string): number {
+  return (estado.faturas ?? []).find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
+}
+
+function valorFaturaFechadaCartao(estado: EstadoControleFinanceiro, cartao: string): number {
+  return (estado.faturasFechadas ?? []).find((fatura) => fatura.cartao === cartao)?.valor ?? 0;
+}
+
+export function consultarCartoesControle(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  if (!ehConsultaCartoesControle(mensagem)) return null;
+
+  const nomesCartoes = new Map<string, string>();
+  for (const cartao of estadoAtual.cartoes ?? []) nomesCartoes.set(cartao.nome, cartao.nome);
+  for (const fatura of estadoAtual.faturas ?? []) nomesCartoes.set(fatura.cartao, fatura.cartao);
+  for (const fatura of estadoAtual.faturasFechadas ?? []) nomesCartoes.set(fatura.cartao, fatura.cartao);
+
+  if (nomesCartoes.size === 0) {
+    return {
+      resposta:
+        "💳 *Meus cartões*\n\n" +
+        "Você ainda não tem cartão registrado no Controle.\n\n" +
+        "Para configurar, envie: Nubank fecha dia 25 e vence dia 05.",
+      estado: estadoAtual,
+      atualizouEstado: false,
+    };
+  }
+
+  const linhas = ["💳 *Meus cartões*", ""];
+  for (const nome of nomesCartoes.values()) {
+    const configuracao = obterCartaoConfigurado(estadoAtual, nome);
+    linhas.push(
+      `Cartão: ${nome}`,
+      `Fechamento: ${configuracao?.fechamento ? `dia ${formatarDiaCartao(configuracao.fechamento)}` : "não informado"}`,
+      `Vencimento: ${configuracao?.vencimento ? `dia ${formatarDiaCartao(configuracao.vencimento)}` : "não informado"}`,
+      `Fatura aberta: ${formatarValorBR(valorFaturaAbertaCartao(estadoAtual, nome))}`,
+      `Fatura fechada: ${formatarValorBR(valorFaturaFechadaCartao(estadoAtual, nome))}`,
+      ""
+    );
+  }
+
+  return {
+    resposta: linhas.join("\n").trimEnd(),
+    estado: estadoAtual,
+    atualizouEstado: false,
+  };
+}
+
+export function consultarSaldoControle(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  if (!ehConsultaSaldoControle(mensagem)) return null;
+
+  const faturasFechadas = totalFaturasFechadasControle(estadoAtual);
+  const faturasAbertas = totalFaturasAbertasControle(estadoAtual);
+  const linhas = [
+    "📊 *Resumo do mês*",
+    "",
+    `Renda mensal: ${formatarValorBR(estadoAtual.rendaMensal)}`,
+    `Despesas fixas: ${formatarValorBR(estadoAtual.totalDespesasFixas)}`,
+    `Gastos do mês: ${formatarValorBR(estadoAtual.totalGastosSaldo ?? 0)}`,
+    `Faturas fechadas: ${formatarValorBR(faturasFechadas)}`,
+    `Faturas em aberto: ${formatarValorBR(faturasAbertas)}`,
+    "",
+    `Saldo estimado disponível: ${formatarValorBR(calcularSaldoEstimadoControle(estadoAtual))}`,
+  ];
+
+  return {
+    resposta: linhas.join("\n"),
+    estado: estadoAtual,
+    atualizouEstado: false,
+  };
 }
 
 function removerFaturaAbertaCartao(

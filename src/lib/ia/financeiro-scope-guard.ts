@@ -34,6 +34,16 @@ const PADROES_PROMPT_INJECTION = [
 ];
 
 const PADROES_ESCOPO = [
+  /\bcartao\b/,
+  /\bcartoes\b/,
+  /\bmeus\s+cartoes\b/,
+  /\bsaldo\b/,
+  /\bmeu\s+saldo\b/,
+  /\bcomo\s+esta\s+meu\s+saldo\b/,
+  /\bquanto\s+sobrou\b/,
+  /\bquanto\s+tenho\b/,
+  /\bresumo\b/,
+  /\bresumo\s+do\s+mes\b/,
   /\brenda\b/,
   /\bsalario\b/,
   /\brecebi\b/,
