@@ -506,7 +506,30 @@ test("agua comprada vira alimentacao e conta de agua vira contas da casa", () =>
 
 test("fluxo deterministico classifica apostas separado de lazer", () => {
   const hoje = new Date(2026, 6, 1, 12, 0, 0);
+  const casosApostas = [
+    ["100,00 em apostas", 100],
+    ["100 em apostas", 100],
+    ["R$ 100 em apostas", 100],
+    ["R$100,00 em apostas", 100],
+    ["50 na aposta", 50],
+    ["50 em aposta", 50],
+    ["30 em bet", 30],
+    ["30 na bet", 30],
+    ["80 no jogo de aposta", 80],
+    ["perdi 100 em apostas", 100],
+    ["apostei 100", 100],
+    ["gastei 100 em apostas", 100],
+  ];
 
+  for (const [mensagem, valor] of casosApostas) {
+    const gasto = processarFluxoGasto(mensagem, hoje);
+    assert.ok(gasto, mensagem);
+    assert.equal(gasto.descricao, "Apostas", mensagem);
+    assert.equal(gasto.categoria, "Apostas", mensagem);
+    assert.equal(gasto.valor, valor, mensagem);
+  }
+
+  assert.equal(processarFluxoGasto("apostei 50 na betano", hoje)?.descricao, "Apostas");
   assert.equal(processarFluxoGasto("apostei 50 na betano", hoje)?.categoria, "Apostas");
   assert.equal(processarFluxoGasto("gastei 30 no tigrinho", hoje)?.categoria, "Apostas");
   assert.equal(processarFluxoGasto("blaze 40", hoje)?.categoria, "Apostas");
@@ -574,6 +597,11 @@ test("guardiao reconhece mensagens financeiras e evita custo em comandos curtos"
     "como está meu saldo?",
     "como está o meu saldo?",
     "resumo do mês",
+    "100,00 em apostas",
+    "100 em apostas",
+    "apostei 100",
+    "perdi 100 em apostas",
+    "30 em bet",
   ]) {
     assert.equal(avaliarEscopoFinanceiro(mensagem).emEscopo, true, mensagem);
   }
@@ -581,6 +609,11 @@ test("guardiao reconhece mensagens financeiras e evita custo em comandos curtos"
   for (const mensagem of ["1", "2", "sim", "não", "resetar", "listar despesas fixas"]) {
     assert.equal(devePularInterpretadorFinanceiroIA(mensagem), true, mensagem);
   }
+});
+
+test("aposta curta passa pelo escopo e segue para gasto rapido", async () => {
+  assert.equal(avaliarEscopoFinanceiro("100,00 em apostas").emEscopo, true);
+  assert.equal(await resolverIntencaoFinanceiraIA("100,00 em apostas", { forcarLocal: true }), null);
 });
 
 test("guardiao deixa gasto simples em cartao seguir para fluxo deterministico", async () => {
@@ -2462,10 +2495,68 @@ test("gasto com apostas mostra alerta e mantem calculo deterministico", () => {
   assert.ok(resultado);
   assert.equal(calcularSaldoDisponivelControle(resultado.estado), 1910);
   assert.equal(totalFaturasAbertasControle(resultado.estado), 0);
-  assert.match(resultado.resposta, /✍️ \*Descrição:\* Betano/);
+  assert.match(resultado.resposta, /✍️ \*Descrição:\* Apostas/);
   assert.match(resultado.resposta, /🏷️ \*Categoria:\* Apostas/);
-  assert.match(resultado.resposta, /⚠️ Atenção: gastos com apostas podem comprometer seu controle financeiro rapidamente\./);
+  assert.match(resultado.resposta, /⚠️ Apostas podem comprometer seu or.amento\. Vou acompanhar essa categoria separadamente\./);
+  assert.doesNotMatch(resultado.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
   assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("aposta curta registra gasto no saldo e desconta do saldo disponivel atual", () => {
+  const { depoisFechamento } = montarCenarioConsultasControle();
+  const padaria = registrarGastoControle(
+    "gastei 10 na padaria",
+    depoisFechamento,
+    new Date(2026, 6, 2, 12, 0, 0)
+  );
+  assert.ok(padaria);
+  assert.match(padaria.resposta, /💰 \*Saldo disponível:\* R\$ 1\.781,50/);
+
+  const aposta = registrarGastoControle(
+    "100,00 em apostas",
+    padaria.estado,
+    new Date(2026, 6, 2, 13, 0, 0)
+  );
+
+  assert.ok(aposta);
+  assert.equal(aposta.estado.ultimoGasto?.descricao, "Apostas");
+  assert.equal(aposta.estado.ultimoGasto?.categoria, "Apostas");
+  assert.equal(aposta.estado.ultimoGasto?.origem, "SALDO");
+  assert.equal(calcularSaldoDisponivelAgoraControle(aposta.estado), 1681.5);
+  assert.equal(totalFaturasFechadasControle(aposta.estado), 63.5);
+  assert.equal(totalFaturasAbertasControle(aposta.estado), 0);
+  assert.match(aposta.resposta, /✍️ \*Descrição:\* Apostas/);
+  assert.match(aposta.resposta, /💰 \*Valor:\* R\$ 100,00/);
+  assert.match(aposta.resposta, /🏷️ \*Categoria:\* Apostas/);
+  assert.match(aposta.resposta, /💳 \*Origem:\* Saldo do mês/);
+  assert.match(aposta.resposta, /💰 \*Saldo disponível:\* R\$ 1\.681,50/);
+  assert.match(aposta.resposta, /⚠️ Apostas podem comprometer seu or.amento\. Vou acompanhar essa categoria separadamente\./);
+  assert.doesNotMatch(aposta.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
+  assert.doesNotMatch(aposta.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+test("aposta curta com cartao registra na fatura sem reduzir saldo", () => {
+  const { antesFechamento } = montarCenarioConsultasControle();
+  const aposta = registrarGastoControle(
+    "100 em apostas no nubank",
+    antesFechamento,
+    new Date(2026, 6, 2, 13, 0, 0)
+  );
+
+  assert.ok(aposta);
+  assert.equal(aposta.estado.ultimoGasto?.descricao, "Apostas");
+  assert.equal(aposta.estado.ultimoGasto?.categoria, "Apostas");
+  assert.equal(aposta.estado.ultimoGasto?.origem, "CARTAO");
+  assert.equal(aposta.estado.ultimoGasto?.cartao, "Nubank");
+  assert.equal(calcularSaldoDisponivelAgoraControle(aposta.estado), 1855);
+  assert.equal(totalFaturasAbertasControle(aposta.estado), 163.5);
+  assert.match(aposta.resposta, /✍️ \*Descrição:\* Apostas/);
+  assert.match(aposta.resposta, /🏷️ \*Categoria:\* Apostas/);
+  assert.match(aposta.resposta, /💳 \*Origem:\* Cartão Nubank/);
+  assert.match(aposta.resposta, /💳 \*Fatura Nubank:\* R\$ 163,50/);
+  assert.match(aposta.resposta, /⚠️ Apostas podem comprometer seu or.amento\. Vou acompanhar essa categoria separadamente\./);
+  assert.doesNotMatch(aposta.resposta, /Eu sou o assistente financeiro do QuitaZAP/);
+  assert.doesNotMatch(aposta.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
 test("correcao posterior move ultimo gasto do saldo para fatura do cartao", () => {

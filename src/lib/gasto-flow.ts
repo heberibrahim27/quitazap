@@ -99,6 +99,9 @@ const PALAVRAS_GASTO = [
   "banca",
 ];
 
+const TERMOS_APOSTAS =
+  /\b(?:apostei|aposta|apostas|bet|betano|blaze|tigrinho|jogo\s+do\s+tigrinho|jogo\s+de\s+aposta|cassino|cassino\s+online|roleta|foguetinho|pix\s+bet|banca|casa\s+de\s+aposta|jogo\s+online)\b/;
+
 function normalizarTexto(texto: string): string {
   return texto
     .toLowerCase()
@@ -211,6 +214,8 @@ function detectarQuantidadeValorUnitario(mensagem: string): {
 export function definirCategoriaGasto(mensagem: string): CategoriaGasto {
   const texto = normalizarTexto(mensagem);
 
+  if (TERMOS_APOSTAS.test(texto)) return "Apostas";
+
   if (/\baguas?\b/.test(texto)) {
     if (/\b(conta|boleto|embasa|servico|residencial|casa|energia|despesa fixa|todo mes)\b/.test(texto)) {
       return "Contas da casa";
@@ -233,6 +238,8 @@ export function definirCategoriaGasto(mensagem: string): CategoriaGasto {
 }
 
 export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGasto): string {
+  if (categoria === "Apostas") return "Apostas";
+
   let texto = normalizarTexto(mensagem);
   texto = texto
     .replace(/r\$\s*\d{1,3}(?:\.\d{3})*,\d{1,2}/gi, " ")

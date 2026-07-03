@@ -2134,7 +2134,7 @@ export function registrarGastoControle(
     ? "Esse valor será considerado na fatura do cartão. 👌"
     : "Pode mandar mais que eu vou organizando tudo pra você. 👌";
   const alertaApostas = gasto.categoria === "Apostas"
-    ? "\n\n⚠️ Atenção: gastos com apostas podem comprometer seu controle financeiro rapidamente."
+    ? "\n\n⚠️ Apostas podem comprometer seu orçamento. Vou acompanhar essa categoria separadamente."
     : "";
   const linhasQuantidade = gasto.quantidade && gasto.valorUnitario
     ? `🔢 *Quantidade:* ${gasto.quantidade}\n` +
