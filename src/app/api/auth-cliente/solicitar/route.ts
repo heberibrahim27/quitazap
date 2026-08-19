@@ -56,8 +56,13 @@ export async function POST(req: NextRequest) {
     // API do WhatsApp é bem mais lenta que a consulta no banco).
     if (cliente) {
       after(async () => {
+        const link = urlLinkAcessoCliente(cliente.id);
+        // Log temporário: a instância Z-API do QuitaZAP está desviada pro
+        // BancaZAP no momento, então o envio abaixo não chega no WhatsApp de
+        // ninguém. Enquanto isso, o link sai aqui no log do servidor pra dar
+        // pra testar o fluxo mesmo assim. Remover quando o WhatsApp voltar.
+        console.log(`[AUTH-CLIENTE] Link de acesso gerado (cliente ${cliente.id}): ${link}`);
         try {
-          const link = urlLinkAcessoCliente(cliente.id);
           const primeiroNome = cliente.nome.split(" ")[0];
           await sendWhatsApp(
             cliente.telefone,
