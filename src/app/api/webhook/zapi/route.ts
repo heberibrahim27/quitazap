@@ -25,6 +25,7 @@ import {
 import {
   persistirLancamentosControle,
   persistirCartaoControle,
+  corrigirOrigemLancamentoControle,
   type OrigemLancamentoControle,
 } from "@/lib/controle-financeiro-service";
 import {
@@ -1155,6 +1156,14 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
+      after(() =>
+        corrigirOrigemLancamentoControle(
+          sessao.clienteId,
+          estadoAntesGasto.ultimoGasto,
+          correcaoOrigem.estado.ultimoGasto?.cartao
+        )
+      );
+
       return NextResponse.json({ ok: true });
     }
 
@@ -1173,6 +1182,8 @@ Pode mandar tudo em uma mensagem só.`;
           ]),
         },
       });
+
+      after(() => persistirLancamentosControle(sessao.clienteId, gerenciamentoFaturaCartao.itensParaPersistir, origemLancamentoControle));
 
       return NextResponse.json({ ok: true });
     }

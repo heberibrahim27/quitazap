@@ -80,7 +80,7 @@ export type EstadoControleFinanceiro = {
 // correção de texto, etc.) — só quem de fato confirma um gasto/receita/cartão
 // preenche isso.
 export type ItemParaPersistirControle = {
-  tipo: "RECEITA" | "DESPESA_FIXA" | "DESPESA_VARIAVEL" | "COMPRA_CARTAO";
+  tipo: "RECEITA" | "DESPESA_FIXA" | "DESPESA_VARIAVEL" | "COMPRA_CARTAO" | "FATURA_FECHADA";
   descricao: string;
   categoria?: string | null;
   valor: number;
@@ -1799,6 +1799,17 @@ export function gerenciarFaturaCartaoControle(
         `Novo valor fechado: ${formatarValorBR(pendente.novoValor)}`,
       estado,
       atualizouEstado: true,
+      itensParaPersistir: [
+        {
+          tipo: "FATURA_FECHADA",
+          // Deixa claro no histórico que esse valor substitui o anterior,
+          // em vez de aparecer como uma segunda fatura fechada sem contexto.
+          descricao: `Fatura fechada (valor corrigido) — ${pendente.cartao}`,
+          valor: pendente.novoValor,
+          recorrente: false,
+          cartaoNome: pendente.cartao,
+        },
+      ],
     };
   }
 
@@ -1871,6 +1882,15 @@ export function gerenciarFaturaCartaoControle(
     resposta: respostaFaturaFechadaRegistrada(estado, cartao, valor),
     estado,
     atualizouEstado: true,
+    itensParaPersistir: [
+      {
+        tipo: "FATURA_FECHADA",
+        descricao: `Fatura fechada — ${cartao}`,
+        valor,
+        recorrente: false,
+        cartaoNome: cartao,
+      },
+    ],
   };
 }
 

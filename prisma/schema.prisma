@@ -260,7 +260,10 @@ model Cartao {
 // registros relacionais de verdade — renda, despesa fixa, despesa variável e
 // compra no cartão, todos numa tabela só, filtráveis por mês/categoria.
 // ─────────────────────────────────────────
-// tipo:      RECEITA | DESPESA_FIXA | DESPESA_VARIAVEL | COMPRA_CARTAO
+// tipo:      RECEITA | DESPESA_FIXA | DESPESA_VARIAVEL | COMPRA_CARTAO | FATURA_FECHADA
+//            (FATURA_FECHADA é só um marcador de "fechei a fatura em R$X" —
+//            não soma no total de saídas, que já é coberto pelas linhas
+//            individuais de COMPRA_CARTAO daquele cartão)
 // categoria: mesmas categorias de src/lib/gasto-flow.ts (Mercado, Alimentação,
 //            Transporte, Moradia, Contas da casa, ...), quando aplicável
 // origem:    TEXTO | AUDIO | FOTO

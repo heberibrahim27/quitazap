@@ -15,6 +15,7 @@ const ROTULO_TIPO_LANCAMENTO: Record<string, string> = {
   DESPESA_FIXA: "Despesa fixa",
   DESPESA_VARIAVEL: "Despesa variável",
   COMPRA_CARTAO: "Compra no cartão",
+  FATURA_FECHADA: "Fatura fechada",
 };
 
 const ICONE_TIPO_LANCAMENTO: Record<string, string> = {
@@ -22,6 +23,7 @@ const ICONE_TIPO_LANCAMENTO: Record<string, string> = {
   DESPESA_FIXA: "📌",
   DESPESA_VARIAVEL: "🛒",
   COMPRA_CARTAO: "💳",
+  FATURA_FECHADA: "🧾",
 };
 
 const NOMES_MES = [
@@ -262,7 +264,10 @@ export default async function MinhaContaPage({
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: l.tipo === "RECEITA" ? "#16a34a" : "#0f172a" }}>
-                    {l.tipo === "RECEITA" ? "+" : "-"}{fmtValor(l.valor)}
+                    {/* Fatura fechada é só um resumo do que já foi contado nas
+                        compras individuais no cartão — sem +/- pra não parecer
+                        uma saída nova (dobraria a contagem visualmente). */}
+                    {l.tipo === "RECEITA" ? "+" : l.tipo === "FATURA_FECHADA" ? "" : "-"}{fmtValor(l.valor)}
                   </div>
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>{fmtData(l.data)}</div>
                 </div>

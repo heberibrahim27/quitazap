@@ -50,6 +50,7 @@ const {
   registrarGastoControle,
   configurarCartaoControle,
   gerenciarDespesasFixasControle,
+  gerenciarFaturaCartaoControle,
 } = loadTsModule("src/lib/controle-financeiro-flow.ts");
 
 const { normalizarRespostaCompraImagem } = loadTsModule("src/lib/gasto-flow.ts");
@@ -292,4 +293,42 @@ test("salvarItensConfirmadosIA: tipo bloqueado (ex: cartao) não gera itensParaP
   const resultado = salvarItensConfirmadosIA(estadoBase(), intent);
   assert.ok(resultado);
   assert.equal(resultado.itensParaPersistir, undefined);
+});
+
+// ── gerenciarFaturaCartaoControle (Fase: fatura fechada vira Lancamento) ──
+
+test("gerenciarFaturaCartaoControle: fechar fatura nova gera item FATURA_FECHADA", () => {
+  const resultado = gerenciarFaturaCartaoControle("fatura do nubank fechou em 850", estadoBase());
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir.length, 1);
+  const item = resultado.itensParaPersistir[0];
+  assert.equal(item.tipo, "FATURA_FECHADA");
+  assert.equal(item.valor, 850);
+  assert.equal(item.cartaoNome, "Nubank");
+});
+
+test("gerenciarFaturaCartaoControle: fatura fechada duplicada (mesmo valor) não gera item novo", () => {
+  const estadoComFatura = {
+    ...estadoBase(),
+    faturasFechadas: [{ cartao: "Nubank", valor: 850 }],
+  };
+  const resultado = gerenciarFaturaCartaoControle("fatura do nubank fechou em 850", estadoComFatura);
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir, undefined);
+});
+
+test("gerenciarFaturaCartaoControle: substituir fatura fechada (após confirmar) gera item com o novo valor", () => {
+  const estadoComFatura = {
+    ...estadoBase(),
+    faturasFechadas: [{ cartao: "Nubank", valor: 850 }],
+  };
+  const pedido = gerenciarFaturaCartaoControle("fatura do nubank fechou em 900", estadoComFatura);
+  assert.ok(pedido);
+  assert.equal(pedido.estado.confirmacaoPendente?.tipo, "substituir_fatura_fechada");
+
+  const confirmacao = gerenciarFaturaCartaoControle("sim", pedido.estado);
+  assert.ok(confirmacao);
+  assert.equal(confirmacao.itensParaPersistir.length, 1);
+  assert.equal(confirmacao.itensParaPersistir[0].tipo, "FATURA_FECHADA");
+  assert.equal(confirmacao.itensParaPersistir[0].valor, 900);
 });
