@@ -181,9 +181,9 @@ function AbaFunil() {
         body: JSON.stringify({ telefone: telefoneReal }),
       });
       const data = await res.json();
-      setStatusReal(data.ok ? "✅ Mensagem enviada! Verifique o WhatsApp." : `Erro: ${data.error}`);
+      setStatusReal(data.ok ? "✅ Mensagem enviada! Verifique o WhatsApp." : (res.status >= 500 ? "Não consegui enviar agora. Tenta de novo em instantes." : (data.error ?? "Não consegui enviar.")));
     } catch {
-      setStatusReal("Erro ao chamar API.");
+      setStatusReal("Não consegui enviar. Verifica sua conexão e tenta de novo.");
     }
     setEnviandoReal(false);
   }
@@ -339,7 +339,8 @@ function AbaBot() {
       const data = await res.json();
 
       if (data.error) {
-        setChat((prev) => [...prev, { de: "bot", texto: `❌ Erro: ${data.error}` }]);
+        const mensagemErro = res.status >= 500 ? "Não consegui responder agora. Tenta de novo em instantes." : data.error;
+        setChat((prev) => [...prev, { de: "bot", texto: `❌ ${mensagemErro}` }]);
         return;
       }
 

@@ -3,8 +3,10 @@
 // /financeiro
 // ─────────────────────────────────────────
 
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { ExcluirForm } from "@/components/ExcluirForm";
+import { IconWallet, IconTrendUp, IconTarget, IconCheckCircle, IconAlertTriangle } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -16,241 +18,363 @@ function pct(v: number) {
   return (v * 100).toFixed(1) + "%";
 }
 
+function mesAtualBrasil(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" })
+    .format(new Date())
+    .slice(0, 7);
+}
+
+const NOMES_MES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 const PRECO_MENSAL = 29.90;
 const COMISSAO_CAKTO = 0.053; // 5,3% via PIX
-const CUSTO_ZAPI = 99.99;
-const CUSTO_DOMINIO = 5.83;   // R$70/ano ÷ 12
-const CUSTO_OPENAI_POR_CLIENTE = 0.07;
+
+const ROTULO_METRICA: Record<string, string> = {
+  clientes_pagos: "Clientes pagos",
+  mrr: "MRR (receita mensal)",
+};
+
+const excluirEstiloDark: React.CSSProperties = {
+  background: "rgba(239,68,68,0.1)",
+  border: "1px solid rgba(239,68,68,0.25)",
+  color: "#fca5a5",
+  padding: "5px 10px",
+  borderRadius: 8,
+  fontWeight: 600,
+  fontSize: 12,
+};
 
 export default async function FinanceiroPage() {
-  const [pagantes, totalGratuitos, totalPlanos] = await Promise.all([
+  const mesAtual = mesAtualBrasil();
+  const [ano, mesNum] = mesAtual.split("-").map(Number);
+
+  // Início do mês corrente em horário de Brasília (meia-noite BRT = 03:00
+  // UTC) — mesma convenção usada em /minha-conta, pra não desalinhar do
+  // "mes" (YYYY-MM em BR) usado no filtro dos custos manuais. Calcular isso
+  // com Date local do servidor (UTC na Vercel) faria o custo de IA já
+  // contar o dia 1 (UTC) enquanto ainda é dia 31 (BR) — achado da
+  // auto-revisão.
+  const inicioMesBrasil = new Date(Date.UTC(ano, mesNum - 1, 1, 3, 0, 0, 0));
+
+  const [pagantes, totalGratuitos, custosDoMes, metas, custoIA] = await Promise.all([
     prisma.cliente.count({ where: { gratuito: false } }),
     prisma.cliente.count({ where: { gratuito: true } }),
-    prisma.planoEnviado.count(),
+    prisma.custoMensal.findMany({ where: { mes: mesAtual }, orderBy: { criadoEm: "asc" } }),
+    prisma.metaFinanceira.findMany(),
+    (async () => {
+      const r = await prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { criadoEm: { gte: inicioMesBrasil } } });
+      return (r._sum.custoUSD ?? 0) * 5.7; // USD → BRL
+    })(),
   ]);
 
-  const totalAssinantes = pagantes; // apenas pagantes contam na receita
+  const totalAssinantes = pagantes;
+  const totalClientesAtivos = totalAssinantes + totalGratuitos;
 
   // Receita
   const receitaBruta = totalAssinantes * PRECO_MENSAL;
   const comissaoCakto = receitaBruta * COMISSAO_CAKTO;
   const receitaLiquida = receitaBruta - comissaoCakto;
 
-  // Custos (IA estimada por todos os clientes ativos, gratuitos inclusos)
-  const totalClientesAtivos = totalAssinantes + totalGratuitos;
-  const custoFixo = CUSTO_ZAPI + CUSTO_DOMINIO;
-  const custoVariavel = totalClientesAtivos * CUSTO_OPENAI_POR_CLIENTE;
-  const custoTotal = custoFixo + custoVariavel;
+  // Custos: comissão + IA (automáticos, dados reais) + o que o fundador lançou manualmente esse mês
+  const custoManualMes = custosDoMes.reduce((soma, c) => soma + c.valor, 0);
+  const custoTotal = comissaoCakto + custoIA + custoManualMes;
+  const custoVariavelPorCliente = totalClientesAtivos > 0 ? custoIA / totalClientesAtivos : 0;
 
   // Resultado
-  const lucroLiquido = receitaLiquida - custoTotal;
+  const lucroLiquido = receitaLiquida - custoIA - custoManualMes;
   const margem = receitaLiquida > 0 ? lucroLiquido / receitaLiquida : 0;
 
-  // Break-even
-  const breakEvenClientes = Math.ceil(custoFixo / (PRECO_MENSAL * (1 - COMISSAO_CAKTO) - CUSTO_OPENAI_POR_CLIENTE));
-  const clientesFaltam = Math.max(0, breakEvenClientes - totalAssinantes);
-
+  // Break-even: quantos assinantes cobrem o custo fixo do mês (custo manual)
+  // + a fatia variável de IA por cliente, considerando a comissão da CAKTO
+  // sobre cada nova assinatura.
+  const margemPorCliente = PRECO_MENSAL * (1 - COMISSAO_CAKTO) - custoVariavelPorCliente;
+  const breakEvenClientes = margemPorCliente > 0 ? Math.ceil(custoManualMes / margemPorCliente) : null;
+  const clientesFaltam = breakEvenClientes != null ? Math.max(0, breakEvenClientes - totalAssinantes) : null;
   const lucroPositivo = lucroLiquido >= 0;
 
+  const metaClientes = metas.find((m) => m.metrica === "clientes_pagos");
+  const metaMrr = metas.find((m) => m.metrica === "mrr");
+
+  async function lancarCusto(formData: FormData) {
+    "use server";
+    const categoria = String(formData.get("categoria") || "").trim();
+    const descricao = String(formData.get("descricao") || "").trim();
+    const valorTexto = String(formData.get("valor") || "0").replace(",", ".");
+    const valor = Number(valorTexto);
+    const mes = String(formData.get("mes") || mesAtualBrasil());
+
+    if (!categoria || !Number.isFinite(valor) || valor <= 0) {
+      redirect("/financeiro?erro=custo");
+    }
+
+    await prisma.custoMensal.create({
+      data: { mes, categoria, descricao: descricao || null, valor },
+    });
+    redirect("/financeiro");
+  }
+
+  async function apagarCusto(formData: FormData) {
+    "use server";
+    const id = String(formData.get("id") || "");
+    if (!id) return;
+    try {
+      await prisma.custoMensal.delete({ where: { id } });
+    } catch (err) {
+      console.error("[FINANCEIRO] Erro ao apagar custo:", err);
+    }
+    redirect("/financeiro");
+  }
+
+  async function salvarMeta(formData: FormData) {
+    "use server";
+    const metrica = String(formData.get("metrica") || "");
+    const valorTexto = String(formData.get("valorAlvo") || "0").replace(",", ".");
+    const valorAlvo = Number(valorTexto);
+    const dataAlvoTexto = String(formData.get("dataAlvo") || "");
+
+    if (!ROTULO_METRICA[metrica] || !Number.isFinite(valorAlvo) || valorAlvo <= 0) {
+      redirect("/financeiro?erro=meta");
+    }
+
+    await prisma.metaFinanceira.upsert({
+      where: { metrica },
+      update: { valorAlvo, dataAlvo: dataAlvoTexto ? new Date(`${dataAlvoTexto}T12:00:00`) : null },
+      create: { metrica, valorAlvo, dataAlvo: dataAlvoTexto ? new Date(`${dataAlvoTexto}T12:00:00`) : null },
+    });
+    redirect("/financeiro");
+  }
+
   return (
-    <main className="app-shell">
-      <section className="home-card">
+    <div>
+      <div className="qa-page-header">
+        <div>
+          <h1 className="qa-page-title">Financeiro</h1>
+          <p className="qa-page-subtitle">Receita, custos e lucro do QuitaZAP — {NOMES_MES[mesNum - 1]}/{ano}</p>
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="home-header">
+      <div className="qa-stat-grid">
+        <div className="qa-stat-card">
+          <p className="qa-stat-label">Assinantes pagos</p>
+          <strong className="qa-stat-value" style={{ color: "#6ee7b7" }}>{totalAssinantes}</strong>
+          <p className="qa-stat-caption">+ {totalGratuitos} gratuito{totalGratuitos !== 1 ? "s" : ""} (não contabilizados)</p>
+        </div>
+        <div className="qa-stat-card">
+          <p className="qa-stat-label"><IconWallet size={13} /> Receita bruta/mês</p>
+          <strong className="qa-stat-value">{fmt(receitaBruta)}</strong>
+          <p className="qa-stat-caption">{totalAssinantes} × {fmt(PRECO_MENSAL)}</p>
+        </div>
+        <div className="qa-stat-card">
+          <p className="qa-stat-label">Comissão CAKTO (5,3%)</p>
+          <strong className="qa-stat-value" style={{ color: "#fcd34d" }}>- {fmt(comissaoCakto)}</strong>
+          <p className="qa-stat-caption">Descontado automaticamente</p>
+        </div>
+        <div className="qa-stat-card">
+          <p className="qa-stat-label"><IconTrendUp size={13} /> Lucro líquido/mês</p>
+          <strong className="qa-stat-value" style={{ color: lucroPositivo ? "#6ee7b7" : "#fca5a5" }}>{fmt(lucroLiquido)}</strong>
+          <p className="qa-stat-caption">Margem: {pct(margem)}</p>
+        </div>
+      </div>
+
+      {breakEvenClientes != null && clientesFaltam !== null && clientesFaltam > 0 && (
+        <div className="qa-alert qa-alert-amber">
+          <IconAlertTriangle size={18} />
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: "#0f172a" }}>
-              💰 Financeiro
-            </h1>
-            <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
-              Receita, custos e lucro do QuitaZAP em tempo real
-            </p>
-          </div>
-          <Link href="/" className="primary-link">← Voltar</Link>
-        </div>
-
-        {/* Cards principais */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 32 }}>
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 16, padding: "20px 24px" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#16a34a", fontWeight: 600 }}>Assinantes pagos</p>
-            <strong style={{ fontSize: 36, color: "#15803d" }}>{totalAssinantes}</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
-              + {totalGratuitos} gratuito{totalGratuitos !== 1 ? "s" : ""} (não contabilizados)
-            </p>
-          </div>
-
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 16, padding: "20px 24px" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#16a34a", fontWeight: 600 }}>Receita bruta/mês</p>
-            <strong style={{ fontSize: 28, color: "#15803d" }}>{fmt(receitaBruta)}</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>{totalAssinantes} × R$29,90</p>
-          </div>
-
-          <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: 16, padding: "20px 24px" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#a16207", fontWeight: 600 }}>Comissão CAKTO (5,3%)</p>
-            <strong style={{ fontSize: 28, color: "#92400e" }}>- {fmt(comissaoCakto)}</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Descontado automaticamente</p>
-          </div>
-
-          <div style={{
-            background: lucroPositivo ? "#f0fdf4" : "#fef2f2",
-            border: `1px solid ${lucroPositivo ? "#bbf7d0" : "#fecaca"}`,
-            borderRadius: 16, padding: "20px 24px"
-          }}>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: lucroPositivo ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
-              Lucro líquido/mês
-            </p>
-            <strong style={{ fontSize: 28, color: lucroPositivo ? "#15803d" : "#dc2626" }}>
-              {fmt(lucroLiquido)}
-            </strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Margem: {pct(margem)}</p>
+            <strong style={{ display: "block" }}>Faltam {clientesFaltam} assinante(s) para o break-even</strong>
+            <span style={{ opacity: 0.85 }}>Com {breakEvenClientes} assinantes você cobre todos os custos lançados este mês. Hoje você tem {totalAssinantes}.</span>
           </div>
         </div>
+      )}
 
-        {/* Break-even */}
-        {clientesFaltam > 0 && (
-          <div style={{
-            background: "#fffbeb", border: "1px solid #fde68a",
-            borderRadius: 16, padding: 20, marginBottom: 24,
-            display: "flex", alignItems: "center", gap: 16
-          }}>
-            <span style={{ fontSize: 32 }}>⚠️</span>
-            <div>
-              <strong style={{ color: "#92400e", display: "block" }}>
-                Faltam {clientesFaltam} assinante(s) para o break-even
-              </strong>
-              <span style={{ fontSize: 13, color: "#78350f" }}>
-                Com {breakEvenClientes} assinantes você cobre todos os custos. Hoje você tem {totalAssinantes}.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {clientesFaltam === 0 && totalAssinantes > 0 && (
-          <div style={{
-            background: "#f0fdf4", border: "1px solid #86efac",
-            borderRadius: 16, padding: 20, marginBottom: 24,
-            display: "flex", alignItems: "center", gap: 16
-          }}>
-            <span style={{ fontSize: 32 }}>🎉</span>
-            <div>
-              <strong style={{ color: "#15803d", display: "block" }}>No lucro!</strong>
-              <span style={{ fontSize: 13, color: "#166534" }}>
-                Você superou o break-even de {breakEvenClientes} assinantes. Cada novo assinante gera {fmt(PRECO_MENSAL * (1 - COMISSAO_CAKTO) - CUSTO_OPENAI_POR_CLIENTE)} de lucro extra.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Detalhamento */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 24 }}>
-
-          {/* Receita */}
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, padding: 24 }}>
-            <h2 style={{ margin: "0 0 16px", fontSize: 16, color: "#0f172a" }}>📈 Receita</h2>
-            <div style={{ display: "grid", gap: 10 }}>
-              {[
-                ["Receita bruta", fmt(receitaBruta)],
-                ["Comissão CAKTO (5,3%)", `- ${fmt(comissaoCakto)}`],
-              ].map(([label, valor]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-                  <span style={{ color: "#64748b" }}>{label}</span>
-                  <strong style={{ color: "#0f172a" }}>{valor}</strong>
-                </div>
-              ))}
-              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 15 }}>
-                <span style={{ fontWeight: 700 }}>Receita líquida</span>
-                <strong style={{ color: "#16a34a" }}>{fmt(receitaLiquida)}</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Custos */}
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, padding: 24 }}>
-            <h2 style={{ margin: "0 0 16px", fontSize: 16, color: "#0f172a" }}>📉 Custos</h2>
-            <div style={{ display: "grid", gap: 10 }}>
-              {[
-                ["Z-API (WhatsApp)", fmt(CUSTO_ZAPI)],
-                ["Domínio (.com.br)", fmt(CUSTO_DOMINIO)],
-                [`OpenAI (${totalClientesAtivos} clientes × R$0,07)`, fmt(custoVariavel)],
-              ].map(([label, valor]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-                  <span style={{ color: "#64748b" }}>{label}</span>
-                  <strong style={{ color: "#0f172a" }}>{valor}</strong>
-                </div>
-              ))}
-              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 15 }}>
-                <span style={{ fontWeight: 700 }}>Custo total</span>
-                <strong style={{ color: "#dc2626" }}>{fmt(custoTotal)}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Resultado final */}
-        <div style={{
-          background: lucroPositivo ? "#f0fdf4" : "#fef2f2",
-          border: `2px solid ${lucroPositivo ? "#16a34a" : "#dc2626"}`,
-          borderRadius: 16, padding: 24,
-          display: "flex", justifyContent: "space-between", alignItems: "center"
-        }}>
+      {breakEvenClientes != null && clientesFaltam === 0 && totalAssinantes > 0 && (
+        <div className="qa-alert qa-alert-emerald">
+          <IconCheckCircle size={18} />
           <div>
-            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>RESULTADO MENSAL</p>
-            <strong style={{ fontSize: 32, color: lucroPositivo ? "#15803d" : "#dc2626" }}>
-              {fmt(lucroLiquido)}
-            </strong>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-              Margem líquida: {pct(margem)} · {totalPlanos} planos gerados
-            </p>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>Por assinante</p>
-            <strong style={{ fontSize: 20, color: "#15803d" }}>
-              {fmt(PRECO_MENSAL * (1 - COMISSAO_CAKTO) - CUSTO_OPENAI_POR_CLIENTE)}
-            </strong>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>lucro/mês</p>
+            <strong style={{ display: "block" }}>No lucro!</strong>
+            <span style={{ opacity: 0.85 }}>Você superou o break-even de {breakEvenClientes} assinantes.</span>
           </div>
         </div>
+      )}
 
-        {/* Projeção rápida */}
-        <div style={{ marginTop: 24 }}>
-          <h2 style={{ margin: "0 0 16px", fontSize: 16, color: "#0f172a" }}>📊 Projeção</h2>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ background: "#f1f5f9" }}>
-                  {["Assinantes", "Receita Bruta", "- CAKTO", "- Custos", "Lucro Líquido", "Margem"].map(h => (
-                    <th key={h} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: "#475569", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 3, 5, 10, 20, 50].map((n, i) => {
-                  const rb = n * PRECO_MENSAL;
-                  const ck = rb * COMISSAO_CAKTO;
-                  const cv = n * CUSTO_OPENAI_POR_CLIENTE;
-                  const ct = custoFixo + cv;
-                  const ll = rb - ck - ct;
-                  const mg = ll / (rb - ck);
-                  const isAtual = n === totalAssinantes;
-                  return (
-                    <tr key={n} style={{ background: isAtual ? "#f0fdf4" : i % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
-                      <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: isAtual ? 800 : 400 }}>
-                        {n}{isAtual ? " ← atual" : ""}
-                      </td>
-                      <td style={{ padding: "10px 14px", textAlign: "center" }}>{fmt(rb)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "center", color: "#b45309" }}>- {fmt(ck)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "center", color: "#dc2626" }}>- {fmt(ct)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: ll >= 0 ? "#16a34a" : "#dc2626" }}>{fmt(ll)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "center", color: ll >= 0 ? "#16a34a" : "#dc2626" }}>{pct(mg)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {breakEvenClientes == null && custoManualMes === 0 && (
+        <div className="qa-alert qa-alert-amber">
+          <IconAlertTriangle size={18} />
+          <div>
+            <strong style={{ display: "block" }}>Nenhum custo lançado este mês</strong>
+            <span style={{ opacity: 0.85 }}>Lance seus custos fixos (Z-API, domínio, hospedagem...) abaixo pra calcular o break-even certinho.</span>
           </div>
         </div>
+      )}
 
-      </section>
-    </main>
+      {breakEvenClientes == null && custoManualMes > 0 && (
+        <div className="qa-alert qa-alert-red">
+          <IconAlertTriangle size={18} />
+          <div>
+            <strong style={{ display: "block" }}>Break-even impossível no preço atual</strong>
+            <span style={{ opacity: 0.85 }}>
+              O custo médio de IA por cliente ({fmt(custoVariavelPorCliente)}) já é maior que o quanto sobra de cada assinatura
+              ({fmt(PRECO_MENSAL * (1 - COMISSAO_CAKTO))}) — mais assinante nenhum cobre os custos fixos nesse ritmo.
+              Vale rever o preço ou o custo de IA por cliente.
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+        {/* Custos do mês */}
+        <div className="qa-card">
+          <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 600 }}>Custos — {NOMES_MES[mesNum - 1]}/{ano}</h2>
+
+          <div className="qa-list-row">
+            <span style={{ fontSize: 13.5, color: "var(--qa-gray-400)" }}>IA (uso real, automático)</span>
+            <strong style={{ fontSize: 13.5 }}>{fmt(custoIA)}</strong>
+          </div>
+          <div className="qa-list-row">
+            <span style={{ fontSize: 13.5, color: "var(--qa-gray-400)" }}>Comissão CAKTO (automático)</span>
+            <strong style={{ fontSize: 13.5 }}>{fmt(comissaoCakto)}</strong>
+          </div>
+
+          {custosDoMes.length === 0 ? (
+            <p className="qa-empty">Nenhum custo manual lançado este mês.</p>
+          ) : (
+            custosDoMes.map((c) => (
+              <div key={c.id} className="qa-list-row">
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5 }}>{c.categoria}</div>
+                  {c.descricao && <div style={{ fontSize: 11.5, color: "var(--qa-gray-500)" }}>{c.descricao}</div>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <strong style={{ fontSize: 13.5 }}>{fmt(c.valor)}</strong>
+                  <ExcluirForm
+                    action={apagarCusto}
+                    mensagem={`Apagar o custo "${c.categoria}" (${fmt(c.valor)})?`}
+                    label="apagar"
+                    tamanho="pequeno"
+                    fields={{ id: c.id }}
+                    estiloBotao={excluirEstiloDark}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+
+          <div className="qa-list-row" style={{ borderTop: "1px solid var(--qa-line)", marginTop: 4, fontWeight: 700 }}>
+            <span>Custo total do mês</span>
+            <span style={{ color: "#fca5a5" }}>{fmt(custoTotal)}</span>
+          </div>
+
+          <form action={lancarCusto} style={{ display: "grid", gap: 12, marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--qa-line)" }}>
+            <input type="hidden" name="mes" value={mesAtual} />
+            <label className="qa-label">
+              Categoria
+              <input name="categoria" required placeholder="Ex: Z-API, Domínio, Hospedagem..." className="qa-input" />
+            </label>
+            <label className="qa-label">
+              Valor (R$)
+              <input name="valor" required placeholder="0,00" className="qa-input" />
+            </label>
+            <label className="qa-label">
+              Descrição (opcional)
+              <input name="descricao" className="qa-input" />
+            </label>
+            <button type="submit" className="qa-btn-primary">Lançar custo</button>
+          </form>
+        </div>
+
+        {/* Meta */}
+        <div className="qa-card">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <IconTarget size={16} />
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Meta</h2>
+          </div>
+
+          {[metaClientes, metaMrr].filter(Boolean).map((meta) => {
+            const valorAtual = meta!.metrica === "clientes_pagos" ? totalAssinantes : receitaBruta;
+            const progresso = meta!.valorAlvo > 0 ? Math.min(1, valorAtual / meta!.valorAlvo) : 0;
+            return (
+              <div key={meta!.metrica} style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: "var(--qa-gray-400)" }}>{ROTULO_METRICA[meta!.metrica]}</span>
+                  <strong>
+                    {meta!.metrica === "mrr" ? fmt(valorAtual) : valorAtual} / {meta!.metrica === "mrr" ? fmt(meta!.valorAlvo) : meta!.valorAlvo}
+                  </strong>
+                </div>
+                <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${progresso * 100}%`, background: "var(--qa-gradient)" }} />
+                </div>
+                {meta!.dataAlvo && (
+                  <p style={{ fontSize: 11.5, color: "var(--qa-gray-500)", marginTop: 4 }}>
+                    Meta até {new Intl.DateTimeFormat("pt-BR").format(new Date(meta!.dataAlvo))}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
+          {!metaClientes && !metaMrr && <p className="qa-empty">Nenhuma meta definida ainda.</p>}
+
+          <form action={salvarMeta} style={{ display: "grid", gap: 12, marginTop: 8, paddingTop: 16, borderTop: "1px solid var(--qa-line)" }}>
+            <label className="qa-label">
+              Métrica
+              <select name="metrica" required className="qa-input">
+                <option value="clientes_pagos">Clientes pagos</option>
+                <option value="mrr">MRR (receita mensal)</option>
+              </select>
+            </label>
+            <label className="qa-label">
+              Valor alvo
+              <input name="valorAlvo" required placeholder="Ex: 50" className="qa-input" />
+            </label>
+            <label className="qa-label">
+              Data alvo (opcional)
+              <input name="dataAlvo" type="date" className="qa-input" />
+            </label>
+            <button type="submit" className="qa-btn-secondary">Salvar meta</button>
+          </form>
+        </div>
+      </div>
+
+      {/* Projeção */}
+      <div className="qa-card">
+        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600 }}>Projeção</h2>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+            <thead>
+              <tr>
+                {["Assinantes", "Receita Bruta", "- CAKTO", "- Custos", "Lucro Líquido", "Margem"].map((h) => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, color: "var(--qa-gray-400)", borderBottom: "1px solid var(--qa-line)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[1, 3, 5, 10, 20, 50].map((n) => {
+                const rb = n * PRECO_MENSAL;
+                const ck = rb * COMISSAO_CAKTO;
+                const cv = n * custoVariavelPorCliente;
+                const ct = custoManualMes + cv;
+                const ll = rb - ck - ct;
+                const mg = rb - ck > 0 ? ll / (rb - ck) : 0;
+                const isAtual = n === totalAssinantes;
+                return (
+                  <tr key={n} style={{ background: isAtual ? "rgba(0,123,255,0.08)" : "transparent" }}>
+                    <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: isAtual ? 700 : 400 }}>
+                      {n}{isAtual ? " ← atual" : ""}
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "center" }}>{fmt(rb)}</td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", color: "#fcd34d" }}>- {fmt(ck)}</td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", color: "#fca5a5" }}>- {fmt(ct)}</td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: ll >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmt(ll)}</td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", color: ll >= 0 ? "#6ee7b7" : "#fca5a5" }}>{pct(mg)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ fontSize: 11.5, color: "var(--qa-gray-500)", marginTop: 12 }}>
+          Considera o custo fixo lançado este mês ({fmt(custoManualMes)}) + custo médio de IA por cliente ativo ({fmt(custoVariavelPorCliente)}).
+        </p>
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { IconDownload, IconArrowUpRight } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,64 +12,52 @@ export default async function ExportarPage() {
   const totalPagamentos = await prisma.pagamento.count();
 
   return (
-    <main className="page-shell">
-      <section style={{ maxWidth: 760, margin: "0 auto" }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 className="page-title">Exportar dados</h1>
-          <p className="page-subtitle">
-            Baixe um backup completo dos dados do QuitaZAP em formato JSON.
-          </p>
+    <div style={{ maxWidth: 760 }}>
+      <div className="qa-page-header">
+        <div>
+          <h1 className="qa-page-title">Exportar dados</h1>
+          <p className="qa-page-subtitle">Baixe uma cópia completa dos dados do QuitaZAP.</p>
         </div>
+      </div>
 
-        <div className="content-card" style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 18 }}>Resumo do banco</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
-            {[
-              { label: "Clientes",    valor: totalClientes },
-              { label: "Dívidas",     valor: totalDividas },
-              { label: "Parcelas",    valor: totalParcelas },
-              { label: "Pagamentos",  valor: totalPagamentos },
-            ].map((item) => (
-              <div key={item.label} style={{
-                background: "#f8fafc", border: "1px solid #e2e8f0",
-                borderRadius: 14, padding: 16, textAlign: "center",
-              }}>
-                <strong style={{ display: "block", fontSize: 28, color: "#0f172a" }}>{item.valor}</strong>
-                <span style={{ fontSize: 13, color: "#64748b" }}>{item.label}</span>
-              </div>
-            ))}
-          </div>
+      <div className="qa-card" style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>Resumo</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
+          {[
+            { label: "Clientes",    valor: totalClientes },
+            { label: "Dívidas",     valor: totalDividas },
+            { label: "Parcelas",    valor: totalParcelas },
+            { label: "Pagamentos",  valor: totalPagamentos },
+          ].map((item) => (
+            <div key={item.label} style={{
+              background: "rgba(255,255,255,0.03)", border: "1px solid var(--qa-line-soft)",
+              borderRadius: 14, padding: 16, textAlign: "center",
+            }}>
+              <strong style={{ display: "block", fontSize: 26, fontWeight: 300 }}>{item.valor}</strong>
+              <span style={{ fontSize: 13, color: "var(--qa-gray-400)" }}>{item.label}</span>
+            </div>
+          ))}
         </div>
+      </div>
 
-        <div className="content-card" style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: "0 0 8px", color: "#0f172a", fontSize: 18 }}>Exportação completa (JSON)</h2>
-          <p style={{ margin: "0 0 20px", color: "#64748b", fontSize: 14, lineHeight: 1.6 }}>
-            O arquivo JSON contém todos os clientes, dívidas, parcelas e pagamentos.
-            Use para backup ou para migrar para outro ambiente.
-          </p>
-          <a
-            href="/api/exportar"
-            download="quitazap-backup.json"
-            style={{
-              display: "inline-block",
-              background: "#16a34a", color: "#ffffff",
-              padding: "12px 20px", borderRadius: 12,
-              fontWeight: 700, fontSize: 15, textDecoration: "none",
-            }}
-          >
-            ⬇️ Baixar backup JSON
-          </a>
-        </div>
+      <div className="qa-card" style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600 }}>Cópia completa</h2>
+        <p style={{ margin: "0 0 20px", color: "var(--qa-gray-400)", fontSize: 13.5, lineHeight: 1.6 }}>
+          Um arquivo com todos os clientes, dívidas, parcelas e pagamentos cadastrados — guarde num
+          lugar seguro (Google Drive, computador) como backup, ou para levar seus dados pra outro lugar.
+        </p>
+        <a href="/api/exportar" download="quitazap-backup.json" className="qa-btn-primary">
+          <IconDownload size={15} /> Baixar cópia
+        </a>
+      </div>
 
-        <div style={{ padding: "16px 20px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 14, marginBottom: 24 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "#854d0e", lineHeight: 1.6 }}>
-            <strong>Dica:</strong> Faça backup regularmente antes de atualizações ou mudanças no banco.
-            O arquivo <code>prisma/dev.db</code> também pode ser copiado diretamente como backup do SQLite.
-          </p>
-        </div>
+      <div className="qa-alert qa-alert-amber">
+        <strong>Dica:</strong>&nbsp;baixe essa cópia regularmente, principalmente antes de qualquer mudança grande no sistema.
+      </div>
 
-        <Link href="/" style={{ color: "#16a34a", fontWeight: 700 }}>← Voltar para o dashboard</Link>
-      </section>
-    </main>
+      <Link href="/" style={{ color: "#7dc4ff", fontWeight: 600, fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 4, marginTop: 16 }}>
+        <IconArrowUpRight size={13} style={{ transform: "rotate(-135deg)" }} /> Voltar para o dashboard
+      </Link>
+    </div>
   );
 }

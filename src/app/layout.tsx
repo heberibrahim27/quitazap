@@ -1,5 +1,5 @@
-﻿import "./globals.css";
-import { Navbar } from "@/components/Navbar";
+import "./globals.css";
+import { AdminShell } from "@/components/AdminShell";
 
 export const metadata = {
   title: "QuitaZAP MVP",
@@ -17,8 +17,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
-        <Navbar />
-        {children}
+        <AdminShell>{children}</AdminShell>
       </body>
     </html>
   );

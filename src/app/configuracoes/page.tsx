@@ -1,48 +1,102 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { verificarSenhaAdmin, definirSenhaAdmin, temSenhaAdminDefinida } from "@/lib/admin-auth";
+import { IconSettings, IconLogout, IconCheckCircle, IconAlertTriangle } from "@/components/icons";
 
-export default async function ConfiguracoesPage() {
+export default async function ConfiguracoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; erro?: string }>;
+}) {
+  const { ok, erro } = await searchParams;
+  const jaTemSenhaPropria = await temSenhaAdminDefinida();
+
+  async function trocarSenha(formData: FormData) {
+    "use server";
+
+    const senhaAtual = String(formData.get("senhaAtual") || "");
+    const senhaNova = String(formData.get("senhaNova") || "");
+    const senhaNovaConfirmar = String(formData.get("senhaNovaConfirmar") || "");
+
+    if (!(await verificarSenhaAdmin(senhaAtual))) {
+      redirect("/configuracoes?erro=atual");
+    }
+    if (senhaNova.length < 8) {
+      redirect("/configuracoes?erro=curta");
+    }
+    if (senhaNova !== senhaNovaConfirmar) {
+      redirect("/configuracoes?erro=confirmacao");
+    }
+
+    await definirSenhaAdmin(senhaNova);
+    redirect("/configuracoes?ok=1");
+  }
+
+  const mensagemErro: Record<string, string> = {
+    atual: "Senha atual incorreta.",
+    curta: "A senha nova precisa ter pelo menos 8 caracteres.",
+    confirmacao: "A confirmação não bateu com a senha nova.",
+  };
+
   return (
-    <main className="page-shell">
-      <section style={{ maxWidth: 640, margin: "0 auto" }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 className="page-title">⚙️ Configurações</h1>
-          <p className="page-subtitle">Gerencie o acesso ao sistema QuitaZAP.</p>
+    <div>
+      <div className="qa-page-header">
+        <div>
+          <h1 className="qa-page-title">Configurações</h1>
+          <p className="qa-page-subtitle">Gerencie o acesso ao painel do QuitaZAP.</p>
         </div>
+      </div>
 
-        {/* Alterar senha */}
-        <div style={{
-          background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20,
-          padding: 32, boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
-          display: "grid", gap: 16, marginBottom: 24,
-        }}>
-          <h2 style={{ margin: 0, fontSize: 17, color: "#0f172a" }}>🔑 Senha de acesso</h2>
-          <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
-            A senha de acesso ao painel é definida pela variável <code>APP_SENHA</code>, configurada
-            direto na Vercel (Project Settings → Environment Variables). Não existe um formulário
-            aqui pra trocar — trocar direto no Vercel evita que a senha nova fique guardada em
-            algum lugar inseguro do próprio app.
-          </p>
+      <div className="qa-card" style={{ maxWidth: 460, marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+          <span className="qa-nav-icon"><IconSettings size={16} /></span>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Senha de acesso</h2>
         </div>
+        <p style={{ fontSize: 13, color: "var(--qa-gray-400)", marginBottom: 18 }}>
+          {jaTemSenhaPropria
+            ? "Você já definiu sua própria senha. Pode trocar a qualquer momento aqui."
+            : "Você ainda está usando a senha padrão configurada no servidor. Defina uma senha só sua abaixo."}
+        </p>
 
-        {/* Sair */}
-        <div style={{
-          background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20,
-          padding: 24, display: "flex", justifyContent: "space-between",
-          alignItems: "center", gap: 16, flexWrap: "wrap",
-        }}>
-          <div>
-            <strong style={{ color: "#0f172a", display: "block", marginBottom: 4 }}>Encerrar sessão</strong>
-            <span style={{ fontSize: 13, color: "#64748b" }}>Você precisará digitar a senha novamente para acessar.</span>
+        {ok === "1" && (
+          <div className="qa-alert qa-alert-emerald">
+            <IconCheckCircle size={16} /> Senha atualizada com sucesso.
           </div>
-          <Link href="/logout" style={{
-            background: "#fee2e2", color: "#991b1b", fontWeight: 700,
-            padding: "10px 18px", borderRadius: 10, fontSize: 14, whiteSpace: "nowrap",
-          }}>
-            Sair do sistema
-          </Link>
-        </div>
+        )}
+        {erro && mensagemErro[erro] && (
+          <div className="qa-alert qa-alert-red">
+            <IconAlertTriangle size={16} /> {mensagemErro[erro]}
+          </div>
+        )}
 
-      </section>
-    </main>
+        <form action={trocarSenha} style={{ display: "grid", gap: 16 }}>
+          <div className="qa-input-group">
+            <input type="password" name="senhaAtual" placeholder=" " required autoComplete="current-password" />
+            <label>Senha atual</label>
+          </div>
+          <div className="qa-input-group">
+            <input type="password" name="senhaNova" placeholder=" " required minLength={8} autoComplete="new-password" />
+            <label>Senha nova (mínimo 8 caracteres)</label>
+          </div>
+          <div className="qa-input-group">
+            <input type="password" name="senhaNovaConfirmar" placeholder=" " required minLength={8} autoComplete="new-password" />
+            <label>Confirmar senha nova</label>
+          </div>
+          <button type="submit" className="qa-btn-primary" style={{ marginTop: 4 }}>
+            Salvar senha nova
+          </button>
+        </form>
+      </div>
+
+      <div className="qa-card" style={{ maxWidth: 460, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <strong style={{ display: "block", marginBottom: 4 }}>Encerrar sessão</strong>
+          <span style={{ fontSize: 13, color: "var(--qa-gray-400)" }}>Você precisará digitar a senha novamente para acessar.</span>
+        </div>
+        <Link href="/logout" className="qa-btn-secondary">
+          <IconLogout size={15} /> Sair
+        </Link>
+      </div>
+    </div>
   );
 }

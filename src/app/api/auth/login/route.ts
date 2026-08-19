@@ -1,22 +1,12 @@
 // POST /api/auth/login
 // Suporta dois modos:
-// 1. FormData com "senha" → login admin legado (mantém compatibilidade)
+// 1. FormData com "senha" → login admin (fundador)
 // 2. JSON com "email"+"senha" → login multi-tenant QuitaZAP Receber
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { criarToken } from "@/lib/auth-jwt";
+import { verificarSenhaAdmin } from "@/lib/admin-auth";
 import { compareSync } from "bcryptjs";
-import { timingSafeEqual } from "crypto";
-
-function senhaConfere(digitada: string, correta: string): boolean {
-  const a = Buffer.from(digitada);
-  const b = Buffer.from(correta);
-  // Comparação com tempo constante — mesmo padrão já usado em
-  // src/lib/cliente-auth.ts. Sem isso, alguém enviando muitas tentativas de
-  // login poderia, em teoria, inferir a senha certa medindo quanto tempo o
-  // "!==" leva pra cada tentativa (achado do levantamento técnico).
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 const COOKIE_NAME  = "qz_auth";
 const COOKIE_TOKEN = "qz_autenticado";
@@ -24,21 +14,12 @@ const COOKIE_TOKEN = "qz_autenticado";
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get("content-type") ?? "";
 
-  // ── Modo legado (admin) ── FormData
+  // ── Modo admin (fundador) ── FormData
   if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
     const form  = await req.formData();
     const senha = String(form.get("senha") || "");
-    const correta = process.env.APP_SENHA;
 
-    // Sem fallback pra senha pública: se APP_SENHA não estiver configurada,
-    // o login fica bloqueado (em vez de aceitar uma senha previsível
-    // conhecida por qualquer um que leia o código-fonte).
-    if (!correta) {
-      console.error("[LOGIN ADMIN] APP_SENHA não configurada — login bloqueado até configurar.");
-      return NextResponse.redirect(new URL("/login?erro=1", req.url), 303);
-    }
-
-    if (!senhaConfere(senha, correta)) {
+    if (!(await verificarSenhaAdmin(senha))) {
       return NextResponse.redirect(new URL("/login?erro=1", req.url), 303);
     }
 

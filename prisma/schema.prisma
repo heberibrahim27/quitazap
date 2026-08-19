@@ -429,3 +429,45 @@ model LogIA {
   custoUSD     Float    @default(0)
   criadoEm     DateTime @default(now())
 }
+
+// ─────────────────────────────────────────
+// LOGIN DO FUNDADOR (painel admin)
+// ─────────────────────────────────────────
+// Uma linha só (é sempre o mesmo dono). Existe pra ele poder definir/trocar
+// a própria senha pelo painel em vez de mexer direto na Vercel — enquanto
+// não existir nenhuma linha, o login continua aceitando a senha da variável
+// de ambiente APP_SENHA (bootstrap, compatível com o que já está em uso).
+model ContaAdmin {
+  id           String   @id @default(cuid())
+  senhaHash    String
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
+// PAINEL FINANCEIRO — custos e metas
+// ─────────────────────────────────────────
+// Custo lançado manualmente pelo fundador (assinatura da Z-API, domínio,
+// IA, hospedagem, etc). "mes" no formato YYYY-MM.
+model CustoMensal {
+  id           String   @id @default(cuid())
+  mes          String
+  categoria    String
+  descricao    String?
+  valor        Float
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([mes])
+}
+
+// Meta financeira simples: 1 alvo por métrica (nova substitui a anterior).
+// metrica: "clientes_pagos" | "mrr"
+model MetaFinanceira {
+  id           String    @id @default(cuid())
+  metrica      String    @unique
+  valorAlvo    Float
+  dataAlvo     DateTime?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+}

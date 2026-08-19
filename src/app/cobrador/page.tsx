@@ -130,7 +130,7 @@ function CobradorContent() {
     if (res.ok) {
       showToast(d.disparadas > 0 ? `🚀 ${d.disparadas} mensagem(ns) enviada(s)!` : "Nenhuma pendente para hoje.");
       carregar();
-    } else showToast(`Erro: ${d.error ?? "desconhecido"}`, false);
+    } else showToast(res.status >= 500 ? "Não consegui completar agora. Tenta de novo em instantes." : (d.error ?? "Algo deu errado."), false);
   }
 
   async function enviarAgora() {
@@ -163,7 +163,7 @@ function CobradorContent() {
       setMostrarForm(false); carregar();
     } else {
       const err = await res.json();
-      showToast(`Erro: ${err.error ?? "desconhecido"}`, false);
+      showToast(res.status >= 500 ? "Não consegui salvar agora. Tenta de novo em instantes." : (err.error ?? "Algo deu errado."), false);
     }
   }
 
