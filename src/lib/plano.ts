@@ -201,6 +201,17 @@ export function gerarListaComandos(nome: string): string {
 ⭐ *"quitascore"* ou *"meu score"*
 ↳ Consulta seu score de saúde financeira atualizado
 
+🔔 *"lembrete: pagar a luz dia 10, R$150"*
+↳ Cria um lembrete (pode ser recorrente: "todo dia 10", "toda segunda")
+↳ Funciona por áudio também! 🎤
+
+✅ *"pagamento: paguei a luz, R$150"*
+↳ Registra um pagamento — se achar uma dívida parecida, atualiza o saldo dela
+
+📋 *"minhas tarefas"* — lista o que está pendente
+✔️ *"concluí [nome da tarefa]"* — marca como feita
+🗑️ *"cancelar [nome da tarefa]"* — remove o lembrete
+
 É só mandar a mensagem — pode escrever ou mandar áudio do seu jeito! 😊`;
 }
 

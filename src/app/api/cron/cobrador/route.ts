@@ -90,6 +90,8 @@ export async function GET(req: NextRequest) {
       if (authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
+    } else {
+      console.warn("[COBRADOR] CRON_SECRET não configurado — rota acessível sem autenticação.");
     }
   }
 
