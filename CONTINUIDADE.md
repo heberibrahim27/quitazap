@@ -221,3 +221,19 @@ O motor de conversa (`controle-financeiro-flow.ts`) só gravava em `BotSessao.di
 Cobre: gasto/receita/despesa avulsa (caminho rápido e caminho IA), despesa fixa (direta, em lista "frase corrida" e confirmada em duas etapas), compra no cartão (com canonização do nome do cartão pelo mesmo catálogo usado no resto do fluxo), configuração de cartão (fechamento/vencimento).
 
 **Limitação aceita, documentada, não é bug**: no caminho da IA (`salvarItensConfirmadosIA`), o item interpretado não carrega uma data própria do gasto (só existe pro caminho rápido, via `gasto-flow.ts`) — o lançamento é gravado com a data/hora da confirmação, não a data em que o gasto realmente aconteceu. Resolver isso direito exigiria adicionar um campo de data ao schema de interpretação da IA (`financeiro-intent-schema.ts`) — fora de escopo por enquanto.
+
+## 10. Direção visual pro redesign (painel do cliente + painel admin)
+
+Combinado com o usuário: terminar o que falta de funcionalidade primeiro, redesenhar os dois painéis juntos depois, numa linha visual única. Referências de estilo compartilhadas pelo usuário (apps de finanças: Vektora, Aurex, Monzo e similares) — padrão visual pedido:
+
+- **Clean e premium ao mesmo tempo**, foco em mobile (é onde a maioria usa).
+- **Glassmorphism + neomorphism** — cards com efeito vidro (blur/translucidez), sombras suaves.
+- Card de saldo em destaque no topo, fundo escuro ou gradiente, número grande como protagonista.
+- Ações rápidas em ícones redondos logo abaixo do saldo.
+- Lista de lançamentos com ícone de categoria + valor colorido (verde entrada, neutro saída).
+- Menu inferior flutuante, formato pílula arredondada.
+- Gráficos discretos (candlestick/barras) nas telas de histórico/investimento.
+- Modais com efeito vidro pra detalhe, em vez de página nova.
+- Paleta com gradiente (roxo/laranja/azul), nada de "cara de template genérico" — **explicitamente pediu pra não parecer feito por IA**.
+
+Aplicar essa linguagem visual tanto no painel do cliente (`/minha-conta`) quanto no painel admin, com variação de paleta pra diferenciar os dois — mas os dois compartilhando os mesmos componentes-base (ver seção "Duplicação com /minha-conta" do mapeamento do painel admin: cartão, badge de status, tabela, empty state já se repetem nos dois sem reaproveitamento).
