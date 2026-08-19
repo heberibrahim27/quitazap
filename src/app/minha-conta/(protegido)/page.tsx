@@ -280,7 +280,13 @@ export default async function MinhaContaPage({
                         uma saída nova (dobraria a contagem visualmente). */}
                     {l.tipo === "RECEITA" ? "+" : l.tipo === "FATURA_FECHADA" ? "" : "-"}{fmtValor(l.valor)}
                   </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>{fmtData(l.data)}</div>
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                    {fmtData(l.data)}
+                    {" · "}
+                    <Link href={`/minha-conta/lancamento/${l.id}/editar`} style={{ color: "#64748b" }}>
+                      editar
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}

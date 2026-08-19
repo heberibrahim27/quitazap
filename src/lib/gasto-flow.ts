@@ -31,7 +31,7 @@ export type GastoDetectado = {
 
 const PERGUNTA_VALOR = "Qual foi o valor desse gasto?";
 
-const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
+export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
   { categoria: "Mercado", palavras: ["mercado", "supermercado", "atacadao", "assai", "atacarejo"] },
   { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanxe", "lanches", "restaurante", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
   { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "combustivel", "transporte", "trasporte", "tranporte"] },
