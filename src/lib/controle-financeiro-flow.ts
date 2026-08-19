@@ -73,11 +73,34 @@ export type EstadoControleFinanceiro = {
   ultimoGasto?: UltimoGastoControle;
 };
 
+// Tipo/descrição/valor já resolvidos no momento da confirmação — usado pelo
+// route.ts pra também gravar em Lancamento/Cartao (tabelas relacionais),
+// além do JSON de conversa em BotSessao.dividasTemp que já existia. Opcional
+// porque a maioria dos handlers do fluxo não gera lançamento novo (consulta,
+// correção de texto, etc.) — só quem de fato confirma um gasto/receita/cartão
+// preenche isso.
+export type ItemParaPersistirControle = {
+  tipo: "RECEITA" | "DESPESA_FIXA" | "DESPESA_VARIAVEL" | "COMPRA_CARTAO";
+  descricao: string;
+  categoria?: string | null;
+  valor: number;
+  recorrente: boolean;
+  cartaoNome?: string | null;
+};
+
+export type CartaoParaPersistirControle = {
+  nome: string;
+  fechamento?: number;
+  vencimento?: number;
+};
+
 export type ResultadoGastoControle = {
   resposta: string;
   estado: EstadoControleFinanceiro;
   atualizouEstado: boolean;
   etapa?: string;
+  itensParaPersistir?: ItemParaPersistirControle[];
+  cartaoParaPersistir?: CartaoParaPersistirControle;
 };
 
 const DESPESAS_FIXAS_ANTERIORES = "Despesas fixas anteriores";
@@ -831,6 +854,37 @@ export function salvarItensConfirmadosIA(
       : estadoAtual.ultimoGasto,
   };
 
+  const itensParaPersistir: ItemParaPersistirControle[] = [
+    ...receitas.map((item) => ({
+      tipo: "RECEITA" as const,
+      descricao: item.descricao,
+      categoria: item.categoria,
+      valor: item.valor,
+      recorrente: false,
+    })),
+    ...variaveisSaldo.map((item) => ({
+      tipo: "DESPESA_VARIAVEL" as const,
+      descricao: item.descricao,
+      categoria: item.categoria,
+      valor: item.valor,
+      recorrente: false,
+    })),
+    ...variaveisCartao.map((item) => ({
+      tipo: "COMPRA_CARTAO" as const,
+      descricao: item.descricao,
+      categoria: item.categoria,
+      valor: item.valor,
+      recorrente: false,
+      cartaoNome: item.cartao,
+    })),
+    ...resultadoFixas.adicionados.map((item) => ({
+      tipo: "DESPESA_FIXA" as const,
+      descricao: item.descricao,
+      valor: item.valor,
+      recorrente: true,
+    })),
+  ];
+
   if (receitas.length === 1 && variaveis.length === 0 && fixas.length === 0) {
     const receita = receitas[0];
     return {
@@ -843,6 +897,7 @@ export function salvarItensConfirmadosIA(
         resumoAtualizadoMes(estado),
       estado,
       atualizouEstado: true,
+      itensParaPersistir,
     };
   }
 
@@ -915,6 +970,7 @@ export function salvarItensConfirmadosIA(
     resposta: linhas.join("\n").replace(/\n{3,}/g, "\n\n").trim(),
     estado,
     atualizouEstado: true,
+    itensParaPersistir,
   };
 }
 
@@ -1250,6 +1306,9 @@ export function gerenciarDespesasFixasControle(
           resumoDespesasFixasAtualizado(estado),
         estado,
         atualizouEstado: true,
+        itensParaPersistir: [
+          { tipo: "DESPESA_FIXA", descricao: item.descricao, valor: item.valor, recorrente: true },
+        ],
       };
     }
 
@@ -1288,6 +1347,12 @@ export function gerenciarDespesasFixasControle(
         resumoDespesasFixasAtualizado(estado),
       estado,
       atualizouEstado: resultadoAdicao.adicionados.length > 0,
+      itensParaPersistir: resultadoAdicao.adicionados.map((item) => ({
+        tipo: "DESPESA_FIXA" as const,
+        descricao: item.descricao,
+        valor: item.valor,
+        recorrente: true,
+      })),
     };
   }
 
@@ -1889,6 +1954,11 @@ export function configurarCartaoControle(
     resposta: linhas.join("\n"),
     estado,
     atualizouEstado: true,
+    cartaoParaPersistir: {
+      nome: nomeCartao,
+      fechamento: cartaoAtualizado.fechamento,
+      vencimento: cartaoAtualizado.vencimento,
+    },
   };
 }
 
@@ -2158,5 +2228,15 @@ export function registrarGastoControle(
     resposta,
     estado,
     atualizouEstado: true,
+    itensParaPersistir: [
+      {
+        tipo: cartao ? "COMPRA_CARTAO" : "DESPESA_VARIAVEL",
+        descricao: gasto.descricao || gasto.categoria,
+        categoria: gasto.categoria,
+        valor: gasto.valor,
+        recorrente: false,
+        cartaoNome: cartao,
+      },
+    ],
   };
 }

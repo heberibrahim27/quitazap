@@ -23,6 +23,11 @@ import {
   registrarGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import {
+  persistirLancamentosControle,
+  persistirCartaoControle,
+  type OrigemLancamentoControle,
+} from "@/lib/controle-financeiro-service";
+import {
   formatarPreviaIntentFinanceiro,
   intentFinanceiroConfirmavel,
   resolverLoteGastosCartao,
@@ -730,6 +735,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Usado só pelo Lancamento (dashboard "Minha Conta") — o restante do
+    // fluxo de Controle continua distinguindo só por tipoEntrada.
+    const origemLancamentoControle: OrigemLancamentoControle =
+      tipoEntrada === "audio" ? "AUDIO" : tipoEntrada === "imagem" ? "FOTO" : "TEXTO";
+
     if (!mensagem && tipoEntrada === "texto") return NextResponse.json({ ok: true });
 
     const rawPhone = body.phone ?? "";
@@ -1112,6 +1122,8 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
+      await persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle);
+
       return NextResponse.json({ ok: true });
     }
 
@@ -1169,6 +1181,8 @@ Pode mandar tudo em uma mensagem só.`;
           ]),
         },
       });
+
+      await persistirCartaoControle(sessao.clienteId, configuracaoCartao.cartaoParaPersistir);
 
       return NextResponse.json({ ok: true });
     }
@@ -1460,6 +1474,8 @@ Pode mandar tudo em uma mensagem só.`;
           ]),
         },
       });
+
+      await persistirLancamentosControle(sessao.clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle);
 
       return NextResponse.json({ ok: true });
     }
