@@ -1,12 +1,14 @@
 // ─────────────────────────────────────────
 // QuitaZAP Controle — Cron: Lembretes de Tarefa
-// GET /api/cron/tarefas (roda de hora em hora)
+// GET /api/cron/tarefas (roda 1x por dia — plano Hobby da Vercel não permite
+// cron mais frequente; um "schedule" tipo "0 * * * *" derruba o deploy inteiro)
 //
 // 1. Avança tarefas recorrentes cujo vencimento já passou (< hoje) para a
 //    próxima ocorrência, voltando o status para PENDENTE.
-// 2. Envia lembrete de WhatsApp pras tarefas PENDENTE que vencem hoje,
-//    respeitando o horarioEnvio configurado em cada tarefa (fuso America/Sao_Paulo,
-//    mesma convenção usada em src/lib/gasto-flow.ts).
+// 2. Envia lembrete de WhatsApp pras tarefas PENDENTE que vencem hoje. O
+//    horarioEnvio configurado em cada tarefa não é respeitado à risca (só há
+//    1 execução por dia no plano atual) — todo lembrete do dia sai junto,
+//    no horário em que o cron roda.
 // 3. Limpa registros velhos de MensagemProcessada (dedupe do webhook Z-API) —
 //    a janela de dedupe é de só 10 minutos, reter por 24h já é folga generosa.
 // ─────────────────────────────────────────
@@ -17,15 +19,6 @@ import { sendWhatsApp } from "@/lib/zapi";
 import { calcularProximaOcorrencia } from "@/lib/tarefa-flow";
 
 const FUSO = "America/Sao_Paulo";
-
-function horaAtualBrasil(agora: Date): number {
-  const horaTexto = new Intl.DateTimeFormat("en-US", {
-    timeZone: FUSO,
-    hour: "2-digit",
-    hour12: false,
-  }).format(agora);
-  return parseInt(horaTexto, 10) % 24;
-}
 
 // yyyy-mm-dd conforme o calendário de Brasília, independente do fuso do servidor.
 // vencimento é gravado como "meia-noite local do servidor" (UTC na Vercel) pro dia
@@ -54,7 +47,6 @@ export async function GET(req: NextRequest) {
 
   const agora = new Date();
   const hojeBrasil = dataBrasil(agora);
-  const horaAtual = horaAtualBrasil(agora);
 
   // Janela ampla só pra reduzir o quanto o banco devolve — a decisão real de
   // "é hoje mesmo (em Brasília)?" é feita depois, comparando dataBrasil().
@@ -103,9 +95,6 @@ export async function GET(req: NextRequest) {
 
     for (const t of candidatasHoje) {
       if (!t.vencimento || dataBrasil(t.vencimento) !== hojeBrasil) continue;
-
-      const horaConfig = parseInt(t.horarioEnvio.split(":")[0] ?? "", 10);
-      if (Number.isNaN(horaConfig) || horaConfig !== horaAtual) continue;
       if (t.ultimoLembrete && dataBrasil(t.ultimoLembrete) === hojeBrasil) continue;
 
       const telefone = t.cliente?.telefone;
