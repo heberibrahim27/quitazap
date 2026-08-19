@@ -91,37 +91,31 @@ export default async function EditarLancamentoPage({
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>Editar lançamento</h1>
-        <p style={{ color: "#64748b" }}>{ROTULO_TIPO[lancamento.tipo] ?? lancamento.tipo}</p>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Editar lançamento</h1>
+        <p style={{ color: "var(--mc-ink-dim)", marginTop: 4 }}>{ROTULO_TIPO[lancamento.tipo] ?? lancamento.tipo}</p>
       </div>
 
-      <form
-        action={salvarLancamento}
-        style={{
-          background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16,
-          padding: 24, display: "grid", gap: 16, marginBottom: 16,
-        }}
-      >
-        <label style={labelStyle}>
+      <form action={salvarLancamento} className="mc-form-card" style={{ marginBottom: 16 }}>
+        <label className="mc-label">
           Descrição *
-          <input name="descricao" required defaultValue={lancamento.descricao} style={inputStyle} />
+          <input name="descricao" required defaultValue={lancamento.descricao} className="mc-input" />
         </label>
 
-        <label style={labelStyle}>
+        <label className="mc-label">
           Valor *
           <input
             name="valor"
             required
             type="text"
             defaultValue={Number(lancamento.valor).toFixed(2).replace(".", ",")}
-            style={inputStyle}
+            className="mc-input"
           />
         </label>
 
-        <label style={labelStyle}>
+        <label className="mc-label">
           Categoria
-          <select name="categoria" defaultValue={lancamento.categoria ?? ""} style={inputStyle}>
+          <select name="categoria" defaultValue={lancamento.categoria ?? ""} className="mc-input">
             <option value="">Sem categoria</option>
             {CATEGORIAS.map(({ categoria }) => (
               <option key={categoria} value={categoria}>{categoria}</option>
@@ -129,33 +123,21 @@ export default async function EditarLancamentoPage({
           </select>
         </label>
 
-        <label style={labelStyle}>
+        <label className="mc-label">
           Data
-          <input name="data" type="date" defaultValue={dataInput} style={inputStyle} />
+          <input name="data" type="date" defaultValue={dataInput} className="mc-input" />
         </label>
 
-        <label style={{ ...labelStyle, flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <label className="mc-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
           <input name="recorrente" type="checkbox" defaultChecked={lancamento.recorrente} style={{ width: 16, height: 16 }} />
           Recorrente (despesa fixa mensal)
         </label>
 
-        <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-          <button
-            type="submit"
-            style={{
-              background: "#0f172a", color: "#fff", border: "none",
-              padding: "12px 20px", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer",
-            }}
-          >
+        <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
             Salvar alterações
           </button>
-          <Link
-            href="/minha-conta"
-            style={{
-              background: "#e2e8f0", color: "#0f172a", padding: "12px 20px",
-              borderRadius: 12, fontWeight: 700, fontSize: 14, textDecoration: "none",
-            }}
-          >
+          <Link href="/minha-conta" className="mc-btn-secondary">
             Cancelar
           </Link>
         </div>
@@ -165,13 +147,17 @@ export default async function EditarLancamentoPage({
         action={apagarLancamento}
         mensagem={`Apagar o lançamento "${lancamento.descricao}"? Essa ação não pode ser desfeita.`}
         label="🗑️ Apagar lançamento"
+        estiloBotao={{
+          width: "100%",
+          background: "rgba(251, 113, 133, 0.12)",
+          border: "1px solid rgba(251, 113, 133, 0.3)",
+          color: "#fda4af",
+          borderRadius: 13,
+          padding: "13px 20px",
+          fontWeight: 700,
+          fontSize: 13.5,
+        }}
       />
     </div>
   );
 }
-
-const labelStyle: React.CSSProperties = { display: "grid", gap: 6, color: "#0f172a", fontWeight: 700, fontSize: 14 };
-const inputStyle: React.CSSProperties = {
-  width: "100%", border: "1px solid #cbd5e1", borderRadius: 12,
-  padding: "11px 14px", fontSize: 15, outline: "none", background: "#fff", color: "#0f172a", boxSizing: "border-box",
-};

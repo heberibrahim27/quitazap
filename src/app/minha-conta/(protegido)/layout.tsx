@@ -1,7 +1,11 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { getClienteAtual, COOKIE_CLIENTE } from "@/lib/get-cliente";
+import { manrope } from "../fonte";
+import { BottomNav } from "./BottomNav";
+import "./minha-conta.css";
 
 export default async function MinhaContaLayout({ children }: { children: React.ReactNode }) {
   const cliente = await getClienteAtual();
@@ -14,30 +18,28 @@ export default async function MinhaContaLayout({ children }: { children: React.R
     redirect("/minha-conta/entrar");
   }
 
+  const inicial = cliente.nome.trim().charAt(0).toUpperCase() || "?";
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-      <header
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 24px", background: "#0f172a", color: "#fff",
-        }}
-      >
-        <Link href="/minha-conta" style={{ color: "#fff", textDecoration: "none", fontWeight: 800, fontSize: 16 }}>
-          QuitaZAP — Minha Conta
+    <div className={`mc-shell ${manrope.className}`}>
+      <header className="mc-header">
+        <Link href="/minha-conta" className="mc-brand">
+          <span className="mc-brand-mark">Q</span>
+          QuitaZAP
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 14 }}>
-          <span>{cliente.nome.split(" ")[0]}</span>
+        <div className="mc-header-user">
+          <span className="mc-avatar">{inicial}</span>
           <form action={sair}>
-            <button
-              type="submit"
-              style={{ background: "transparent", border: "1px solid #475569", color: "#e2e8f0", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13 }}
-            >
-              Sair
-            </button>
+            <button type="submit" className="mc-logout-btn">Sair</button>
           </form>
         </div>
       </header>
-      <main style={{ maxWidth: 1000, margin: "0 auto", padding: 24 }}>{children}</main>
+
+      <main className="mc-main">{children}</main>
+
+      <Suspense fallback={null}>
+        <BottomNav sair={sair} />
+      </Suspense>
     </div>
   );
 }

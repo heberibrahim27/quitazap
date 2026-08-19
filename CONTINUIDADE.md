@@ -253,3 +253,27 @@ O que **não** foi apagado (de propósito):
 - O código de geração de relatório/diagnóstico (`gerarRelatorio`, `gerarMensagemPlano` em `src/lib/plano.ts`; `normalizarDiagnosticoManual` em `src/lib/diagnostico-normalizer.ts`) — ficou sem nenhum caminho de produção chamando, mas segue coberto por `tests/regressao-servidor-publico.test.mjs`. Não removi porque pode servir de referência pra uma versão nova, melhor, desse gerador de plano — no futuro, como uma funcionalidade separada e bem definida, usando os dados de `Lancamento`/`Divida` que já são confiáveis (ideia do usuário: "depois podemos estudar uma skill para fazer esse plano de quitação").
 
 Próximo passo (não iniciado, futuro): desenhar esse novo gerador de plano do zero, como recurso separado, só depois que a base do Controle estiver madura.
+
+## 13. Redesign visual — painel do cliente (`/minha-conta`) concluído
+
+Primeira metade da direção visual combinada na seção 10 (screenshots de apps de finança) implementada e publicada — só o painel do cliente por enquanto, o painel admin fica pra depois (ver seção 10 original: mesma linguagem, paleta diferente).
+
+O que mudou:
+- Novo arquivo `src/app/minha-conta/(protegido)/minha-conta.css`: tokens e classes com prefixo `mc-` (não mexe nas classes do painel admin em `globals.css`), tema escuro, cartões com efeito vidro (glassmorphism), gradiente roxo/azul/laranja.
+- Card de saldo em destaque no topo (hero) com o resultado do mês em número grande, navegação de mês, dois chips (renda/saldo devedor) — cor branca quando positivo, rosa-clara + ⚠️ quando negativo (achado da auto-revisão: a 1ª versão tinha perdido essa cor, que já existia antes do redesign e é informação importante pra um app de controle de dívida).
+- Fileira de ações rápidas (ícones redondos) que pulam pra seção da própria página (Extrato, Cartões, Dívidas, Tarefas).
+- Menu inferior flutuante (pílula, vidro) fixo em todas as telas de `/minha-conta`, com aba ativa destacada e preservando `?mes=` ao pular de seção (`src/app/minha-conta/(protegido)/BottomNav.tsx`, client component — precisa saber a rota/query atual).
+- Tela de login (`/minha-conta/entrar`) e de editar lançamento redesenhadas no mesmo estilo.
+- Fonte Manrope (`next/font/google`) compartilhada num módulo único (`src/app/minha-conta/fonte.ts`) entre o layout protegido e a tela de login.
+- Toda a lógica de dados/consultas/Server Actions ficou igual — só trocou a marcação/estilo.
+
+Achados corrigidos na auto-revisão (2 rodadas):
+- Navbar do painel admin (links tipo "Clientes"/"Cobrador") estava aparecendo por cima do cabeçalho novo do cliente em toda página de `/minha-conta` — bug pré-existente que só ficou óbvio com o redesign (não é falha de segurança: `middleware.ts` já protege essas rotas, mandaria pro `/login` do admin). Corrigido excluindo `/minha-conta` do `Navbar.tsx` global.
+- Seção "Cartões" só existia (com o id da âncora) quando o cliente já tinha cartão cadastrado — cliente novo sem cartão que clicasse no atalho "Cartões" não ia pra lugar nenhum. Agora a seção sempre existe, com estado vazio.
+- Contraste de texto secundário (datas, "de R$X", etc) abaixo do mínimo recomendado (AA) — cor clareada.
+- Classe CSS de "aba ativa" do menu inferior existia mas nunca era aplicada — corrigido.
+- Um `flexDirection` num checkbox não fazia nada (o label é `display: grid`, não `flex`) — corrigido, já era assim antes do redesign também.
+
+Não testado num navegador real com dados reais (esse ambiente não tem acesso ao banco) — validado com uma página HTML estática usando o mesmo CSS, com screenshot em viewport mobile (390×844) via Playwright/Chromium, inclusive testando que o menu inferior fixo realmente acompanha o scroll. Recomendo o usuário dar uma olhada ao vivo assim que puder.
+
+Próximo passo: redesenhar o painel admin na mesma linguagem visual (paleta diferente), reaproveitando os componentes-base onde fizer sentido.

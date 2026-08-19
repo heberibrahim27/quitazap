@@ -9,6 +9,9 @@ interface ExcluirFormProps {
   tamanho?: "pequeno" | "normal";
   /** Campos hidden extras incluídos no FormData ao submeter */
   fields?: Record<string, string>;
+  /** Sobrescreve o estilo padrão (claro) do botão — usado no painel do
+   * cliente, que tem tema escuro próprio. */
+  estiloBotao?: React.CSSProperties;
 }
 
 export function ExcluirForm({
@@ -17,10 +20,11 @@ export function ExcluirForm({
   label = "Excluir",
   tamanho = "normal",
   fields,
+  estiloBotao,
 }: ExcluirFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
-  const style: React.CSSProperties =
+  const styleBase: React.CSSProperties =
     tamanho === "pequeno"
       ? {
           background: "none",
@@ -42,6 +46,8 @@ export function ExcluirForm({
           fontSize: 15,
           cursor: "pointer",
         };
+
+  const style: React.CSSProperties = { ...styleBase, ...estiloBotao };
 
   return (
     <form ref={formRef} action={action} style={{ display: "inline" }}>

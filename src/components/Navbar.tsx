@@ -24,7 +24,7 @@ export function Navbar() {
   // Fecha o menu sempre que a rota mudar
   useEffect(() => { setMenuAberto(false); }, [pathname]);
 
-  if (pathname === "/oferta" || pathname === "/login") return null;
+  if (pathname === "/oferta" || pathname === "/login" || pathname.startsWith("/minha-conta")) return null;
 
   function ativo(href: string) {
     if (href === "/") return pathname === "/";
