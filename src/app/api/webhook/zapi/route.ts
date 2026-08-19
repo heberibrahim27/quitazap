@@ -35,7 +35,7 @@ import {
   resolverIntencaoFinanceiraIA,
 } from "@/lib/ia/financeiro-intent-resolver";
 import { MENSAGEM_FORA_ESCOPO_FINANCEIRO } from "@/lib/ia/financeiro-intent-schema";
-import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
+import { extrairDadosServidorPublicoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { parseMoneyBR } from "@/lib/money";
 import { normalizarRespostaCompraImagem } from "@/lib/gasto-flow";
@@ -59,7 +59,6 @@ import { processarLeadVendas } from "@/lib/sales-bot";
 import { detectarComandoTarefa } from "@/lib/tarefa-flow";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import {
-  gerarRelatorio,
   gerarResumoMensal,
   gerarResumoSemana,
   gerarDespesasMes,
@@ -1923,66 +1922,38 @@ Pode mandar tudo em uma mensagem só.`;
       { role: "user", content: mensagem },
     ];
 
-    // ── Gera diagnóstico completo ────────────
+    // ── Diagnóstico/plano de quitação: aposentado ────────────
+    // Esse é o sistema antigo (gerar um "plano de quitação" automático a
+    // partir de um diagnóstico da IA) — decisão de produto tomada em chat:
+    // o QuitaZAP Controle deixou de ser gerador de plano e virou app de
+    // controle de entrada/saída. Não apaga os dados já existentes
+    // (Divida/PlanoEnviado antigos continuam visíveis no painel admin,
+    // ex. histórico de planos) nem o código de diagnóstico/relatório em
+    // src/lib/plano.ts e diagnostico-normalizer.ts (só ficou sem uso a
+    // partir daqui, mas segue coberto por teste de regressão) — só para
+    // de criar `Divida`/`PlanoEnviado` novos e de mandar o relatório de
+    // plano pro cliente a partir de agora. Reencaminha pro fluxo normal
+    // de conversa do Controle em vez disso.
     if (resultado.diagnostico) {
-      const diag = normalizarDiagnosticoManual(
-        resultado.diagnostico,
-        historicoAtualizado.filter((h) => h.role === "user").map((h) => h.content)
-      );
-      const relatorio = gerarRelatorio(diag);
-      const isServidor = (diag.dadosPessoais?.vinculo ?? "").toUpperCase().includes("SERVIDOR_PUBLICO");
-      const rendaTotal = isServidor
-        ? diag.renda?.salarioLiquido ?? diag.renda?.totalFamiliar ?? 0
-        : diag.renda?.totalFamiliar ?? diag.renda?.salarioLiquido ?? 0;
+      const respostaRedirecionamento =
+        "Entendi as informações que você passou! 👍\n\n" +
+        "Aqui no QuitaZAP você pode ir me contando suas dívidas e gastos aos poucos, naturalmente — por exemplo:\n\n" +
+        "_\"devo 500 pro Nubank\"_\n" +
+        "_\"gastei 50 no mercado\"_\n" +
+        "_\"lembrete: pagar a luz dia 10, R$150\"_\n\n" +
+        "Vou guardando tudo e você acompanha o resumo na sua Minha Conta.";
 
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
         data: {
-          etapa: "PLANO_GERADO",
-          renda: rendaTotal,
           dividasTemp: JSON.stringify([
             ...historicoAtualizado,
-            { role: "assistant", content: relatorio },
+            { role: "assistant", content: respostaRedirecionamento },
           ]),
         },
       });
 
-      if (sessao.clienteId) {
-        await prisma.cliente.update({
-          where: { id: sessao.clienteId },
-          data: { rendaMensal: rendaTotal, statusAtendimento: "PLANO_GERADO" },
-        });
-
-        for (const d of diag.dividas ?? []) {
-          await prisma.divida.create({
-            data: {
-              clienteId: sessao.clienteId,
-              credor: d.credor,
-              valorTotal: d.saldoAtual ?? d.valorOriginal ?? 0,
-              tipo: d.tipo ?? "OUTRO",
-              status: "ATIVA",
-              diaVencimento: d.diaVencimento ?? null,
-              emAtraso: d.emAtraso ?? false,
-              diasAtraso: d.diasAtraso ?? null,
-              obs: `${d.parcelasRestantes}x de R$${d.valorParcela} — via bot QuitaZAP`,
-            },
-          });
-        }
-
-        await prisma.planoEnviado.create({
-          data: { clienteId: sessao.clienteId, texto: relatorio },
-        });
-      }
-
-      if (relatorio.length > 3800) {
-        const partes = dividirMensagem(relatorio, 3800);
-        for (const parte of partes) {
-          await sendWhatsApp(telefone, parte);
-          await new Promise((r) => setTimeout(r, 1200));
-        }
-      } else {
-        await sendWhatsApp(telefone, relatorio);
-      }
+      await sendWhatsApp(telefone, respostaRedirecionamento);
 
       return NextResponse.json({ ok: true });
     }

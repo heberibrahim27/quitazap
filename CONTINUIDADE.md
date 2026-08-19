@@ -237,3 +237,19 @@ Combinado com o usuário: terminar o que falta de funcionalidade primeiro, redes
 - Paleta com gradiente (roxo/laranja/azul), nada de "cara de template genérico" — **explicitamente pediu pra não parecer feito por IA**.
 
 Aplicar essa linguagem visual tanto no painel do cliente (`/minha-conta`) quanto no painel admin, com variação de paleta pra diferenciar os dois — mas os dois compartilhando os mesmos componentes-base (ver seção "Duplicação com /minha-conta" do mapeamento do painel admin: cartão, badge de status, tabela, empty state já se repetem nos dois sem reaproveitamento).
+
+## 11. Achado do painel admin: rotas de parcela sem link (pra resolver no redesign)
+
+Ao limpar a duplicidade de "nova parcela" (2 rotas fazendo a mesma coisa, removida a mais fraca — ver commit), descobri que **nenhuma rota de parcela tem link em lugar nenhum do painel hoje**: `/clientes/[id]/divida/[dividaId]/parcela/nova`, `/clientes/[id]/divida/[dividaId]/parcelar` e `/clientes/[id]/parcela/[parcelaId]/editar` só funcionam se alguém digitar o endereço direto — nem a ficha do cliente (`/clientes/[id]`) nem a tela da dívida linkam pra elas. Não mexi nisso agora (é navegação/UX, não um bug funcional) — fica documentado pra resolver no redesign, quando essas telas serão reconstruídas de qualquer forma (é a hora natural de decidir onde esses links devem aparecer).
+
+## 12. Sistema antigo de "plano de quitação" — aposentado
+
+Decisão combinada com o usuário: o QuitaZAP deixou de ser "gerador de plano de quitação automático via IA" e virou o app de controle de entrada/saída (Controle). O motivo: o plano antigo dependia de a IA "improvisar" cálculos a partir de um diagnóstico de texto livre, sem dados relacionais confiáveis por trás — hoje já existe uma base de dados limpa (`Lancamento`/`Cartao`) que um gerador de plano de verdade poderia usar no futuro.
+
+O que mudou em `src/app/api/webhook/zapi/route.ts`: quando `processarMensagemIA()` (que também serve como fallback de conversa geral com a IA) monta um `diagnostico`, o webhook **não cria mais** `Divida` em lote nem `PlanoEnviado`, e não manda mais o relatório de plano em várias partes. Em vez disso, manda uma mensagem redirecionando o cliente pro jeito de usar do Controle ("vai me contando as dívidas e gastos aos poucos, tipo *devo 500 pro Nubank*...").
+
+O que **não** foi apagado (de propósito):
+- Os dados antigos (`Divida`/`PlanoEnviado` já existentes) continuam no banco e visíveis no painel admin (ex. histórico de planos de cada cliente).
+- O código de geração de relatório/diagnóstico (`gerarRelatorio`, `gerarMensagemPlano` em `src/lib/plano.ts`; `normalizarDiagnosticoManual` em `src/lib/diagnostico-normalizer.ts`) — ficou sem nenhum caminho de produção chamando, mas segue coberto por `tests/regressao-servidor-publico.test.mjs`. Não removi porque pode servir de referência pra uma versão nova, melhor, desse gerador de plano — no futuro, como uma funcionalidade separada e bem definida, usando os dados de `Lancamento`/`Divida` que já são confiáveis (ideia do usuário: "depois podemos estudar uma skill para fazer esse plano de quitação").
+
+Próximo passo (não iniciado, futuro): desenhar esse novo gerador de plano do zero, como recurso separado, só depois que a base do Controle estiver madura.
