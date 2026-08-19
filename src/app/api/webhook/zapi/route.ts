@@ -4,7 +4,7 @@
 // Suporta: texto, áudio (Whisper), imagem (GPT-4o Vision) e PDF (pdf-parse)
 // ─────────────────────────────────────────
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone, variacoesTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
@@ -1122,7 +1122,7 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
-      await persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle);
+      after(() => persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle));
 
       return NextResponse.json({ ok: true });
     }
@@ -1182,7 +1182,7 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
-      await persistirCartaoControle(sessao.clienteId, configuracaoCartao.cartaoParaPersistir);
+      after(() => persistirCartaoControle(sessao.clienteId, configuracaoCartao.cartaoParaPersistir));
 
       return NextResponse.json({ ok: true });
     }
@@ -1475,7 +1475,7 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
-      await persistirLancamentosControle(sessao.clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle);
+      after(() => persistirLancamentosControle(sessao.clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle));
 
       return NextResponse.json({ ok: true });
     }

@@ -86,6 +86,10 @@ export type ItemParaPersistirControle = {
   valor: number;
   recorrente: boolean;
   cartaoNome?: string | null;
+  // Só o caminho rápido (registrarGastoControle) resolve uma data própria
+  // (hoje, "ontem", data explícita — via gasto-flow.ts). O caminho da IA não
+  // carrega data no item interpretado; quem persistir usa "agora" nesse caso.
+  data?: Date;
 };
 
 export type CartaoParaPersistirControle = {
@@ -875,7 +879,11 @@ export function salvarItensConfirmadosIA(
       categoria: item.categoria,
       valor: item.valor,
       recorrente: false,
-      cartaoNome: item.cartao,
+      // A IA extrai o nome do cartão em texto livre — canoniza pelo mesmo
+      // catálogo usado em configurarCartaoControle/detectarCartao quando
+      // reconhece (evita duas linhas de Cartao pro mesmo cartão físico);
+      // fora do catálogo, mantém o texto original em vez de descartar.
+      cartaoNome: (item.cartao && normalizarNomeCartaoControle(item.cartao)) || item.cartao,
     })),
     ...resultadoFixas.adicionados.map((item) => ({
       tipo: "DESPESA_FIXA" as const,
@@ -1095,6 +1103,12 @@ function processarConfirmacaoPendenteDespesaFixa(
       estado,
       atualizouEstado: true,
       etapa: "AGUARDANDO_GASTOS",
+      itensParaPersistir: resultadoAdicao.adicionados.map((item) => ({
+        tipo: "DESPESA_FIXA" as const,
+        descricao: item.descricao,
+        valor: item.valor,
+        recorrente: true,
+      })),
     };
   }
 
@@ -2236,6 +2250,7 @@ export function registrarGastoControle(
         valor: gasto.valor,
         recorrente: false,
         cartaoNome: cartao,
+        data: gasto.data,
       },
     ],
   };

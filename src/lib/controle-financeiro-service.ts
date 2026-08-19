@@ -41,7 +41,7 @@ export async function persistirLancamentosControle(
           descricao: item.descricao,
           categoria: item.categoria ?? null,
           valor: item.valor,
-          data: new Date(),
+          data: item.data ?? new Date(),
           recorrente: item.recorrente,
           cartaoId,
           origem,

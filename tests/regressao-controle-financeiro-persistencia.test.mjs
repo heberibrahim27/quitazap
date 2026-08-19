@@ -89,6 +89,15 @@ test("registrarGastoControle: gasto no cartão vira item COMPRA_CARTAO com o nom
   assert.equal(item.cartaoNome, "Nubank");
 });
 
+test("registrarGastoControle: usa a data resolvida do gasto (ex: 'ontem'), não a data da confirmação", () => {
+  const agora = new Date("2026-08-19T12:00:00Z");
+  const resultado = registrarGastoControle("gastei 50 no mercado ontem", estadoBase(), agora);
+  assert.ok(resultado);
+  const item = resultado.itensParaPersistir[0];
+  assert.ok(item.data instanceof Date);
+  assert.equal(item.data.getUTCDate(), 18);
+});
+
 test("registrarGastoControle: mensagem sem valor não gera item pra persistir", () => {
   const resultado = registrarGastoControle("gastei no mercado", estadoBase());
   if (resultado) {
@@ -125,6 +134,17 @@ test("gerenciarDespesasFixasControle: despesa fixa única direta vira item DESPE
   assert.equal(item.recorrente, true);
 });
 
+test("gerenciarDespesasFixasControle: confirma lote em frase corrida ('sim') e gera itensParaPersistir", () => {
+  const pedido = gerenciarDespesasFixasControle("cadastrar despesa fixa: internet 100 reais e transporte 50 reais", estadoBase());
+  assert.ok(pedido);
+  assert.equal(pedido.estado.confirmacaoPendente?.tipo, "cadastrar_despesas_fixas");
+
+  const confirmacao = gerenciarDespesasFixasControle("sim", pedido.estado);
+  assert.ok(confirmacao);
+  assert.equal(confirmacao.itensParaPersistir.length, 2);
+  assert.ok(confirmacao.itensParaPersistir.every((item) => item.tipo === "DESPESA_FIXA" && item.recorrente === true));
+});
+
 // ── salvarItensConfirmadosIA (confirmação do lote interpretado pela IA) ──
 
 test("salvarItensConfirmadosIA: confirma receita + despesa variável no saldo + compra no cartão + despesa fixa", () => {
@@ -149,6 +169,30 @@ test("salvarItensConfirmadosIA: confirma receita + despesa variável no saldo + 
   assert.equal(porTipo.COMPRA_CARTAO.cartaoNome, "Nubank");
   assert.equal(porTipo.DESPESA_FIXA.valor, 900);
   assert.equal(porTipo.DESPESA_FIXA.recorrente, true);
+});
+
+test("salvarItensConfirmadosIA: nome de cartão em texto livre é padronizado pelo catálogo conhecido", () => {
+  const intent = {
+    itens: [
+      { tipo: "despesa_variavel", descricaoOriginal: "tenis", descricaoNormalizada: "Tênis", categoria: "Vestuário", valor: 300, origem: "cartao", cartao: "meu nubank roxo" },
+    ],
+  };
+
+  const resultado = salvarItensConfirmadosIA(estadoBase(), intent);
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir[0].cartaoNome, "Nubank");
+});
+
+test("salvarItensConfirmadosIA: cartão fora do catálogo mantém o texto original em vez de descartar", () => {
+  const intent = {
+    itens: [
+      { tipo: "despesa_variavel", descricaoOriginal: "tenis", descricaoNormalizada: "Tênis", categoria: "Vestuário", valor: 300, origem: "cartao", cartao: "Cartão da Loja X" },
+    ],
+  };
+
+  const resultado = salvarItensConfirmadosIA(estadoBase(), intent);
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir[0].cartaoNome, "Cartão da Loja X");
 });
 
 test("salvarItensConfirmadosIA: item inválido (sem valor) não gera itensParaPersistir", () => {
