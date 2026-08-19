@@ -6,6 +6,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { criarToken } from "@/lib/auth-jwt";
 import { compareSync } from "bcryptjs";
+import { timingSafeEqual } from "crypto";
+
+function senhaConfere(digitada: string, correta: string): boolean {
+  const a = Buffer.from(digitada);
+  const b = Buffer.from(correta);
+  // Comparação com tempo constante — mesmo padrão já usado em
+  // src/lib/cliente-auth.ts. Sem isso, alguém enviando muitas tentativas de
+  // login poderia, em teoria, inferir a senha certa medindo quanto tempo o
+  // "!==" leva pra cada tentativa (achado do levantamento técnico).
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 const COOKIE_NAME  = "qz_auth";
 const COOKIE_TOKEN = "qz_autenticado";
@@ -17,9 +28,17 @@ export async function POST(req: NextRequest) {
   if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
     const form  = await req.formData();
     const senha = String(form.get("senha") || "");
-    const correta = process.env.APP_SENHA || "quitazap2024";
+    const correta = process.env.APP_SENHA;
 
-    if (senha !== correta) {
+    // Sem fallback pra senha pública: se APP_SENHA não estiver configurada,
+    // o login fica bloqueado (em vez de aceitar uma senha previsível
+    // conhecida por qualquer um que leia o código-fonte).
+    if (!correta) {
+      console.error("[LOGIN ADMIN] APP_SENHA não configurada — login bloqueado até configurar.");
+      return NextResponse.redirect(new URL("/login?erro=1", req.url), 303);
+    }
+
+    if (!senhaConfere(senha, correta)) {
       return NextResponse.redirect(new URL("/login?erro=1", req.url), 303);
     }
 
