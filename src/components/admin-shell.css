@@ -210,7 +210,7 @@
 .qa-content {
   flex: 1;
   min-width: 0;
-  padding: 32px 40px 56px;
+  padding: 40px 48px 64px;
   position: relative;
   z-index: 1;
 }
@@ -221,13 +221,13 @@
   align-items: flex-start;
   gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 28px;
+  margin-bottom: 34px;
 }
 
 .qa-page-title {
   margin: 0;
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 27px;
+  font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--qa-ink);
 }
@@ -243,16 +243,16 @@
 .qa-stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 20px;
+  margin-bottom: 28px;
 }
 
 .qa-card {
   background: var(--qa-glass);
   border: 1px solid var(--qa-line);
   border-top-color: var(--qa-line-top);
-  border-radius: 20px;
-  padding: 22px;
+  border-radius: 22px;
+  padding: 26px;
   transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.35s, border-color 0.35s;
 }
 
@@ -266,8 +266,8 @@
   background: var(--qa-glass);
   border: 1px solid var(--qa-line);
   border-top-color: var(--qa-line-top);
-  border-radius: 20px;
-  padding: 22px;
+  border-radius: 22px;
+  padding: 26px;
   position: relative;
   overflow: hidden;
   transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.35s;
@@ -278,29 +278,31 @@
   background: var(--qa-glass-strong);
 }
 
+/* Rótulo discreto: cor entra só quando é mesmo um sinal (positivo/negativo/
+   alerta), não em cada rótulo — banco premium usa cor com parcimônia. */
 .qa-stat-label {
   margin: 0;
-  font-size: 11.5px;
-  color: var(--qa-gray-400);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  color: var(--qa-gray-500);
+  font-weight: 500;
+  letter-spacing: 0.01em;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .qa-stat-value {
-  margin: 10px 0 0;
-  font-size: 30px;
+  margin: 12px 0 0;
+  font-size: 36px;
   font-weight: 300;
   letter-spacing: -0.03em;
   color: var(--qa-ink);
+  line-height: 1.1;
 }
 
 .qa-stat-caption {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 6px 0 0;
+  font-size: 12.5px;
   color: var(--qa-gray-500);
 }
 
@@ -309,12 +311,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
   border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .qa-badge-emerald { background: rgba(16, 185, 129, 0.12); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.25); }
@@ -322,19 +322,19 @@
 .qa-badge-red     { background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.25); }
 .qa-badge-blue    { background: var(--qa-blue-soft); color: #7dc4ff; border: 1px solid rgba(0, 123, 255, 0.3); }
 
-/* ── Buttons (hover inverte cor, não só escurece) ─ */
+/* ── Buttons (hover inverte cor, não só escurece) ─
+   Caixa normal, sem letter-spacing largo — texto em CAIXA ALTA com
+   tracking lembra banner de site de venda, não app de banco sério. */
 .qa-btn-primary,
 .qa-btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px 18px;
+  padding: 12px 20px;
   border-radius: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   border: none;
