@@ -37,6 +37,7 @@ import { MENSAGEM_FORA_ESCOPO_FINANCEIRO } from "@/lib/ia/financeiro-intent-sche
 import { extrairDadosServidorPublicoManual, normalizarDiagnosticoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { parseMoneyBR } from "@/lib/money";
+import { normalizarRespostaCompraImagem } from "@/lib/gasto-flow";
 import {
   deveAguardarDespesasFixasControle,
   ETAPA_AGUARDANDO_DESPESAS_FIXAS,
@@ -132,6 +133,16 @@ async function analisarImagem(imageUrl: string): Promise<string> {
               text: `Analise esta imagem financeira. Pode ser:
 - Boleto, fatura de cartão, extrato bancário, comprovante de empréstimo, carnê
 - Contracheque, holerite, comprovante de salário ou folha de pagamento
+- Recibo, nota fiscal ou cupom de uma COMPRA do dia a dia (mercado, farmácia, restaurante, loja, posto de gasolina, etc.)
+
+Se for RECIBO, NOTA FISCAL ou CUPOM DE COMPRA (não é boleto, fatura, contracheque nem holerite — não tem valor de parcela mensal, vencimento futuro, nem é sobre salário/desconto em folha), extraia:
+- Nome do estabelecimento (loja, mercado, restaurante etc.)
+- Valor total pago
+
+Responda EXATAMENTE nesse formato, numa frase só, sem mais nada — não inclua CNPJ, data, hora, número do pedido/cupom nem qualquer outro número além do valor total:
+Comprei em [nome do estabelecimento], R$ [valor total]
+
+Exemplo: Comprei em Mercado Extra, R$ 85,30
 
 Se for CONTRACHEQUE ou HOLERITE, extraia:
 - Nome do órgão ou empresa pagadora
@@ -826,11 +837,11 @@ export async function POST(req: NextRequest) {
         console.log(`[Z-API] Imagem analisada: "${analise}"`);
 
         if (!analise || analise.includes("[NAO_FINANCEIRA]")) {
-          await sendWhatsApp(sessao.telefone, "Não identifiquei informações financeiras nessa imagem. Pode me descrever a dívida em texto?");
+          await sendWhatsApp(sessao.telefone, "Não identifiquei informações financeiras nessa imagem. Pode me descrever em texto (dívida, gasto, compra...)?");
           return NextResponse.json({ ok: true });
         }
 
-        mensagem = analise;
+        mensagem = normalizarRespostaCompraImagem(analise);
       } catch (err) {
         console.error("[Z-API] Erro ao analisar imagem:", err);
         await sendWhatsApp(sessao.telefone, "Não consegui ler essa imagem. Pode digitar as informações?");

@@ -282,6 +282,34 @@ export function definirDataGasto(mensagem: string, agora = new Date()): Date {
   return base;
 }
 
+// Recibo de compra (foto) tem CNPJ, data, número de pedido etc. — números "a
+// mais" que a IA de visão pode incluir na resposta mesmo pedindo pra não
+// incluir. processarFluxoGasto (via deveBloquearGastoUnicoPorMultiplosValores)
+// descarta o lançamento inteiro, sem avisar o cliente, se ver mais de um
+// valor solto na frase — então garante aqui, no código, que só sobra "loja" +
+// "valor" antes de repassar adiante, em vez de confiar só na instrução do
+// prompt de visão computacional.
+export function normalizarRespostaCompraImagem(texto: string): string {
+  // Valor: só dígitos/./,  que realmente formam um valor (evita pegar um "."
+  // de fim de frase — "R$ 85,30." virando "85,30." e sendo lido como 8530).
+  const match = texto.match(
+    /compr(?:ei|a)\s+em\s+(.+?)[,:-]?\s*r\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}|\d+)/i
+  );
+  if (!match) return texto;
+
+  // Nome do estabelecimento pode ter número (ex: "Posto Ipiranga 24 Horas") —
+  // isso sozinho já derrubaria o lançamento inteiro mais adiante (mais de um
+  // valor solto na frase), então tira dígitos do nome, só o valor pode ficar.
+  const loja = match[1]
+    .replace(/\d+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/[,:-]+$/, "");
+  if (!loja) return texto;
+
+  return `Comprei em ${loja}, R$ ${match[2]}`;
+}
+
 export function formatarValorBR(valor: number): string {
   if (!Number.isFinite(valor)) return "R$ 0,00";
   return valor

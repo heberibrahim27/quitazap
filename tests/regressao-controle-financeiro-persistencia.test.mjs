@@ -52,6 +52,8 @@ const {
   gerenciarDespesasFixasControle,
 } = loadTsModule("src/lib/controle-financeiro-flow.ts");
 
+const { normalizarRespostaCompraImagem } = loadTsModule("src/lib/gasto-flow.ts");
+
 function estadoBase(overrides = {}) {
   return {
     rendaMensal: 3000,
@@ -103,6 +105,83 @@ test("registrarGastoControle: mensagem sem valor não gera item pra persistir", 
   if (resultado) {
     assert.equal(resultado.itensParaPersistir, undefined);
   }
+});
+
+// ── normalizarRespostaCompraImagem (Fase 3) ─────────────────────────────
+
+test("normalizarRespostaCompraImagem: mantém o formato quando a IA responde certinho", () => {
+  const texto = normalizarRespostaCompraImagem("Comprei em Mercado Extra, R$ 85,30");
+  assert.equal(texto, "Comprei em Mercado Extra, R$ 85,30");
+});
+
+test("normalizarRespostaCompraImagem: descarta CNPJ/data/outros números que a IA incluir a mais", () => {
+  const texto = normalizarRespostaCompraImagem(
+    "Comprei em Mercado Extra, R$ 85,30 (CNPJ 12.345.678/0001-90, 19/08/2026, pedido 4521)"
+  );
+  assert.equal(texto, "Comprei em Mercado Extra, R$ 85,30");
+});
+
+test("normalizarRespostaCompraImagem: não deixa ponto final grudar no valor (senão vira 8530 em vez de 85,30)", () => {
+  const texto = normalizarRespostaCompraImagem("Comprei em Mercado Extra, R$ 85,30.");
+  assert.equal(texto, "Comprei em Mercado Extra, R$ 85,30");
+});
+
+test("normalizarRespostaCompraImagem: tira número de dentro do nome da loja (ex: 'Posto Ipiranga 24 Horas')", () => {
+  const texto = normalizarRespostaCompraImagem("Comprei em Posto Ipiranga 24 Horas, R$ 85,30");
+  assert.equal(texto, "Comprei em Posto Ipiranga Horas, R$ 85,30");
+});
+
+test("normalizarRespostaCompraImagem: não mexe em textos de boleto/contracheque (formato diferente)", () => {
+  const texto = normalizarRespostaCompraImagem("Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150.");
+  assert.equal(texto, "Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150.");
+});
+
+// ── Fase 3: formato de texto que o reconhecimento de foto de compra usa ──
+// analisarImagem (route.ts) devolve "Comprei em [loja], R$ [valor]" pra
+// recibo/nota fiscal — confirma que esse texto passa pelo mesmo pipeline
+// já testado acima de texto/áudio, sem precisar de nenhum código novo.
+
+test("registrarGastoControle: reconhece o formato usado pela leitura de foto de compra", () => {
+  const resultado = registrarGastoControle("Comprei em Mercado Extra, R$ 85,30", estadoBase());
+  assert.ok(resultado);
+  const item = resultado.itensParaPersistir[0];
+  assert.equal(item.tipo, "DESPESA_VARIAVEL");
+  assert.equal(item.valor, 85.3);
+  assert.equal(item.categoria, "Mercado");
+});
+
+test("registrarGastoControle: resposta 'suja' da IA (CNPJ/data) só funciona depois de normalizada", () => {
+  const textoSujo = "Comprei em Mercado Extra, R$ 85,30 (CNPJ 12.345.678/0001-90, 19/08/2026, pedido 4521)";
+
+  // Sem normalizar, o excesso de números soltos derruba o lançamento (null).
+  assert.equal(registrarGastoControle(textoSujo, estadoBase()), null);
+
+  // Normalizando primeiro (como o route.ts agora faz), funciona normalmente.
+  const textoLimpo = normalizarRespostaCompraImagem(textoSujo);
+  const resultado = registrarGastoControle(textoLimpo, estadoBase());
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir[0].valor, 85.3);
+});
+
+test("registrarGastoControle: nome de loja com número (ex: posto 24 horas) só funciona depois de normalizado", () => {
+  const textoSujo = "Comprei em Posto Ipiranga 24 Horas, R$ 85,30";
+
+  // Sem normalizar, o "24" solto também derruba o lançamento (null).
+  assert.equal(registrarGastoControle(textoSujo, estadoBase()), null);
+
+  const textoLimpo = normalizarRespostaCompraImagem(textoSujo);
+  const resultado = registrarGastoControle(textoLimpo, estadoBase());
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir[0].valor, 85.3);
+});
+
+test("registrarGastoControle: compra em loja sem categoria conhecida cai em 'Outros'", () => {
+  const resultado = registrarGastoControle("Comprei em Loja do Zé, R$ 42,00", estadoBase());
+  assert.ok(resultado);
+  const item = resultado.itensParaPersistir[0];
+  assert.equal(item.tipo, "DESPESA_VARIAVEL");
+  assert.equal(item.valor, 42);
+  assert.equal(item.categoria, "Outros");
 });
 
 // ── configurarCartaoControle ────────────────────────────────────────────
