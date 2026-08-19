@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
@@ -23,10 +24,14 @@ const ICONE_TIPO_LANCAMENTO: Record<string, string> = {
   COMPRA_CARTAO: "💳",
 };
 
-// Início/fim do mês corrente em horário de Brasília (fixo UTC-3, sem
-// horário de verão desde 2019) — mesma convenção já usada no cron de
-// tarefas, pra "mês atual" bater com o calendário que o cliente vê.
-function limitesDoMesAtualBrasil(agora: Date) {
+const NOMES_MES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+// Ano/mês corrente em horário de Brasília (fixo UTC-3, sem horário de
+// verão desde 2019) — mesma convenção já usada no cron de tarefas.
+function anoMesAtualBrasil(agora: Date): { ano: number; mes: number } {
   const [ano, mes] = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -35,10 +40,20 @@ function limitesDoMesAtualBrasil(agora: Date) {
     .format(agora)
     .split("-")
     .map(Number);
+  return { ano, mes };
+}
 
+// Início/fim de um mês (meia-noite de Brasília do dia 1 até meia-noite de
+// Brasília do dia 1 do mês seguinte) — mesma âncora usada em todo o app
+// pra "dia X em Brasília" não virar o dia errado em UTC.
+function limitesDoMes(ano: number, mes: number) {
   const inicio = new Date(Date.UTC(ano, mes - 1, 1, 3, 0, 0, 0));
   const fim = new Date(Date.UTC(mes === 12 ? ano + 1 : ano, mes === 12 ? 0 : mes, 1, 3, 0, 0, 0));
   return { inicio, fim };
+}
+
+function paramMes(ano: number, mes: number): string {
+  return `${ano}-${String(mes).padStart(2, "0")}`;
 }
 
 const cardStyle: React.CSSProperties = {
@@ -46,11 +61,38 @@ const cardStyle: React.CSSProperties = {
 };
 const tituloStyle: React.CSSProperties = { fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "0 0 14px" };
 
-export default async function MinhaContaPage() {
+export default async function MinhaContaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string | string[] }>;
+}) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
-  const { inicio: inicioMes, fim: fimMes } = limitesDoMesAtualBrasil(new Date());
+  const { mes: mesParamBruto } = await searchParams;
+  // Next.js entrega string[] se a query tiver "?mes=" repetido — usa só o
+  // primeiro valor nesse caso, em vez de deixar o .match() quebrar a página.
+  const mesParam = Array.isArray(mesParamBruto) ? mesParamBruto[0] : mesParamBruto;
+  const { ano: anoAtual, mes: mesAtualNum } = anoMesAtualBrasil(new Date());
+
+  let ano = anoAtual;
+  let mes = mesAtualNum;
+  const match = mesParam?.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    const anoInformado = Number(match[1]);
+    const mesInformado = Number(match[2]);
+    // Ano mínimo 2000: evita o comportamento legado do JS Date, que trata
+    // ano de 0 a 99 como 1900+ano (ex: Date.UTC(2, ...) vira o ano 1902).
+    if (anoInformado >= 2000 && anoInformado <= 2100 && mesInformado >= 1 && mesInformado <= 12) {
+      ano = anoInformado;
+      mes = mesInformado;
+    }
+  }
+
+  const { inicio: inicioMes, fim: fimMes } = limitesDoMes(ano, mes);
+  const ehMesAtual = ano === anoAtual && mes === mesAtualNum;
+  const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
+  const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 
   const [dividas, pagamentos, tarefasPendentes, lancamentosDoMes, cartoes, ultimosLancamentos] = await Promise.all([
     prisma.divida.findMany({
@@ -122,11 +164,13 @@ export default async function MinhaContaPage() {
           <div style={{ fontSize: 22, fontWeight: 800, color: "#dc2626", marginTop: 6 }}>{fmtValor(totalDividas)}</div>
         </div>
         <div style={{ ...cardStyle, marginBottom: 0 }}>
-          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Entradas − saídas do mês</div>
+          <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+            Entradas − saídas {ehMesAtual ? "do mês" : `— ${NOMES_MES[mes - 1]}/${ano}`}
+          </div>
           <div style={{ fontSize: 22, fontWeight: 800, color: resultadoMes >= 0 ? "#16a34a" : "#dc2626", marginTop: 6 }}>
             {fmtValor(resultadoMes)}
           </div>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>já conta compras no cartão deste mês</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>já conta compras no cartão do mês</div>
         </div>
         <div style={{ ...cardStyle, marginBottom: 0 }}>
           <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Tarefas pendentes</div>
@@ -135,9 +179,27 @@ export default async function MinhaContaPage() {
       </div>
 
       <div style={cardStyle}>
-        <h2 style={tituloStyle}>📊 Resumo do mês</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
+          <h2 style={{ ...tituloStyle, margin: 0 }}>📊 Resumo — {NOMES_MES[mes - 1]}/{ano}</h2>
+          <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
+            <Link
+              href={`/minha-conta?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+              style={{ color: "#0f172a", fontWeight: 700, textDecoration: "none", padding: "4px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+            >
+              ← {NOMES_MES[mesAnterior.mes - 1].slice(0, 3)}
+            </Link>
+            {!ehMesAtual && (
+              <Link
+                href={`/minha-conta?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+                style={{ color: "#0f172a", fontWeight: 700, textDecoration: "none", padding: "4px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+              >
+                {NOMES_MES[mesSeguinte.mes - 1].slice(0, 3)} →
+              </Link>
+            )}
+          </div>
+        </div>
         {lancamentosDoMes.length === 0 ? (
-          <p style={{ color: "#94a3b8", fontSize: 14 }}>Nenhum gasto ou receita registrado neste mês ainda.</p>
+          <p style={{ color: "#94a3b8", fontSize: 14 }}>Nenhum gasto ou receita registrado em {NOMES_MES[mes - 1]}/{ano}.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[
@@ -159,7 +221,7 @@ export default async function MinhaContaPage() {
 
       {cartoes.length > 0 && (
         <div style={cardStyle}>
-          <h2 style={tituloStyle}>💳 Cartões</h2>
+          <h2 style={tituloStyle}>💳 Cartões — {NOMES_MES[mes - 1]}/{ano}</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {cartoes.map((c) => (
               <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", paddingBottom: 10 }}>
@@ -173,7 +235,6 @@ export default async function MinhaContaPage() {
                 </div>
                 <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
                   {fmtValor(gastoCartaoMes.get(c.nome) ?? 0)}
-                  <span style={{ fontWeight: 400, color: "#94a3b8" }}> este mês</span>
                 </div>
               </div>
             ))}
