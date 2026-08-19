@@ -213,3 +213,5 @@ Pedido em chat: o cliente do Controle não tinha nenhuma tela própria pra ver o
 - **Fase 3**: comprovante de compra por foto (extrair "compra" de imagem de recibo, hoje `analisarImagem` só reconhece boleto/fatura/contracheque) e reativar a leitura de contracheque pra virar `Divida` automaticamente.
 - Confirmar `NEXTAUTH_SECRET` configurado na Vercel (ver acima).
 - Fazer deploy da branch pra esse login/dashboard existir de verdade em produção — está tudo só na branch ainda.
+
+<!-- teste de deploy: commit real com alteracao de arquivo -->
