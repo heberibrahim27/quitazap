@@ -30,7 +30,8 @@ function esperar(ms: number): Promise<void> {
 export async function persistirLancamentosControle(
   clienteId: string | null | undefined,
   itens: ItemParaPersistirControle[] | undefined,
-  origem: OrigemLancamentoControle
+  origem: OrigemLancamentoControle,
+  comprovanteUrl?: string
 ): Promise<void> {
   if (!clienteId || !itens || itens.length === 0) return;
 
@@ -52,6 +53,7 @@ export async function persistirLancamentosControle(
           recorrente: item.recorrente,
           cartaoId,
           origem,
+          comprovanteUrl: comprovanteUrl ?? null,
         },
       });
     }

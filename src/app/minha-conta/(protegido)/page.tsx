@@ -255,6 +255,17 @@ export default async function MinhaContaPage({
                 <div>
                   <div style={{ fontSize: 14, color: "#0f172a" }}>
                     {ICONE_TIPO_LANCAMENTO[l.tipo] ?? "•"} {l.descricao}
+                    {l.comprovanteUrl && (
+                      <a
+                        href={l.comprovanteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ver comprovante"
+                        style={{ marginLeft: 6, textDecoration: "none" }}
+                      >
+                        📎
+                      </a>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>
                     {ROTULO_TIPO_LANCAMENTO[l.tipo] ?? l.tipo}

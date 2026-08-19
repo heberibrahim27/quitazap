@@ -752,6 +752,22 @@ export async function POST(req: NextRequest) {
     const origemLancamentoControle: OrigemLancamentoControle =
       tipoEntrada === "audio" ? "AUDIO" : tipoEntrada === "imagem" ? "FOTO" : "TEXTO";
 
+    // URL da própria imagem enviada no WhatsApp/Z-API, salva junto do
+    // Lancamento como comprovante visual quando o gasto veio de foto.
+    // 2 limitações aceitas:
+    // 1. É a URL original da Z-API, não uma cópia hospedada por nós — se ela
+    //    expirar (a Z-API não garante que fica acessível pra sempre), o
+    //    comprovante para de abrir. Resolver direito exigiria subir a
+    //    imagem pra um storage próprio (ex: Supabase Storage), com
+    //    credencial nova (service role key) que não temos configurada.
+    // 2. Só cobre o caminho em que o gasto é reconhecido na mesma mensagem
+    //    da foto (o caso comum). Se a foto virar uma pergunta de confirmação
+    //    ("cadastrar essas despesas?") respondida numa mensagem de texto
+    //    separada, o comprovante se perde — a URL não é carregada dentro do
+    //    confirmacaoPendente do JSON da conversa.
+    const comprovanteUrlImagem: string | undefined =
+      tipoEntrada === "imagem" ? body.image?.imageUrl : undefined;
+
     if (!mensagem && tipoEntrada === "texto") return NextResponse.json({ ok: true });
 
     const rawPhone = body.phone ?? "";
@@ -1134,7 +1150,7 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
-      after(() => persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle));
+      after(() => persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
 
       return NextResponse.json({ ok: true });
     }
@@ -1497,7 +1513,7 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
-      after(() => persistirLancamentosControle(sessao.clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle));
+      after(() => persistirLancamentosControle(sessao.clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
 
       return NextResponse.json({ ok: true });
     }
