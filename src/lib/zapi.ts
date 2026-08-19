@@ -200,3 +200,19 @@ export function normalizarTelefone(phone: string): string {
   if (digits.startsWith("55") && digits.length >= 12) return digits;
   return "55" + digits;
 }
+
+/**
+ * Telefone normalizado + variação com/sem o "9" extra (números BR antigos
+ * migraram pra 9 dígitos, mas nem todo cadastro/webhook reflete isso). Mesma
+ * lógica já usada em src/app/api/webhook/zapi/route.ts, extraída aqui pra
+ * reuso em qualquer busca de Cliente por telefone.
+ */
+export function variacoesTelefone(telefoneNormalizado: string): string[] {
+  const alt =
+    telefoneNormalizado.length === 13
+      ? telefoneNormalizado.slice(0, 4) + telefoneNormalizado.slice(5)
+      : telefoneNormalizado.length === 12
+      ? telefoneNormalizado.slice(0, 4) + "9" + telefoneNormalizado.slice(4)
+      : null;
+  return alt ? [telefoneNormalizado, alt] : [telefoneNormalizado];
+}

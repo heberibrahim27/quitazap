@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone } from "@/lib/zapi";
+import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone, variacoesTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
 import {
   atualizarDespesasFixasControle,
@@ -737,14 +737,10 @@ export async function POST(req: NextRequest) {
     console.log(`[Z-API] phone raw="${rawPhone}" normalizado="${telefone}" tipo="${tipoEntrada}"`);
     if (telefone.length < 10) return NextResponse.json({ ok: true });
 
-    const telefoneAlt = telefone.length === 13
-      ? telefone.slice(0, 4) + telefone.slice(5)
-      : telefone.length === 12
-      ? telefone.slice(0, 4) + "9" + telefone.slice(4)
-      : null;
+    const variacoes = variacoesTelefone(telefone);
 
     const sessao = await prisma.botSessao.findFirst({
-      where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } }
+      where: { telefone: { in: variacoes } }
     });
 
     console.log(`[Z-API] sessao=${sessao ? `id=${sessao.id} etapa=${sessao.etapa}` : "null"}`);
@@ -752,7 +748,7 @@ export async function POST(req: NextRequest) {
     if (!sessao) {
       // Verifica se é cliente cadastrado (sem sessão de bot ativa)
       const clienteCadastrado = await prisma.cliente.findFirst({
-        where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } },
+        where: { telefone: { in: variacoes } },
         select: { id: true },
       });
 
@@ -766,11 +762,11 @@ export async function POST(req: NextRequest) {
         // Número desconhecido → funil de vendas
         // Busca lead existente para garantir que usamos o telefone no formato correto
         const leadExistente = await prisma.leadVendas.findFirst({
-          where: { telefone: { in: [telefone, ...(telefoneAlt ? [telefoneAlt] : [])] } },
+          where: { telefone: { in: variacoes } },
           select: { telefone: true },
         });
         const telefoneParaFunil = leadExistente?.telefone ?? telefone;
-        console.log(`[FUNIL] raw="${rawPhone}" norm="${telefone}" alt="${telefoneAlt}" leadExistente="${leadExistente?.telefone ?? "null"}" → usando="${telefoneParaFunil}"`);
+        console.log(`[FUNIL] raw="${rawPhone}" norm="${telefone}" alt="${variacoes[1] ?? "null"}" leadExistente="${leadExistente?.telefone ?? "null"}" → usando="${telefoneParaFunil}"`);
         await processarLeadVendas(telefoneParaFunil, mensagem);
       }
       return NextResponse.json({ ok: true });

@@ -178,3 +178,38 @@ lembrete: teste dia 10, R$10
 minhas tarefas
 concluí teste
 ```
+
+---
+
+## 9. Dashboard do cliente ("Minha Conta") — Fase 0 + Fase 1 mínima
+
+Pedido em chat: o cliente do Controle não tinha nenhuma tela própria pra ver o que registrou pelo WhatsApp (só existia o painel admin, de uso interno, e o painel `/cobrador`, que é só sobre quem deve pro cliente). Direção de produto também mudou: o QuitaZAP deixa de ser "gerador de plano de quitação" e passa a ser **app de controle de entrada/saída** — dívidas, compras, comprovantes, tudo filtrável por mês.
+
+### O que foi construído e já aplicado no banco real
+
+**Schema:**
+- `Divida.totalParcelas` (Int?) — quantidade de parcelas, exibido no dashboard.
+- `model Cartao` — nome, dia de fechamento, dia de vencimento, por cliente.
+- `model Lancamento` — unifica receita, despesa fixa, despesa variável e compra no cartão numa tabela só, com categoria e data (pro filtro por mês) — substitui o que hoje só existe dentro do JSON de `BotSessao.dividasTemp`. **Ainda não é escrita pelo webhook** (isso é a Fase 2, ver abaixo) — a tabela existe e está pronta, mas o motor de conversa ainda grava só no JSON como sempre gravou.
+- Migration aplicada direto no banco de produção nesta sessão (com autorização explícita seção por seção), RLS ligado nas tabelas novas.
+
+**Login do cliente ("Minha Conta"), sem senha:**
+- Pedido de acesso por WhatsApp — `POST /api/auth-cliente/solicitar` (telefone → cliente existe? manda link por WhatsApp; resposta sempre genérica pra não vazar quais números são cadastrados).
+- Link de acesso curto (15 min) → tela de confirmação em `/minha-conta/entrar?token=...` → clique explícito (POST, não GET) → `POST /api/auth-cliente/confirmar` → cookie de sessão `qz_cliente_auth` (30 dias).
+- `src/lib/cliente-auth.ts` — HMAC com tipo embutido na assinatura (token de sessão nunca é aceito como token de acesso, e vice-versa); **sem segredo de fallback** — se `NEXTAUTH_SECRET`/`CRON_SECRET` não estiverem configurados, as rotas de login do cliente falham alto e cedo (erro claro, só nessas rotas) em vez de aceitar um segredo previsível. **Precisa confirmar que `NEXTAUTH_SECRET` está configurado na Vercel** — não consegui verificar isso pelas ferramentas disponíveis nesta sessão.
+- `middleware.ts` libera `/minha-conta/*` da senha do admin de propósito — a checagem de verdade acontece no layout (`src/app/minha-conta/(protegido)/layout.tsx`), não no middleware, pra não depender de Node `crypto` rodando em Edge Runtime.
+- Passou por 2 rodadas de auditoria própria — achados corrigidos: vazamento de tempo de resposta (dava pra descobrir quais telefones são clientes só medindo quanto a resposta demora — corrigido movendo o envio do WhatsApp pra depois da resposta via `after()`), confirmação em GET que preview de link (WhatsApp Web, scanners) poderia disparar sozinha (trocado por confirmação explícita em duas etapas), segredo de fallback previsível (removido), e duas instâncias do mesmo bug de ordem de expulsão de Map que eu já tinha corrigido antes no dedupe do webhook.
+
+**Dashboard (`/minha-conta`):**
+- Resumo: renda mensal, saldo devedor total, contagem de tarefas pendentes.
+- Dívidas ativas (credor, tipo, parcelas, vencimento, atraso, saldo).
+- Tarefas/lembretes pendentes.
+- Últimos 10 pagamentos.
+- Cobre só o que já é dado estruturado hoje (`Cliente`, `Divida`, `Pagamento`, `Tarefa`) — despesas/cartões/lançamentos ainda não aparecem porque o webhook ainda não escreve em `Lancamento`/`Cartao` (Fase 2).
+
+### O que falta
+
+- **Fase 2 (a mais delicada)**: fazer o motor de conversa (`controle-financeiro-flow.ts`, ~2160 linhas, já em produção) passar a gravar em `Lancamento`/`Cartao` além do JSON de sessão — só assim despesas fixas/variáveis e cartões aparecem no dashboard. Precisa de cuidado real, é o fluxo mais testado e mais usado do bot.
+- **Fase 3**: comprovante de compra por foto (extrair "compra" de imagem de recibo, hoje `analisarImagem` só reconhece boleto/fatura/contracheque) e reativar a leitura de contracheque pra virar `Divida` automaticamente.
+- Confirmar `NEXTAUTH_SECRET` configurado na Vercel (ver acima).
+- Fazer deploy da branch pra esse login/dashboard existir de verdade em produção — está tudo só na branch ainda.

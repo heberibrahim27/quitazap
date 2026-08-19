@@ -37,6 +37,8 @@ model Cliente {
   botSessoes     BotSessao[]
   cobrancas      Cobranca[]
   tarefas        Tarefa[]
+  lancamentos    Lancamento[]
+  cartoes        Cartao[]
 }
 
 // ─────────────────────────────────────────
@@ -56,6 +58,7 @@ model Divida {
   tipo           String    @default("OUTRO")
   status         String    @default("ATIVA")
   prioridade     Int       @default(0)
+  totalParcelas  Int?      // quantidade total de parcelas, quando aplicável (empréstimo, financiamento)
   diaVencimento  Int?
   emAtraso       Boolean   @default(false)
   diasAtraso     Int?
@@ -231,6 +234,56 @@ model Tarefa {
 
   @@index([clienteId, status])
   @@index([vencimento])
+}
+
+// ─────────────────────────────────────────
+// CARTÃO (QuitaZAP Controle)
+// ─────────────────────────────────────────
+model Cartao {
+  id            String   @id @default(cuid())
+  clienteId     String
+  nome          String
+  diaFechamento Int?
+  diaVencimento Int?
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  cliente     Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  lancamentos Lancamento[]
+
+  @@unique([clienteId, nome])
+}
+
+// ─────────────────────────────────────────
+// LANÇAMENTO (QuitaZAP Controle)
+// Substitui o estado hoje só guardado em BotSessao.dividasTemp (JSON) por
+// registros relacionais de verdade — renda, despesa fixa, despesa variável e
+// compra no cartão, todos numa tabela só, filtráveis por mês/categoria.
+// ─────────────────────────────────────────
+// tipo:      RECEITA | DESPESA_FIXA | DESPESA_VARIAVEL | COMPRA_CARTAO
+// categoria: mesmas categorias de src/lib/gasto-flow.ts (Mercado, Alimentação,
+//            Transporte, Moradia, Contas da casa, ...), quando aplicável
+// origem:    TEXTO | AUDIO | FOTO
+model Lancamento {
+  id             String    @id @default(cuid())
+  clienteId      String
+  tipo           String
+  descricao      String
+  categoria      String?
+  valor          Float
+  data           DateTime
+  recorrente     Boolean   @default(false)
+  cartaoId       String?
+  origem         String    @default("TEXTO")
+  comprovanteUrl String?
+  criadoEm       DateTime  @default(now())
+  atualizadoEm   DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cartao  Cartao? @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId, data])
+  @@index([clienteId, tipo])
 }
 
 // ═════════════════════════════════════════
