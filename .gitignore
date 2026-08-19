@@ -11,3 +11,6 @@ prisma/dev.db-journal
 # Scripts temporarios (podem conter segredos)
 *.bat
 *.ps1
+
+# Cache do TypeScript incremental
+*.tsbuildinfo

@@ -16,26 +16,27 @@ generator client {
 // ─────────────────────────────────────────
 // statusAtendimento: NOVO | AGUARDANDO_INFORMACOES | PLANO_GERADO | ACOMPANHAMENTO | ENCERRADO
 model Cliente {
-  id                    String   @id @default(cuid())
+  id                    String    @id @default(cuid())
   nome                  String
   telefone              String
   cpf                   String?
   email                 String?
   obs                   String?
-  statusAtendimento     String   @default("NOVO")
+  statusAtendimento     String    @default("NOVO")
   rendaMensal           Float?
   despesasFixas         Float?
   valorDisponivelMensal Float?
   gratuito              Boolean   @default(false)
   assinaturaVenceEm     DateTime?
   criadoEm              DateTime  @default(now())
-  atualizadoEm          DateTime @updatedAt
+  atualizadoEm          DateTime  @updatedAt
 
   dividas        Divida[]
   pagamentos     Pagamento[]
   planosEnviados PlanoEnviado[]
   botSessoes     BotSessao[]
   cobrancas      Cobranca[]
+  tarefas        Tarefa[]
 }
 
 // ─────────────────────────────────────────
@@ -65,6 +66,7 @@ model Divida {
   cliente    Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   parcelas   Parcela[]
   pagamentos Pagamento[]
+  tarefas    Tarefa[]
 }
 
 // ─────────────────────────────────────────
@@ -155,13 +157,13 @@ model LeadVendas {
 model Cobranca {
   id           String    @id @default(cuid())
   clienteId    String
-  credorNome   String    // nome do assinante que cobra (ex: "Ibrahim")
-  devedorNome  String    // nome de quem deve
-  devedorFone  String    // whatsapp de quem deve (com DDI)
+  credorNome   String // nome do assinante que cobra (ex: "Ibrahim")
+  devedorNome  String // nome de quem deve
+  devedorFone  String // whatsapp de quem deve (com DDI)
   valor        Float
   vencimento   DateTime
-  mensagem     String?   // mensagem personalizada do credor
-  pixChave     String?   // chave pix do credor (default: telefone do credor)
+  mensagem     String? // mensagem personalizada do credor
+  pixChave     String? // chave pix do credor (default: telefone do credor)
   status       String    @default("PENDENTE")
   etapa        Int       @default(1)
   tentativas   Int       @default(0)
@@ -170,6 +172,49 @@ model Cobranca {
   atualizadoEm DateTime  @updatedAt
 
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// TAREFA (QuitaZAP Controle)
+// Lembretes e pagamentos registrados por áudio/texto no WhatsApp.
+// ─────────────────────────────────────────
+// tipo:       LEMBRETE | PAGAMENTO
+// status:     PENDENTE | CONCLUIDA | CANCELADA
+// origem:     TEXTO | AUDIO
+// frequencia (só quando recorrente=true): MENSAL | SEMANAL | ANUAL
+// diaMes:     1-31, usado quando frequencia = MENSAL ou ANUAL
+// mesAnual:   1-12, usado quando frequencia = ANUAL (junto com diaMes) — guardado
+//             à parte do `vencimento` pra recorrência não ficar presa a uma data
+//             já clampada (ex: 29/02 num ano não bissexto)
+// diaSemana:  0 (domingo) a 6 (sábado), usado quando frequencia = SEMANAL
+// dividaId:   preenchido quando o texto foi casado com uma Divida ATIVA do cliente
+//             (por nome do credor); usado para reconciliar o pagamento com a dívida
+model Tarefa {
+  id             String    @id @default(cuid())
+  clienteId      String
+  tipo           String    @default("LEMBRETE")
+  descricao      String
+  valor          Float?
+  vencimento     DateTime?
+  recorrente     Boolean   @default(false)
+  frequencia     String?
+  diaMes         Int?
+  mesAnual       Int?
+  diaSemana      Int?
+  horarioEnvio   String    @default("08:00")
+  dividaId       String?
+  status         String    @default("PENDENTE")
+  origem         String    @default("TEXTO")
+  concluidaEm    DateTime?
+  ultimoLembrete DateTime?
+  criadoEm       DateTime  @default(now())
+  atualizadoEm   DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  divida  Divida? @relation(fields: [dividaId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId, status])
+  @@index([vencimento])
 }
 
 // ═════════════════════════════════════════
@@ -209,14 +254,14 @@ model Usuario {
 // CONTATO (pagador/devedor do usuário)
 // ─────────────────────────────────────────
 model ContatoReceber {
-  id         String      @id @default(cuid())
-  usuarioId  String
-  nome       String
-  telefone   String
-  email      String?
-  documento  String?
-  obs        String?
-  criadoEm   DateTime    @default(now())
+  id        String   @id @default(cuid())
+  usuarioId String
+  nome      String
+  telefone  String
+  email     String?
+  documento String?
+  obs       String?
+  criadoEm  DateTime @default(now())
 
   usuario    Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   pendencias Pendencia[]
@@ -228,56 +273,56 @@ model ContatoReceber {
 // PENDÊNCIA (cobrança/lembrete de pagamento)
 // ─────────────────────────────────────────
 model Pendencia {
-  id             String    @id @default(cuid())
-  usuarioId      String
-  contatoId      String?
+  id                String    @id @default(cuid())
+  usuarioId         String
+  contatoId         String?
   // Dados
-  descricao      String
+  descricao         String
   // tipo: VENDA_FIADA | SERVICO | PARCELA | MENSALIDADE | ALUGUEL | OUTRO
-  tipo           String    @default("OUTRO")
-  valor          Float
-  vencimento     DateTime
+  tipo              String    @default("OUTRO")
+  valor             Float
+  vencimento        DateTime
   // Pagamento
   // formaPagto: PIX_CHAVE | PIX_QR | PIX_LINK | MANUAL | SEM_PAGAMENTO_ONLINE
-  formaPagto     String?
-  pixChave       String?
-  linkSlug       String?   @unique
+  formaPagto        String?
+  pixChave          String?
+  linkSlug          String?   @unique
   // Status: RASCUNHO | AGENDADA | ENVIADA | ENTREGUE | LIDA | LINK_ABERTO
   //         | RESPONDIDA | AGUARDANDO_PAGAMENTO | PAGAMENTO_INICIADO
   //         | PAGA | PARCIALMENTE_PAGA | VENCIDA | PAUSADA | CANCELADA | FALHOU
-  status         String    @default("RASCUNHO")
-  etapa          Int       @default(1)
-  tentativas     Int       @default(0)
-  enviarEm       DateTime?
-  ultimoEnvio    DateTime?
-  reguaPausada   Boolean   @default(false)
+  status            String    @default("RASCUNHO")
+  etapa             Int       @default(1)
+  tentativas        Int       @default(0)
+  enviarEm          DateTime?
+  ultimoEnvio       DateTime?
+  reguaPausada      Boolean   @default(false)
   // Pagamento registrado
-  valorPago      Float?
-  pagoEm         DateTime?
-  comprovante    String?
-  confirmacaoManual Boolean @default(false)
+  valorPago         Float?
+  pagoEm            DateTime?
+  comprovante       String?
+  confirmacaoManual Boolean   @default(false)
   // Mensagem personalizada
-  mensagemCustom String?
-  criadoEm       DateTime  @default(now())
-  atualizadoEm   DateTime  @updatedAt
+  mensagemCustom    String?
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
 
-  usuario  Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  contato  ContatoReceber? @relation(fields: [contatoId], references: [id], onDelete: SetNull)
-  envios   EnvioBot[]
+  usuario Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  contato ContatoReceber? @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+  envios  EnvioBot[]
 }
 
 // ─────────────────────────────────────────
 // ENVIO BOT (cada mensagem enviada)
 // ─────────────────────────────────────────
 model EnvioBot {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   usuarioId   String
   pendenciaId String
   etapa       Int
   mensagem    String
-  enviadoEm   DateTime  @default(now())
+  enviadoEm   DateTime @default(now())
   // status: ENVIADO | ENTREGUE | LIDO | RESPONDIDO | FALHOU
-  status      String    @default("ENVIADO")
+  status      String   @default("ENVIADO")
   resposta    String?
 
   usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -288,13 +333,13 @@ model EnvioBot {
 // CONFIGURAÇÕES DO USUÁRIO
 // ─────────────────────────────────────────
 model ConfigUsuario {
-  id             String  @id @default(cuid())
-  usuarioId      String  @unique
-  nomeNegocio    String?
-  horarioEnvio   String  @default("08:00")
-  fusoHorario    String  @default("America/Bahia")
-  resumoDiario   Boolean @default(true)
-  resumoSemanal  Boolean @default(true)
+  id            String  @id @default(cuid())
+  usuarioId     String  @unique
+  nomeNegocio   String?
+  horarioEnvio  String  @default("08:00")
+  fusoHorario   String  @default("America/Bahia")
+  resumoDiario  Boolean @default(true)
+  resumoSemanal Boolean @default(true)
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 }
@@ -303,12 +348,12 @@ model ConfigUsuario {
 // LOG DE CONSUMO DE IA
 // ─────────────────────────────────────────
 model LogIA {
-  id          String   @id @default(cuid())
-  clienteId   String?
-  gratuito    Boolean  @default(false)
-  tipo        String   // "chat" | "whisper" | "vision"
-  tokensInput Int      @default(0)
-  tokensOutput Int     @default(0)
-  custoUSD    Float    @default(0)
-  criadoEm   DateTime @default(now())
+  id           String   @id @default(cuid())
+  clienteId    String?
+  gratuito     Boolean  @default(false)
+  tipo         String // "chat" | "whisper" | "vision"
+  tokensInput  Int      @default(0)
+  tokensOutput Int      @default(0)
+  custoUSD     Float    @default(0)
+  criadoEm     DateTime @default(now())
 }

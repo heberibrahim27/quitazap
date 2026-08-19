@@ -1,126 +1,146 @@
 # CONTINUIDADE.md
 
-> Documento de continuidade para a próxima feature do QuitaZAP: **registro de tarefas e pagamentos por áudio/texto via WhatsApp**.
+> Documento de continuidade do QuitaZAP Controle.
 > Base: `LEVANTAMENTO-QUITAZAP.md` (raio-x read-only de 2026-08-15).
-> Decisão de escopo confirmada em chat: **a feature entra somente no QuitaZAP Controle** (schema legado `Cliente`/`Divida`/`BotSessao` + webhook Z-API já ativo). O QuitaZAP Receber (`Usuario`/`Pendencia`) fica de fora — módulo futuro separado, sem integração com esta etapa.
+> Escopo confirmado em chat: **só QuitaZAP Controle**. O QuitaZAP Receber (`Usuario`/`Pendencia`/`/dashboard`) é outro projeto/módulo, tratado à parte — nada aqui mexe nele.
+
+---
+
+## Status
+
+**Feature "tarefas e pagamentos por áudio/texto": implementada, testada e auditada.**
+
+- Schema + migration (`Tarefa`), módulo de parsing puro, orquestração com Prisma, integração no webhook, cron de lembretes, e 42 testes de regressão novos (131 no total do projeto) — tudo commitado na branch `claude/quitazap-codebase-audit-d99arm`.
+- `tsc --noEmit`, `npm test` e `npm run build` passando limpos.
+- Passou por 3 rodadas de auto-revisão de código (skill `code-review`, effort alto) — 9 achados reais encontrados e corrigidos ao longo do processo (detalhe na seção "Auditoria" abaixo). Nenhum achado aberto.
+
+O que **não** está feito: o restante do backlog de dívida técnica do Controle (seção "Backlog do restante do Controle", no final) — não fazia parte do pedido desta etapa, listado aqui pra priorizarmos juntos o que vem a seguir.
 
 ---
 
 ## 1. Objetivo da feature
 
 Permitir que o usuário do QuitaZAP Controle registre, por **áudio ou texto** no WhatsApp:
-- **Tarefas** — algo a fazer/lembrar (ex.: "lembrar de pagar a luz dia 10", "renovar o seguro do carro").
-- **Pagamentos** — confirmação de que algo foi pago (ex.: "paguei a fatura do nubank", "quitei o boleto da faculdade").
-
-E que o bot organize isso de forma confiável, avise nos momentos certos, e (quando fizer sentido) conecte com o que já existe em `Divida`/`Parcela` no fluxo de controle financeiro.
+- **Tarefas/lembretes** — algo a fazer/lembrar, pontual ou recorrente (ex.: "lembrete: pagar a luz dia 10, R$150", "lembrete: revisar gastos toda segunda").
+- **Pagamentos** — confirmação de que algo foi pago (ex.: "pagamento: paguei a luz, R$150"), reconciliando automaticamente com uma `Divida` ativa se o texto casar com o nome de um credor cadastrado.
 
 ---
 
 ## 2. Escopo confirmado
 
-**Dentro do escopo:**
-- Webhook `POST /api/webhook/zapi` e tudo que já roda sobre `Cliente` / `BotSessao` / `Divida` / `Parcela`.
-- Reaproveitamento do padrão de interpretação local-first + IA fallback (`financeiro-intent-resolver.ts`) e do padrão de confirmação (prévia → "1 confirma / 2 cancela").
-- Transcrição de áudio via Whisper, já implementada e funcionando (`transcreverAudio`).
+**Dentro do escopo:** webhook `POST /api/webhook/zapi`, schema legado (`Cliente`/`Divida`/`Pagamento`/`BotSessao`), transcrição de áudio via Whisper já existente.
 
-**Fora do escopo (explicitamente adiado):**
-- QuitaZAP Receber (`Usuario`, `Pendencia`, `ContatoReceber`, `EnvioBot`, `/dashboard`) — módulo futuro, sem qualquer integração nesta etapa.
-- Leitura automática de PDF de contracheque — continua pausada como está, a menos que o usuário decida reativar separadamente.
-- Correção de bugs não relacionados à feature (ex.: cookie `qz_auth`/`qz-auth`, rota `/api/usuario/whatsapp` quebrada) — esses bugs vivem no sistema Receber/dashboard, que está fora de escopo aqui. Não bloqueiam esta feature e não serão tocados salvo pedido explícito.
+**Fora do escopo (explicitamente adiado, não tocado):**
+- QuitaZAP Receber (`Usuario`, `Pendencia`, `ContatoReceber`, `EnvioBot`, `/dashboard`).
+- Leitura automática de PDF de contracheque (continua pausada).
+- Bugs pré-existentes fora da área desta feature (ex.: cookie `qz_auth`/`qz-auth` do dashboard Receber, rota `/api/usuario/whatsapp` quebrada) — vivem no sistema Receber, não foram tocados.
 
 ---
 
-## 3. O que já existe e será reaproveitado
+## 3. Decisões de produto fechadas (respondidas em chat)
 
-Do levantamento, estas peças do QuitaZAP Controle já resolvem parte do problema e não precisam ser reconstruídas:
-
-| Peça | Onde | Reaproveitamento |
+| Decisão | Resposta | Onde impacta |
 |---|---|---|
-| Recepção de áudio + transcrição Whisper | `transcreverAudio()` em `src/app/api/webhook/zapi/route.ts` | Entrada de voz para tarefas/pagamentos usa o mesmo caminho já usado para lançamentos financeiros. |
-| Interpretador de intenção local-first + IA | `src/lib/ia/financeiro-intent-resolver.ts` | Padrão de "tenta regex primeiro, só chama IA se ficar em escopo e vazio" pode ser estendido com novos tipos de intent (`tarefa`, `pagamento`) em vez de recriar do zero. |
-| Fluxo de confirmação (prévia + 1/2) | `criarEstadoComConfirmacaoInterpretacaoFinanceira`, `formatarPreviaIntentFinanceiro` (`controle-financeiro-flow.ts` / `financeiro-intent-resolver.ts`) | Mesma UX de "aqui está o que entendi, confirma?" pode ser reaproveitada para tarefas/pagamentos. |
-| Resolução de sessão por telefone | `BotSessao` (única por `telefone`) | Continua sendo o ponto de entrada de identidade do usuário no bot. |
-| Categorização por palavra-chave | `src/lib/gasto-flow.ts` | Mesmo princípio pode inspirar uma categorização simples de tarefas, se fizer sentido no produto. |
-| Comandos rápidos existentes | `detectarComando()` no webhook | Já existe um padrão pronto de detecção de comando por regex (`RESUMO_MES`, `PAGUEI`, etc.) — novos comandos como "minhas tarefas" ou "concluí X" entram no mesmo padrão. |
-| Suíte de regressão | `tests/regressao-servidor-publico.test.mjs` (~89 casos) | Mostra que esse fluxo é tratado como crítico e testado de verdade — a nova feature deveria seguir o mesmo padrão de cobertura, não ficar sem teste. |
+| Tarefas recorrentes na v1? | **Sim** | `Tarefa.recorrente`/`frequencia`/`diaMes`/`diaSemana`/`mesAnual` + cron avança pra próxima ocorrência |
+| Pagamento confirmado casa automaticamente com `Divida`? | **Sim** | `encontrarDividaCorrespondente()` por nome do credor + `registrarPagamentoDivida()` (cria `Pagamento`, incrementa `valorPago`, marca `QUITADA` se cobrir o total) |
+| Tarefa é só financeira ou genérica? | **Só financeira** | Todo item tem `valor`/`vencimento` opcionais, mas o conceito continua dentro do domínio financeiro do Controle |
+| Horário do lembrete: fixo ou configurável? | **Configurável por tarefa** | `Tarefa.horarioEnvio` (string "HH:MM", default "08:00"), extraído do texto ("...as 20h") |
 
 ---
 
-## 4. Lacunas que afetam diretamente esta feature
+## 4. O que foi entregue
 
-Do levantamento, os pontos de dívida técnica com impacto direto no desenho desta feature:
-
-1. **Não existe tabela relacional para lançamentos do dia a dia hoje.** Tudo do fluxo "Controle" (gastos, despesas fixas, cartões) vive serializado dentro de `BotSessao.dividasTemp` (um JSON de histórico de conversa). Se "tarefas" e "pagamentos" seguirem esse mesmo padrão, ficam frágeis (sem índice, sem consulta estruturada, sem cron de lembrete confiável) — **recomendação: criar tabela(s) relacionais dedicadas desde já**, em vez de estender o JSON.
-2. **A cascata de `if`s no webhook já está grande** (~1900 linhas em `route.ts`, ~2160 em `controle-financeiro-flow.ts`). Adicionar mais um domínio direto nessa cascata sem uma camada de roteamento de intents mais explícita tende a piorar a manutenibilidade — vale pelo menos isolar a lógica nova em módulo(s) próprio(s) (`tarefa-flow.ts`, por exemplo), no padrão já usado por `gasto-flow.ts`.
-3. **Dedupe de mensagens em memória** (`Set` de até 500 `messageId`s, não sobrevive a cold start/múltiplas instâncias serverless). Não é um problema novo desta feature, mas registrar pagamento por áudio duplicado (ex.: reentrega de webhook) tem custo maior que um lançamento comum — vale considerar dedupe mais robusto (ex.: unique constraint no banco) se a feature for sensível a duplicidade.
-4. **Não há hoje nenhum cron de lembrete de tarefa** — os crons existentes (`/api/cron/lembretes`, `/api/cron/cobrador`) são específicos de `Pendencia` (Receber, fora de escopo) e `Divida`/`Cobranca`. Um lembrete de tarefa (“lembrar de pagar a luz dia 10”) precisa de um novo cron ou de extensão de um existente.
-5. **Cron sem autenticação garantida se `CRON_SECRET` não estiver setado** — se o novo cron de tarefas seguir o mesmo padrão dos crons atuais, herda esse comportamento fail-open. Vale decidir se este é o momento de também endurecer isso, ou se fica para depois.
-
----
-
-## 5. Proposta de modelo de dados (para validação, não implementado)
-
-Sugestão de uma tabela nova, no mesmo espírito do schema legado (`Cliente`-cêntrico), para não misturar com o schema Receber:
+### Modelo de dados
+`model Tarefa` em `prisma/schema.prisma` (migration `prisma/migrations/20260819130406_add_tarefa/`, ainda **não aplicada em nenhum banco** — este ambiente não tem `DATABASE_URL`, então validação foi feita só via `prisma generate`/`tsc`/testes unitários, nunca contra um Postgres real):
 
 ```prisma
-// Tarefa/pagamento registrado via WhatsApp (QuitaZAP Controle)
 model Tarefa {
-  id           String    @id @default(cuid())
-  clienteId    String
-  tipo         String    // LEMBRETE | PAGAMENTO
-  descricao    String
-  valor        Float?    // preenchido quando tipo = PAGAMENTO ou quando a tarefa tem valor associado
-  vencimento   DateTime? // data-alvo do lembrete/pagamento, se houver
-  status       String    @default("PENDENTE") // PENDENTE | CONCLUIDA | CANCELADA
-  origem       String    @default("TEXTO")    // TEXTO | AUDIO
-  dividaId     String?   // vínculo opcional com Divida/Parcela existente, se o pagamento quitar algo já rastreado
-  concluidaEm  DateTime?
-  criadoEm     DateTime  @default(now())
-  atualizadoEm DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  clienteId      String
+  tipo           String    @default("LEMBRETE") // LEMBRETE | PAGAMENTO
+  descricao      String
+  valor          Float?
+  vencimento     DateTime?
+  recorrente     Boolean   @default(false)
+  frequencia     String?   // MENSAL | SEMANAL | ANUAL
+  diaMes         Int?      // 1-31 — usado em MENSAL e ANUAL
+  mesAnual       Int?      // 1-12 — usado em ANUAL (guardado à parte do vencimento clampado)
+  diaSemana      Int?      // 0-6 — usado em SEMANAL
+  horarioEnvio   String    @default("08:00")
+  dividaId       String?   // preenchido quando o texto bateu com uma Divida ATIVA
+  status         String    @default("PENDENTE") // PENDENTE | CONCLUIDA | CANCELADA
+  origem         String    @default("TEXTO")    // TEXTO | AUDIO
+  concluidaEm    DateTime?
+  ultimoLembrete DateTime?
+  criadoEm       DateTime  @default(now())
+  atualizadoEm   DateTime  @updatedAt
 
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   divida  Divida? @relation(fields: [dividaId], references: [id], onDelete: SetNull)
 }
 ```
 
-Pontos que **precisam de decisão de produto antes de fechar o schema** (não são verificáveis por código, e mudam o desenho):
+### Código
+- **`src/lib/tarefa-flow.ts`** — lógica pura (sem Prisma): `detectarComandoTarefa`, `extrairTarefa` (parsing de descrição/valor/data/recorrência/horário), `calcularProximaOcorrencia`/`proximaDataDoMes`/`proximaDataDaSemana`/`proximaDataAnual`, `encontrarDividaCorrespondente`, `encontrarTarefaPorTermo`, formatação de mensagens. Segue o padrão já usado em `gasto-flow.ts`/`onboarding-controle.ts` (módulo isolado, sem tocar Prisma).
+- **`src/lib/tarefa-service.ts`** — orquestração com Prisma (criar/listar/concluir/cancelar tarefa, reconciliar pagamento com `Divida`, reaproveitando a mesma lógica de `src/app/clientes/[id]/pagamento/novo/page.tsx`).
+- **`src/app/api/webhook/zapi/route.ts`** — novo bloco na cascata, logo após o comando RESETAR (comandos com prefixo explícito — `tarefa:`/`lembrete:`/`pagamento:` — e frases exatas como "minhas tarefas" sempre respondem; "concluí"/"cancelar" só interceptam quando encontram uma tarefa pendente correspondente, senão devolvem `null` e a cascata normal continua).
+- **`src/app/api/cron/tarefas/route.ts`** — roda de hora em hora (`vercel.json`): avança recorrências vencidas e envia lembrete respeitando o `horarioEnvio` de cada tarefa, com toda a lógica de "é hoje?" ancorada em `America/Sao_Paulo` (não em UTC — ver Auditoria).
+- **`src/lib/plano.ts`** — menu de ajuda (`gerarListaComandos`) atualizado com os novos comandos.
+- **`tests/regressao-tarefas.test.mjs`** — 42 testes cobrindo parsing, recorrência, cálculo de datas (com fuso), matching e formatação.
 
-- Tarefas recorrentes existem (ex.: "lembrar de pagar a luz todo dia 10") ou toda tarefa é pontual?
-- Quando o usuário diz "paguei a luz", isso deveria automaticamente marcar uma `Parcela`/`Divida` existente como paga (se houver uma correspondente), ou "pagamento" aqui é um conceito solto, sem tentar casar com dívidas já cadastradas?
-- Tarefas são só financeiras (lembrete de pagar algo) ou genéricas (qualquer lembrete, tipo "ligar pro médico")? Isso muda se o campo `valor` é opcional de verdade ou se na prática a feature é 100% financeira.
-- Quem recebe o lembrete e em que horário — mesmo horário fixo dos crons atuais (11h/12h UTC) ou configurável por tarefa?
-
----
-
-## 6. Proposta de fluxo no webhook (alto nível)
-
-1. **Entrada** (texto ou áudio transcrito) chega no webhook, já normalizada — reaproveita 100% o que existe hoje (nenhuma mudança na captação).
-2. **Novo passo de detecção de intent** antes/ao lado do `resolverIntencaoFinanceiraIA` atual: reconhecer se a mensagem é uma tarefa/lembrete ou uma confirmação de pagamento, usando o mesmo padrão local-first + fallback IA.
-3. **Prévia + confirmação** no mesmo formato já usado (`1 confirma / 2 cancela`), guardando o item pendente do mesmo jeito que hoje (estado serializado na sessão até a confirmação — igual ao padrão atual de lançamentos).
-4. **Persistência** na tabela `Tarefa` (proposta acima) na confirmação — não mais só no JSON da sessão.
-5. **Comandos de consulta**: "minhas tarefas", "o que falta pagar", "concluí [tarefa]" — no mesmo padrão de `detectarComando()`.
-6. **Lembrete automático**: novo cron (`/api/cron/tarefas`, por exemplo) rodando diariamente, no mesmo padrão de autenticação dos crons existentes, avisando tarefas com vencimento próximo.
-
----
-
-## 7. Plano de implementação sugerido (fases)
-
-1. **Fechar decisões de produto** da seção 5 (recorrência, vínculo com dívida, escopo financeiro vs. genérico, horário de lembrete).
-2. **Schema + migration** da tabela `Tarefa` (migration versionada de verdade, diferente do que aconteceu com o restante do schema — ver achado de migrations dessincronizadas no levantamento).
-3. **Módulo de interpretação** (`tarefa-flow.ts` ou extensão do intent resolver) com parsing local-first + fallback IA, seguindo o padrão de `financeiro-intent-resolver.ts`.
-4. **Integração no webhook**: novo bloco na cascata do `route.ts`, isolado em módulo próprio (não espalhado inline).
-5. **Comandos de consulta e conclusão de tarefa.**
-6. **Cron de lembrete** de tarefas (novo endpoint + entrada em `vercel.json`).
-7. **Testes de regressão** cobrindo os casos principais (registro por texto, por áudio, confirmação, cancelamento, consulta, conclusão, lembrete), no padrão de `tests/regressao-servidor-publico.test.mjs`.
+### Comandos novos no bot
+```
+lembrete: pagar a luz dia 10, R$150
+lembrete: pagar a luz todo dia 10, R$150     (recorrente mensal)
+lembrete: revisar gastos toda segunda        (recorrente semanal)
+lembrete: renovar seguro todo ano dia 10/03  (recorrente anual)
+pagamento: paguei a luz, R$150               (reconcilia com Divida se achar match)
+minhas tarefas
+concluí pagar a luz
+cancelar pagar a luz
+```
 
 ---
 
-## 8. Decisões de produto pendentes (bloqueiam o desenho fino, não o início do trabalho)
+## 5. Auditoria — achados e correções
 
-- Tarefas recorrentes: sim ou não nesta primeira versão?
-- Pagamento confirmado casa automaticamente com `Divida`/`Parcela` existente, ou é um registro independente?
-- Tarefa é conceito só financeiro ou genérico?
-- Horário/regra de lembrete (fixo como os crons atuais, ou configurável)?
-- Nome de tabela/domínio: mantém `Tarefa` genérico cobrindo os dois tipos (`LEMBRETE`/`PAGAMENTO`), ou vale separar em duas tabelas desde já?
+Três rodadas de `code-review` (effort alto) sobre o diff. Todos os achados abaixo foram corrigidos e travados com teste; nenhum ficou pendente.
 
-Essas decisões não impedem começar (schema pode ser ajustado antes da migration final), mas o ideal é fechá-las antes de escrever o parsing de intenção, porque mudam a estrutura dos dados capturados.
+**Rodada 1:**
+1. **Colisão de cascata** — "concluí"/"cancelar" são verbos naturais demais; sem cuidado, sequestrariam mensagens comuns do onboarding/negociação de dívida. Corrigido: só interceptam quando encontram uma tarefa pendente de fato correspondente; sem match, devolvem `null` e a cascata normal continua.
+2. **Overflow de dia do mês** — "todo dia 31" num mês de 30 dias estourava pro mês seguinte (`new Date` normaliza automaticamente). Corrigido com `construirDataClamped`/`ultimoDiaDoMes`.
+3. **Reconciliação automática indevida** — "concluí" (só dispensar o lembrete) estava também gravando `Pagamento`/atualizando `Divida`. Corrigido: reconciliação com dívida só acontece no comando explícito `pagamento:`.
+4. **Fuso do cron** — janela "é hoje?" comparava limites de dia em UTC, mas a hora do lembrete (`horarioEnvio`) é em horário de Brasília — lembretes configurados entre 21h-23h nunca disparariam. Corrigido comparando por data já convertida pro fuso (`Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"`).
+
+**Rodada 2:**
+5. **Bug de fuso na raiz (o mais sério)** — `new Date(ano, mes, dia)` é interpretado no fuso do processo (UTC na Vercel), então "dia 10" virava 10 às 00h UTC = 9 às 21h em Brasília — toda data aparecia e disparava **um dia adiantada**, sempre, não só em horário de borda. Corrigido reescrevendo a construção de datas pra ancorar explicitamente em Brasília via `Date.UTC(..., 3, 0, 0, 0)` (meia-noite de Brasília = 03h UTC, já que o Brasil não tem mais horário de verão desde 2019).
+6. **Verbo "terminei" colidia com o comando PAGUEI legado** ("terminei de pagar" já é gatilho de outro fluxo, de confirmação de pagamento de dívida). Corrigido removendo "terminei"/"finalizei" do gatilho de tarefa — só "concluí" (que não existe em nenhum outro lugar do código).
+7. **Matching fuzzy fraco demais** — 1 palavra genérica em comum (ex. "pagar") já bastava pra interceptar. Corrigido: exige 2+ palavras significativas em comum (ou a tarefa ter só 1 palavra), e resultado ambíguo (empate ou múltiplos matches diretos) retorna `null` em vez de escolher arbitrariamente.
+8. **ANUAL relia no `vencimento` já clampado** — um "29/02" clampado pra 28/02 num ano não bissexto ficaria preso em 28/02 pra sempre, mesmo no próximo ano bissexto. Corrigido guardando `diaMes`+`mesAnual` separado do `vencimento`, e recalculando a partir desses dois.
+
+**Rodada 3:**
+9. **Termo curto demais no match direto** — "cancela a" (`termo="a"`) batia como substring de qualquer tarefa que contivesse a letra "a". Corrigido exigindo pelo menos uma palavra com 3+ letras antes de tentar qualquer match.
+
+---
+
+## 6. Limitações conhecidas (não são bugs, são escolhas de escopo pra v1)
+
+- **UX sem prévia de confirmação** — diferente do fluxo de gastos (que tem "1 confirma / 2 cancela"), os comandos `tarefa:`/`lembrete:`/`pagamento:` criam direto, sem passo de confirmação. Decisão pragmática: são prefixos explícitos e deliberados, então o risco de interpretação errada é baixo — mas se quiser o mesmo padrão de prévia, dá pra adicionar depois.
+- **Cron hourly pode não rodar de hora em hora no plano Hobby da Vercel** — o plano gratuito da Vercel limita cron jobs a uma execução por dia, independente do `schedule` configurado; o `horarioEnvio` configurável por tarefa só funciona de verdade com plano Pro (ou superior). **Não verificável via código** qual plano está em uso — vale confirmar.
+- **Migration não aplicada** — este ambiente não tem acesso a um Postgres real (`DATABASE_URL` não configurada), então a migration nunca rodou contra um banco de verdade. Precisa ser aplicada (`prisma migrate deploy` ou equivalente) antes do deploy.
+- **Matching de dívida é só por nome do credor** — não há desambiguação se dois credores tiverem nomes parecidos; nesse caso pega o de maior pontuação de match, sem pedir confirmação ao usuário.
+
+---
+
+## 7. Backlog do restante do Controle (pra priorizarmos juntos)
+
+Da seção "Dívida técnica conhecida" do `LEVANTAMENTO-QUITAZAP.md`, filtrado só pro que é relevante ao Controle (exclui itens específicos do Receber, como o bug de cookie do dashboard):
+
+- **Estado financeiro do dia a dia inteiro dentro de JSON de conversa** (`BotSessao.dividasTemp`) — gastos, despesas fixas e cartões não têm tabela relacional própria; é o maior item de dívida técnica do produto e o que mais limitaria qualquer evolução futura (relatórios estruturados, edição/correção de lançamento, auditoria).
+- **Migrations dessincronizadas do schema** — só 7 dos 15 modelos atuais têm migration versionada (o resto do legado nunca foi versionado, incluindo `Cobranca`/`LogIA`/`LeadVendas`). Isso pode causar drift silencioso entre `schema.prisma` e o banco real de produção.
+- **Dedupe de mensagens do webhook em memória** — `Set` de até 500 IDs, não sobrevive a cold start nem funciona com múltiplas instâncias serverless.
+- **Cron sem autenticação garantida se `CRON_SECRET` não estiver setado** (fail-open) — afeta `/api/cron/lembretes`, `/api/cron/cobrador` e agora também `/api/cron/tarefas`.
+- **PDF de contracheque pausado** — código pronto (`extrairPDF` etc.) mas desativado no fluxo principal; decisão de produto sobre reativar ou não.
+- **Cascata do webhook muito grande** (`route.ts` já passa de 1900 linhas) — cada feature nova que entra direto na cascata piora a manutenibilidade; vale considerar extrair um roteador de intents mais explícito em algum momento.
+
+Nenhum desses bloqueia a feature de tarefas/pagamentos entregue nesta etapa. Ficam aqui só pra decidirmos juntos o que entra na próxima rodada.

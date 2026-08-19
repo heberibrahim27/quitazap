@@ -49,6 +49,8 @@ import {
   devePularDespesasFixasControle,
 } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
+import { detectarComandoTarefa } from "@/lib/tarefa-flow";
+import { processarComandoTarefa } from "@/lib/tarefa-service";
 import {
   gerarRelatorio,
   gerarResumoMensal,
@@ -820,6 +822,23 @@ export async function POST(req: NextRequest) {
       await sendWhatsApp(telefone, respostaInicio);
 
       return NextResponse.json({ ok: true });
+    }
+
+    // ── Comandos de Tarefa (lembretes e pagamentos por texto/áudio) ───────
+    // Prefixos explícitos ("tarefa:", "lembrete:", "pagamento:") e comandos
+    // de consulta ("minhas tarefas", "concluí ...", "cancelar ...") — não
+    // interferem no estado de conversa (dividasTemp) do resto do fluxo.
+    const comandoTarefa = detectarComandoTarefa(mensagem);
+    if (comandoTarefa) {
+      const origemMensagemTarefa = tipoEntrada === "audio" ? "AUDIO" : "TEXTO";
+      const respostaTarefa = await processarComandoTarefa(sessao.clienteId, comandoTarefa, origemMensagemTarefa);
+      // respostaTarefa é null quando "concluir"/"cancelar" não acham nenhuma tarefa
+      // pendente parecida — nesse caso não intercepta, a cascata normal continua
+      // (evita sequestrar mensagens comuns que começam com "terminei"/"cancela"/etc).
+      if (respostaTarefa) {
+        await sendWhatsApp(telefone, respostaTarefa);
+        return NextResponse.json({ ok: true });
+      }
     }
 
     // ── Fluxo fixo: Servidor público / contracheque ───────────────────────
