@@ -7,6 +7,8 @@
 // 2. Envia lembrete de WhatsApp pras tarefas PENDENTE que vencem hoje,
 //    respeitando o horarioEnvio configurado em cada tarefa (fuso America/Sao_Paulo,
 //    mesma convenção usada em src/lib/gasto-flow.ts).
+// 3. Limpa registros velhos de MensagemProcessada (dedupe do webhook Z-API) —
+//    a janela de dedupe é de só 10 minutos, reter por 24h já é folga generosa.
 // ─────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -134,11 +136,24 @@ export async function GET(req: NextRequest) {
     console.error("[CRON TAREFAS] Erro ao enviar lembretes:", err);
   }
 
+  // ── 3. Limpa dedupe do webhook (retenção de 24h) ───────────
+  let mensagensLimpas = 0;
+  try {
+    const limite24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+    const resultado = await prisma.mensagemProcessada.deleteMany({
+      where: { criadoEm: { lt: limite24h } },
+    });
+    mensagensLimpas = resultado.count;
+  } catch (err) {
+    console.error("[CRON TAREFAS] Erro ao limpar MensagemProcessada:", err);
+  }
+
   const resumo = {
     ok: true,
     rodadoEm: agora.toISOString(),
     avancadas,
     lembretesEnviados,
+    mensagensLimpas,
     erros: erros.length > 0 ? erros : undefined,
   };
 

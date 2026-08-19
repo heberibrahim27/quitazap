@@ -625,16 +625,71 @@ Exemplos:
 }
 
 // ── Deduplicação de mensagens ─────────────
-const mensagensProcessadas = new Set<string>();
+// O carimbo de "já processado" é gravado ANTES do processamento em si (não dá
+// pra marcar só no fim — a função tem dezenas de `return` espalhados pelo
+// fluxo). Por isso, nas duas camadas, "já processei" só vale por uma janela
+// curta: se o processamento anterior falhou (erro 500, timeout) e a Z-API
+// reenviar o mesmo webhook depois da janela, deixa passar de novo em vez de
+// bloquear a mensagem pra sempre.
+const JANELA_DEDUPE_MS = 10 * 60 * 1000; // 10 minutos, nas duas camadas
+
+// Camada 1: Map em memória (rápido, mas não sobrevive a cold start nem
+// funciona entre múltiplas instâncias serverless). Guarda o instante em que
+// viu cada messageId — sem isso, uma instância "quente" reteria o ID
+// indefinidamente (até ser expulso pelo limite de 500), reproduzindo o mesmo
+// bloqueio permanente que a janela de expiração existe pra evitar.
+const mensagensProcessadas = new Map<string, number>();
 function jáProcessou(id: string): boolean {
   if (!id) return false;
-  if (mensagensProcessadas.has(id)) return true;
-  mensagensProcessadas.add(id);
+  const agora = Date.now();
+  const vistoEm = mensagensProcessadas.get(id);
+  if (vistoEm !== undefined && agora - vistoEm < JANELA_DEDUPE_MS) return true;
+  // Map preserva ordem de inserção, não de atualização — ao renovar uma chave
+  // existente, remove e reinsere pra ela ir pro fim (senão a expulsão por
+  // tamanho abaixo pode derrubar uma entrada recém-vista antes de uma velha).
+  mensagensProcessadas.delete(id);
+  mensagensProcessadas.set(id, agora);
   if (mensagensProcessadas.size > 500) {
-    const primeiro = mensagensProcessadas.values().next().value;
-    if (primeiro) mensagensProcessadas.delete(primeiro);
+    const primeiraChave = mensagensProcessadas.keys().next().value;
+    if (primeiraChave !== undefined) mensagensProcessadas.delete(primeiraChave);
   }
   return false;
+}
+
+// Camada 2: tabela MensagemProcessada (só é consultada quando a camada 1 diz
+// "não vi essa antes" — cobre cold start / múltiplas instâncias). Qualquer
+// erro aqui (tabela ainda não migrada, banco fora do ar) é tratado como
+// "não é duplicata" — essa camada nunca pode bloquear uma mensagem legítima.
+// A renovação do carimbo velho usa updateMany com filtro de data (atômico no
+// banco) em vez de ler-e-depois-escrever, pra duas requisições concorrentes
+// do mesmo messageId vencido não conseguirem "renovar" as duas ao mesmo tempo.
+async function jáProcessouPersistente(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    await prisma.mensagemProcessada.create({ data: { messageId: id } });
+    return false;
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
+      const cutoff = new Date(Date.now() - JANELA_DEDUPE_MS);
+      try {
+        const renovado = await prisma.mensagemProcessada.updateMany({
+          where: { messageId: id, criadoEm: { lt: cutoff } },
+          data: { criadoEm: new Date() },
+        });
+        // count === 0: ou ainda está dentro da janela (duplicata de verdade),
+        // ou outra requisição concorrente já reivindicou a renovação primeiro —
+        // nos dois casos, essa aqui deve recuar e tratar como duplicata.
+        return renovado.count === 0;
+      } catch (erroRenovacao) {
+        // Erro na renovação (não no create) não pode virar "é duplicata" por
+        // padrão — mantém a garantia de nunca bloquear mensagem legítima.
+        console.warn("[Z-API] Falha ao renovar carimbo de duplicata (seguindo só com a checagem em memória):", erroRenovacao);
+        return false;
+      }
+    }
+    console.warn("[Z-API] Checagem persistente de duplicata falhou (seguindo só com a checagem em memória):", err);
+    return false;
+  }
 }
 
 // ── Webhook principal ─────────────────────
@@ -647,9 +702,15 @@ export async function POST(req: NextRequest) {
 
     // Ignora duplicatas (Z-API pode enviar o mesmo webhook 2x)
     const msgId = body.messageId ?? body.message?.messageId ?? "";
-    if (msgId && jáProcessou(msgId)) {
-      console.log(`[Z-API] Duplicata ignorada: ${msgId}`);
-      return NextResponse.json({ ok: true });
+    if (msgId) {
+      if (jáProcessou(msgId)) {
+        console.log(`[Z-API] Duplicata ignorada (memória): ${msgId}`);
+        return NextResponse.json({ ok: true });
+      }
+      if (await jáProcessouPersistente(msgId)) {
+        console.log(`[Z-API] Duplicata ignorada (banco): ${msgId}`);
+        return NextResponse.json({ ok: true });
+      }
     }
 
     // Tipo de entrada: texto, áudio ou imagem

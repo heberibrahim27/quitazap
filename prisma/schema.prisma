@@ -135,6 +135,22 @@ model BotSessao {
 }
 
 // ─────────────────────────────────────────
+// MENSAGEM PROCESSADA (dedupe do webhook Z-API)
+// ─────────────────────────────────────────
+// Segunda camada de deduplicação, além do Map em memória em route.ts (que
+// guarda messageId → instante em que foi visto). O Map sozinho não sobrevive
+// a cold start nem funciona entre múltiplas instâncias serverless — esta
+// tabela cobre exatamente esses casos. O código trata qualquer erro nesta
+// camada (tabela ainda não migrada, banco fora do ar) como "não é duplicata"
+// — nunca bloqueia uma mensagem legítima por falha aqui. Limpeza de linhas
+// velhas roda dentro do cron /api/cron/tarefas (retenção de 24h).
+model MensagemProcessada {
+  id        String   @id @default(cuid())
+  messageId String   @unique
+  criadoEm  DateTime @default(now())
+}
+
+// ─────────────────────────────────────────
 // LEAD DE VENDAS (funil Instagram/Facebook)
 // ─────────────────────────────────────────
 // etapa: QUALIFICACAO | PROVA | OFERTA | FOLLOWUP | CONVERTIDO | DESISTIU
