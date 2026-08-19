@@ -144,3 +144,37 @@ Da seção "Dívida técnica conhecida" do `LEVANTAMENTO-QUITAZAP.md`, filtrado 
 - **Cascata do webhook muito grande** (`route.ts` já passa de 1900 linhas) — cada feature nova que entra direto na cascata piora a manutenibilidade; vale considerar extrair um roteador de intents mais explícito em algum momento.
 
 Nenhum desses bloqueia a feature de tarefas/pagamentos entregue nesta etapa. Ficam aqui só pra decidirmos juntos o que entra na próxima rodada.
+
+---
+
+## 8. Checklist de deploy (o que só você consegue fazer/confirmar)
+
+Confirmado no repositório: **não existe nenhum passo automático de `prisma migrate deploy` no build** (`package.json` só roda `prisma generate` no `postinstall`, e não há isso em `vercel.json`). Ou seja, aplicar a migration no banco real é sempre manual — nunca acontece sozinho ao fazer deploy na Vercel.
+
+### 1. Aplicar a migration com segurança
+
+O levantamento original já tinha achado que o histórico de migrations está dessincronizado do schema (só 6 das 14 tabelas de então tinham migration versionada — ver seção 7). Isso muito provavelmente significa que `Cobranca`, `LogIA` e `LeadVendas` (e as tabelas do Receber) já existem no banco real, criadas por fora do histórico de migrations (via `prisma db push` ou direto no Supabase). **Isso importa pra migration nova da `Tarefa` também**, mesmo ela sendo uma tabela nova (sem esse risco de conflito) — porque `prisma migrate deploy` roda migrations em ordem, e se o histórico já estiver "torto", o comando pode reclamar de divergência antes mesmo de chegar na migration da `Tarefa`.
+
+Dois caminhos possíveis — escolha o que já bate com o que vocês normalmente fazem:
+
+- **Se o hábito de vocês é `prisma db push`** (parece ser o caso, dado o histórico): pode continuar assim — rode `npx prisma db push` contra o banco de produção depois de revisar o diff que ele mostra antes de confirmar. Simples, mas não deixa a `Tarefa` registrada no histórico de migrations (mesma situação das outras tabelas que já ficaram de fora).
+- **Se preferirem manter o histórico de migrations consistente daqui pra frente**: primeiro rodem `npx prisma migrate status` contra o banco real pra ver exatamente o que está "não aplicado" ou "divergente". Se aparecerem tabelas antigas como não-migradas, uma migration "baseline" (`prisma migrate resolve --applied <nome>`) marca o que já existe como aplicado sem tentar recriar — só depois disso `npx prisma migrate deploy` aplicaria a migration nova da `Tarefa` com segurança.
+
+**Não fizemos nenhuma dessas ações neste ambiente** — não há `DATABASE_URL`/`DIRECT_URL` configurada aqui, e mesmo se houvesse, aplicar migration em produção é uma ação que decidimos não tomar sem você por perto pra confirmar.
+
+### 2. Confirmar `CRON_SECRET`
+
+Os 4 endpoints de cron/broadcast agora logam um aviso (`console.warn`) quando `CRON_SECRET` não está definido, sem mudar nenhum comportamento — só pra ficar visível nos logs da Vercel. Verifique em **Project Settings → Environment Variables** se `CRON_SECRET` está configurado; se estiver, a Vercel já injeta o header `Authorization: Bearer <secret>` sozinha nas chamadas de cron dela.
+
+### 3. Confirmar o plano da Vercel
+
+O cron novo (`/api/cron/tarefas`) está registrado pra rodar de hora em hora (`0 * * * *`). No plano **Hobby (gratuito)** da Vercel, cron jobs só executam **uma vez por dia** independente do `schedule` configurado — o horário configurável por tarefa (`horarioEnvio`) só funciona de verdade no plano **Pro** ou superior. Vale confirmar qual plano está ativo antes de anunciar essa funcionalidade pros usuários.
+
+### 4. Smoke test depois do deploy
+
+Depois de aplicar a migration e confirmar os itens acima, testar num número real (ou no `/testar-funil`, se ele cobrir esse fluxo):
+```
+lembrete: teste dia 10, R$10
+minhas tarefas
+concluí teste
+```

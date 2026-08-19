@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
       if (auth !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
+    } else {
+      console.warn("[BROADCAST COBRADOR] CRON_SECRET não configurado — rota acessível sem autenticação.");
     }
   }
 
@@ -136,6 +138,8 @@ export async function GET(req: NextRequest) {
       if (auth !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
+    } else {
+      console.warn("[BROADCAST COBRADOR] CRON_SECRET não configurado — rota acessível sem autenticação.");
     }
   }
 
