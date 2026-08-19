@@ -190,7 +190,7 @@ Pedido em chat: o cliente do Controle não tinha nenhuma tela própria pra ver o
 **Schema:**
 - `Divida.totalParcelas` (Int?) — quantidade de parcelas, exibido no dashboard.
 - `model Cartao` — nome, dia de fechamento, dia de vencimento, por cliente.
-- `model Lancamento` — unifica receita, despesa fixa, despesa variável e compra no cartão numa tabela só, com categoria e data (pro filtro por mês) — substitui o que hoje só existe dentro do JSON de `BotSessao.dividasTemp`. **Ainda não é escrita pelo webhook** (isso é a Fase 2, ver abaixo) — a tabela existe e está pronta, mas o motor de conversa ainda grava só no JSON como sempre gravou.
+- `model Lancamento` — unifica receita, despesa fixa, despesa variável e compra no cartão numa tabela só, com categoria e data (pro filtro por mês) — substitui o que hoje só existe dentro do JSON de `BotSessao.dividasTemp`. **Fase 2 concluída**: o motor de conversa (`controle-financeiro-flow.ts`) agora também devolve os itens já resolvidos em cada ponto de confirmação (`itensParaPersistir`/`cartaoParaPersistir`, sempre opcional — a função continua pura, sem Prisma) e `controle-financeiro-flow.ts`/`route.ts` gravam via novo `src/lib/controle-financeiro-service.ts`, sempre depois de já ter respondido ao usuário (Next.js `after()`) e só de forma aditiva (erro na gravação nova nunca derruba a resposta nem o `dividasTemp`, que continua sendo a fonte de verdade da conversa).
 - Migration aplicada direto no banco de produção nesta sessão (com autorização explícita seção por seção), RLS ligado nas tabelas novas.
 
 **Login do cliente ("Minha Conta"), sem senha:**
@@ -205,13 +205,19 @@ Pedido em chat: o cliente do Controle não tinha nenhuma tela própria pra ver o
 - Dívidas ativas (credor, tipo, parcelas, vencimento, atraso, saldo).
 - Tarefas/lembretes pendentes.
 - Últimos 10 pagamentos.
-- Cobre só o que já é dado estruturado hoje (`Cliente`, `Divida`, `Pagamento`, `Tarefa`) — despesas/cartões/lançamentos ainda não aparecem porque o webhook ainda não escreve em `Lancamento`/`Cartao` (Fase 2).
+- Ainda mostra só resumo/dívidas/tarefas/pagamentos — a tela não tem, por enquanto, uma lista própria de "lançamentos" (despesas/cartões) nem filtro por mês; os dados já estão sendo gravados em `Lancamento`/`Cartao` desde a Fase 2, falta só a tela ler e mostrar isso.
 
 ### O que falta
 
-- **Fase 2 (a mais delicada)**: fazer o motor de conversa (`controle-financeiro-flow.ts`, ~2160 linhas, já em produção) passar a gravar em `Lancamento`/`Cartao` além do JSON de sessão — só assim despesas fixas/variáveis e cartões aparecem no dashboard. Precisa de cuidado real, é o fluxo mais testado e mais usado do bot.
+- **Exibir `Lancamento`/`Cartao` no dashboard**: a Fase 2 já grava os dados (ver abaixo), falta a página `/minha-conta` somar/listar isso — despesas fixas/variáveis, compras por cartão, filtro por mês.
 - **Fase 3**: comprovante de compra por foto (extrair "compra" de imagem de recibo, hoje `analisarImagem` só reconhece boleto/fatura/contracheque) e reativar a leitura de contracheque pra virar `Divida` automaticamente.
 - Confirmar `NEXTAUTH_SECRET` configurado na Vercel (ver acima).
 - Fazer deploy da branch pra esse login/dashboard existir de verdade em produção — está tudo só na branch ainda.
 
-<!-- teste de deploy: commit real com alteracao de arquivo -->
+### Fase 2 — persistência de gastos/receitas/cartão em Lancamento/Cartao (concluída)
+
+O motor de conversa (`controle-financeiro-flow.ts`) só gravava em `BotSessao.dividasTemp` (JSON) — nada aparecia no dashboard do cliente. Agora, em cada ponto onde o fluxo já decide "confirmado" (gasto rápido sem pedir "sim", confirmação de lote interpretado pela IA, despesa fixa direta ou confirmada, configuração de cartão), a função pura devolve também os itens já resolvidos (`itensParaPersistir`/`cartaoParaPersistir`), e `route.ts` grava isso via `src/lib/controle-financeiro-service.ts` — sempre depois de responder ao usuário (`after()`), sempre com try/catch que só loga (nunca derruba a resposta nem o `dividasTemp`).
+
+Cobre: gasto/receita/despesa avulsa (caminho rápido e caminho IA), despesa fixa (direta, em lista "frase corrida" e confirmada em duas etapas), compra no cartão (com canonização do nome do cartão pelo mesmo catálogo usado no resto do fluxo), configuração de cartão (fechamento/vencimento).
+
+**Limitação aceita, documentada, não é bug**: no caminho da IA (`salvarItensConfirmadosIA`), o item interpretado não carrega uma data própria do gasto (só existe pro caminho rápido, via `gasto-flow.ts`) — o lançamento é gravado com a data/hora da confirmação, não a data em que o gasto realmente aconteceu. Resolver isso direito exigiria adicionar um campo de data ao schema de interpretação da IA (`financeiro-intent-schema.ts`) — fora de escopo por enquanto.

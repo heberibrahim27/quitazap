@@ -98,6 +98,10 @@ export type CartaoParaPersistirControle = {
   vencimento?: number;
 };
 
+function itemDespesaFixaParaPersistir(item: DespesaFixaRegistradaControle): ItemParaPersistirControle {
+  return { tipo: "DESPESA_FIXA", descricao: item.descricao, valor: item.valor, recorrente: true };
+}
+
 export type ResultadoGastoControle = {
   resposta: string;
   estado: EstadoControleFinanceiro;
@@ -885,12 +889,7 @@ export function salvarItensConfirmadosIA(
       // fora do catálogo, mantém o texto original em vez de descartar.
       cartaoNome: (item.cartao && normalizarNomeCartaoControle(item.cartao)) || item.cartao,
     })),
-    ...resultadoFixas.adicionados.map((item) => ({
-      tipo: "DESPESA_FIXA" as const,
-      descricao: item.descricao,
-      valor: item.valor,
-      recorrente: true,
-    })),
+    ...resultadoFixas.adicionados.map(itemDespesaFixaParaPersistir),
   ];
 
   if (receitas.length === 1 && variaveis.length === 0 && fixas.length === 0) {
@@ -1103,12 +1102,7 @@ function processarConfirmacaoPendenteDespesaFixa(
       estado,
       atualizouEstado: true,
       etapa: "AGUARDANDO_GASTOS",
-      itensParaPersistir: resultadoAdicao.adicionados.map((item) => ({
-        tipo: "DESPESA_FIXA" as const,
-        descricao: item.descricao,
-        valor: item.valor,
-        recorrente: true,
-      })),
+      itensParaPersistir: resultadoAdicao.adicionados.map(itemDespesaFixaParaPersistir),
     };
   }
 
@@ -1320,9 +1314,7 @@ export function gerenciarDespesasFixasControle(
           resumoDespesasFixasAtualizado(estado),
         estado,
         atualizouEstado: true,
-        itensParaPersistir: [
-          { tipo: "DESPESA_FIXA", descricao: item.descricao, valor: item.valor, recorrente: true },
-        ],
+        itensParaPersistir: [itemDespesaFixaParaPersistir(item)],
       };
     }
 
@@ -1361,12 +1353,7 @@ export function gerenciarDespesasFixasControle(
         resumoDespesasFixasAtualizado(estado),
       estado,
       atualizouEstado: resultadoAdicao.adicionados.length > 0,
-      itensParaPersistir: resultadoAdicao.adicionados.map((item) => ({
-        tipo: "DESPESA_FIXA" as const,
-        descricao: item.descricao,
-        valor: item.valor,
-        recorrente: true,
-      })),
+      itensParaPersistir: resultadoAdicao.adicionados.map(itemDespesaFixaParaPersistir),
     };
   }
 
