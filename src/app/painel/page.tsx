@@ -169,7 +169,7 @@ export default async function Home() {
           </p>
         </div>
         <div className="qa-hero-chart">
-          <QaTrendChart data={mrrTrend} dataKey="mrr" color="#00bfff" formatValue={fmt} />
+          <QaTrendChart data={mrrTrend} dataKey="mrr" color="#00bfff" />
         </div>
       </QaReveal>
 

@@ -5,22 +5,26 @@ import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 
 type QaTrendPoint = Record<string, number | string>;
 
+const fmtBRL = (v: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
 /**
  * Mini gráfico de área usado dentro do .qa-hero — linha suave com
  * gradiente translúcido, sem eixo/grade pesados (estilo "banco premium").
+ * Formata o valor do tooltip como BRL sempre — a função de formatação
+ * roda aqui dentro (componente cliente), não pode vir via prop de um
+ * Server Component (Next.js não serializa função como prop de cliente).
  */
 export function QaTrendChart({
   data,
   dataKey,
   labelKey = "label",
   color = "#00bfff",
-  formatValue,
 }: {
   data: QaTrendPoint[];
   dataKey: string;
   labelKey?: string;
   color?: string;
-  formatValue?: (v: number) => string;
 }) {
   const gradId = useId();
 
@@ -45,7 +49,7 @@ export function QaTrendChart({
           }}
           labelStyle={{ color: "#9ca3af", marginBottom: 2 }}
           itemStyle={{ color: "#fff" }}
-          formatter={(value) => [formatValue ? formatValue(Number(value)) : String(value), ""]}
+          formatter={(value) => [fmtBRL(Number(value)), ""]}
           labelFormatter={(_, payload) => payload?.[0]?.payload?.[labelKey] ?? ""}
         />
         <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#${gradId})`} />
