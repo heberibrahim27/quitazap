@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { IconUsers, IconWallet, IconTrendUp, IconAlertTriangle, IconCheckCircle, IconArrowUpRight, IconPlus } from "@/components/icons";
+import { QaReveal } from "@/components/QaReveal";
+import { QaTrendChart } from "@/components/QaTrendChart";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,12 +14,24 @@ function fmtData(data: Date) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(data));
 }
 
+// Mês/ano atual em horário de Brasília — mesmo padrão do Financeiro, evita
+// que um cliente cadastrado nas primeiras ~3h UTC do mês seguinte conte
+// como se já fosse do mês novo no gráfico de crescimento do MRR.
+function mesAtualBrasil(): { ano: number; mes: number } {
+  const [anoTxt, mesTxt] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit",
+  }).format(new Date()).split("-");
+  return { ano: Number(anoTxt), mes: Number(mesTxt) - 1 };
+}
+
 const PRECO_MENSAL = 29.90; // R$ por assinante/mês
+const NOMES_MES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 async function buscarCustoIA(): Promise<{ gastoMes: number; gastoPagantes: number; gastoGratuitos: number }> {
   try {
     const { prisma } = await import("@/lib/prisma");
-    const inicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const { ano, mes } = mesAtualBrasil();
+    const inicio = new Date(Date.UTC(ano, mes, 1, 3, 0, 0, 0));
 
     const [pagantes, gratuitos] = await Promise.all([
       prisma.logIA.aggregate({
@@ -67,6 +81,17 @@ export default async function Home() {
 
   // MRR = assinantes pagantes × R$29,90
   const mrr = pagantes.length * PRECO_MENSAL;
+
+  // Crescimento do MRR nos últimos 6 meses (cliente pagante contado a
+  // partir do mês em que se cadastrou — sem dado de cancelamento hoje,
+  // então é um crescimento acumulado, não "MRR líquido de churn").
+  const { ano: anoAtualBR, mes: mesAtualBR } = mesAtualBrasil();
+  const mrrTrend = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(anoAtualBR, mesAtualBR - (5 - i), 1);
+    const inicioProximoMesBrasil = new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 1, 3, 0, 0, 0));
+    const qtd = pagantes.filter((c) => new Date(c.criadoEm) < inicioProximoMesBrasil).length;
+    return { label: NOMES_MES_CURTO[d.getMonth()], mrr: qtd * PRECO_MENSAL };
+  });
 
   // Receita total estimada (meses ativos × R$29,90)
   const receitaTotal = pagantes.reduce((acc, c) => {
@@ -135,69 +160,77 @@ export default async function Home() {
         </div>
       )}
 
+      <QaReveal className="qa-hero">
+        <div>
+          <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconWallet size={14} /> Receita mensal recorrente (MRR)</p>
+          <strong className="qa-hero-value">{fmt(mrr)}</strong>
+          <p className="qa-hero-caption">
+            {pagantes.length} cliente{pagantes.length !== 1 ? "s" : ""} pagante{pagantes.length !== 1 ? "s" : ""} · lucro estimado {fmt(lucroEstimado)}/mês
+          </p>
+        </div>
+        <div className="qa-hero-chart">
+          <QaTrendChart data={mrrTrend} dataKey="mrr" color="#00bfff" formatValue={fmt} />
+        </div>
+      </QaReveal>
+
       <p style={{ margin: "0 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
         Assinantes
       </p>
       <div className="qa-stat-grid">
-        <div className="qa-stat-card">
+        <QaReveal className="qa-stat-card" delay={0}>
           <p className="qa-stat-label"><IconUsers size={14} /> Clientes pagos</p>
           <strong className="qa-stat-value" style={{ color: "#6ee7b7" }}>{pagantes.length}</strong>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.05}>
           <p className="qa-stat-label"><IconUsers size={14} /> Clientes gratuitos</p>
           <strong className="qa-stat-value" style={{ color: "#7dc4ff" }}>{gratuitos.length}</strong>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.1}>
           <p className="qa-stat-label">Total de clientes</p>
           <strong className="qa-stat-value">{clientes.length}</strong>
-        </div>
+        </QaReveal>
       </div>
 
       <p style={{ margin: "0 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
         Receita
       </p>
       <div className="qa-stat-grid">
-        <div className="qa-stat-card">
-          <p className="qa-stat-label"><IconWallet size={14} /> MRR (receita mensal)</p>
-          <strong className="qa-stat-value">{fmt(mrr)}</strong>
-          <p className="qa-stat-caption">{pagantes.length} × {fmt(PRECO_MENSAL)}</p>
-        </div>
-        <div className="qa-stat-card">
+        <QaReveal className="qa-stat-card" delay={0}>
           <p className="qa-stat-label">Receita total estimada</p>
           <strong className="qa-stat-value">{fmt(receitaTotal)}</strong>
           <p className="qa-stat-caption">acumulado histórico</p>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.05}>
           <p className="qa-stat-label">Planos gerados</p>
           <strong className="qa-stat-value">{totalPlanos}</strong>
-        </div>
+        </QaReveal>
       </div>
 
       <p style={{ margin: "0 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
         Operação
       </p>
       <div className="qa-stat-grid">
-        <div className="qa-stat-card">
+        <QaReveal className="qa-stat-card" delay={0}>
           <p className="qa-stat-label">Gasto IA este mês</p>
           <strong className="qa-stat-value" style={{ color: custoIABRL > 0 ? "#fca5a5" : "var(--qa-gray-500)" }}>
             {custoIABRL > 0 ? fmt(custoIABRL) : "R$ 0,00"}
           </strong>
           <p className="qa-stat-caption">pagantes {fmt(custoIAPagantesBRL)} · gratuitos {fmt(custoIAGratuitosBRL)}</p>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.05}>
           <p className="qa-stat-label"><IconTrendUp size={14} /> Lucro estimado/mês</p>
           <strong className="qa-stat-value" style={{ color: lucroEstimado >= 0 ? "#6ee7b7" : "#fca5a5" }}>
             {fmt(lucroEstimado)}
           </strong>
           <p className="qa-stat-caption">MRR − custo IA real</p>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.1}>
           <p className="qa-stat-label">Assinaturas em risco</p>
           <strong className="qa-stat-value" style={{ color: vencidas.length > 0 ? "#fca5a5" : vencendoEm7.length > 0 ? "#fcd34d" : "#6ee7b7" }}>
             {vencidas.length + vencendoEm7.length}
           </strong>
           <p className="qa-stat-caption">{vencidas.length} vencida{vencidas.length !== 1 ? "s" : ""} · {vencendoEm7.length} vencendo</p>
-        </div>
+        </QaReveal>
       </div>
 
       <div className="qa-card" style={{ marginTop: 8 }}>

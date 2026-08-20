@@ -407,6 +407,76 @@
   padding: 4px 0;
 }
 
+/* ── Hero (número em destaque, cartão "sólido" entre os de vidro) ── */
+.qa-hero {
+  position: relative;
+  background: linear-gradient(165deg, #0c1524 0%, #050a14 65%);
+  border: 1px solid var(--qa-line);
+  border-top-color: var(--qa-line-top);
+  border-radius: 26px;
+  padding: 32px 36px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.qa-hero::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -8%;
+  width: 55%;
+  height: 200%;
+  background: radial-gradient(circle, var(--qa-blue-glow), transparent 65%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.qa-hero-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--qa-gray-400);
+  position: relative;
+  z-index: 1;
+}
+
+.qa-hero-value {
+  margin: 10px 0 0;
+  font-size: 52px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--qa-ink);
+  position: relative;
+  z-index: 1;
+}
+
+.qa-hero-caption {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--qa-gray-400);
+  position: relative;
+  z-index: 1;
+}
+
+.qa-hero-chart {
+  position: relative;
+  z-index: 1;
+  width: 220px;
+  height: 84px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .qa-hero-value { font-size: 40px; }
+  .qa-hero-chart { width: 100%; height: 70px; }
+}
+
 /* ── Forms (floating label, estilo Liquid Glass) ── */
 .qa-input-group {
   position: relative;

@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import { IconWallet, IconTrendUp, IconTarget, IconCheckCircle, IconAlertTriangle } from "@/components/icons";
+import { QaReveal } from "@/components/QaReveal";
+import { QaRing } from "@/components/QaRing";
 
 export const dynamic = "force-dynamic";
 
@@ -153,27 +155,40 @@ export default async function FinanceiroPage() {
         </div>
       </div>
 
+      <QaReveal className="qa-hero">
+        <div>
+          <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconTrendUp size={14} /> Lucro líquido do mês</p>
+          <strong className="qa-hero-value" style={{ color: lucroPositivo ? undefined : "#fca5a5" }}>{fmt(lucroLiquido)}</strong>
+          <p className="qa-hero-caption">Receita líquida {fmt(receitaLiquida)} · Custos {fmt(custoIA + custoManualMes)}</p>
+        </div>
+        <QaRing
+          value={margem}
+          color={lucroPositivo ? "#10b981" : "#ef4444"}
+          label={`${Math.round(margem * 100)}%`}
+        />
+      </QaReveal>
+
       <div className="qa-stat-grid">
-        <div className="qa-stat-card">
+        <QaReveal className="qa-stat-card" delay={0}>
           <p className="qa-stat-label">Assinantes pagos</p>
           <strong className="qa-stat-value" style={{ color: "#6ee7b7" }}>{totalAssinantes}</strong>
           <p className="qa-stat-caption">+ {totalGratuitos} gratuito{totalGratuitos !== 1 ? "s" : ""} (não contabilizados)</p>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.05}>
           <p className="qa-stat-label"><IconWallet size={13} /> Receita bruta/mês</p>
           <strong className="qa-stat-value">{fmt(receitaBruta)}</strong>
           <p className="qa-stat-caption">{totalAssinantes} × {fmt(PRECO_MENSAL)}</p>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.1}>
           <p className="qa-stat-label">Comissão CAKTO (5,3%)</p>
           <strong className="qa-stat-value" style={{ color: "#fcd34d" }}>- {fmt(comissaoCakto)}</strong>
           <p className="qa-stat-caption">Descontado automaticamente</p>
-        </div>
-        <div className="qa-stat-card">
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.15}>
           <p className="qa-stat-label"><IconTrendUp size={13} /> Lucro líquido/mês</p>
           <strong className="qa-stat-value" style={{ color: lucroPositivo ? "#6ee7b7" : "#fca5a5" }}>{fmt(lucroLiquido)}</strong>
           <p className="qa-stat-caption">Margem: {pct(margem)}</p>
-        </div>
+        </QaReveal>
       </div>
 
       {breakEvenClientes != null && clientesFaltam !== null && clientesFaltam > 0 && (
