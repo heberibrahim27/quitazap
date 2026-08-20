@@ -634,6 +634,44 @@ test("mensagem sem nenhum valor com cara de dinheiro continua fora de escopo", (
 test("horario escrito com virgula em vez de dois-pontos nao e confundido com valor em dinheiro", () => {
   assert.equal(avaliarEscopoFinanceiro("cheguei em casa umas 22,30 hoje").emEscopo, false);
   assert.equal(avaliarEscopoFinanceiro("sai daqui as 18,30h").emEscopo, false);
+  // "30,00" não é hora plausível (não existe hora 30) — mesmo colado num
+  // sufixo de hora, o número em si desqualifica a leitura como horário.
+  assert.equal(avaliarEscopoFinanceiro("torrei 30,00 hs atras").emEscopo, true);
+});
+
+test("gasto sem palavra-gatilho com 'hoje'/'da manha' etc. continua em escopo (item 7)", () => {
+  // Achado do item 7: a 1ª versão da checagem de "hora escrita com vírgula"
+  // (regex única) excluía qualquer "X,XX hoje"/"X,XX da manhã" mesmo sem
+  // nenhuma pista de horário ANTES do número — derrubando de volta pra
+  // fora de escopo frases comuns de gasto sem palavra-gatilho (a mesma
+  // classe que o item 2 tinha acabado de resolver). Só deveria tratar como
+  // horário quando também há "as"/"umas"/"pelas"... antes do número.
+  assert.equal(avaliarEscopoFinanceiro("torrei 30,00 hoje").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("torrei 30,00 hoje na padaria").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("queimei 45,00 hoje de gasolina").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("desembolsei 45,00 hoje").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("amiga me devolveu 45,00 hoje").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("cheguei em casa 22,30 hoje").emEscopo, true);
+  assert.equal(deveChamarInterpretadorFinanceiroIA("torrei 30,00 hoje"), true);
+});
+
+test("'uns'/'umas'/'a' antes do valor nao derruba dinheiro de verdade fora de escopo", () => {
+  // Achado do code-review no item 7: a 1ª correção exigia só uma palavra
+  // de contexto antes do número ("as"/"umas"/"a"...) — mas essas mesmas
+  // palavras também são jeito comum de escrever quantia aproximada
+  // ("uns 30 reais", "consegui a 30,00"), então continuavam derrubando
+  // mensagem de dinheiro real fora de escopo. O critério decisivo agora é
+  // se o número tem cara de horário (hora 0-23, minuto 0-59) — "30,00" não
+  // é hora plausível, então "uns"/"a" antes dele não muda nada.
+  assert.equal(avaliarEscopoFinanceiro("peguei uns 30,00 hoje").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("ganhei umas 45,00 hoje no boteco").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("consegui a 30,00 hoje").emEscopo, true);
+  assert.equal(deveChamarInterpretadorFinanceiroIA("recebi a 30,00 hoje"), true);
+});
+
+test("'por volta das' (variante de 'por volta de') continua reconhecida como horario", () => {
+  assert.equal(avaliarEscopoFinanceiro("cheguei por volta das 22,30 hoje").emEscopo, false);
+  assert.equal(avaliarEscopoFinanceiro("cheguei por volta de 22,30 hoje").emEscopo, false);
 });
 
 test("resolverIntencaoFinanceiraIA devolve null (nao um objeto vazio) quando nao acha nenhum item, mesmo com IA remota ligada", async () => {

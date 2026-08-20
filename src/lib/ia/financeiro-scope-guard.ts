@@ -116,11 +116,52 @@ const ALIASES_CARTAO_ESCOPO = [
 // critério já usado em gasto-flow.ts pra filtrar candidato a valor de
 // gasto — reaproveitado aqui pra ampliar o que conta como "mensagem
 // financeira" sem abrir mão de exigir que pareça mesmo um valor.
-// O ramo de valor com vírgula (ex: "45,00") exclui o caso de vir seguido de
-// marcador de horário ("22,30 hoje", "22,30h") — gente às vezes escreve
-// hora com vírgula em vez de dois-pontos, e isso não é dinheiro nenhum.
-const TEM_VALOR_MONETARIO_FORTE =
-  /\b\d[\d.]*,\d{2}\b(?!\s*(?:h|hs|hrs|horas|hoje|da manha|da tarde|da noite)\b)|\br\$\s*\d|\b\d[\d.,]*\s*(?:reais|real)\b/;
+//
+// O caso de horário escrito com vírgula ("cheguei umas 22,30 hoje", "sai as
+// 18,30h") não pode ser confundido com dinheiro — mas a 1ª versão dessa
+// checagem (regex única, achado do item 7) excluía QUALQUER "X,XX hoje"/
+// "X,XX da manhã" mesmo sem nenhuma pista de horário antes do número,
+// derrubando de volta pra fora de escopo frases comuns de gasto sem
+// palavra-gatilho como "torrei 30,00 hoje" ou "queimei 45,00 hoje de
+// gasolina" — exatamente a classe de mensagem que essa checagem existe pra
+// cobrir. Uma 2ª versão (ainda no item 7) passou a exigir também uma pista
+// de horário ANTES do número ("as"/"umas"/"pelas"...) — mas "umas"/"uns"/"a"
+// sozinhos também são jeito comum de escrever quantia aproximada ("peguei
+// uns 30,00 hoje", "ganhei umas 45,00"), então continuavam derrubando
+// mensagem de dinheiro de verdade. O critério decisivo de verdade é se o
+// número TEM CARA de horário: hora entre 0-23 e minuto entre 0-59 ("22,30"
+// é plausível, "30,00" não existe como hora). Só trata como horário quando
+// o número é hora-plausível E: (a) vem colado num sufixo de hora ("18,30h"
+// — inequívoco em qualquer contexto), ou (b) tem uma pista de horário antes
+// *e* um marcador de período do dia depois ("hoje"/"da manhã"...).
+const PISTA_HORARIO_ANTES = /\b(?:as|umas|uns|pelas|pelos|la pelas|por volta d[ae]s?)\s*$/;
+const PISTA_HORARIO_DEPOIS_FORTE = /^\s*(?:h|hs|hrs|horas)\b/;
+const PISTA_HORARIO_DEPOIS_FRACA = /^\s*(?:hoje|da manha|da tarde|da noite)\b/;
+
+function pareceHorarioPlausivel(horaTexto: string, minutoTexto: string): boolean {
+  const hora = Number(horaTexto.replace(/\./g, ""));
+  const minuto = Number(minutoTexto);
+  return Number.isInteger(hora) && hora >= 0 && hora <= 23 && Number.isInteger(minuto) && minuto >= 0 && minuto <= 59;
+}
+
+function pareceValorMonetarioForte(texto: string): boolean {
+  if (/\br\$\s*\d/.test(texto)) return true;
+  if (/\b\d[\d.,]*\s*(?:reais|real)\b/.test(texto)) return true;
+
+  const regexDecimal = /\b(\d[\d.]*),(\d{2})\b/g;
+  let match: RegExpExecArray | null;
+  while ((match = regexDecimal.exec(texto))) {
+    const antes = texto.slice(0, match.index);
+    const depois = texto.slice(match.index + match[0].length);
+    const horaPlausivel = pareceHorarioPlausivel(match[1], match[2]);
+
+    if (horaPlausivel && PISTA_HORARIO_DEPOIS_FORTE.test(depois)) continue;
+    if (horaPlausivel && PISTA_HORARIO_ANTES.test(antes) && PISTA_HORARIO_DEPOIS_FRACA.test(depois)) continue;
+    return true;
+  }
+
+  return false;
+}
 
 function pareceGastoEmCartao(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
@@ -149,7 +190,7 @@ export function avaliarEscopoFinanceiro(mensagem: string): FinanceiroIntent {
   const emEscopo =
     PADROES_ESCOPO.some((regex) => regex.test(texto)) ||
     pareceGastoEmCartao(mensagem) ||
-    TEM_VALOR_MONETARIO_FORTE.test(texto);
+    pareceValorMonetarioForte(texto);
 
   return emEscopo
     ? {
@@ -187,7 +228,7 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   // não achou nada (ver resolverIntencaoFinanceiraIA), então não substitui
   // os resolvedores locais — só evita que a mensagem pule direto pro
   // fallback 100% regex de registrarGastoControle sem passar pela IA.
-  if (TEM_VALOR_MONETARIO_FORTE.test(texto)) return true;
+  if (pareceValorMonetarioForte(texto)) return true;
   return false;
 }
 
