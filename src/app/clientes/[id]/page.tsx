@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import { AlertaBanner } from "@/components/AlertaBanner";
+import { IconAlertTriangle, IconCheckCircle, IconClock } from "@/components/icons";
 
 function fmt(valor: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
@@ -12,12 +13,21 @@ function fmtData(data: Date | null) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(data));
 }
 
-const STATUS_ATEND: Record<string, { label: string; bg: string; color: string }> = {
-  NOVO:                    { label: "🆕 Novo",                   bg: "#dbeafe", color: "#1e40af" },
-  AGUARDANDO_INFORMACOES:  { label: "⏳ Aguardando informações", bg: "#fef9c3", color: "#854d0e" },
-  PLANO_GERADO:            { label: "📋 Plano gerado",           bg: "#f3e8ff", color: "#6b21a8" },
-  ACOMPANHAMENTO:          { label: "🔄 Acompanhamento",         bg: "#dcfce7", color: "#166534" },
-  ENCERRADO:               { label: "✅ Encerrado",              bg: "#f1f5f9", color: "#475569" },
+const STATUS_ATEND: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  NOVO:                    { label: "Novo",                   bg: "rgba(0,123,255,0.12)",   color: "#7dc4ff", border: "rgba(0,123,255,0.3)" },
+  AGUARDANDO_INFORMACOES:  { label: "Aguardando informações", bg: "rgba(245,158,11,0.12)",  color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
+  PLANO_GERADO:            { label: "Plano gerado",           bg: "rgba(167,139,250,0.12)", color: "#c4b5fd", border: "rgba(167,139,250,0.3)" },
+  ACOMPANHAMENTO:          { label: "Acompanhamento",         bg: "rgba(16,185,129,0.12)",  color: "#6ee7b7", border: "rgba(16,185,129,0.25)" },
+  ENCERRADO:               { label: "Encerrado",              bg: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "rgba(255,255,255,0.12)" },
+};
+
+const estiloExcluir: React.CSSProperties = {
+  background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5",
+  padding: "11px 18px", borderRadius: 12, fontWeight: 600, fontSize: 13.5,
+};
+const estiloResetar: React.CSSProperties = {
+  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "#e5e7eb",
+  padding: "11px 18px", borderRadius: 12, fontWeight: 600, fontSize: 13.5,
 };
 
 export default async function ClienteDetalhePage({
@@ -81,186 +91,176 @@ export default async function ClienteDetalhePage({
   };
 
   return (
-    <main className="page-shell">
-      <section className="page-container">
+    <div>
+      {ok && mensagemOk[ok] && (
+        <AlertaBanner tipo={ok === "resetado" ? "info" : "sucesso"} mensagem={mensagemOk[ok]} />
+      )}
 
-        {ok && mensagemOk[ok] && (
-          <AlertaBanner tipo={ok === "resetado" ? "info" : "sucesso"} mensagem={mensagemOk[ok]} />
-        )}
-
-        {/* ── Cabeçalho ── */}
-        <div className="page-header">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-              <h1 className="page-title" style={{ margin: 0 }}>{cliente.nome}</h1>
-              <span style={{
-                background: statusInfo.bg, color: statusInfo.color,
-                padding: "3px 10px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-              }}>
-                {statusInfo.label}
-              </span>
-            </div>
-            <p className="page-subtitle" style={{ marginBottom: 2 }}>📱 {cliente.telefone}</p>
-            {cliente.email && (
-              <p className="page-subtitle" style={{ marginBottom: 2 }}>✉️ {cliente.email}</p>
-            )}
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>
-              {planos > 0
-                ? `📋 ${planos} plano${planos !== 1 ? "s" : ""} enviado${planos !== 1 ? "s" : ""}`
-                : "Nenhum plano enviado ainda"}
-              {" · "}desde {fmtData(cliente.criadoEm)}
-            </p>
+      {/* ── Cabeçalho ── */}
+      <div className="qa-page-header">
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+            <h1 className="qa-page-title" style={{ margin: 0 }}>{cliente.nome}</h1>
+            <span className="qa-badge" style={{ background: statusInfo.bg, color: statusInfo.color, border: `1px solid ${statusInfo.border}` }}>
+              {statusInfo.label}
+            </span>
           </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
-            <Link href={`/clientes/${id}/editar`} className="btn-secondary">Editar</Link>
-            <ExcluirForm
-              action={resetarCliente}
-              mensagem={`Reiniciar a conversa de "${cliente.nome}"? Isso apaga todas as dívidas e planos, mas mantém o cadastro.`}
-              label="🔄 Reiniciar"
-            />
-            <ExcluirForm
-              action={excluirCliente}
-              mensagem={`Excluir o cliente "${cliente.nome}"? Esta ação não pode ser desfeita.`}
-              label="Excluir"
-            />
-            <Link href="/clientes" className="btn-secondary">Voltar</Link>
-          </div>
+          <p className="qa-page-subtitle" style={{ marginBottom: 2 }}>{cliente.telefone}</p>
+          {cliente.email && (
+            <p className="qa-page-subtitle" style={{ marginBottom: 2 }}>{cliente.email}</p>
+          )}
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--qa-gray-500)" }}>
+            {planos > 0
+              ? `${planos} plano${planos !== 1 ? "s" : ""} enviado${planos !== 1 ? "s" : ""}`
+              : "Nenhum plano enviado ainda"}
+            {" · "}desde {fmtData(cliente.criadoEm)}
+          </p>
         </div>
 
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <Link href={`/clientes/${id}/editar`} className="qa-btn-secondary">Editar</Link>
+          <ExcluirForm
+            action={resetarCliente}
+            mensagem={`Reiniciar a conversa de "${cliente.nome}"? Isso apaga todas as dívidas e planos, mas mantém o cadastro.`}
+            label="Reiniciar"
+            estiloBotao={estiloResetar}
+          />
+          <ExcluirForm
+            action={excluirCliente}
+            mensagem={`Excluir o cliente "${cliente.nome}"? Esta ação não pode ser desfeita.`}
+            label="Excluir"
+            estiloBotao={estiloExcluir}
+          />
+          <Link href="/clientes" className="qa-btn-secondary">Voltar</Link>
+        </div>
+      </div>
 
-        {/* ── Dados do cliente ── */}
-        <div style={{
-          background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 14,
-          padding: "20px", marginBottom: 20,
-        }}>
-          <h2 style={{ margin: "0 0 16px", fontSize: 16, color: "#0f172a" }}>Dados do cliente</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+      {/* ── Dados do cliente ── */}
+      <div className="qa-card" style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600 }}>Dados do cliente</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 18 }}>
 
+          <div>
+            <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Nome completo</span>
+            <strong style={{ fontSize: 14 }}>{cliente.nome}</strong>
+          </div>
+
+          <div>
+            <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>WhatsApp</span>
+            <strong style={{ fontSize: 14 }}>{cliente.telefone}</strong>
+          </div>
+
+          {cliente.email && (
             <div>
-              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Nome completo</span>
-              <strong style={{ fontSize: 14, color: "#0f172a" }}>{cliente.nome}</strong>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>E-mail</span>
+              <strong style={{ fontSize: 14 }}>{cliente.email}</strong>
             </div>
+          )}
 
+          {cliente.cpf && (
             <div>
-              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>WhatsApp</span>
-              <strong style={{ fontSize: 14, color: "#0f172a" }}>{cliente.telefone}</strong>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>CPF</span>
+              <strong style={{ fontSize: 14 }}>{cliente.cpf}</strong>
             </div>
+          )}
 
-            {cliente.email && (
-              <div>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>E-mail</span>
-                <strong style={{ fontSize: 14, color: "#0f172a" }}>{cliente.email}</strong>
-              </div>
-            )}
-
-            {cliente.cpf && (
-              <div>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>CPF</span>
-                <strong style={{ fontSize: 14, color: "#0f172a" }}>{cliente.cpf}</strong>
-              </div>
-            )}
-
-            {cliente.rendaMensal && (
-              <div>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Renda mensal</span>
-                <strong style={{ fontSize: 14, color: "#166534" }}>{fmt(Number(cliente.rendaMensal))}</strong>
-              </div>
-            )}
-
-            {cliente.despesasFixas && (
-              <div>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Despesas fixas</span>
-                <strong style={{ fontSize: 14, color: "#0f172a" }}>{fmt(Number(cliente.despesasFixas))}</strong>
-              </div>
-            )}
-
-            {cliente.valorDisponivelMensal && (
-              <div>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Disponível/mês</span>
-                <strong style={{ fontSize: 14, color: "#2563eb" }}>{fmt(Number(cliente.valorDisponivelMensal))}</strong>
-              </div>
-            )}
-
+          {cliente.rendaMensal && (
             <div>
-              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Cliente desde</span>
-              <strong style={{ fontSize: 14, color: "#0f172a" }}>{fmtData(cliente.criadoEm)}</strong>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Renda mensal</span>
+              <strong style={{ fontSize: 14, color: "#6ee7b7" }}>{fmt(Number(cliente.rendaMensal))}</strong>
             </div>
+          )}
 
+          {cliente.despesasFixas && (
             <div>
-              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Meses ativo</span>
-              <strong style={{ fontSize: 14, color: "#0f172a" }}>{mesesAtivo} mês{mesesAtivo !== 1 ? "es" : ""}</strong>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Despesas fixas</span>
+              <strong style={{ fontSize: 14 }}>{fmt(Number(cliente.despesasFixas))}</strong>
             </div>
+          )}
 
+          {cliente.valorDisponivelMensal && (
             <div>
-              <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Total em assinaturas</span>
-              {(cliente as { gratuito?: boolean }).gratuito ? (
-                <strong style={{ fontSize: 14, color: "#2563eb" }}>🎁 Gratuito</strong>
-              ) : (
-                <strong style={{ fontSize: 14, color: "#7c3aed" }}>{fmt(totalAssinaturas)}</strong>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Disponível/mês</span>
+              <strong style={{ fontSize: 14, color: "#7dc4ff" }}>{fmt(Number(cliente.valorDisponivelMensal))}</strong>
+            </div>
+          )}
+
+          <div>
+            <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Cliente desde</span>
+            <strong style={{ fontSize: 14 }}>{fmtData(cliente.criadoEm)}</strong>
+          </div>
+
+          <div>
+            <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Meses ativo</span>
+            <strong style={{ fontSize: 14 }}>{mesesAtivo} mês{mesesAtivo !== 1 ? "es" : ""}</strong>
+          </div>
+
+          <div>
+            <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Total em assinaturas</span>
+            {(cliente as { gratuito?: boolean }).gratuito ? (
+              <strong style={{ fontSize: 14, color: "#7dc4ff" }}>Gratuito</strong>
+            ) : (
+              <strong style={{ fontSize: 14, color: "#c4b5fd" }}>{fmt(totalAssinaturas)}</strong>
+            )}
+          </div>
+
+          {!(cliente as { gratuito?: boolean }).gratuito && (
+            <div>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Assinatura vence em</span>
+              {(cliente as { assinaturaVenceEm?: Date | null }).assinaturaVenceEm ? (() => {
+                const vence = new Date((cliente as { assinaturaVenceEm: Date }).assinaturaVenceEm);
+                const hoje = new Date();
+                const diasRestantes = Math.ceil((vence.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                const vencido = diasRestantes < 0;
+                const urgente = diasRestantes <= 5 && diasRestantes >= 0;
+                const cor = vencido ? "#fca5a5" : urgente ? "#fcd34d" : "#6ee7b7";
+                const Icone = vencido ? IconAlertTriangle : urgente ? IconClock : IconCheckCircle;
+                return (
+                  <strong style={{ fontSize: 14, color: cor, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Icone size={14} /> {fmtData(vence)}
+                    {!vencido && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--qa-gray-500)" }}>({diasRestantes}d)</span>}
+                  </strong>
+                );
+              })() : (
+                <strong style={{ fontSize: 14, color: "var(--qa-gray-500)", fontWeight: 500 }}>Não definida</strong>
               )}
             </div>
+          )}
 
-            {!(cliente as { gratuito?: boolean }).gratuito && (
-              <div>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Assinatura vence em</span>
-                {(cliente as { assinaturaVenceEm?: Date | null }).assinaturaVenceEm ? (() => {
-                  const vence = new Date((cliente as { assinaturaVenceEm: Date }).assinaturaVenceEm);
-                  const hoje = new Date();
-                  const diasRestantes = Math.ceil((vence.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-                  const vencido = diasRestantes < 0;
-                  const urgente = diasRestantes <= 5 && diasRestantes >= 0;
-                  return (
-                    <strong style={{ fontSize: 14, color: vencido ? "#dc2626" : urgente ? "#d97706" : "#166534" }}>
-                      {vencido ? "⚠️ Vencida" : urgente ? "⏳" : "✅"} {fmtData(vence)}
-                      {!vencido && <span style={{ fontSize: 12, fontWeight: 400, marginLeft: 4 }}>({diasRestantes}d)</span>}
-                    </strong>
-                  );
-                })() : (
-                  <strong style={{ fontSize: 14, color: "#94a3b8" }}>Não definida</strong>
-                )}
-              </div>
-            )}
-
-            {cliente.obs && (
-              <div style={{ gridColumn: "1 / -1" }}>
-                <span style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 2 }}>Observações</span>
-                <span style={{ fontSize: 14, color: "#475569" }}>{cliente.obs}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-
-        {/* ── Último plano enviado ── */}
-        {ultimoPlano && (
-          <div style={{
-            background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 14,
-            padding: "20px",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 16, color: "#0f172a" }}>Último plano enviado</h2>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>{fmtData(ultimoPlano.criadoEm)}</span>
+          {cliente.obs && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Observações</span>
+              <span style={{ fontSize: 14, color: "var(--qa-ink-70)" }}>{cliente.obs}</span>
             </div>
-            <pre style={{
-              margin: 0,
-              whiteSpace: "pre-wrap",
-              fontFamily: "inherit",
-              fontSize: 13,
-              color: "#475569",
-              lineHeight: 1.6,
-              background: "#f8fafc",
-              borderRadius: 10,
-              padding: "14px 16px",
-              maxHeight: 320,
-              overflowY: "auto",
-            }}>
-              {ultimoPlano.texto}
-            </pre>
-          </div>
-        )}
+          )}
+        </div>
+      </div>
 
-      </section>
-    </main>
+      {/* ── Último plano enviado ── */}
+      {ultimoPlano && (
+        <div className="qa-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Último plano enviado</h2>
+            <span style={{ fontSize: 12, color: "var(--qa-gray-500)" }}>{fmtData(ultimoPlano.criadoEm)}</span>
+          </div>
+          <pre style={{
+            margin: 0,
+            whiteSpace: "pre-wrap",
+            fontFamily: "inherit",
+            fontSize: 13,
+            color: "var(--qa-gray-400)",
+            lineHeight: 1.6,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid var(--qa-line-soft)",
+            borderRadius: 12,
+            padding: "14px 16px",
+            maxHeight: 320,
+            overflowY: "auto",
+          }}>
+            {ultimoPlano.texto}
+          </pre>
+        </div>
+      )}
+    </div>
   );
 }

@@ -85,42 +85,32 @@ export default function TestarFunilPage() {
   const [abaAtiva, setAbaAtiva] = useState<Aba>("funil");
 
   return (
-    <main className="page-shell">
-      <section style={{ maxWidth: 740, margin: "0 auto" }}>
-        <div style={{ marginBottom: 20 }}>
-          <h1 className="page-title">🧪 Simulador</h1>
-          <p className="page-subtitle">Teste o funil de vendas e o bot de IA do QuitaZAP</p>
+    <div style={{ maxWidth: 740 }}>
+      <div className="qa-page-header">
+        <div>
+          <h1 className="qa-page-title">Simulador</h1>
+          <p className="qa-page-subtitle">Teste o funil de vendas e o bot de IA do QuitaZAP</p>
         </div>
+      </div>
 
-        {/* Abas */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {[
-            { id: "funil" as Aba, label: "📢 Funil de Vendas" },
-            { id: "bot"   as Aba, label: "🤖 Bot QuitaZAP" },
-          ].map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setAbaAtiva(id)}
-              style={{
-                padding: "9px 20px",
-                borderRadius: 10,
-                border: "none",
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: "pointer",
-                background: abaAtiva === id ? "#075E54" : "#e2e8f0",
-                color: abaAtiva === id ? "#fff" : "#374151",
-                transition: "all 0.15s",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Abas */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[
+          { id: "funil" as Aba, label: "Funil de vendas" },
+          { id: "bot"   as Aba, label: "Bot QuitaZAP" },
+        ].map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setAbaAtiva(id)}
+            className={abaAtiva === id ? "qa-btn-primary" : "qa-btn-secondary"}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        {abaAtiva === "funil" ? <AbaFunil /> : <AbaBot />}
-      </section>
-    </main>
+      {abaAtiva === "funil" ? <AbaFunil /> : <AbaBot />}
+    </div>
   );
 }
 
@@ -223,9 +213,9 @@ function AbaFunil() {
       />
 
       {/* Enviar para número real */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 20 }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#0f172a" }}>📱 Testar no WhatsApp real</h3>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#64748b" }}>
+      <div className="qa-card">
+        <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>Testar no WhatsApp real</h3>
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--qa-gray-400)" }}>
           Insira um número não cadastrado para receber a mensagem de boas-vindas do funil agora.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -234,16 +224,17 @@ function AbaFunil() {
             placeholder="5511999999999 (com DDI)"
             value={telefoneReal}
             onChange={(e) => setTelefoneReal(e.target.value.replace(/\D/g, ""))}
-            style={{ flex: 1, minWidth: 200, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 14px", fontSize: 14 }}
+            className="qa-input"
+            style={{ flex: 1, minWidth: 200 }}
           />
           <button
             onClick={enviarParaNumeroReal}
             disabled={enviandoReal}
-            style={{ background: "#075E54", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+            className="qa-btn-primary"
           >{enviandoReal ? "Enviando..." : "Enviar boas-vindas"}</button>
         </div>
         {statusReal && (
-          <p style={{ margin: "10px 0 0", fontSize: 13, color: statusReal.startsWith("✅") ? "#16a34a" : "#dc2626" }}>
+          <p style={{ margin: "10px 0 0", fontSize: 13, color: statusReal.startsWith("✅") ? "#6ee7b7" : "#fca5a5" }}>
             {statusReal}
           </p>
         )}
@@ -377,17 +368,17 @@ function AbaBot() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Config */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <label style={{ fontSize: 13, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>Nome do cliente:</label>
+      <div className="qa-card" style={{ padding: "14px 18px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <label style={{ fontSize: 13, color: "var(--qa-gray-400)", fontWeight: 600, whiteSpace: "nowrap" }}>Nome do cliente:</label>
         <input
           value={nome}
           onChange={(e) => setNome(e.target.value)}
-          style={{ border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 14, width: 160 }}
+          className="qa-input"
+          style={{ width: 160, padding: "7px 12px" }}
         />
-        <button onClick={reiniciar} style={{
-          marginLeft: "auto", background: "#f1f5f9", border: "1px solid #e2e8f0",
-          borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, color: "#374151",
-        }}>↺ Reiniciar conversa</button>
+        <button onClick={reiniciar} className="qa-btn-secondary" style={{ marginLeft: "auto", padding: "7px 14px", fontSize: 13 }}>
+          Reiniciar conversa
+        </button>
       </div>
 
       {/* Chat */}
@@ -424,25 +415,25 @@ function AbaBot() {
       />
 
       {/* Respostas rápidas */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>⚡ Respostas rápidas</span>
-          <span style={{ fontSize: 12, color: "#9ca3af" }}>— clique para enviar sem digitar</span>
+      <div className="qa-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Respostas rápidas</span>
+          <span style={{ fontSize: 12, color: "var(--qa-gray-500)" }}>— clique para enviar sem digitar</span>
         </div>
 
         {RESPOSTAS_RAPIDAS.map(({ categoria, emoji, itens }) => (
-          <div key={categoria} style={{ borderBottom: "1px solid #f1f5f9" }}>
+          <div key={categoria} style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             <button
               onClick={() => setCategoriaAberta(categoriaAberta === categoria ? null : categoria)}
               style={{
-                width: "100%", textAlign: "left", background: categoriaAberta === categoria ? "#f0fdf4" : "#fff",
-                border: "none", padding: "10px 16px", cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 8,
+                width: "100%", textAlign: "left", background: categoriaAberta === categoria ? "rgba(0,123,255,0.08)" : "transparent",
+                border: "none", padding: "10px 18px", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 8, color: "#e5e7eb",
               }}
             >
               <span style={{ fontSize: 14 }}>{emoji}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{categoria}</span>
-              <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af" }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{categoria}</span>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--qa-gray-500)" }}>
                 {categoriaAberta === categoria ? "▲" : "▼"}
               </span>
             </button>
@@ -470,7 +461,7 @@ function AbaBot() {
         ))}
       </div>
 
-      <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", margin: 0 }}>
+      <p style={{ fontSize: 12, color: "var(--qa-gray-500)", textAlign: "center", margin: 0 }}>
         💡 Este chat chama a IA diretamente — sem WhatsApp. Respostas reais do bot.
       </p>
     </div>

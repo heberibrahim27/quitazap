@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { IconAlertTriangle, IconCheckCircle } from "@/components/icons";
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 function fmt(v: number) {
@@ -52,128 +54,111 @@ export default async function ParcelasVencidasPage() {
   const grupos = Object.values(porCliente).sort((a, b) => b.total - a.total);
 
   return (
-    <main className="page-shell">
-      <section className="page-container">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">⚠️ Parcelas vencidas</h1>
-            <p className="page-subtitle">
-              {parcelas.length} parcela{parcelas.length !== 1 ? "s" : ""} em atraso
-              em {grupos.length} cliente{grupos.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <Link href="/painel" className="btn-secondary">← Dashboard</Link>
+    <div>
+      <div className="qa-page-header">
+        <div>
+          <h1 className="qa-page-title">Parcelas vencidas</h1>
+          <p className="qa-page-subtitle">
+            {parcelas.length} parcela{parcelas.length !== 1 ? "s" : ""} em atraso
+            em {grupos.length} cliente{grupos.length !== 1 ? "s" : ""}
+          </p>
         </div>
+        <Link href="/painel" className="qa-btn-secondary">← Dashboard</Link>
+      </div>
 
-        {/* Resumo */}
-        {parcelas.length > 0 && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 14, marginBottom: 24,
-          }}>
-            <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 14, padding: "16px 20px" }}>
-              <p style={{ margin: 0, fontSize: 12, color: "#991b1b" }}>Total em atraso</p>
-              <strong style={{ display: "block", fontSize: 22, color: "#7f1d1d" }}>{fmt(totalValor)}</strong>
-            </div>
-            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 14, padding: "16px 20px" }}>
-              <p style={{ margin: 0, fontSize: 12, color: "#9a3412" }}>Parcelas</p>
-              <strong style={{ display: "block", fontSize: 22, color: "#7c2d12" }}>{parcelas.length}</strong>
-            </div>
-            <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 14, padding: "16px 20px" }}>
-              <p style={{ margin: 0, fontSize: 12, color: "#854d0e" }}>Clientes com atraso</p>
-              <strong style={{ display: "block", fontSize: 22, color: "#713f12" }}>{grupos.length}</strong>
-            </div>
+      {/* Resumo */}
+      {parcelas.length > 0 && (
+        <div className="qa-stat-grid">
+          <div className="qa-stat-card">
+            <p className="qa-stat-label">Total em atraso</p>
+            <strong className="qa-stat-value" style={{ color: "#fca5a5" }}>{fmt(totalValor)}</strong>
           </div>
-        )}
+          <div className="qa-stat-card">
+            <p className="qa-stat-label">Parcelas</p>
+            <strong className="qa-stat-value" style={{ color: "#fdba74" }}>{parcelas.length}</strong>
+          </div>
+          <div className="qa-stat-card">
+            <p className="qa-stat-label">Clientes com atraso</p>
+            <strong className="qa-stat-value" style={{ color: "#fcd34d" }}>{grupos.length}</strong>
+          </div>
+        </div>
+      )}
 
-        {parcelas.length === 0 ? (
-          <div className="content-card" style={{ textAlign: "center", padding: "40px 0" }}>
-            <p style={{ fontSize: 40, margin: "0 0 8px" }}>✅</p>
-            <p style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
-              Nenhuma parcela vencida!
-            </p>
-            <p style={{ margin: 0, color: "#64748b" }}>Todos os clientes estão em dia.</p>
+      {parcelas.length === 0 ? (
+        <div className="qa-card" style={{ textAlign: "center", padding: "40px 0" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: "#6ee7b7" }}>
+            <IconCheckCircle size={40} />
           </div>
-        ) : (
-          <div style={{ display: "grid", gap: 16 }}>
-            {grupos.map(({ cliente, parcelas: ps, total }) => (
-              <div key={cliente.id} className="content-card" style={{ padding: "20px 24px" }}>
-                {/* Cabeçalho do cliente */}
-                <div style={{
-                  display: "flex", justifyContent: "space-between",
-                  alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap",
-                }}>
-                  <div>
-                    <Link href={`/clientes/${cliente.id}`} style={{
-                      fontWeight: 700, fontSize: 16, color: "#0f172a",
-                      textDecoration: "underline", textDecorationColor: "#e2e8f0",
-                    }}>
-                      {cliente.nome}
-                    </Link>
-                    <span style={{ display: "block", fontSize: 13, color: "#64748b", marginTop: 2 }}>
-                      {cliente.telefone} · {ps.length} parcela{ps.length !== 1 ? "s" : ""} vencida{ps.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <strong style={{ color: "#dc2626", fontSize: 15 }}>{fmt(total)}</strong>
-                    <Link
-                      href={`/clientes/${cliente.id}/pagamento/novo`}
-                      style={{
-                        fontSize: 13, fontWeight: 700, color: "#16a34a",
-                        padding: "5px 12px", border: "1px solid #bbf7d0", borderRadius: 8,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Registrar pagamento
-                    </Link>
-                    <a
-                      href={`https://api.whatsapp.com/send?phone=55${cliente.telefone.replace(/\D/g, "")}&text=${encodeURIComponent(`Olá ${cliente.nome}, passando para lembrar sobre sua(s) parcela(s) em atraso. Podemos conversar?`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: 13, fontWeight: 700, color: "#16a34a",
-                        padding: "5px 12px", border: "1px solid #bbf7d0", borderRadius: 8,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      WhatsApp
-                    </a>
-                  </div>
+          <p style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 600 }}>
+            Nenhuma parcela vencida!
+          </p>
+          <p style={{ margin: 0, color: "var(--qa-gray-400)" }}>Todos os clientes estão em dia.</p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 16 }}>
+          {grupos.map(({ cliente, parcelas: ps, total }) => (
+            <div key={cliente.id} className="qa-card">
+              {/* Cabeçalho do cliente */}
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap",
+              }}>
+                <div>
+                  <Link href={`/clientes/${cliente.id}`} style={{ fontWeight: 700, fontSize: 15.5 }}>
+                    {cliente.nome}
+                  </Link>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--qa-gray-400)", marginTop: 2 }}>
+                    {cliente.telefone} · {ps.length} parcela{ps.length !== 1 ? "s" : ""} vencida{ps.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
-
-                {/* Parcelas do cliente */}
-                <div style={{ display: "grid", gap: 6 }}>
-                  {ps.map((p) => {
-                    const atraso = diasAtraso(p.vencimento);
-                    const cor = atraso > 30 ? "#dc2626" : atraso > 7 ? "#ea580c" : "#ca8a04";
-                    return (
-                      <div key={p.id} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "8px 12px", background: "#fef2f2", borderRadius: 8, gap: 12,
-                        flexWrap: "wrap",
-                      }}>
-                        <span style={{ fontSize: 13, color: "#64748b" }}>
-                          {p.divida.credor} · Parcela {p.numero}
-                        </span>
-                        <span style={{ fontSize: 13, color: "#64748b" }}>
-                          venceu em {fmtData(p.vencimento)}
-                        </span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: cor }}>
-                          {atraso}d de atraso
-                        </span>
-                        <strong style={{ fontSize: 14, color: "#0f172a" }}>
-                          {fmt(Number(p.valor))}
-                        </strong>
-                      </div>
-                    );
-                  })}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <strong style={{ color: "#fca5a5", fontSize: 15 }}>{fmt(total)}</strong>
+                  <Link href={`/clientes/${cliente.id}/pagamento/novo`} className="qa-btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
+                    Registrar pagamento
+                  </Link>
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=55${cliente.telefone.replace(/\D/g, "")}&text=${encodeURIComponent(`Olá ${cliente.nome}, passando para lembrar sobre sua(s) parcela(s) em atraso. Podemos conversar?`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="qa-btn-secondary"
+                    style={{ padding: "7px 14px", fontSize: 13 }}
+                  >
+                    WhatsApp
+                  </a>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
+
+              {/* Parcelas do cliente */}
+              <div style={{ display: "grid", gap: 6 }}>
+                {ps.map((p) => {
+                  const atraso = diasAtraso(p.vencimento);
+                  const cor = atraso > 30 ? "#fca5a5" : atraso > 7 ? "#fdba74" : "#fcd34d";
+                  return (
+                    <div key={p.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "9px 12px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)",
+                      borderRadius: 10, gap: 12, flexWrap: "wrap",
+                    }}>
+                      <span style={{ fontSize: 13, color: "var(--qa-gray-400)" }}>
+                        {p.divida.credor} · Parcela {p.numero}
+                      </span>
+                      <span style={{ fontSize: 13, color: "var(--qa-gray-400)" }}>
+                        venceu em {fmtData(p.vencimento)}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: cor, display: "flex", alignItems: "center", gap: 4 }}>
+                        <IconAlertTriangle size={12} /> {atraso}d de atraso
+                      </span>
+                      <strong style={{ fontSize: 14 }}>
+                        {fmt(Number(p.valor))}
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
