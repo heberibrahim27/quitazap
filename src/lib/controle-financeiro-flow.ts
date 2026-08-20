@@ -1563,26 +1563,62 @@ function obterCartaoConfigurado(
   return (estado.cartoes ?? []).find((item) => item.nome === cartao);
 }
 
+// As perguntas de "cartão"/"saldo" abaixo são frases fechadas — mas o
+// cliente raramente manda só "saldo": costuma vir cercado de educação
+// ("me diz", "queria saber", "?", "por favor"). Em vez de listar mais e
+// mais frases inteiras, tira esse verniz antes de comparar, assim as
+// mesmas regras enxutas continuam valendo pra "qual meu saldo?" e "me diz
+// meu saldo por favor" também.
+const PREFIXOS_FILLER_CONSULTA: RegExp[] = [
+  /^(?:me\s+)?(?:diz|fala|mostra|conta)\s+/,
+  /^(?:queria|quero|gostaria\s+de)\s+saber\s+/,
+  /^(?:voce\s+)?(?:pode\s+)?(?:me\s+)?(?:dizer|mostrar|falar)\s+/,
+  /^por\s+favor\s*,?\s*/,
+  /^qual\s+(?:e\s+|eh\s+)?/,
+  /^(?:o|a|os|as)\s+/,
+];
+
+function semFillerConsulta(texto: string): string {
+  // texto já chega normalizado (normalizarTexto já removeu "?"/"!" — só "."
+  // sobrevive, ex: "qual meu saldo."), e "por favor" no final também pode
+  // vir sem "?" antes dele.
+  let atual = texto.replace(/\.+$/, "").replace(/\s*,?\s*por\s+favor$/, "").trim();
+  let mudou = true;
+  while (mudou) {
+    mudou = false;
+    for (const prefixo of PREFIXOS_FILLER_CONSULTA) {
+      const semPrefixo = atual.replace(prefixo, "");
+      if (semPrefixo !== atual) {
+        atual = semPrefixo.trim();
+        mudou = true;
+      }
+    }
+  }
+  return atual;
+}
+
 function ehConsultaCartoesControle(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
-  return (
-    /^(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(texto) ||
-    /^quais\s+(?:sao\s+)?(?:os\s+)?meus\s+cartoes$/.test(texto) ||
-    /^ver\s+(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(texto) ||
-    /^mostrar\s+(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(texto)
+  const candidatos = [texto, semFillerConsulta(texto)];
+  return candidatos.some((candidato) =>
+    /^(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(candidato) ||
+    /^quais\s+(?:sao\s+)?(?:os\s+)?meus\s+cartoes$/.test(candidato) ||
+    /^ver\s+(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(candidato) ||
+    /^mostrar\s+(?:(?:meu|meus)\s+)?(?:cartao|cartoes)$/.test(candidato)
   );
 }
 
 function ehConsultaSaldoControle(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
-  return (
-    /^saldo$/.test(texto) ||
-    /^meu\s+saldo$/.test(texto) ||
-    /^saldo\s+do\s+mes$/.test(texto) ||
-    /^como\s+(?:esta|ta)\s+(?:o\s+)?(?:meu\s+)?saldo$/.test(texto) ||
-    /^quanto\s+(?:sobrou|tenho)(?:\s+no\s+mes)?$/.test(texto) ||
-    /^resumo(?:\s+do\s+mes)?$/.test(texto) ||
-    /^resumo\s+financeiro$/.test(texto)
+  const candidatos = [texto, semFillerConsulta(texto)];
+  return candidatos.some((candidato) =>
+    /^saldo$/.test(candidato) ||
+    /^meu\s+saldo$/.test(candidato) ||
+    /^saldo\s+do\s+mes$/.test(candidato) ||
+    /^como\s+(?:esta|ta)\s+(?:o\s+)?(?:meu\s+)?saldo$/.test(candidato) ||
+    /^quanto\s+(?:sobrou|tenho)(?:\s+no\s+mes)?$/.test(candidato) ||
+    /^resumo(?:\s+do\s+mes)?$/.test(candidato) ||
+    /^resumo\s+financeiro$/.test(candidato)
   );
 }
 

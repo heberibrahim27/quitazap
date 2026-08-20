@@ -2382,6 +2382,30 @@ test("consulta meus cartoes usa dados do Controle e mostra faturas abertas e fec
   assert.doesNotMatch(consultaDepois.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
+test("consulta saldo/cartões reconhece a pergunta cercada de educação, não só a frase exata", () => {
+  const { antesFechamento } = montarCenarioConsultasControle();
+
+  for (const mensagem of [
+    "me diz meu saldo",
+    "queria saber meu saldo",
+    "qual meu saldo?",
+    "qual é o meu saldo",
+    "você pode me dizer o saldo do mês?",
+    "por favor, saldo",
+    "por favor,saldo",
+  ]) {
+    assert.ok(consultarSaldoControle(mensagem, antesFechamento), mensagem);
+  }
+
+  for (const mensagem of ["me mostra meus cartões", "queria saber quais são meus cartões", "por favor, meus cartões?"]) {
+    assert.ok(consultarCartoesControle(mensagem, antesFechamento), mensagem);
+  }
+
+  // Continua não confundindo uma pergunta qualquer com pedido de saldo/cartão.
+  assert.equal(consultarSaldoControle("me diz uma piada", antesFechamento), null);
+  assert.equal(consultarCartoesControle("queria saber que horas são", antesFechamento), null);
+});
+
 test("consulta saldo mostra disponivel agora e seguro com fatura aberta", () => {
   const { antesFechamento } = montarCenarioConsultasControle();
   const consulta = consultarSaldoControle("como está meu saldo?", antesFechamento);
