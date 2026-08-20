@@ -33,7 +33,7 @@ export async function classificarConfirmacaoIA(
       { role: "user", content: mensagem },
     ],
     temperature: 0,
-    max_tokens: 20,
+    max_tokens: 40,
     response_format: { type: "json_object" },
   };
 

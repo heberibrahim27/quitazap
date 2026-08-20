@@ -98,6 +98,22 @@ test("mensagem sem prefixo/comando de tarefa não é capturada", () => {
   assert.equal(detectarComandoTarefa(""), null);
 });
 
+test("mensagem em linguagem natural, prefixada como o fallback de IA do webhook faz, extrai normalmente", () => {
+  // route.ts's classificarLembreteLivreIA fallback re-injeta a mensagem original
+  // com "lembrete: "/"pagamento: " na frente antes de chamar detectarComandoTarefa
+  // de novo — confirma que esse re-encaixe funciona igual pro parser determinístico.
+  const lembrete = detectarComandoTarefa("lembrete: me lembra de pagar a luz dia 10");
+  assert.equal(lembrete.comando, "CRIAR");
+  assert.equal(lembrete.resultado.ok, true);
+  assert.equal(lembrete.resultado.tarefa.tipo, "LEMBRETE");
+  assert.ok(lembrete.resultado.tarefa.vencimento);
+  assert.equal(new Date(lembrete.resultado.tarefa.vencimento).getUTCDate(), 10);
+
+  const pagamento = detectarComandoTarefa("pagamento: não esquece que preciso pagar o boleto do carro amanhã");
+  assert.equal(pagamento.comando, "CRIAR");
+  assert.equal(pagamento.resultado.tarefa.tipo, "PAGAMENTO");
+});
+
 test("'terminei de pagar ...' nao e capturado (e' o comando PAGUEI legado, nao tarefa)", () => {
   // Regressão: "terminei" já é gatilho do fluxo PAGUEI (route.ts) pra confirmar
   // pagamento de dívida. Não pode ser reaproveitado como sinônimo de "concluir

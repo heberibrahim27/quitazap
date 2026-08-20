@@ -101,6 +101,7 @@ const {
   resolverIntencaoFinanceiraIA,
 } = loadTsModule("src/lib/ia/financeiro-intent-resolver.ts");
 const { classificarConfirmacaoIA } = loadTsModule("src/lib/ia/confirmacao-resolver.ts");
+const { classificarLembreteLivreIA, devePularFallbackLembreteIA } = loadTsModule("src/lib/ia/tarefa-resolver.ts");
 
 const mensagemManual = `
 Salario liquido normal: 3812,68
@@ -2767,4 +2768,116 @@ test("classificarConfirmacaoIA retorna null quando a IA responde indefinido ou d
     process.env.OPENAI_API_KEY = originalApiKey;
     globalThis.fetch = originalFetch;
   }
+});
+
+// ── classificarLembreteLivreIA (fallback de IA pra lembrete sem prefixo "tarefa:") ──
+
+test("classificarLembreteLivreIA retorna null sem OPENAI_API_KEY ou mensagem longa demais", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    assert.equal(await classificarLembreteLivreIA("me lembra de pagar a luz dia 10"), null);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+  }
+
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  let chamouFetch = false;
+  globalThis.fetch = async () => {
+    chamouFetch = true;
+    throw new Error("não deveria chamar a IA aqui");
+  };
+  try {
+    assert.equal(await classificarLembreteLivreIA("a".repeat(401)), null);
+    assert.equal(chamouFetch, false);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("classificarLembreteLivreIA reconhece lembrete e pagamento em linguagem natural, e nao classifica papo comum", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+
+  const respostas = {
+    "me lembra de pagar a luz dia 10": "PAGAMENTO",
+    "lembra eu de ligar pro banco toda segunda": "LEMBRETE",
+    "bom dia, tudo bem?": "NENHUM",
+  };
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    const mensagem = body.messages[1].content;
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ tipo: respostas[mensagem] }) } }],
+      }),
+    };
+  };
+
+  try {
+    assert.equal(await classificarLembreteLivreIA("me lembra de pagar a luz dia 10"), "PAGAMENTO");
+    assert.equal(await classificarLembreteLivreIA("lembra eu de ligar pro banco toda segunda"), "LEMBRETE");
+    assert.equal(await classificarLembreteLivreIA("bom dia, tudo bem?"), null);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("classificarLembreteLivreIA retorna null quando a chamada de IA falha", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  globalThis.fetch = async () => ({ ok: false });
+
+  try {
+    assert.equal(await classificarLembreteLivreIA("me lembra de pagar a luz dia 10"), null);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("classificarLembreteLivreIA nao chama a IA quando a mensagem nao tem nenhuma pista de lembrete", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  let chamouFetch = false;
+  globalThis.fetch = async () => {
+    chamouFetch = true;
+    throw new Error("não deveria chamar a IA aqui");
+  };
+
+  try {
+    assert.equal(await classificarLembreteLivreIA("gastei 50 no mercado"), null);
+    assert.equal(chamouFetch, false);
+    assert.equal(await classificarLembreteLivreIA("oi tudo bem?"), null);
+    assert.equal(chamouFetch, false);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ── devePularFallbackLembreteIA (guarda de ordenação do fallback de lembrete) ──
+
+test("devePularFallbackLembreteIA pula quando ja existe comando de tarefa detectado, de qualquer formato", () => {
+  assert.equal(devePularFallbackLembreteIA({ comando: "CONCLUIR", resultado: { ok: false } }, null), true);
+  assert.equal(devePularFallbackLembreteIA({ comando: "CRIAR", resultado: { ok: true } }, "MENU"), true);
+  assert.equal(devePularFallbackLembreteIA("qualquer-coisa-truthy", null), true);
+});
+
+test("devePularFallbackLembreteIA pula quando o comando de menu e PAGUEI, mesmo sem comando de tarefa", () => {
+  assert.equal(devePularFallbackLembreteIA(null, "PAGUEI"), true);
+  assert.equal(devePularFallbackLembreteIA(undefined, "PAGUEI"), true);
+});
+
+test("devePularFallbackLembreteIA nao pula quando nao ha comando de tarefa nem PAGUEI", () => {
+  assert.equal(devePularFallbackLembreteIA(null, null), false);
+  assert.equal(devePularFallbackLembreteIA(undefined, "MENU"), false);
+  assert.equal(devePularFallbackLembreteIA(null, "SALDO"), false);
 });

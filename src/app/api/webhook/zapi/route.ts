@@ -25,6 +25,7 @@ import {
   type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
+import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
   persistirCartaoControle,
@@ -1929,6 +1930,33 @@ Pode mandar tudo em uma mensagem só.`;
       if (resposta) {
         await sendWhatsApp(telefone, resposta);
         return NextResponse.json({ ok: true });
+      }
+    }
+
+    // ── Último recurso: pedido de lembrete em linguagem natural ───────────
+    // Só chega aqui depois que toda a cascata determinística (gasto,
+    // confirmação, fatura, comandos de menu...) já não reconheceu a
+    // mensagem — detectarComandoTarefa (lá em cima) só bate com prefixo
+    // explícito ("tarefa:"/"lembrete:"). Antes de cair pro papo genérico,
+    // vale checar se não é um "me lembra de pagar a luz dia 10" disfarçado.
+    // devePularFallbackLembreteIA protege duas quedas intencionais que já
+    // aconteceram mais acima: PAGUEI (linha ~1914, cai de propósito pra IA
+    // atualizar a dívida) e CONCLUIR/CANCELAR sem tarefa encontrada (linha
+    // ~975) — sem isso, esse fallback "roubaria" essas mensagens e criaria
+    // um Tarefa/Pagamento novo em vez de deixar o destino original acontecer.
+    const tipoLembreteIA = devePularFallbackLembreteIA(comandoTarefa, comando)
+      ? null
+      : await classificarLembreteLivreIA(mensagem);
+    if (tipoLembreteIA) {
+      const prefixo = tipoLembreteIA === "PAGAMENTO" ? "pagamento" : "lembrete";
+      const comandoTarefaIA = detectarComandoTarefa(`${prefixo}: ${mensagem}`);
+      if (comandoTarefaIA) {
+        const origemMensagemTarefaIA = tipoEntrada === "audio" ? "AUDIO" : "TEXTO";
+        const respostaTarefaIA = await processarComandoTarefa(sessao.clienteId, comandoTarefaIA, origemMensagemTarefaIA);
+        if (respostaTarefaIA) {
+          await sendWhatsApp(telefone, respostaTarefaIA);
+          return NextResponse.json({ ok: true });
+        }
       }
     }
 
