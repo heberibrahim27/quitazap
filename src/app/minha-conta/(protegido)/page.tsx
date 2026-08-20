@@ -171,7 +171,7 @@ export default async function MinhaContaPage({
         <div className="mc-hero-body">
           <div>
             <p className="mc-hero-label">Entradas − saídas</p>
-            <p className="mc-hero-amount" style={{ color: resultadoMes >= 0 ? "#fff" : "#ffe1e6" }}>
+            <p className="mc-hero-amount" style={{ color: resultadoMes >= 0 ? "#fff" : "#fca5a5" }}>
               {resultadoMes < 0 && "⚠️ "}{fmtValor(resultadoMes)}
             </p>
             <p className="mc-hero-caption">já conta compras no cartão do mês</p>
@@ -181,7 +181,7 @@ export default async function MinhaContaPage({
               value={percentualRendaComprometida}
               size={76}
               strokeWidth={7}
-              color={percentualRendaComprometida <= 1 ? "#34d399" : "#fb7185"}
+              color={percentualRendaComprometida <= 1 ? "#10b981" : "#ef4444"}
               label={`${Math.round(percentualRendaComprometida * 100)}%`}
             />
           )}
@@ -194,7 +194,7 @@ export default async function MinhaContaPage({
           </div>
           <div className="mc-hero-chip">
             <p className="mc-hero-chip-label">Saldo devedor</p>
-            <p className="mc-hero-chip-value" style={{ color: totalDividas > 0 ? "#ffe1e6" : "#fff" }}>{fmtValor(totalDividas)}</p>
+            <p className="mc-hero-chip-value" style={{ color: totalDividas > 0 ? "#fca5a5" : "#fff" }}>{fmtValor(totalDividas)}</p>
           </div>
         </div>
       </div>

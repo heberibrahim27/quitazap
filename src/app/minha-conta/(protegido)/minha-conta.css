@@ -1,30 +1,34 @@
 /* ─────────────────────────────────────────
    QuitaZAP — Minha Conta (painel do cliente)
-   Linguagem visual própria: dark, glassmorphism, gradiente
-   roxo/azul/laranja. Escopado com prefixo "mc-" de propósito —
-   não reaproveita nem sobrescreve as classes do painel admin
-   (page-shell, content-card, etc, em globals.css).
+   Mesma linguagem "banco premium" já validada no painel admin
+   (design system "Liquid Glass": fundo quase preto #050a14, um
+   acento só em azul #007bff→#00bfff, números com peso leve, rótulo
+   discreto em vez de CAIXA ALTA, cor só quando é sinal de verdade).
+   Prefixo "mc-" de propósito — não mexe em globals.css nem em
+   admin-shell.css (produtos diferentes, mesmos tokens visuais).
    ───────────────────────────────────────── */
 
 .mc-shell {
-  --mc-bg-0: #0a0e1a;
-  --mc-bg-1: #11162a;
-  --mc-ink: #f4f6fb;
-  --mc-ink-dim: #9aa4bf;
-  --mc-ink-faint: #9099b8;
-  --mc-line: rgba(255, 255, 255, 0.09);
-  --mc-glass: rgba(255, 255, 255, 0.055);
-  --mc-glass-strong: rgba(255, 255, 255, 0.09);
-  --mc-green: #34d399;
-  --mc-red: #fb7185;
-  --mc-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 45%, #f97316 100%);
+  --mc-bg: #050a14;
+  --mc-ink: #ffffff;
+  --mc-ink-dim: #9ca3af;
+  --mc-ink-faint: #6b7280;
+  --mc-line: rgba(255, 255, 255, 0.08);
+  --mc-line-top: rgba(255, 255, 255, 0.15);
+  --mc-line-soft: rgba(255, 255, 255, 0.05);
+  --mc-glass: rgba(255, 255, 255, 0.03);
+  --mc-glass-strong: rgba(255, 255, 255, 0.07);
+  --mc-accent: #00bfff;
+  --mc-accent-soft: rgba(0, 123, 255, 0.12);
+  --mc-accent-glow: rgba(0, 123, 255, 0.35);
+  --mc-gradient: linear-gradient(90deg, #007bff, #00bfff);
+  --mc-green: #10b981;
+  --mc-red: #ef4444;
 
   position: relative;
   min-height: 100vh;
-  background: radial-gradient(ellipse 900px 500px at 15% -10%, rgba(124, 58, 237, 0.35), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 110% 10%, rgba(249, 115, 22, 0.18), transparent 55%),
-    radial-gradient(ellipse 800px 600px at 50% 120%, rgba(79, 70, 229, 0.25), transparent 60%),
-    linear-gradient(180deg, var(--mc-bg-0), var(--mc-bg-1) 40%, var(--mc-bg-0));
+  background: radial-gradient(ellipse 900px 500px at 15% -10%, rgba(0, 123, 255, 0.14), transparent 60%),
+    var(--mc-bg);
   color: var(--mc-ink);
   isolation: isolate;
 }
@@ -43,9 +47,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
-  background: rgba(10, 14, 26, 0.65);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: rgba(5, 10, 20, 0.8);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-bottom: 1px solid var(--mc-line);
 }
 
@@ -55,9 +59,9 @@
   gap: 10px;
   color: var(--mc-ink);
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 15px;
-  letter-spacing: 0.2px;
+  letter-spacing: -0.01em;
 }
 
 .mc-brand-mark {
@@ -68,10 +72,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
-  font-size: 15px;
+  font-weight: 800;
+  font-size: 14px;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 6px 18px -6px var(--mc-accent-glow);
 }
 
 .mc-header-user {
@@ -91,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 12px;
   color: var(--mc-ink);
 }
@@ -103,7 +108,7 @@
   border-radius: 10px;
   padding: 7px 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -118,20 +123,25 @@
 
 /* ── Hero (saldo em destaque) ───────────── */
 .mc-hero {
-  border-radius: 28px;
-  padding: 24px 22px;
-  background: var(--mc-gradient);
-  box-shadow: 0 20px 50px -18px rgba(79, 70, 229, 0.55);
-  margin-bottom: 18px;
   position: relative;
+  border-radius: 26px;
+  padding: 26px 24px;
+  background: linear-gradient(165deg, #0c1524 0%, #050a14 65%);
+  border: 1px solid var(--mc-line);
+  border-top-color: var(--mc-line-top);
+  margin-bottom: 18px;
   overflow: hidden;
 }
 
-.mc-hero::after {
+.mc-hero::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 85% -10%, rgba(255, 255, 255, 0.28), transparent 55%);
+  top: -50%;
+  right: -8%;
+  width: 55%;
+  height: 200%;
+  background: radial-gradient(circle, var(--mc-accent-glow), transparent 65%);
+  opacity: 0.5;
   pointer-events: none;
 }
 
@@ -140,20 +150,22 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .mc-hero-greeting {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mc-ink);
 }
 
 .mc-hero-sub {
   margin: 2px 0 0;
   font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.68);
+  color: var(--mc-ink-faint);
 }
 
 .mc-hero-nav {
@@ -168,8 +180,9 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--mc-glass);
+  border: 1px solid var(--mc-line);
+  color: var(--mc-ink);
   font-size: 13px;
   text-decoration: none;
 }
@@ -180,62 +193,62 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .mc-hero-label {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+  color: var(--mc-ink-faint);
 }
 
 .mc-hero-amount {
-  margin: 0;
+  margin: 10px 0 0;
   font-size: 38px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #fff;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  color: var(--mc-ink);
   line-height: 1.1;
 }
 
 .mc-hero-caption {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--mc-ink-faint);
 }
 
 .mc-hero-chips {
   display: flex;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 20px;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 }
 
 .mc-hero-chip {
   flex: 1;
   min-width: 130px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--mc-glass);
+  border: 1px solid var(--mc-line);
   border-radius: 16px;
-  padding: 10px 14px;
+  padding: 11px 14px;
 }
 
 .mc-hero-chip-label {
   margin: 0;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mc-ink-faint);
 }
 
 .mc-hero-chip-value {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   font-size: 16px;
-  font-weight: 800;
-  color: #fff;
+  font-weight: 500;
+  color: var(--mc-ink);
 }
 
 /* ── Quick actions ───────────────────────── */
@@ -258,24 +271,22 @@
 .mc-quick-action-icon {
   width: 52px;
   height: 52px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--mc-glass);
   border: 1px solid var(--mc-line);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 21px;
+  font-size: 20px;
 }
 
 .mc-quick-action-label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
 }
 
-/* ── Sections / glass cards ─────────────── */
+/* ── Sections / cards ─────────────────────── */
 .mc-section {
   margin-bottom: 18px;
   scroll-margin-top: 84px;
@@ -293,7 +304,7 @@
 .mc-section-title {
   margin: 0;
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--mc-ink);
   display: flex;
   align-items: center;
@@ -303,11 +314,9 @@
 .mc-card {
   background: var(--mc-glass);
   border: 1px solid var(--mc-line);
-  border-radius: 22px;
+  border-top-color: var(--mc-line-top);
+  border-radius: 20px;
   padding: 18px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 12px 34px -20px rgba(0, 0, 0, 0.6);
 }
 
 .mc-list {
@@ -320,7 +329,7 @@
   align-items: center;
   gap: 12px;
   padding: 11px 0;
-  border-bottom: 1px solid var(--mc-line);
+  border-bottom: 1px solid var(--mc-line-soft);
 }
 
 .mc-list-row:last-child {
@@ -333,15 +342,15 @@
 }
 
 .mc-list-icon {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  background: rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .mc-list-body {
@@ -352,7 +361,7 @@
 .mc-list-desc {
   font-size: 13.5px;
   color: var(--mc-ink);
-  font-weight: 600;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -371,7 +380,7 @@
 
 .mc-list-value {
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--mc-ink);
 }
 
@@ -411,10 +420,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(17, 22, 42, 0.75);
+  background: rgba(5, 10, 20, 0.85);
   border: 1px solid var(--mc-line);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 999px;
   padding: 8px;
   box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.7);
@@ -431,7 +440,7 @@
   color: var(--mc-ink-dim);
   text-decoration: none;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -444,17 +453,17 @@
 
 .mc-bottom-nav-item.mc-active {
   color: #fff;
-  background: var(--mc-glass-strong);
+  background: var(--mc-accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.35);
 }
 
-/* ── Formulários (glass) ─────────────────── */
+/* ── Formulários ─────────────────── */
 .mc-form-card {
   background: var(--mc-glass);
   border: 1px solid var(--mc-line);
-  border-radius: 24px;
+  border-top-color: var(--mc-line-top);
+  border-radius: 22px;
   padding: 22px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   display: grid;
   gap: 16px;
 }
@@ -463,18 +472,18 @@
   display: grid;
   gap: 7px;
   color: var(--mc-ink-dim);
-  font-weight: 700;
+  font-weight: 500;
   font-size: 12.5px;
 }
 
 .mc-input {
   width: 100%;
   border: 1px solid var(--mc-line);
-  border-radius: 13px;
+  border-radius: 12px;
   padding: 12px 14px;
   font-size: 14.5px;
   outline: none;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--mc-ink);
   box-sizing: border-box;
 }
@@ -484,20 +493,20 @@
 }
 
 .mc-input:focus {
-  border-color: rgba(124, 58, 237, 0.6);
-  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(0, 123, 255, 0.5);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mc-input option {
-  background: #11162a;
+  background: #0a0f1a;
   color: var(--mc-ink);
 }
 
 .mc-btn-primary,
 .mc-btn-secondary {
-  border-radius: 13px;
+  border-radius: 12px;
   padding: 13px 20px;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
   text-align: center;
   cursor: pointer;
