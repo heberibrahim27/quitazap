@@ -14,14 +14,17 @@ const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600"] }
 
 // Rotas que NÃO fazem parte do painel admin com menu lateral — cada uma
 // já tem seu próprio layout/autenticação (painel do cliente, portal do
-// QuitaZAP Receber, páginas públicas de login/cadastro/oferta).
+// QuitaZAP Receber, página de vendas pública e o redirecionamento antigo
+// dela, login/cadastro). "/" não pode entrar nessa lista com startsWith
+// (bateria em toda rota do site, já que toda rota começa com "/") — por
+// isso tem checagem exata à parte em foraDoPainel().
 const ROTAS_FORA_DO_PAINEL = ["/minha-conta", "/dashboard", "/oferta", "/login", "/cadastro", "/entrar", "/logout"];
 
 const GRUPOS = [
   {
     rotulo: "Visão geral",
     itens: [
-      { href: "/", label: "Dashboard", Icone: IconHome },
+      { href: "/painel", label: "Dashboard", Icone: IconHome },
       { href: "/financeiro", label: "Financeiro", Icone: IconWallet },
     ],
   },
@@ -43,7 +46,7 @@ const GRUPOS = [
 ];
 
 function ehAtivo(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
+  if (href === "/painel") return pathname === "/painel";
   return pathname.startsWith(href);
 }
 
@@ -79,7 +82,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     setDrawerAberto(false);
   }, [pathname]);
 
-  const foraDoPainel = ROTAS_FORA_DO_PAINEL.some((rota) => pathname.startsWith(rota));
+  const foraDoPainel = pathname === "/" || ROTAS_FORA_DO_PAINEL.some((rota) => pathname.startsWith(rota));
   if (foraDoPainel) return <>{children}</>;
 
   function navegar(href: string) {
@@ -90,7 +93,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={`qa-shell ${inter.className}`}>
       <aside className="qa-sidebar">
-        <Link href="/" className="qa-brand">
+        <Link href="/painel" className="qa-brand">
           <span className="qa-brand-mark">Q</span>
           <span className="qa-brand-text">QuitaZAP</span>
         </Link>
@@ -110,7 +113,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <div className="qa-topbar">
-          <Link href="/" className="qa-brand" style={{ padding: 0 }}>
+          <Link href="/painel" className="qa-brand" style={{ padding: 0 }}>
             <span className="qa-brand-mark">Q</span>
             <span className="qa-brand-text">QuitaZAP</span>
           </Link>

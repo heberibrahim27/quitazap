@@ -55,7 +55,7 @@ export default async function ExportarPage() {
         <strong>Dica:</strong>&nbsp;baixe essa cópia regularmente, principalmente antes de qualquer mudança grande no sistema.
       </div>
 
-      <Link href="/" style={{ color: "#7dc4ff", fontWeight: 600, fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 4, marginTop: 16 }}>
+      <Link href="/painel" style={{ color: "#7dc4ff", fontWeight: 600, fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 4, marginTop: 16 }}>
         <IconArrowUpRight size={13} style={{ transform: "rotate(-135deg)" }} /> Voltar para o dashboard
       </Link>
     </div>

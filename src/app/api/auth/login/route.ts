@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/login?erro=1", req.url), 303);
     }
 
-    const res = NextResponse.redirect(new URL("/", req.url), 303);
+    const res = NextResponse.redirect(new URL("/painel", req.url), 303);
     res.cookies.set(COOKIE_NAME, COOKIE_TOKEN, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

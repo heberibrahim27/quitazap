@@ -7,12 +7,16 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Rotas públicas
+  // "/" é a página de vendas do produto (pública, visitante sem login) —
+  // o painel do fundador mudou pra "/painel" depois do login. "/oferta"
+  // continua liberada só como redirecionamento pra "/" (link antigo).
   // "/minha-conta" fica de fora da senha do admin de propósito: é a área do
   // cliente, com login próprio (link mágico por WhatsApp, cookie
   // qz_cliente_auth) verificado no layout de src/app/minha-conta/(protegido)
   // — não aqui no middleware, pra evitar depender de Node crypto no Edge
   // Runtime (middleware roda em Edge por padrão).
   if (
+    pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/oferta") ||
     pathname.startsWith("/minha-conta") ||

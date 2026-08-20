@@ -62,7 +62,7 @@ export default async function ParcelasVencidasPage() {
               em {grupos.length} cliente{grupos.length !== 1 ? "s" : ""}
             </p>
           </div>
-          <Link href="/" className="btn-secondary">← Dashboard</Link>
+          <Link href="/painel" className="btn-secondary">← Dashboard</Link>
         </div>
 
         {/* Resumo */}

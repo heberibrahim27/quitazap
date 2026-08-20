@@ -36,7 +36,7 @@ export default async function EditarClientePage({
       },
     });
 
-    revalidatePath("/");
+    revalidatePath("/painel");
     revalidatePath("/clientes");
     revalidatePath(`/clientes/${id}`);
     redirect(`/clientes/${id}?ok=editado`);
