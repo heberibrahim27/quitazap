@@ -263,7 +263,12 @@ test("salvarItensConfirmadosIA: nome de cartão em texto livre é padronizado pe
   assert.equal(resultado.itensParaPersistir[0].cartaoNome, "Nubank");
 });
 
-test("salvarItensConfirmadosIA: cartão fora do catálogo mantém o texto original em vez de descartar", () => {
+test("salvarItensConfirmadosIA: cartão fora do catálogo com a palavra 'cartão' extrai só o nome (item 5)", () => {
+  // Antes (Fase 2b), normalizarNomeCartaoControle não reconhecia nada fora
+  // do catálogo fixo e esse item mantinha o texto original inteiro. Agora
+  // (item 5 do raio-x do bot) ela reconhece o nome explícito depois de
+  // "cartão"/"cartão da" — resultado mais limpo pra exibir ("Fatura Loja X"
+  // em vez de "Fatura Cartão da Loja X").
   const intent = {
     itens: [
       { tipo: "despesa_variavel", descricaoOriginal: "tenis", descricaoNormalizada: "Tênis", categoria: "Vestuário", valor: 300, origem: "cartao", cartao: "Cartão da Loja X" },
@@ -272,7 +277,19 @@ test("salvarItensConfirmadosIA: cartão fora do catálogo mantém o texto origin
 
   const resultado = salvarItensConfirmadosIA(estadoBase(), intent);
   assert.ok(resultado);
-  assert.equal(resultado.itensParaPersistir[0].cartaoNome, "Cartão da Loja X");
+  assert.equal(resultado.itensParaPersistir[0].cartaoNome, "Loja X");
+});
+
+test("salvarItensConfirmadosIA: cartão fora do catálogo sem pista nenhuma mantém o texto original em vez de descartar", () => {
+  const intent = {
+    itens: [
+      { tipo: "despesa_variavel", descricaoOriginal: "tenis", descricaoNormalizada: "Tênis", categoria: "Vestuário", valor: 300, origem: "cartao", cartao: "conta da loja parceira" },
+    ],
+  };
+
+  const resultado = salvarItensConfirmadosIA(estadoBase(), intent);
+  assert.ok(resultado);
+  assert.equal(resultado.itensParaPersistir[0].cartaoNome, "conta da loja parceira");
 });
 
 test("salvarItensConfirmadosIA: item inválido (sem valor) não gera itensParaPersistir", () => {

@@ -6,7 +6,7 @@ import {
   type GastoDetectado,
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
-import { normalizarDescricaoFinanceira } from "./descricao-financeira";
+import { normalizarDescricaoFinanceira, normalizarTextoBusca } from "./descricao-financeira";
 import type { FinanceiroIntent, ItemFinanceiroInterpretado } from "./ia/financeiro-intent-schema";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
@@ -130,6 +130,90 @@ const CARTOES_CONHECIDOS: Array<{ aliases: string[]; nome: string }> = [
   { aliases: ["bb"], nome: "Banco do Brasil" },
   { aliases: ["c6"], nome: "C6" },
 ];
+
+// Cartão fora do catálogo fixo acima (ex: "Will Bank", "XP") — em vez de
+// simplesmente não reconhecer (e o gasto cair silenciosamente como "Saldo
+// do mês" em vez de fatura), aceita quando a própria mensagem diz
+// "cartão X" explicitamente. Não generaliza pra "no X"/"na X" sozinho,
+// porque aí qualquer lugar comum ("no mercado", "na padaria") viraria um
+// cartão desconhecido.
+const ANCORA_CARTAO_EXPLICITA = /\bcart[aã]o\s+(?:d[oa]\s+)?/i;
+const PADRAO_NOME_CARTAO_DESCONHECIDO = new RegExp(
+  ANCORA_CARTAO_EXPLICITA.source + "([a-zà-ÿ0-9]+(?:\\s+[a-zà-ÿ0-9]+){0,2})",
+  "i"
+);
+// Fatura de cartão às vezes é mencionada sem a palavra "cartão"
+// ("fatura do Will Bank fechou em 850") — a captura roda pela mesma lista
+// de palavras-parada de baixo (senão "fatura de luz fechou" viraria um
+// cartão fantasma "De Luz").
+const ANCORA_FATURA_CARTAO_DESCONHECIDO = /\bfatura\s+(?:d[oa]\s+)?([a-zà-ÿ0-9][a-zà-ÿ0-9 ]*?)\s+(?:fechou|fechada|fechar)\b/i;
+// Preposição que costuma vir logo antes de "cartão X" ("no cartão Will
+// Bank") — precisa sair junto na hora de limpar a descrição do gasto,
+// senão sobra um "no" solto ("gastei 45 no de gasolina").
+const PREPOSICAO_ANTES_DE_CARTAO = /\b(?:no|na|pelo|pela)\s*$/i;
+
+const STOPWORDS_NOME_CARTAO = new Set([
+  "fechou", "fechada", "fechar", "fecha", "fechamento",
+  "vence", "vencimento", "venceu", "hoje", "ontem", "amanha",
+  "dia", "reais", "real", "em", "por", "de", "para", "pra", "com",
+  // "fatura do cartão fechou" (sem dizer qual banco) não deveria virar um
+  // cartão fantasma chamado literalmente "Cartão".
+  "cartao",
+]);
+
+// Nome de cartão fora do catálogo é normalmente uma marca própria ("Will
+// Bank", "PicPay Card") — diferente de normalizarDescricaoFinanceira (feita
+// pra descrição de gasto comum), aqui cada palavra vira Title Case, sem
+// deixar a 2ª palavra em diante em minúsculo. A exceção de sigla (mantém
+// maiúsculo) fica restrita a 2-3 letras (XP, C6, BB) — palavra maior toda
+// em caixa alta é sinal de CAPS LOCK, não sigla de banco.
+function titularizarNomeCartao(texto: string): string {
+  return texto
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((palavra) => (/^[A-Z0-9]{2,3}$/.test(palavra) ? palavra : palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase()))
+    .join(" ");
+}
+
+function capturarPalavrasValidas(grupo: string): string[] {
+  const capturadas: string[] = [];
+  for (const palavra of grupo.split(/\s+/)) {
+    if (STOPWORDS_NOME_CARTAO.has(normalizarTextoBusca(palavra))) break;
+    capturadas.push(palavra);
+  }
+  return capturadas;
+}
+
+function casarCartaoDesconhecido(mensagem: string): { nome: string; trecho: string } | null {
+  const match = mensagem.match(PADRAO_NOME_CARTAO_DESCONHECIDO);
+  if (!match || match.index === undefined) return null;
+
+  const capturadas = capturarPalavrasValidas(match[1]);
+  if (capturadas.length === 0) return null;
+
+  const nome = titularizarNomeCartao(capturadas.join(" "));
+  if (!nome) return null;
+
+  // Reconstrói o trecho a remover casando de novo contra a mensagem
+  // original (em vez de só reencaixar `capturadas.join(" ")`), pra não
+  // divergir em espaçamento (ex: espaço duplo digitado no celular).
+  const regexTrecho = new RegExp(
+    ANCORA_CARTAO_EXPLICITA.source + `[a-zà-ÿ0-9]+(?:\\s+[a-zà-ÿ0-9]+){0,${capturadas.length - 1}}`,
+    "i"
+  );
+  const matchTrecho = mensagem.match(regexTrecho);
+  let inicioTrecho = matchTrecho?.index ?? match.index;
+  let trecho = matchTrecho ? matchTrecho[0] : match[0];
+
+  const antesDoMatch = mensagem.slice(0, inicioTrecho);
+  const preposicao = antesDoMatch.match(PREPOSICAO_ANTES_DE_CARTAO);
+  if (preposicao) {
+    inicioTrecho -= preposicao[0].length;
+    trecho = mensagem.slice(inicioTrecho, inicioTrecho + preposicao[0].length) + trecho;
+  }
+
+  return { nome, trecho };
+}
 
 function normalizarTexto(texto: string): string {
   return texto
@@ -1507,7 +1591,7 @@ function detectarCartao(mensagem: string): string | null {
     }
   }
 
-  return null;
+  return casarCartaoDesconhecido(mensagem)?.nome ?? null;
 }
 
 export function normalizarNomeCartaoControle(mensagem: string): string | null {
@@ -1519,6 +1603,17 @@ export function normalizarNomeCartaoControle(mensagem: string): string | null {
       const regex = new RegExp(`\\b${aliasNormalizado}\\b`);
       if (regex.test(texto)) return cartao.nome;
     }
+  }
+
+  const porCartaoExplicito = casarCartaoDesconhecido(mensagem);
+  if (porCartaoExplicito) return porCartaoExplicito.nome;
+
+  const matchFatura = mensagem.match(ANCORA_FATURA_CARTAO_DESCONHECIDO);
+  if (matchFatura) {
+    const semPossessivo = matchFatura[1].trim().replace(/^(?:meu|minha)\s+/i, "");
+    const capturadas = capturarPalavrasValidas(semPossessivo);
+    const nome = capturadas.length > 0 ? titularizarNomeCartao(capturadas.join(" ")) : "";
+    if (nome) return nome;
   }
 
   return null;
@@ -2023,11 +2118,17 @@ function removerTrechoCartao(mensagem: string, cartao: string | null): string {
   if (!cartao) return mensagem;
   let limpa = mensagem;
 
-  for (const item of CARTOES_CONHECIDOS) {
-    if (item.nome !== cartao) continue;
-    for (const alias of item.aliases) {
-      limpa = limpa.replace(new RegExp(`\\b(?:no|na|pelo|pela|cart[aã]o)\\s+${alias.replace(/\s+/g, "\\s+")}\\b`, "gi"), " ");
+  const eraConhecido = CARTOES_CONHECIDOS.some((item) => item.nome === cartao);
+  if (eraConhecido) {
+    for (const item of CARTOES_CONHECIDOS) {
+      if (item.nome !== cartao) continue;
+      for (const alias of item.aliases) {
+        limpa = limpa.replace(new RegExp(`\\b(?:no|na|pelo|pela|cart[aã]o)\\s+${alias.replace(/\s+/g, "\\s+")}\\b`, "gi"), " ");
+      }
     }
+  } else {
+    const desconhecido = casarCartaoDesconhecido(mensagem);
+    if (desconhecido) limpa = limpa.replace(desconhecido.trecho, " ");
   }
 
   return limpa.replace(/\s+/g, " ").trim();

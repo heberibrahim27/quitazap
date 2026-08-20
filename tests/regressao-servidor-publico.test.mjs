@@ -2484,6 +2484,85 @@ test("mensagem automatica de gasto em cartao aberto nao reduz saldo disponivel",
   assert.doesNotMatch(farmacia.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 
+test("gasto no cartao fora do catalogo fixo e reconhecido pelo nome explicito", () => {
+  const willBank = registrarGastoControle(
+    "gastei 80 no cartão Will Bank hoje",
+    estadoControleBase(),
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(willBank);
+  assert.equal(willBank.estado.ultimoGasto.origem, "CARTAO");
+  assert.equal(willBank.estado.ultimoGasto.cartao, "Will Bank");
+  assert.deepEqual(willBank.estado.faturas, [{ cartao: "Will Bank", valor: 80 }]);
+  assert.match(willBank.resposta, /💳 \*Origem:\* Cartão Will Bank/);
+  assert.doesNotMatch(willBank.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+
+  const xp = registrarGastoControle(
+    "gastei 30 no cartão do XP",
+    estadoControleBase(),
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(xp);
+  assert.equal(xp.estado.ultimoGasto.cartao, "XP");
+  assert.match(xp.resposta, /💳 \*Origem:\* Cartão XP/);
+});
+
+test("lugar comum sem a palavra 'cartao' nao vira cartao desconhecido", () => {
+  const mercado = registrarGastoControle("gastei 30 no mercado", estadoControleBase(), new Date(2026, 6, 1, 12, 0, 0));
+  assert.ok(mercado);
+  assert.equal(mercado.estado.ultimoGasto.origem, "SALDO");
+
+  const bar = registrarGastoControle("gastei 65 de cerveja no bar", estadoControleBase(), new Date(2026, 6, 1, 12, 0, 0));
+  assert.ok(bar);
+  assert.equal(bar.estado.ultimoGasto.origem, "SALDO");
+});
+
+test("fatura de cartao fora do catalogo fixo e reconhecida por 'fatura do X fechou'", () => {
+  const fechamento = gerenciarFaturaCartaoControle("fatura do Will Bank fechou em 850", estadoControleBase());
+  assert.ok(fechamento);
+  assert.deepEqual(fechamento.estado.faturasFechadas, [{ cartao: "Will Bank", valor: 850 }]);
+  assert.match(fechamento.resposta, /Cartão: Will Bank/);
+});
+
+test("conta de utilidade (luz, agua) nao vira cartao fantasma na fatura", () => {
+  // "de" já era palavra-parada — o achado do code-review era a âncora de
+  // fatura não aplicar essa mesma lista, deixando "de luz" virar cartão.
+  const luz = gerenciarFaturaCartaoControle("minha fatura de luz fechou esse mes, 200 reais", estadoControleBase());
+  assert.equal(luz, null);
+
+  const semBanco = gerenciarFaturaCartaoControle("a fatura do cartão fechou em 800", estadoControleBase());
+  assert.equal(semBanco, null);
+});
+
+test("preposicao antes de 'cartao X' desconhecido sai junto da descricao do gasto", () => {
+  const resultado = registrarGastoControle(
+    "gastei 45 no cartão Will Bank de gasolina",
+    estadoControleBase(),
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(resultado);
+  assert.equal(resultado.estado.ultimoGasto.cartao, "Will Bank");
+  assert.equal(resultado.estado.ultimoGasto.descricao, "Gasolina");
+  assert.doesNotMatch(resultado.resposta, /\bno de\b/);
+});
+
+test("caps lock nao vira sigla falsa no nome do cartao desconhecido", () => {
+  const resultado = registrarGastoControle(
+    "GASTEI 50 NO CARTAO WILL BANK",
+    estadoControleBase(),
+    new Date(2026, 6, 1, 12, 0, 0)
+  );
+  assert.ok(resultado);
+  assert.equal(resultado.estado.ultimoGasto.cartao, "Will Bank");
+});
+
+test("configurar cartao fora do catalogo fixo pelo nome explicito", () => {
+  const configuracao = configurarCartaoControle("cartão Will Bank fecha dia 10 vence dia 20", estadoControleBase());
+  assert.ok(configuracao);
+  assert.deepEqual(configuracao.estado.cartoes, [{ nome: "Will Bank", fechamento: 10, vencimento: 20 }]);
+  assert.match(configuracao.resposta, /💳 \*Cartão:\* Will Bank/);
+});
+
 test("fatura fechada sem vencimento orienta configuracao", () => {
   const estado = estadoControleBase();
   const fechamento = gerenciarFaturaCartaoControle("fatura inter fechou em 130", estado);
