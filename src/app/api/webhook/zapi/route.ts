@@ -1412,9 +1412,14 @@ Pode mandar tudo em uma mensagem só.`;
         return NextResponse.json({ ok: true });
       }
 
-      const intentOnboardingDespesas = await resolverIntencaoFinanceiraIA(mensagem, {
-        forcarLocal: true,
-      });
+      // forcarLocal removido (item 6 do raio-x do bot): resolverMensagemMista
+      // (regra hiper-específica que só batia com 2 mensagens de teste) foi
+      // removida do resolvedor local — sem deixar a IA real como fallback
+      // aqui, uma mensagem mista de verdade durante o onboarding ("energia
+      // 200, aluguel 900, água na rua 20, chatgpt 35") passaria direto pelo
+      // parser de despesas fixas simples (sem pedir confirmação), perdendo
+      // o gasto variável ("água na rua") no meio do caminho.
+      const intentOnboardingDespesas = await resolverIntencaoFinanceiraIA(mensagem);
       if (
         intentOnboardingDespesas?.emEscopo &&
         intentOnboardingDespesas.itens.length > 1 &&

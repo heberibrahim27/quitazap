@@ -753,11 +753,47 @@ test("interpretador financeiro reconhece receitas basicas sem cair em outros", a
   }
 });
 
-test("interpretador financeiro estrutura mensagem mista com confirmacao", async () => {
-  const resultado = await resolverIntencaoFinanceiraIA(
-    "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900",
-    { forcarLocal: true }
-  );
+test("interpretador financeiro estrutura mensagem mista com confirmacao (via IA remota)", async () => {
+  // Antes (item 6 do raio-x do bot), esse tipo de mensagem tinha um bloco de
+  // regex hiper-específico (resolverMensagemMista) que só reconhecia esse
+  // texto exato — removido por ser overfit ao teste, não uma solução geral.
+  // Agora nenhum resolvedor local reconhece nada aqui de propósito, então a
+  // mensagem cai pro intérprete de IA de verdade (que já tem instruções
+  // pra "agua na rua"/"akuguel" no próprio system prompt).
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            emEscopo: true,
+            intencao: "registrar_multiplos_lancamentos",
+            confianca: 0.88,
+            precisaConfirmacao: true,
+            motivoConfirmacao: "Mensagem com múltiplos lançamentos e tipos diferentes.",
+            itens: [
+              { tipo: "despesa_variavel", descricaoOriginal: "agua na rua", descricaoNormalizada: "Água na rua", categoria: "Alimentação/Bebidas", valor: 2.5, recorrencia: "unica", origem: "saldo" },
+              { tipo: "despesa_fixa", descricaoOriginal: "chatgpt mes", descricaoNormalizada: "ChatGPT", categoria: "Assinaturas", valor: 110, recorrencia: "mensal" },
+              { tipo: "despesa_fixa", descricaoOriginal: "energia", descricaoNormalizada: "Energia", categoria: "Contas da casa", valor: 200, recorrencia: "mensal" },
+              { tipo: "despesa_fixa", descricaoOriginal: "akuguel", descricaoNormalizada: "Aluguel", categoria: "Moradia", valor: 800, recorrencia: "mensal" },
+              { tipo: "despesa_fixa", descricaoOriginal: "pensão", descricaoNormalizada: "Pensão", categoria: "Obrigações familiares", valor: 900, recorrencia: "mensal" },
+            ],
+          }),
+        },
+      }],
+    }),
+  });
+
+  let resultado;
+  try {
+    resultado = await resolverIntencaoFinanceiraIA("agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900");
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
 
   assert.ok(resultado);
   assert.equal(resultado.emEscopo, true);
@@ -782,22 +818,49 @@ test("interpretador financeiro estrutura mensagem mista com confirmacao", async 
   assert.match(previa, /1️⃣ Sim, registrar tudo/);
 });
 
-test("mensagem mista deve usar interpretador antes do gasto comum e nao salvar como gasto unico", async () => {
+test("mensagem mista deve usar interpretador antes do gasto comum e nao salvar como gasto unico", () => {
   const mensagem = "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900";
 
   assert.equal(deveUsarInterpretadorFinanceiroIA(mensagem), true);
-  const intent = await resolverIntencaoFinanceiraIA(mensagem, { forcarLocal: true });
-  assert.ok(intent);
-  assert.equal(intent.itens.length, 5);
   assert.equal(registrarGastoControle(mensagem, estadoControleBase(), new Date(2026, 6, 1)), null);
-  assert.doesNotMatch(formatarPreviaIntentFinanceiro(intent), /R\$ 250,00[\s\S]*Conta da casa/i);
 });
 
-test("interpretador financeiro estrutura despesas fixas em frase natural", async () => {
-  const resultado = await resolverIntencaoFinanceiraIA(
-    "waifai da claro pago 45 conto todo mes. Pago academia tambem de 89. Compro 70 real de livro e pago curso de ingles 120 real todo mes",
-    { forcarLocal: true }
-  );
+test("interpretador financeiro estrutura despesas fixas em frase natural (via IA remota)", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            emEscopo: true,
+            intencao: "registrar_despesas_fixas_multiplas",
+            confianca: 0.86,
+            precisaConfirmacao: true,
+            motivoConfirmacao: "Mensagem com múltiplas despesas fixas em linguagem natural.",
+            itens: [
+              { tipo: "despesa_fixa", descricaoOriginal: "waifai da claro", descricaoNormalizada: "Internet Claro", categoria: "Contas da casa", valor: 45, recorrencia: "mensal" },
+              { tipo: "despesa_fixa", descricaoOriginal: "academia", descricaoNormalizada: "Academia", categoria: "Beleza/Cuidados", valor: 89, recorrencia: "mensal" },
+              { tipo: "despesa_fixa", descricaoOriginal: "livro", descricaoNormalizada: "Livros", categoria: "Educação", valor: 70, recorrencia: "mensal" },
+              { tipo: "despesa_fixa", descricaoOriginal: "curso de ingles", descricaoNormalizada: "Curso de inglês", categoria: "Educação", valor: 120, recorrencia: "mensal" },
+            ],
+          }),
+        },
+      }],
+    }),
+  });
+
+  let resultado;
+  try {
+    resultado = await resolverIntencaoFinanceiraIA(
+      "waifai da claro pago 45 conto todo mes. Pago academia tambem de 89. Compro 70 real de livro e pago curso de ingles 120 real todo mes"
+    );
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
 
   assert.ok(resultado);
   assert.equal(resultado.emEscopo, true);
@@ -841,12 +904,30 @@ test("confirmacao de receita interpretada salva entrada avulsa e limpa pendencia
   assert.match(confirmado.resposta, /Esse valor foi somado ao seu saldo do mês/);
 });
 
-test("confirmacao de interpretacao financeira salva lote misto com seguranca", async () => {
-  const intent = await resolverIntencaoFinanceiraIA(
-    "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900",
-    { forcarLocal: true }
-  );
-  assert.ok(intent);
+// Fixture de um FinanceiroIntent já estruturado (equivalente ao que a IA
+// devolveria pra "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel
+// 800, pensão 900") — usada pelos testes abaixo, que checam o fluxo de
+// CONFIRMAÇÃO/PERSISTÊNCIA (não a interpretação em si, já coberta pelo
+// teste "...com confirmacao (via IA remota)" acima).
+function intentLoteMistoFixture() {
+  return {
+    emEscopo: true,
+    intencao: "registrar_multiplos_lancamentos",
+    confianca: 0.88,
+    precisaConfirmacao: true,
+    motivoConfirmacao: "Mensagem com múltiplos lançamentos e tipos diferentes.",
+    itens: [
+      { tipo: "despesa_variavel", descricaoOriginal: "agua na rua", descricaoNormalizada: "Água na rua", categoria: "Alimentação/Bebidas", valor: 2.5, quantidade: null, valorUnitario: null, recorrencia: "unica", origem: "saldo", cartao: null, dataVencimento: null, observacao: null },
+      { tipo: "despesa_fixa", descricaoOriginal: "chatgpt mes", descricaoNormalizada: "ChatGPT", categoria: "Assinaturas", valor: 110, quantidade: null, valorUnitario: null, recorrencia: "mensal", origem: null, cartao: null, dataVencimento: null, observacao: null },
+      { tipo: "despesa_fixa", descricaoOriginal: "energia", descricaoNormalizada: "Energia", categoria: "Contas da casa", valor: 200, quantidade: null, valorUnitario: null, recorrencia: "mensal", origem: null, cartao: null, dataVencimento: null, observacao: null },
+      { tipo: "despesa_fixa", descricaoOriginal: "akuguel", descricaoNormalizada: "Aluguel", categoria: "Moradia", valor: 800, quantidade: null, valorUnitario: null, recorrencia: "mensal", origem: null, cartao: null, dataVencimento: null, observacao: null },
+      { tipo: "despesa_fixa", descricaoOriginal: "pensão", descricaoNormalizada: "Pensão", categoria: "Obrigações familiares", valor: 900, quantidade: null, valorUnitario: null, recorrencia: "mensal", origem: null, cartao: null, dataVencimento: null, observacao: null },
+    ],
+  };
+}
+
+test("confirmacao de interpretacao financeira salva lote misto com seguranca", () => {
+  const intent = intentLoteMistoFixture();
 
   const estadoPendente = criarEstadoComConfirmacaoInterpretacaoFinanceira(
     {
@@ -1162,12 +1243,8 @@ test("confirmacao de interpretacao financeira salva netflix fixa e mercado varia
   assert.doesNotMatch(confirmado.resposta, /\n\d+\. â€”/);
 });
 
-test("confirmacao de interpretacao financeira nao duplica despesa fixa existente", async () => {
-  const intent = await resolverIntencaoFinanceiraIA(
-    "agua na rua 2,50. chatgpt mes 110. energia 200,00 akuguel 800, pensão 900",
-    { forcarLocal: true }
-  );
-  assert.ok(intent);
+test("confirmacao de interpretacao financeira nao duplica despesa fixa existente", () => {
+  const intent = intentLoteMistoFixture();
 
   const estadoBase = {
     rendaMensal: 3000,

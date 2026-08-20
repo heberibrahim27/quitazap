@@ -190,10 +190,6 @@ function resolverReceita(mensagem: string): FinanceiroIntent | null {
   return null;
 }
 
-function valorDoMatch(match: RegExpMatchArray | null, indice = 1): number | null {
-  return match?.[indice] ? extrairPrimeiroValor(match[indice]) : null;
-}
-
 function valorDoSegmento(segmento: string): number | null {
   const valores = segmento.match(/\d[\d.,]*/g);
   if (!valores?.length) return null;
@@ -328,119 +324,11 @@ function resolverLancamentosSimples(mensagem: string): FinanceiroIntent | null {
   };
 }
 
-function resolverMensagemMista(mensagem: string): FinanceiroIntent | null {
-  const texto = normalizarTexto(mensagem);
-
-  if (/agua na rua/.test(texto) && /chat ?gpt/.test(texto) && /(?:akuguel|aluguel)/.test(texto)) {
-    const itens = [
-      criarItem({
-        tipo: "despesa_variavel",
-        descricaoOriginal: "agua na rua",
-        descricaoNormalizada: "Água na rua",
-        categoria: "Alimentação/Bebidas",
-        valor: valorDoMatch(texto.match(/\bagua na rua\s+(\d[\d.,]*)/)),
-        recorrencia: "unica",
-        origem: "saldo",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "chatgpt mes",
-        descricaoNormalizada: "ChatGPT",
-        categoria: "Assinaturas",
-        valor: valorDoMatch(texto.match(/\bchat ?gpt\s+(?:mes\s+)?(\d[\d.,]*)/)),
-        recorrencia: "mensal",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "energia",
-        descricaoNormalizada: "Energia",
-        categoria: "Contas da casa",
-        valor: valorDoMatch(texto.match(/\benergia\s+(\d[\d.,]*)/)),
-        recorrencia: "mensal",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "akuguel",
-        descricaoNormalizada: "Aluguel",
-        categoria: "Moradia",
-        valor: valorDoMatch(texto.match(/\b(?:akuguel|aluguel)\s+(\d[\d.,]*)/)),
-        recorrencia: "mensal",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "pensão",
-        descricaoNormalizada: "Pensão",
-        categoria: "Obrigações familiares",
-        valor: valorDoMatch(texto.match(/\bpensao\s+(\d[\d.,]*)/)),
-        recorrencia: "mensal",
-      }),
-    ];
-
-    return {
-      emEscopo: true,
-      intencao: "registrar_multiplos_lancamentos",
-      confianca: 0.88,
-      precisaConfirmacao: true,
-      motivoConfirmacao: "Mensagem com múltiplos lançamentos e tipos diferentes.",
-      itens,
-    };
-  }
-
-  if (/waifai|wifi|wi-fi/.test(texto) && /curso de ingles/.test(texto)) {
-    const itens = [
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "waifai da claro",
-        descricaoNormalizada: "Internet Claro",
-        categoria: "Contas da casa",
-        valor: valorDoMatch(texto.match(/\b(?:waifai|wifi|wi-fi)(?:\s+da\s+claro)?[^.?!]*?(\d[\d.,]*)\s*(?:conto|contos)?/)),
-        recorrencia: "mensal",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "academia",
-        descricaoNormalizada: "Academia",
-        categoria: "Beleza/Cuidados",
-        valor: valorDoMatch(texto.match(/\bacademia[^.?!]*?(?:de\s+)?(\d[\d.,]*)/)),
-        recorrencia: "mensal",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "livro",
-        descricaoNormalizada: "Livros",
-        categoria: "Educação",
-        valor: valorDoMatch(texto.match(/\b(\d[\d.,]*)\s+real\s+de\s+livro/)),
-        recorrencia: "mensal",
-      }),
-      criarItem({
-        tipo: "despesa_fixa",
-        descricaoOriginal: "curso de ingles",
-        descricaoNormalizada: "Curso de inglês",
-        categoria: "Educação",
-        valor: valorDoMatch(texto.match(/\bcurso de ingles\s+(\d[\d.,]*)/)),
-        recorrencia: "mensal",
-      }),
-    ];
-
-    return {
-      emEscopo: true,
-      intencao: "registrar_despesas_fixas_multiplas",
-      confianca: 0.86,
-      precisaConfirmacao: true,
-      motivoConfirmacao: "Mensagem com múltiplas despesas fixas em linguagem natural.",
-      itens,
-    };
-  }
-
-  return null;
-}
-
 function resolverLocal(mensagem: string): FinanceiroIntent {
   const escopo = avaliarEscopoFinanceiro(mensagem);
   if (!escopo.emEscopo) return escopo;
 
-  return resolverMensagemMista(mensagem) ??
-    resolverLoteGastosCartao(mensagem) ??
+  return resolverLoteGastosCartao(mensagem) ??
     resolverLancamentosSimples(mensagem) ??
     resolverReceita(mensagem) ??
     {
