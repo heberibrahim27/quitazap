@@ -254,13 +254,20 @@ export default function OfertaPage() {
             </div>
             <span style={{ fontWeight: 700, fontSize: 18, color: "#ffffff", letterSpacing: "-0.3px" }}>QuitaZAP</span>
           </div>
-          <a href={CAKTO_URL} style={{
-            background: "#22c55e", color: "#000", fontWeight: 700,
-            fontSize: 13, padding: "9px 20px", borderRadius: 8,
-            textDecoration: "none", display: "none",
-          }}>
-            Assinar agora
-          </a>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <a href="/minha-conta/entrar" style={{
+              color: "#d1fae5", fontWeight: 600, fontSize: 14, textDecoration: "none",
+            }}>
+              Já sou cliente
+            </a>
+            <a href={CAKTO_URL} style={{
+              background: "#22c55e", color: "#000", fontWeight: 700,
+              fontSize: 13, padding: "9px 20px", borderRadius: 8,
+              textDecoration: "none", display: "none",
+            }}>
+              Assinar agora
+            </a>
+          </div>
         </nav>
 
         {/* Hero content */}
@@ -1191,6 +1198,7 @@ Sobra estimada         R$  -530,00`}
               {["Início", "Como funciona", "Preço", "FAQ"].map((link) => (
                 <a key={link} href={`#${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>{link}</a>
               ))}
+              <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Já sou cliente</a>
             </div>
           </div>
           <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 20 }}>
