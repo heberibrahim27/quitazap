@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { QaRing } from "@/components/QaRing";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -140,7 +141,14 @@ export default async function MinhaContaPage({
   // desconta fatura fechada, pra não travar o saldo antes da fatura vencer).
   // Aqui o objetivo é outro: mostrar tudo que já entrou/saiu no mês, cartão
   // incluído — por isso o rótulo abaixo não usa a palavra "disponível".
-  const resultadoMes = totalReceitasMes - totalFixasMes - totalVariaveisMes - totalCartaoMes;
+  const totalSaidasMes = totalFixasMes + totalVariaveisMes + totalCartaoMes;
+  const resultadoMes = totalReceitasMes - totalSaidasMes;
+
+  // Anel "comprometimento da renda": quanto da renda mensal já foi gasto
+  // este mês (fixo + variável + cartão). Sem renda cadastrada não tem como
+  // calcular percentual nenhum — o anel simplesmente não aparece nesse caso.
+  const percentualRendaComprometida =
+    cliente.rendaMensal && cliente.rendaMensal > 0 ? totalSaidasMes / cliente.rendaMensal : null;
 
   return (
     <div>
@@ -160,11 +168,24 @@ export default async function MinhaContaPage({
           </div>
         </div>
 
-        <p className="mc-hero-label">Entradas − saídas</p>
-        <p className="mc-hero-amount" style={{ color: resultadoMes >= 0 ? "#fff" : "#ffe1e6" }}>
-          {resultadoMes < 0 && "⚠️ "}{fmtValor(resultadoMes)}
-        </p>
-        <p className="mc-hero-caption">já conta compras no cartão do mês</p>
+        <div className="mc-hero-body">
+          <div>
+            <p className="mc-hero-label">Entradas − saídas</p>
+            <p className="mc-hero-amount" style={{ color: resultadoMes >= 0 ? "#fff" : "#ffe1e6" }}>
+              {resultadoMes < 0 && "⚠️ "}{fmtValor(resultadoMes)}
+            </p>
+            <p className="mc-hero-caption">já conta compras no cartão do mês</p>
+          </div>
+          {percentualRendaComprometida != null && (
+            <QaRing
+              value={percentualRendaComprometida}
+              size={76}
+              strokeWidth={7}
+              color={percentualRendaComprometida <= 1 ? "#34d399" : "#fb7185"}
+              label={`${Math.round(percentualRendaComprometida * 100)}%`}
+            />
+          )}
+        </div>
 
         <div className="mc-hero-chips">
           <div className="mc-hero-chip">
