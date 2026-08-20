@@ -21,7 +21,10 @@ import {
   gerenciarFaturaCartaoControle,
   gerenciarDespesasFixasControle,
   registrarGastoControle,
+  type EstadoControleFinanceiro,
+  type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
+import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import {
   persistirLancamentosControle,
   persistirCartaoControle,
@@ -708,6 +711,48 @@ async function jáProcessouPersistente(id: string): Promise<boolean> {
   }
 }
 
+// Os dois wrappers abaixo mantêm gerenciarDespesasFixasControle e
+// gerenciarFaturaCartaoControle 100% síncronos e puros (testados em massa
+// nos testes de regressão) — a chamada de IA só entra aqui, na camada
+// assíncrona do webhook, e só quando já existe uma confirmação pendente e
+// a resposta não bateu no formato exato esperado ("sim"/"1"/"confirmar"...).
+// Nesse caso, a IA classifica a mensagem livre ("beleza pode ser") e a
+// gente re-chama a função original já normalizada pro texto que ela
+// reconhece, em vez de duplicar a lógica de confirmação aqui.
+async function gerenciarDespesasFixasComFallbackIA(
+  mensagem: string,
+  estado: EstadoControleFinanceiro
+): Promise<ResultadoGastoControle | null> {
+  const resultado = gerenciarDespesasFixasControle(mensagem, estado);
+  // processarConfirmacaoPendenteDespesaFixa só resolve estes 3 tipos de
+  // pendência — "substituir_fatura_fechada" é tratado só por
+  // gerenciarFaturaCartaoComFallbackIA. Checar o tipo (em vez de só
+  // truthiness) evita chamar a IA à toa em toda mensagem enquanto uma
+  // pendência de fatura estiver aberta, mesmo pra respostas exatas como "sim".
+  const pendenteResolvivelAqui =
+    estado.confirmacaoPendente &&
+    estado.confirmacaoPendente.tipo !== "substituir_fatura_fechada";
+  if (resultado || !pendenteResolvivelAqui) return resultado;
+
+  const classificacao = await classificarConfirmacaoIA(mensagem);
+  if (!classificacao) return null;
+
+  return gerenciarDespesasFixasControle(classificacao === "confirmar" ? "sim" : "não", estado);
+}
+
+async function gerenciarFaturaCartaoComFallbackIA(
+  mensagem: string,
+  estado: EstadoControleFinanceiro
+): Promise<ResultadoGastoControle | null> {
+  const resultado = gerenciarFaturaCartaoControle(mensagem, estado);
+  if (resultado || estado.confirmacaoPendente?.tipo !== "substituir_fatura_fechada") return resultado;
+
+  const classificacao = await classificarConfirmacaoIA(mensagem);
+  if (!classificacao) return null;
+
+  return gerenciarFaturaCartaoControle(classificacao === "confirmar" ? "sim" : "não", estado);
+}
+
 // ── Webhook principal ─────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -1132,7 +1177,7 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const gerenciamentoDespesasFixas = gerenciarDespesasFixasControle(mensagem, estadoAntesFluxosControle);
+    const gerenciamentoDespesasFixas = await gerenciarDespesasFixasComFallbackIA(mensagem, estadoAntesFluxosControle);
     if (gerenciamentoDespesasFixas) {
       await sendWhatsApp(telefone, gerenciamentoDespesasFixas.resposta);
 
@@ -1182,7 +1227,7 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const gerenciamentoFaturaCartao = gerenciarFaturaCartaoControle(mensagem, estadoAntesGasto);
+    const gerenciamentoFaturaCartao = await gerenciarFaturaCartaoComFallbackIA(mensagem, estadoAntesGasto);
     if (gerenciamentoFaturaCartao) {
       await sendWhatsApp(telefone, gerenciamentoFaturaCartao.resposta);
 

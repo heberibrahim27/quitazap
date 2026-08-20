@@ -93,12 +93,14 @@ const {
   avaliarEscopoFinanceiro,
   devePularInterpretadorFinanceiroIA,
   deveUsarInterpretadorFinanceiroIA,
+  deveChamarInterpretadorFinanceiroIA,
 } = loadTsModule("src/lib/ia/financeiro-scope-guard.ts");
 const {
   formatarPreviaIntentFinanceiro,
   intentFinanceiroConfirmavel,
   resolverIntencaoFinanceiraIA,
 } = loadTsModule("src/lib/ia/financeiro-intent-resolver.ts");
+const { classificarConfirmacaoIA } = loadTsModule("src/lib/ia/confirmacao-resolver.ts");
 
 const mensagemManual = `
 Salario liquido normal: 3812,68
@@ -614,6 +616,38 @@ test("guardiao reconhece mensagens financeiras e evita custo em comandos curtos"
 test("aposta curta passa pelo escopo e segue para gasto rapido", async () => {
   assert.equal(avaliarEscopoFinanceiro("100,00 em apostas").emEscopo, true);
   assert.equal(await resolverIntencaoFinanceiraIA("100,00 em apostas", { forcarLocal: true }), null);
+});
+
+test("mensagem de gasto unico sem palavra-gatilho conhecida ainda entra em escopo por ter valor com cara de dinheiro", () => {
+  assert.equal(avaliarEscopoFinanceiro("desembolsei 45,00 na padaria de manha").emEscopo, true);
+  assert.equal(avaliarEscopoFinanceiro("dei 30 reais pro pedreiro").emEscopo, true);
+  assert.equal(deveChamarInterpretadorFinanceiroIA("desembolsei 45,00 na padaria de manha"), true);
+  assert.equal(deveChamarInterpretadorFinanceiroIA("dei 30 reais pro pedreiro"), true);
+});
+
+test("mensagem sem nenhum valor com cara de dinheiro continua fora de escopo", () => {
+  assert.equal(avaliarEscopoFinanceiro("cheguei em casa umas 22h hoje").emEscopo, false);
+  assert.equal(deveChamarInterpretadorFinanceiroIA("marca 40 minutos no cronometro"), false);
+});
+
+test("horario escrito com virgula em vez de dois-pontos nao e confundido com valor em dinheiro", () => {
+  assert.equal(avaliarEscopoFinanceiro("cheguei em casa umas 22,30 hoje").emEscopo, false);
+  assert.equal(avaliarEscopoFinanceiro("sai daqui as 18,30h").emEscopo, false);
+});
+
+test("resolverIntencaoFinanceiraIA devolve null (nao um objeto vazio) quando nao acha nenhum item, mesmo com IA remota ligada", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  globalThis.fetch = async () => ({ ok: false });
+
+  try {
+    const resultado = await resolverIntencaoFinanceiraIA("desembolsei 45,00 na padaria de manha");
+    assert.equal(resultado, null);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("guardiao deixa gasto simples em cartao seguir para fluxo deterministico", async () => {
@@ -2625,4 +2659,88 @@ test("correcao posterior sem gasto recente orienta reenviar gasto", () => {
   assert.match(correcao.resposta, /Não encontrei um gasto recente para atualizar\./);
   assert.match(correcao.resposta, /gastei 65 de cerveja no Nubank/);
   assert.doesNotMatch(correcao.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
+});
+
+// ── classificarConfirmacaoIA (fallback de IA pra confirmação sim/não fora do formato exato) ──
+
+test("classificarConfirmacaoIA retorna null sem OPENAI_API_KEY configurada", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    assert.equal(await classificarConfirmacaoIA("beleza pode ser"), null);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+  }
+});
+
+test("classificarConfirmacaoIA retorna null pra mensagem vazia ou longa demais, sem chamar a IA", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+  let chamouFetch = false;
+  globalThis.fetch = async () => {
+    chamouFetch = true;
+    throw new Error("não deveria chamar a IA aqui");
+  };
+
+  try {
+    assert.equal(await classificarConfirmacaoIA(""), null);
+    assert.equal(await classificarConfirmacaoIA("a".repeat(301)), null);
+    assert.equal(chamouFetch, false);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("classificarConfirmacaoIA reconhece confirmação e negação em linguagem natural", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+
+  const respostas = { "beleza pode ser": "confirmar", "não, deixa quieto por enquanto": "negar" };
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    const mensagem = body.messages[1].content;
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ resposta: respostas[mensagem] }) } }],
+      }),
+    };
+  };
+
+  try {
+    assert.equal(await classificarConfirmacaoIA("beleza pode ser"), "confirmar");
+    assert.equal(await classificarConfirmacaoIA("não, deixa quieto por enquanto"), "negar");
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("classificarConfirmacaoIA retorna null quando a IA responde indefinido ou dá erro", async () => {
+  const originalApiKey = process.env.OPENAI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.OPENAI_API_KEY = "sk-proj-teste";
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      choices: [{ message: { content: JSON.stringify({ resposta: "indefinido" }) } }],
+    }),
+  });
+  try {
+    assert.equal(await classificarConfirmacaoIA("qual o horário de vocês?"), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  globalThis.fetch = async () => ({ ok: false });
+  try {
+    assert.equal(await classificarConfirmacaoIA("beleza pode ser"), null);
+  } finally {
+    process.env.OPENAI_API_KEY = originalApiKey;
+    globalThis.fetch = originalFetch;
+  }
 });

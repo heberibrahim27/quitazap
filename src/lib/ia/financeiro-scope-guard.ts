@@ -110,6 +110,18 @@ const ALIASES_CARTAO_ESCOPO = [
   "neon",
 ];
 
+// Sinal forte de valor em reais — não é "qualquer número solto" (que pode
+// ser hora, endereço, quantidade), é especificamente um número no formato
+// de dinheiro (com centavos) ou seguido da palavra "reais"/"real". Mesmo
+// critério já usado em gasto-flow.ts pra filtrar candidato a valor de
+// gasto — reaproveitado aqui pra ampliar o que conta como "mensagem
+// financeira" sem abrir mão de exigir que pareça mesmo um valor.
+// O ramo de valor com vírgula (ex: "45,00") exclui o caso de vir seguido de
+// marcador de horário ("22,30 hoje", "22,30h") — gente às vezes escreve
+// hora com vírgula em vez de dois-pontos, e isso não é dinheiro nenhum.
+const TEM_VALOR_MONETARIO_FORTE =
+  /\b\d[\d.]*,\d{2}\b(?!\s*(?:h|hs|hrs|horas|hoje|da manha|da tarde|da noite)\b)|\br\$\s*\d|\b\d[\d.,]*\s*(?:reais|real)\b/;
+
 function pareceGastoEmCartao(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
   if (!/\b\d[\d.,]*\b/.test(texto)) return false;
@@ -137,7 +149,7 @@ export function avaliarEscopoFinanceiro(mensagem: string): FinanceiroIntent {
   const emEscopo =
     PADROES_ESCOPO.some((regex) => regex.test(texto)) ||
     pareceGastoEmCartao(mensagem) ||
-    /\br\$\s*\d/.test(texto);
+    TEM_VALOR_MONETARIO_FORTE.test(texto);
 
   return emEscopo
     ? {
@@ -169,6 +181,13 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   if (/[.?!].+\b\d[\d.,]*\b/.test(texto)) return true;
   if (/\b(?:anota pra mim|cliente pagou|recebi pix|caiu pix|entrou|entrou dinheiro|me pagaram|vendi)\b/.test(texto)) return true;
   if (/\b(?:akuguel|waifai|conto|mes|tambem|umas coisa)\b/.test(texto)) return true;
+  // Mensagem de um único gasto, sem nenhuma das palavras acima — ainda
+  // assim vale chamar a IA se tiver um valor com cara de dinheiro de
+  // verdade. Isso só é alcançado depois que resolverLocal() já tentou e
+  // não achou nada (ver resolverIntencaoFinanceiraIA), então não substitui
+  // os resolvedores locais — só evita que a mensagem pule direto pro
+  // fallback 100% regex de registrarGastoControle sem passar pela IA.
+  if (TEM_VALOR_MONETARIO_FORTE.test(texto)) return true;
   return false;
 }
 

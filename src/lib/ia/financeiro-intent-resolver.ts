@@ -512,7 +512,12 @@ export async function resolverIntencaoFinanceiraIA(
     if (remoto) return remoto;
   }
 
-  return local;
+  // Chegou aqui sem nenhum item identificado (nem local, nem IA remota) —
+  // devolve null em vez do objeto vazio pra deixar claro que não achou
+  // nada de acionável, e o webhook cai pros fluxos determinísticos
+  // (registrarGastoControle etc.) em vez de tratar isso como uma
+  // interpretação válida sem itens.
+  return null;
 }
 
 function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
