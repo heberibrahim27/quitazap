@@ -1,23 +1,24 @@
 // ─────────────────────────────────────────
-// QuitaZAP Controle — Login do Cliente (sem senha)
+// QuitaZAP Controle — Login do Cliente (telefone + senha)
 // Reaproveita o mesmo princípio de src/lib/cobrador-token.ts e
-// src/lib/auth-jwt.ts: token assinado por HMAC, sem sessão guardada
-// no banco. Duas variantes:
-//   - Link de acesso: mandado por WhatsApp, válido por 15 minutos.
-//   - Sessão: cookie do navegador depois do login, válido por 30 dias.
-// O tipo ("cliente-sessao" / "cliente-acesso") entra na própria
-// assinatura pra um token de um tipo nunca ser aceito como o outro,
+// src/lib/auth-jwt.ts: sessão é um token assinado por HMAC, sem nada
+// guardado no banco além do hash da senha. O tipo ("cliente-sessao") entra
+// na própria assinatura pra um token desse fluxo nunca ser aceito por outro,
 // mesmo usando o mesmo segredo.
+//
+// Antes disso o acesso era por link mandado no WhatsApp — trocado porque
+// depende do Z-API estar conectado (não está). Login agora é direto na tela,
+// com telefone + senha; a senha é definida pelo fundador em
+// /clientes/[id]/editar (src/app/api/clientes/[id]/senha/route.ts).
 // ─────────────────────────────────────────
 
 import { createHmac, timingSafeEqual } from "crypto";
+import { hashSync, compareSync } from "bcryptjs";
 
-// Sem fallback pra segredo público: diferente de auth-jwt.ts/cobrador-token.ts
-// (que têm um literal fixo de fallback, dívida técnica pré-existente e fora
-// de escopo aqui), este é login de conta de cliente — um segredo previsível
-// permitiria forjar sessão de qualquer cliente. Falha alto e cedo (erro claro
-// só nas rotas novas de /minha-conta, não derruba o resto do site) em vez de
-// aceitar silenciosamente um segredo conhecido.
+// Sem fallback pra segredo público: um segredo previsível permitiria forjar
+// sessão de qualquer cliente. Falha alto e cedo (erro claro só nas rotas de
+// /minha-conta, não derruba o resto do site) em vez de aceitar silenciosamente
+// um segredo conhecido.
 function getSecret(): string {
   const secret = process.env.NEXTAUTH_SECRET ?? process.env.CRON_SECRET;
   if (!secret) {
@@ -29,7 +30,6 @@ function getSecret(): string {
 }
 
 const VALIDADE_SESSAO_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
-const VALIDADE_ACESSO_MS = 15 * 60 * 1000; // 15 minutos
 
 function assinar(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
@@ -67,7 +67,7 @@ function verificarToken(tipo: string, token: string, validadeMs: number): string
   }
 }
 
-/** Cookie de sessão do cliente, criado depois que ele confirma o link de acesso. Válido por 30 dias. */
+/** Cookie de sessão do cliente, criado depois de um login bem-sucedido. Válido por 30 dias. */
 export function criarSessaoCliente(clienteId: string): string {
   return criarToken("cliente-sessao", clienteId);
 }
@@ -76,19 +76,24 @@ export function verificarSessaoCliente(token: string): string | null {
   return verificarToken("cliente-sessao", token, VALIDADE_SESSAO_MS);
 }
 
-/** Link enviado por WhatsApp pra confirmar o acesso. Válido por só 15 minutos. */
-export function criarLinkAcessoCliente(clienteId: string): string {
-  return criarToken("cliente-acesso", clienteId);
+// ── Senha do cliente ──────────────────────
+
+export function hashSenhaCliente(senha: string): string {
+  return hashSync(senha, 12);
 }
 
-export function verificarLinkAcessoCliente(token: string): string | null {
-  return verificarToken("cliente-acesso", token, VALIDADE_ACESSO_MS);
-}
+// Hash "morto" pré-computado (senha aleatória, sem nenhum uso real), só pra
+// gastar o mesmo tempo de bcrypt quando o cliente não tem senha definida
+// ainda — sem isso, essa checagem seria bem mais rápida do que a de um
+// cliente que tem senha e errou, o que já foi achado de auditoria uma vez
+// neste projeto (vazamento de tempo de resposta no login por link).
+const HASH_MORTO = "$2b$12$5BjfCAmizRfAUWkqkKYQgeUHU4GxnzbqYKR7fZCzLae3jxHvVbyBS";
 
-/** Monta a URL completa do link de acesso a mandar por WhatsApp. Aponta pra
- * página de confirmação (não pra uma rota que já loga sozinha no GET). */
-export function urlLinkAcessoCliente(clienteId: string): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://www.quitazap.com.br";
-  const token = criarLinkAcessoCliente(clienteId);
-  return `${base}/minha-conta/entrar?token=${token}`;
+/** Compara em tempo (aproximadamente) constante, mesmo quando `hash` é nulo. */
+export function verificarSenhaCliente(senhaDigitada: string, hash: string | null): boolean {
+  if (!hash) {
+    compareSync(senhaDigitada, HASH_MORTO);
+    return false;
+  }
+  return compareSync(senhaDigitada, hash);
 }

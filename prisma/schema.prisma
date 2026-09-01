@@ -22,6 +22,7 @@ model Cliente {
   cpf                   String?
   email                 String?
   obs                   String?
+  senhaHash             String?
   statusAtendimento     String    @default("NOVO")
   rendaMensal           Float?
   despesasFixas         Float?
