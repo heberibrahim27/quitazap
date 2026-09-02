@@ -1,20 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { manrope } from "../fonte";
-import "../(protegido)/minha-conta.css";
+import { anton, inter } from "./fontes";
+import "./entrar.css";
 
-const wrapperStyle: React.CSSProperties = {
-  minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-};
+// Depois da primeira visita, a abertura cinemática (~1.8s) vira uma entrada
+// rápida (~350ms) — ninguém precisa ver o show inteiro de novo a cada login.
+const VISITADO_KEY = "qz_entrar_visitado";
 
 export default function EntrarPage() {
   const router = useRouter();
   const [telefone, setTelefone] = useState("");
   const [senha, setSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [rapido, setRapido] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VISITADO_KEY)) {
+        setRapido(true);
+      } else {
+        localStorage.setItem(VISITADO_KEY, "1");
+      }
+    } catch {
+      // localStorage indisponível (modo privado etc.) — mantém a abertura completa.
+    }
+  }, []);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -40,53 +54,108 @@ export default function EntrarPage() {
   }
 
   return (
-    <div className={`mc-shell ${manrope.className}`} style={wrapperStyle}>
-      <div className="mc-form-card" style={{ width: "100%", maxWidth: 400 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Minha Conta QuitaZAP</h1>
-          <p style={{ color: "var(--mc-ink-dim)", marginTop: 8 }}>
-            Entre com o número de WhatsApp e a senha cadastrados.
-          </p>
+    <div className={`qz-entrar ${inter.className} ${rapido ? "qz-fast" : ""}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="qz-bg-photo" src="/minha-conta/login-fundo.jpg" alt="" />
+      <div className="qz-bg-scrim" />
+
+      <div className="qz-stage">
+        <div className="qz-zone-top">
+          <div className="qz-brand-row">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="qz-brand-logo" src="/minha-conta/logo-oficial.webp" alt="QuitaZAP" />
+            <div className="qz-brand-sub">Minha Conta</div>
+          </div>
+          <h1 className={`qz-headline ${anton.className}`}>
+            <span><em>Seu dinheiro,</em></span>
+            <span><em>sob controle.</em></span>
+          </h1>
         </div>
 
-        {erro && (
-          <div style={{ background: "rgba(251,113,133,0.12)", border: "1px solid rgba(251,113,133,0.3)", color: "#fda4af", borderRadius: 12, padding: "10px 14px", fontSize: 13 }}>
-            {erro}
+        <div className="qz-zone-mid">
+          <div className="qz-scene">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/minha-conta/login-mulher.webp"
+              alt="Mulher com a mão aberta, apresentando o cartão de acesso ao QuitaZAP"
+            />
+
+            <form className="qz-login-card" onSubmit={enviar} autoComplete="off">
+              <label>
+                <span className="qz-input-box">
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="Login (WhatsApp)"
+                    required
+                    autoComplete="username"
+                    value={telefone}
+                    onChange={(e) => setTelefone(e.target.value)}
+                  />
+                </span>
+              </label>
+
+              <label>
+                <span className="qz-input-box">
+                  <input
+                    type={mostrarSenha ? "text" : "password"}
+                    placeholder="Senha"
+                    required
+                    autoComplete="current-password"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="qz-eye-btn"
+                    aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                    onClick={() => setMostrarSenha((v) => !v)}
+                  >
+                    {mostrarSenha ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                        <path d="M9.5 5.2A10.8 10.8 0 0 1 12 5c7 0 11 7 11 7a13.2 13.2 0 0 1-3.1 3.6M6.6 6.6C4 8.3 2 12 2 12s4 7 11 7a10.6 10.6 0 0 0 4-0.8" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </span>
+              </label>
+
+              <button
+                type="button"
+                className="qz-forgot-link"
+                onClick={() => setErro("Fale com quem administra sua conta QuitaZAP.")}
+              >
+                Esqueci minha senha
+              </button>
+
+              {erro && <div className="qz-error-banner">{erro}</div>}
+
+              <button className="qz-btn-enter" type="submit" disabled={enviando}>
+                <span className="qz-btn-beam">
+                  <span className="qz-btn-beam-spin" />
+                  <span className="qz-btn-beam-mask" />
+                </span>
+                <span className="qz-btn-surface">
+                  <span className="qz-btn-scanlines" />
+                  <span className="qz-btn-glow" />
+                  <span className="qz-btn-label">{enviando ? "Entrando…" : "Entrar"}</span>
+                  <svg className="qz-btn-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8h10M9 4l4 4-4 4" />
+                  </svg>
+                </span>
+              </button>
+            </form>
           </div>
-        )}
+        </div>
 
-        <form onSubmit={enviar} style={{ display: "grid", gap: 16 }}>
-          <label className="mc-label">
-            WhatsApp
-            <input
-              required
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              placeholder="(71) 99999-9999"
-              autoComplete="username"
-              className="mc-input"
-            />
-          </label>
-          <label className="mc-label">
-            Senha
-            <input
-              required
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              className="mc-input"
-            />
-          </label>
-          <button type="submit" disabled={enviando} className="mc-btn-primary" style={{ border: "none", opacity: enviando ? 0.6 : 1 }}>
-            {enviando ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
-
-        <p style={{ color: "var(--mc-ink-dim)", fontSize: 13, textAlign: "center" }}>
-          Esqueceu a senha? Fale com quem administra sua conta QuitaZAP.
-        </p>
+        <div className="qz-zone-bottom" />
       </div>
     </div>
   );
