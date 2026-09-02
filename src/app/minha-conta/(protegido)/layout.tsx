@@ -19,7 +19,7 @@ export default async function MinhaContaLayout({ children }: { children: React.R
 
   return (
     <div className="mc-shell">
-      <Header nome={cliente.nome.split(" ")[0]} />
+      <Header nome={cliente.nome.split(" ")[0]} fotoUrl={cliente.fotoUrl} />
 
       <main className="mc-main">{children}</main>
 

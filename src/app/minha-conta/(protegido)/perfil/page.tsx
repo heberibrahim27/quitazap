@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
+import { subirFotoPerfil } from "@/lib/supabase-storage";
+import { FotoPerfilForm } from "./FotoPerfilForm";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -29,6 +31,31 @@ export default async function PerfilPage({
 
     await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { rendaMensal: renda } });
     redirect("/minha-conta/perfil?ok=renda");
+  }
+
+  async function salvarFotoPerfil(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const arquivo = formData.get("foto");
+    if (!(arquivo instanceof Blob) || arquivo.size === 0) {
+      redirect("/minha-conta/perfil?erro=Selecione uma imagem.");
+    }
+    if (arquivo.size > 3 * 1024 * 1024) {
+      redirect("/minha-conta/perfil?erro=Imagem muito grande (máx. 3MB).");
+    }
+
+    let url: string;
+    try {
+      url = await subirFotoPerfil(clienteAtual.id, arquivo);
+    } catch (e) {
+      const mensagem = e instanceof Error ? e.message : "Falha ao enviar a foto.";
+      redirect(`/minha-conta/perfil?erro=${encodeURIComponent(mensagem)}`);
+    }
+
+    await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { fotoUrl: url } });
+    redirect("/minha-conta/perfil?ok=foto");
   }
 
   async function trocarSenha(formData: FormData) {
@@ -68,6 +95,11 @@ export default async function PerfilPage({
         </p>
       </div>
 
+      {ok === "foto" && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Foto de perfil atualizada.</p>
+        </div>
+      )}
       {ok === "renda" && (
         <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Renda mensal atualizada.</p>
@@ -83,6 +115,8 @@ export default async function PerfilPage({
           <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
         </div>
       )}
+
+      <FotoPerfilForm fotoAtual={cliente.fotoUrl} enviarFoto={salvarFotoPerfil} />
 
       <div className="mc-card" style={{ marginBottom: 16 }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Nome</p>
