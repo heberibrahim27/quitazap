@@ -63,6 +63,10 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   isolation: isolate;
+  /* Trava o scroll lateral: só rola verticalmente. touch-action evita
+     também o arrasto horizontal (rubber-band) em navegadores mobile. */
+  overflow-x: hidden;
+  touch-action: pan-y;
 }
 
 .mc-shell * { box-sizing: border-box; }
@@ -127,6 +131,7 @@
   padding: 4px 16px calc(116px + env(safe-area-inset-bottom));
   position: relative;
   z-index: 1;
+  overflow-x: hidden;
 }
 
 /* ── Hero ───────────────────────────────────────── */

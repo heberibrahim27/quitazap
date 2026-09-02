@@ -23,6 +23,7 @@ model Cliente {
   email                 String?
   obs                   String?
   senhaHash             String?
+  fotoUrl               String?
   statusAtendimento     String    @default("NOVO")
   rendaMensal           Float?
   despesasFixas         Float?
