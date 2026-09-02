@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
@@ -55,6 +56,10 @@ export default async function PerfilPage({
     }
 
     await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { fotoUrl: url } });
+    // O avatar mora no layout (Header), não nesta página — sem isso o
+    // navegador continuaria mostrando o layout em cache após o redirect,
+    // com a foto antiga (ou o ícone) até uma navegação nova recarregar tudo.
+    revalidatePath("/minha-conta", "layout");
     redirect("/minha-conta/perfil?ok=foto");
   }
 
