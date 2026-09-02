@@ -1,0 +1,257 @@
+/* ─────────────────────────────────────────
+   QuitaZAP — Login do cliente ("Minha Conta")
+   Tela própria, isolada de minha-conta.css (produto diferente de
+   visual: foto full-bleed + cartão de vidro, em vez do dashboard).
+   Prefixo "qz-entrar" evita colisão com o resto do app.
+   ───────────────────────────────────────── */
+
+.qz-entrar {
+  --qz-ink: #f5f8fc;
+  --qz-ink-dim: #c3cee0;
+  --qz-ink-faint: #8a97ad;
+  --qz-accent-1: #0077ff;
+  --qz-accent-2: #1fe0d0;
+  --qz-accent-2-soft: rgba(31, 224, 208, 0.4);
+  --qz-accent-glow: rgba(31, 224, 208, 0.45);
+  --qz-negative: #ff8a94;
+  --qz-card-bg: rgba(5, 9, 18, 0.76);
+  --qz-card-line: rgba(31, 224, 208, 0.4);
+
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #050b16;
+  color: var(--qz-ink);
+}
+
+.qz-entrar * { box-sizing: border-box; }
+
+.qz-bg-photo {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 0;
+}
+
+.qz-bg-scrim {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(3,7,16,0.4) 0%, rgba(3,7,16,0.05) 26%, rgba(3,7,16,0.15) 55%, rgba(3,7,16,0.55) 100%);
+}
+
+/* ── Layout: three zones ─────────────────────── */
+.qz-stage {
+  position: relative; z-index: 2;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+  padding: 24px 22px max(20px, env(safe-area-inset-bottom));
+}
+
+.qz-zone-top { padding-top: 4px; }
+.qz-zone-mid { display: flex; align-items: center; justify-content: center; min-height: 0; }
+.qz-zone-bottom { display: flex; justify-content: center; }
+
+/* ── Brand ────────────────────────────────────── */
+.qz-brand-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  opacity: 0;
+  animation: qz-rise var(--qz-d-brand, 0.6s) cubic-bezier(0.16,1,0.3,1) var(--qz-t-brand, 0.05s) forwards;
+}
+.qz-brand-logo {
+  display: block;
+  height: clamp(38px, 10vw, 48px);
+  width: auto;
+  max-width: 200px;
+}
+.qz-brand-sub { font-size: 11px; font-weight: 500; color: var(--qz-ink-faint); letter-spacing: 0.04em; }
+
+/* ── Headline: authority treatment (Stagore-style condensed display) ── */
+.qz-headline {
+  margin: 18px 0 0;
+  font-weight: 400;
+  font-size: clamp(33px, 10.5vw, 50px);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  max-width: 460px;
+}
+.qz-headline span { display: block; overflow: hidden; }
+.qz-headline span em {
+  display: block; font-style: normal;
+  transform: translateY(115%);
+  animation: qz-rise var(--qz-d-line, 0.75s) cubic-bezier(0.16,1,0.3,1) forwards;
+}
+.qz-headline span:nth-child(1) em { animation-delay: var(--qz-t-line1, 0.22s); color: #ffffff; }
+.qz-headline span:nth-child(2) em {
+  animation-delay: var(--qz-t-line2, 0.36s);
+  color: var(--qz-accent-2);
+}
+
+@keyframes qz-rise { to { transform: translateY(0); opacity: 1; } from { opacity: 0; } }
+
+/* ── Scene: photo + floating card ─────────────── */
+.qz-scene {
+  position: relative;
+  width: min(92vw, 380px);
+  opacity: 0;
+  animation: qz-rise var(--qz-d-photo, 0.85s) cubic-bezier(0.16,1,0.3,1) var(--qz-t-photo, 0.5s) forwards;
+}
+.qz-scene img { display: block; width: 100%; height: auto; }
+
+.qz-login-card {
+  position: absolute;
+  left: 16%;
+  width: 72%;
+  max-width: 270px;
+  top: 38%;
+  border-radius: 20px;
+  background: var(--qz-card-bg);
+  border: 1px solid var(--qz-card-line);
+  box-shadow: 0 0 30px -8px var(--qz-accent-glow), 0 24px 44px -20px rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px) saturate(112%);
+  -webkit-backdrop-filter: blur(8px) saturate(112%);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  opacity: 0;
+  animation: qz-card-in var(--qz-d-panel, 0.7s) cubic-bezier(0.16,1,0.3,1) var(--qz-t-panel, 0.95s) forwards;
+}
+
+@keyframes qz-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.qz-input-box {
+  display: flex; align-items: center;
+  height: 46px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.38);
+  border: 1px solid rgba(255,255,255,0.14);
+  padding: 0 13px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.qz-input-box:focus-within { border-color: var(--qz-accent-2-soft); background: rgba(0,0,0,0.46); }
+
+.qz-input-box input {
+  flex: 1; min-width: 0;
+  background: transparent; border: none; outline: none; padding: 0;
+  color: #fff; font-weight: 500; font-size: 14px;
+  caret-color: var(--qz-accent-2);
+}
+.qz-input-box input::placeholder { color: rgba(225,235,248,0.6); font-weight: 500; }
+
+.qz-eye-btn {
+  background: none; border: none; padding: 4px; margin-left: 4px;
+  color: rgba(210,225,240,0.55); cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center;
+}
+.qz-eye-btn svg { width: 16px; height: 16px; }
+
+.qz-forgot-link {
+  align-self: flex-start;
+  background: none; border: none; padding: 0; margin-top: -1px;
+  font-size: 10px; font-weight: 600;
+  color: var(--qz-accent-2); cursor: pointer;
+}
+
+.qz-error-banner {
+  margin-top: -2px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: rgba(255,107,122,0.16);
+  border: 1px solid rgba(255,107,122,0.35);
+  color: var(--qz-negative);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+/* ── ENTRAR — engineered CTA ─────────────────── */
+.qz-btn-enter {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  margin-top: 2px;
+  border: none;
+  border-radius: 999px;
+  overflow: hidden;
+  cursor: pointer;
+  background: transparent;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.qz-btn-enter:hover { transform: scale(1.02); box-shadow: 0 0 30px -10px var(--qz-accent-glow); }
+.qz-btn-enter:disabled { cursor: default; opacity: 0.75; }
+
+.qz-btn-beam { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.qz-btn-beam-spin {
+  position: absolute; inset: -120%;
+  background: conic-gradient(from 0deg, transparent 0 300deg, var(--qz-accent-2) 358deg);
+  animation: qz-beam-spin 4s linear infinite;
+}
+@keyframes qz-beam-spin { to { transform: rotate(360deg); } }
+.qz-btn-beam-mask { position: absolute; inset: 1px; border-radius: inherit; background: #060606; }
+
+.qz-btn-surface {
+  position: absolute; inset: 2px; border-radius: inherit; overflow: hidden;
+  background: #0a0a0a;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.qz-btn-scanlines {
+  position: absolute; inset: 0; opacity: 0.045; mix-blend-mode: plus-lighter; pointer-events: none;
+  background-image: repeating-linear-gradient(90deg, #fff, #fff 1px, transparent 1px, transparent 9px);
+  background-size: 24px 100%;
+  animation: qz-lines-slide 1.8s linear infinite;
+}
+@keyframes qz-lines-slide { from { background-position-x: 0; } to { background-position-x: 24px; } }
+
+.qz-btn-glow {
+  position: absolute; bottom: -30%; left: 50%; transform: translateX(-50%);
+  width: 62%; height: 70%;
+  background: radial-gradient(closest-side, var(--qz-accent-2-soft), transparent 72%);
+  filter: blur(9px);
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+.qz-btn-enter:hover .qz-btn-glow { opacity: 1; }
+
+.qz-btn-label {
+  position: relative; z-index: 2;
+  font-weight: 700; font-size: clamp(15px, 4.2vw, 17px);
+  letter-spacing: 0.03em; text-transform: uppercase; color: rgba(255,255,255,0.94);
+}
+.qz-btn-arrow { position: relative; z-index: 2; width: 15px; height: 15px; color: #fff; transition: transform 0.3s ease; }
+.qz-btn-enter:hover .qz-btn-arrow { transform: translateX(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .qz-brand-row, .qz-headline span em, .qz-scene, .qz-login-card { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .qz-btn-beam-spin, .qz-btn-scanlines { animation: none !important; }
+}
+
+/* ── Acesso rápido: visitante recorrente já viu a abertura antes ── */
+.qz-entrar.qz-fast {
+  --qz-d-brand: 0.32s; --qz-t-brand: 0s;
+  --qz-d-line: 0.32s; --qz-t-line1: 0s; --qz-t-line2: 0.04s;
+  --qz-d-photo: 0.36s; --qz-t-photo: 0.05s;
+  --qz-d-panel: 0.32s; --qz-t-panel: 0.12s;
+}
+
+/* ── Desktop: side-by-side ─────────────────────
+   Mobile (default acima) continua o layout principal. */
+@media (min-width: 900px) {
+  .qz-stage {
+    grid-template-rows: none;
+    grid-template-columns: minmax(300px, 400px) auto;
+    align-items: center;
+    max-width: 1080px;
+    margin: 0 auto;
+    column-gap: 56px;
+  }
+  .qz-zone-top { grid-column: 1; align-self: center; }
+  .qz-zone-mid { grid-column: 2; grid-row: 1 / span 2; justify-content: flex-end; }
+  .qz-zone-bottom { grid-column: 1; justify-content: flex-start; }
+  .qz-scene { width: auto; height: min(86vh, 660px); }
+  .qz-scene img { width: auto; height: 100%; }
+}
+
+@media (max-width: 359px) {
+  .qz-brand-logo { height: 34px; }
+}
