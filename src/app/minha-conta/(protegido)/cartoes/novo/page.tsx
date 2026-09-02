@@ -1,0 +1,105 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getClienteAtual } from "@/lib/get-cliente";
+import { prisma } from "@/lib/prisma";
+import { NOMES_CARTOES_CONHECIDOS } from "@/lib/cartoes-conhecidos";
+
+export default async function NovoCartaoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ erro?: string }>;
+}) {
+  const cliente = await getClienteAtual();
+  if (!cliente) redirect("/minha-conta/entrar");
+  const { erro } = await searchParams;
+
+  async function criarCartao(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const banco = String(formData.get("banco") || "").trim();
+    const nomePersonalizado = String(formData.get("nomePersonalizado") || "").trim();
+    const nome = banco === "Outro" ? nomePersonalizado : banco;
+
+    if (!nome) {
+      redirect("/minha-conta/cartoes/novo?erro=Digite o nome do cartão.");
+    }
+
+    const diaFechamentoTexto = String(formData.get("diaFechamento") || "").trim();
+    const diaVencimentoTexto = String(formData.get("diaVencimento") || "").trim();
+    const diaFechamento = diaFechamentoTexto ? Number(diaFechamentoTexto) : null;
+    const diaVencimento = diaVencimentoTexto ? Number(diaVencimentoTexto) : null;
+
+    try {
+      await prisma.cartao.create({
+        data: { clienteId: clienteAtual.id, nome, diaFechamento, diaVencimento },
+      });
+    } catch (err: unknown) {
+      // P2002: já existe um cartão com esse nome pra esse cliente (constraint única).
+      if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
+        redirect(`/minha-conta/cartoes/novo?erro=${encodeURIComponent(`Você já tem um cartão chamado "${nome}".`)}`);
+      }
+      console.error("[MINHA-CONTA] Erro ao criar cartão:", err);
+      redirect("/minha-conta/cartoes/novo?erro=Não foi possível salvar o cartão. Tente de novo.");
+    }
+
+    redirect("/minha-conta/cartoes");
+  }
+
+  return (
+    <div>
+      <div className="card-head">
+        <p className="card-title">
+          <span className="title-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /></svg>
+          </span>
+          <span className="title-label">Novo cartão</span>
+        </p>
+      </div>
+
+      {erro && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
+        </div>
+      )}
+
+      <form action={criarCartao} className="mc-form-card">
+        <label className="mc-label">
+          Banco / instituição
+          <select name="banco" required defaultValue="" className="mc-input">
+            <option value="" disabled>Selecione o banco do cartão</option>
+            {NOMES_CARTOES_CONHECIDOS.map((nome) => (
+              <option key={nome} value={nome}>{nome}</option>
+            ))}
+            <option value="Outro">Outro banco</option>
+          </select>
+        </label>
+
+        <label className="mc-label">
+          Nome personalizado (só se escolheu &ldquo;Outro banco&rdquo; acima)
+          <input name="nomePersonalizado" placeholder="Ex: Cartão da loja X" className="mc-input" />
+        </label>
+
+        <label className="mc-label">
+          Dia de fechamento da fatura
+          <input name="diaFechamento" type="number" min={1} max={31} placeholder="Ex: 20" className="mc-input" />
+        </label>
+
+        <label className="mc-label">
+          Dia de vencimento da fatura
+          <input name="diaVencimento" type="number" min={1} max={31} placeholder="Ex: 27" className="mc-input" />
+        </label>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
+            Salvar cartão
+          </button>
+          <Link href="/minha-conta/cartoes" className="mc-btn-secondary">
+            Cancelar
+          </Link>
+        </div>
+      </form>
+    </div>
+  );
+}

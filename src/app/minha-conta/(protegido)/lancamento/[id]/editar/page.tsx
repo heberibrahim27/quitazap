@@ -146,12 +146,12 @@ export default async function EditarLancamentoPage({
       <ExcluirForm
         action={apagarLancamento}
         mensagem={`Apagar o lançamento "${lancamento.descricao}"? Essa ação não pode ser desfeita.`}
-        label="🗑️ Apagar lançamento"
+        label="Apagar lançamento"
         estiloBotao={{
           width: "100%",
-          background: "rgba(251, 113, 133, 0.12)",
-          border: "1px solid rgba(251, 113, 133, 0.3)",
-          color: "#fda4af",
+          background: "rgba(226, 59, 92, 0.1)",
+          border: "1px solid rgba(226, 59, 92, 0.3)",
+          color: "#E23B5C",
           borderRadius: 13,
           padding: "13px 20px",
           fontWeight: 700,

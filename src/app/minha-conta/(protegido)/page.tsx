@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
+import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -24,7 +25,6 @@ const NOMES_MES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-const CORES_CARTAO = ["c-0", "c-1", "c-2", "c-3"];
 
 // Ano/mês corrente em horário de Brasília (fixo UTC-3, sem horário de
 // verão desde 2019) — mesma convenção já usada no cron de tarefas.
@@ -284,6 +284,10 @@ export default async function MinhaContaPage({
           </span>
           <span className="title-label">Resumo — {nomeMes}/{ano}</span>
         </p>
+        <Link href="/minha-conta/movimentacoes" className="card-link">
+          Ver detalhes
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+        </Link>
       </div>
       <section className="card" id="resumo" style={{ paddingBottom: 0 }}>
         {lancamentosDoMes.length === 0 ? (
@@ -332,7 +336,7 @@ export default async function MinhaContaPage({
           </span>
           <span className="title-label">Últimos lançamentos</span>
         </p>
-        <Link href="#" className="card-link">
+        <Link href="/minha-conta/movimentacoes" className="card-link">
           Ver tudo
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
         </Link>
@@ -415,6 +419,10 @@ export default async function MinhaContaPage({
           </span>
           <span className="title-label">Cartões</span>
         </p>
+        <Link href="/minha-conta/cartoes" className="card-link">
+          Ver cartões
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+        </Link>
       </div>
       <section className="card" id="cartoes">
         {cartoes.length === 0 ? (
@@ -432,9 +440,11 @@ export default async function MinhaContaPage({
                 </span>
               </div>
             </div>
-            {cartoes.map((c, i) => (
+            {cartoes.map((c) => {
+              const [cor1, cor2] = gradienteDoCartao(c.nome);
+              return (
               <div key={c.id} className="cartao-row">
-                <span className={`cartao-mark ${CORES_CARTAO[i % CORES_CARTAO.length]}`}>
+                <span className="cartao-mark" style={{ background: `linear-gradient(160deg, ${cor1}, ${cor2})` }}>
                   <span className="cartao-chip" />
                   <span className="cartao-initial">{c.nome.charAt(0).toUpperCase()}</span>
                 </span>
@@ -450,7 +460,8 @@ export default async function MinhaContaPage({
                   <p className="cartao-value">{fmtValor(gastoCartaoMes.get(c.nome) ?? 0)}</p>
                 </span>
               </div>
-            ))}
+              );
+            })}
           </>
         )}
       </section>
@@ -462,6 +473,10 @@ export default async function MinhaContaPage({
           </span>
           <span className="title-label">Próximos compromissos</span>
         </p>
+        <Link href="/minha-conta/agenda" className="card-link">
+          Ver agenda
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+        </Link>
       </div>
       <section className="card" id="tarefas">
         {proximosCompromissos.length === 0 ? (

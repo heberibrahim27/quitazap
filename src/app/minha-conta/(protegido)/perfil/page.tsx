@@ -1,0 +1,152 @@
+import { redirect } from "next/navigation";
+import { getClienteAtual } from "@/lib/get-cliente";
+import { prisma } from "@/lib/prisma";
+import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
+
+function fmtValor(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export default async function PerfilPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; erro?: string }>;
+}) {
+  const cliente = await getClienteAtual();
+  if (!cliente) redirect("/minha-conta/entrar");
+  const { ok, erro } = await searchParams;
+
+  async function salvarRenda(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const rendaTexto = String(formData.get("rendaMensal") || "").replace(",", ".").trim();
+    const renda = rendaTexto ? Number(rendaTexto) : null;
+    if (rendaTexto && (!Number.isFinite(renda) || (renda as number) < 0)) {
+      redirect("/minha-conta/perfil?erro=Digite um valor de renda válido.");
+    }
+
+    await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { rendaMensal: renda } });
+    redirect("/minha-conta/perfil?ok=renda");
+  }
+
+  async function trocarSenha(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const senhaAtual = String(formData.get("senhaAtual") || "");
+    const novaSenha = String(formData.get("novaSenha") || "");
+    const confirmarSenha = String(formData.get("confirmarSenha") || "");
+
+    if (clienteAtual.senhaHash && !verificarSenhaCliente(senhaAtual, clienteAtual.senhaHash)) {
+      redirect("/minha-conta/perfil?erro=Senha atual incorreta.");
+    }
+    if (novaSenha.length < 6) {
+      redirect("/minha-conta/perfil?erro=A nova senha precisa ter pelo menos 6 caracteres.");
+    }
+    if (novaSenha !== confirmarSenha) {
+      redirect("/minha-conta/perfil?erro=A confirmação não bate com a nova senha.");
+    }
+
+    await prisma.cliente.update({
+      where: { id: clienteAtual.id },
+      data: { senhaHash: hashSenhaCliente(novaSenha) },
+    });
+    redirect("/minha-conta/perfil?ok=senha");
+  }
+
+  return (
+    <div>
+      <div className="card-head">
+        <p className="card-title">
+          <span className="title-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" /></svg>
+          </span>
+          <span className="title-label">Perfil</span>
+        </p>
+      </div>
+
+      {ok === "renda" && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Renda mensal atualizada.</p>
+        </div>
+      )}
+      {ok === "senha" && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Senha alterada com sucesso.</p>
+        </div>
+      )}
+      {erro && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
+        </div>
+      )}
+
+      <div className="mc-card" style={{ marginBottom: 16 }}>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Nome</p>
+        <p style={{ margin: "4px 0 14px", fontSize: 15, fontWeight: 700 }}>{cliente.nome}</p>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Telefone</p>
+        <p style={{ margin: "4px 0 0", fontSize: 15, fontWeight: 700 }}>{cliente.telefone}</p>
+        <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "var(--ink-faint)" }}>
+          Pra trocar nome ou telefone, fale com a gente pelo WhatsApp.
+        </p>
+      </div>
+
+      <div className="card-head">
+        <p className="card-title" style={{ fontSize: 14 }}>
+          <span className="title-label">Renda mensal</span>
+        </p>
+      </div>
+      <form action={salvarRenda} className="mc-form-card" style={{ marginBottom: 16 }}>
+        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-faint)", lineHeight: 1.5 }}>
+          Usada pra calcular seu Plano de Pagamento e o % da renda comprometida no início da tela.
+        </p>
+        <label className="mc-label">
+          Renda mensal
+          <input
+            name="rendaMensal"
+            type="text"
+            inputMode="decimal"
+            defaultValue={cliente.rendaMensal != null ? String(cliente.rendaMensal).replace(".", ",") : ""}
+            placeholder={cliente.rendaMensal != null ? fmtValor(cliente.rendaMensal) : "Ex: 3500,00"}
+            className="mc-input"
+          />
+        </label>
+        <div>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
+            Salvar renda
+          </button>
+        </div>
+      </form>
+
+      <div className="card-head">
+        <p className="card-title" style={{ fontSize: 14 }}>
+          <span className="title-label">Alterar senha</span>
+        </p>
+      </div>
+      <form action={trocarSenha} className="mc-form-card">
+        {cliente.senhaHash && (
+          <label className="mc-label">
+            Senha atual
+            <input name="senhaAtual" type="password" required className="mc-input" />
+          </label>
+        )}
+        <label className="mc-label">
+          Nova senha
+          <input name="novaSenha" type="password" required minLength={6} className="mc-input" />
+        </label>
+        <label className="mc-label">
+          Confirmar nova senha
+          <input name="confirmarSenha" type="password" required minLength={6} className="mc-input" />
+        </label>
+        <div>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
+            Alterar senha
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

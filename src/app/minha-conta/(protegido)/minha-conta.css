@@ -512,6 +512,15 @@
   font-family: inherit; text-align: left; cursor: pointer;
 }
 
+/* ── Abas (Despesas, Agenda, Dívidas...) ──────────── */
+.mc-tabs { display: flex; gap: 6px; margin: 0 4px 14px; }
+.mc-tab {
+  flex: 1; text-align: center; text-decoration: none;
+  padding: 9px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  background: var(--card); color: var(--ink-dim); border: 1px solid var(--line);
+}
+.mc-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
 /* ── Sections / cards (telas antigas: Plano, editar lançamento) ── */
 .mc-hero {
   position: relative;
