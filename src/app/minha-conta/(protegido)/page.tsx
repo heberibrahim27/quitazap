@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { QaRing } from "@/components/QaRing";
+import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -150,6 +151,14 @@ export default async function MinhaContaPage({
   const percentualRendaComprometida =
     cliente.rendaMensal && cliente.rendaMensal > 0 ? totalSaidasMes / cliente.rendaMensal : null;
 
+  const resumoPlano = await resumoPlanoSimplificado({
+    clienteId: cliente.id,
+    rendaMensal: cliente.rendaMensal ?? null,
+    totalDespesasMes: totalSaidasMes,
+    inicioMes,
+    fimMes,
+  });
+
   return (
     <div>
       <div className="mc-hero">
@@ -198,6 +207,20 @@ export default async function MinhaContaPage({
           </div>
         </div>
       </div>
+
+      {resumoPlano.calculavel && (
+        <Link href="/minha-conta/plano" className="mc-card" style={{ display: "block", marginBottom: 18, textDecoration: "none", color: "inherit" }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: "var(--mc-ink-faint)" }}>
+            {resumoPlano.saldoProjetado >= 0 ? "Sobra prevista este mês" : "Déficit previsto este mês"}
+          </p>
+          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 600, color: resumoPlano.saldoProjetado >= 0 ? "#fff" : "#fca5a5" }}>
+            {fmtValor(Math.abs(resumoPlano.saldoProjetado))}
+          </p>
+          <p style={{ margin: "10px 0 0", fontSize: 13, fontWeight: 700, color: "var(--mc-accent)" }}>
+            Ver meu plano →
+          </p>
+        </Link>
+      )}
 
       <div className="mc-quick-actions">
         <Link href="#lancamentos" className="mc-quick-action">

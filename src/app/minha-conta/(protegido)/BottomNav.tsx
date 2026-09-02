@@ -25,6 +25,10 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
         <span className="mc-bn-icon">🧾</span>
         Extrato
       </Link>
+      <Link href="/minha-conta/plano" className={`mc-bottom-nav-item ${pathname === "/minha-conta/plano" ? "mc-active" : ""}`}>
+        <span className="mc-bn-icon">🧭</span>
+        Plano
+      </Link>
       <Link href={`/minha-conta${sufixoMes}#cartoes`} className="mc-bottom-nav-item">
         <span className="mc-bn-icon">💳</span>
         Cartões
