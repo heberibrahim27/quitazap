@@ -1,0 +1,17 @@
+{
+  "name": "QuitaZap Controle",
+  "short_name": "QuitaZap",
+  "description": "Organize suas dívidas, gastos e plano de pagamento.",
+  "start_url": "/minha-conta",
+  "scope": "/minha-conta",
+  "id": "/minha-conta",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#071B3D",
+  "theme_color": "#071B3D",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/minha-conta/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/minha-conta/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
