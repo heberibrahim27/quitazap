@@ -96,7 +96,26 @@
 /* Dashboard: logo/saudação/avatar vivem dentro do próprio card da hero
    (ver .hero-header-row mais abaixo) — não existe cabeçalho separado
    nessa tela, então nunca há duas cores pra bater (mesmo bem parecidas,
-   sempre sobrava uma diferença sutil visível na emenda). */
+   sempre sobrava uma diferença sutil visível na emenda). Só quando a
+   hero rola inteira pra fora da tela é que aparece um mini-cabeçalho
+   fixo (cor sólida) — nesse ponto o degradê já não está mais visível,
+   então a cor sólida não tem com o que destoar. */
+.header-mini {
+  background: var(--navy-deep);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.header-mini.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.header-mini .header-greeting { color: #fff; }
 .brand-logo {
   display: block; height: 48px; width: auto;
   filter: drop-shadow(0 1px 3px rgba(11, 30, 51, 0.18));
