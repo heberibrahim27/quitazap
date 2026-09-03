@@ -451,12 +451,18 @@
 .cartoes-total-label { font-size: 12.5px; color: var(--ink-dim); font-weight: 600; }
 .cartoes-total-value { font-size: 18px; font-weight: 800; color: var(--blue); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
 .cartoes-total-icon {
+  position: relative; overflow: hidden;
   width: 40px; height: 40px; border-radius: 13px;
-  background: linear-gradient(160deg, #3A7FF6, var(--blue-deep));
+  background: linear-gradient(160deg, #4A4D54, #16171A 55%, #000 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex; align-items: center; justify-content: center; color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 8px 16px -8px rgba(30,99,233,0.6);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 18px -8px rgba(0,0,0,0.65);
 }
-.cartoes-total-icon svg { width: 19px; height: 19px; }
+.cartoes-total-icon::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(115deg, rgba(255,255,255,0.28) 0%, transparent 35%, transparent 65%, rgba(255,255,255,0.08) 100%);
+}
+.cartoes-total-icon svg { position: relative; width: 19px; height: 19px; z-index: 1; }
 .cartoes-total-bar-track { height: 6px; border-radius: 999px; background: rgba(30,99,233,0.12); margin-top: 12px; overflow: hidden; }
 .cartoes-total-bar-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
 .cartoes-total-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 9px; font-size: 11.5px; color: var(--ink-dim); font-weight: 600; }
