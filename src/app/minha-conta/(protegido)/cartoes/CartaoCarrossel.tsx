@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ValorLista } from "../ValorLista";
 
 export type CompraCartaoView = {
   id: string;
   descricao: string;
   categoria: string | null;
-  valorFmt: string;
+  valor: number;
   dataFmt: string;
 };
 
@@ -173,7 +174,7 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
                       <div className="mc-list-meta">{compra.categoria ?? "Sem categoria"}</div>
                     </div>
                     <div className="mc-list-side">
-                      <div className="mc-list-value">-{compra.valorFmt}</div>
+                      <ValorLista valor={compra.valor} sinal="-" />
                       <div className="mc-list-sub">{compra.dataFmt}</div>
                     </div>
                   </div>

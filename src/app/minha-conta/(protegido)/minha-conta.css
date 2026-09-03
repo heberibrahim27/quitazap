@@ -323,7 +323,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   color: var(--navy-deep); display: flex; align-items: center; gap: 10px;
 }
 .card-title {
-  min-width: 0; flex: 1; margin: 0; font-size: 17px; font-weight: 800;
+  /* clamp em vez de tamanho fixo: títulos mais longos (ex: "Onde está
+     indo — Setembro/2026") quebravam em duas linhas nas telas mais
+     estreitas (iPhone SE/mini, ~360-390px) — encolhe um pouco a fonte
+     nesses casos em vez de cortar/quebrar o texto. */
+  min-width: 0; flex: 1; margin: 0; font-size: clamp(13.5px, 3.9vw, 17px); font-weight: 800;
   font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: 0.02em;
   text-transform: uppercase; color: var(--navy-deep);
   display: flex; align-items: center; gap: 10px;
@@ -1014,6 +1018,21 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   font-weight: 700;
   font-family: 'IBM Plex Mono', monospace;
   color: var(--mc-ink);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  width: 108px;
+  flex-shrink: 0;
+}
+
+.mc-list-value-cifrao {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.mc-list-value-numero {
+  flex-shrink: 0;
 }
 
 .mc-list-value-pos {

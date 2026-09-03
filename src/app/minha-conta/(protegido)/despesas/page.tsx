@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
+import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -138,7 +139,7 @@ export default async function DespesasPage({
                   </div>
                 </div>
                 <div className="mc-list-side">
-                  <div className="mc-list-value">-{fmtValor(d.valor)}</div>
+                  <ValorLista valor={d.valor} sinal="-" />
                   <div className="mc-list-sub">
                     {fmtData(d.data)} · <Link href={`/minha-conta/lancamento/${d.id}/editar`}>editar</Link>
                   </div>

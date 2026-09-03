@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -72,7 +73,7 @@ export default async function DividasPage() {
                   </div>
                 </div>
                 <div className="mc-list-side">
-                  <div className="mc-list-value">{fmtValor(d.valorTotal - d.valorPago)}</div>
+                  <ValorLista valor={d.valorTotal - d.valorPago} />
                   <div className="mc-list-sub">de {fmtValor(d.valorTotal)}</div>
                 </div>
               </Link>
@@ -97,7 +98,7 @@ export default async function DividasPage() {
                     <div className="mc-list-meta">{ROTULO_TIPO[d.tipo] ?? d.tipo} · {d.status === "QUITADA" ? "Quitada" : d.status}</div>
                   </div>
                   <div className="mc-list-side">
-                    <div className="mc-list-value">{fmtValor(d.valorTotal)}</div>
+                    <ValorLista valor={d.valorTotal} />
                   </div>
                 </div>
               ))}

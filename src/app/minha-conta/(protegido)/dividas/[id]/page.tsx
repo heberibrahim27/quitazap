@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { ValorLista } from "../../ValorLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -90,7 +91,7 @@ export default async function DetalheDividaPage({ params }: { params: Promise<{ 
                   <div className="mc-list-meta">Vence {fmtData(p.vencimento)}</div>
                 </div>
                 <div className="mc-list-side">
-                  <div className="mc-list-value">{fmtValor(p.valor)}</div>
+                  <ValorLista valor={p.valor} />
                   <div
                     className="mc-list-sub"
                     style={{
