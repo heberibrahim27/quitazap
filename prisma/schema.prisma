@@ -247,6 +247,7 @@ model Cartao {
   nome          String
   diaFechamento Int?
   diaVencimento Int?
+  limite        Float?
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 
