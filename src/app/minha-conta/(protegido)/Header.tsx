@@ -43,7 +43,7 @@ export function Header({ nome, fotoUrl }: { nome: string; fotoUrl?: string | nul
   const conteudo = (
     <>
       <Link href="/minha-conta">
-        <img className="brand-logo" src="/minha-conta/logo-oficial.webp" alt="QuitaZap" />
+        <img className="brand-logo" src="/minha-conta/logo-simbolo.webp" alt="QuitaZap" />
       </Link>
       <div className="header-user">
         <span className="header-greeting">Olá, {nome}</span>
