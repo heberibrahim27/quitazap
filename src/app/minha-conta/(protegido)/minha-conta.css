@@ -215,9 +215,11 @@
   position: relative; z-index: 2; margin: -34px 28px 0;
   display: flex; align-items: stretch;
   border-radius: 18px; padding: 16px 18px;
-  background: var(--card);
-  border: 1px solid rgba(15, 30, 51, 0.045);
-  box-shadow: 0 4px 10px -6px rgba(7, 27, 61, 0.22);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 20px -10px rgba(7, 27, 61, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .hero-glass-item { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .hero-glass-divider { width: 1px; background: var(--line); margin: 2px 10px; flex-shrink: 0; }
