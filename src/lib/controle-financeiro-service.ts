@@ -12,6 +12,9 @@
 
 import { prisma } from "./prisma";
 import type { ItemParaPersistirControle, CartaoParaPersistirControle } from "./controle-financeiro-flow";
+import { verificarOrcamentoEAvisar } from "./orcamento-service";
+
+const TIPOS_GASTO = new Set(["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"]);
 
 export type OrigemLancamentoControle = "TEXTO" | "AUDIO" | "FOTO";
 
@@ -42,6 +45,7 @@ export async function persistirLancamentosControle(
         cartaoId = (await upsertCartao(clienteId, item.cartaoNome)).id;
       }
 
+      const dataLancamento = item.data ?? new Date();
       await prisma.lancamento.create({
         data: {
           clienteId,
@@ -49,13 +53,19 @@ export async function persistirLancamentosControle(
           descricao: item.descricao,
           categoria: item.categoria ?? null,
           valor: item.valor,
-          data: item.data ?? new Date(),
+          data: dataLancamento,
           recorrente: item.recorrente,
           cartaoId,
           origem,
           comprovanteUrl: comprovanteUrl ?? null,
         },
       });
+
+      if (TIPOS_GASTO.has(item.tipo)) {
+        await verificarOrcamentoEAvisar(clienteId, item.categoria, item.valor, dataLancamento).catch((err) =>
+          console.error("[CONTROLE-FINANCEIRO] Erro ao verificar orçamento:", err)
+        );
+      }
     }
   } catch (err) {
     console.error("[CONTROLE-FINANCEIRO] Erro ao persistir lançamento(s) em Lancamento:", err);

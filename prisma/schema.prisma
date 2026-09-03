@@ -42,6 +42,26 @@ model Cliente {
   lancamentos        Lancamento[]
   cartoes            Cartao[]
   pushSubscriptions  PushSubscription[]
+  orcamentos         OrcamentoCategoria[]
+}
+
+// ─────────────────────────────────────────
+// ORÇAMENTO POR CATEGORIA
+// ─────────────────────────────────────────
+// Limite mensal opcional que o cliente define por categoria (mesmas
+// categorias de src/lib/gasto-flow.ts). Um valor por categoria — se ele
+// redefinir, substitui o anterior (não é histórico mês a mês).
+model OrcamentoCategoria {
+  id           String   @id @default(cuid())
+  clienteId    String
+  categoria    String
+  limiteMensal Float
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, categoria])
 }
 
 // ─────────────────────────────────────────
