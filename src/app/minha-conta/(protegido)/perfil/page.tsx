@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
 import { subirFotoPerfil } from "@/lib/supabase-storage";
 import { FotoPerfilForm } from "./FotoPerfilForm";
+import { NotificacoesPush } from "../NotificacoesPush";
 
 export default async function PerfilPage({
   searchParams,
@@ -98,6 +99,8 @@ export default async function PerfilPage({
       )}
 
       <FotoPerfilForm fotoAtual={cliente.fotoUrl} enviarFoto={salvarFotoPerfil} />
+
+      <NotificacoesPush />
 
       <div className="mc-card" style={{ marginBottom: 16 }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Nome</p>
