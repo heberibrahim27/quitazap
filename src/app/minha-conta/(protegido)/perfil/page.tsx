@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
@@ -5,10 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
 import { subirFotoPerfil } from "@/lib/supabase-storage";
 import { FotoPerfilForm } from "./FotoPerfilForm";
-
-function fmtValor(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 
 export default async function PerfilPage({
   searchParams,
@@ -18,26 +15,6 @@ export default async function PerfilPage({
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
   const { ok, erro } = await searchParams;
-
-  async function salvarRenda(formData: FormData) {
-    "use server";
-    const clienteAtual = await getClienteAtual();
-    if (!clienteAtual) redirect("/minha-conta/entrar");
-
-    const rendaTexto = String(formData.get("rendaMensal") || "").replace(",", ".").trim();
-    const renda = rendaTexto ? Number(rendaTexto) : null;
-    if (rendaTexto && (!Number.isFinite(renda) || (renda as number) < 0)) {
-      redirect("/minha-conta/perfil?erro=Digite um valor de renda válido.");
-    }
-
-    await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { rendaMensal: renda } });
-    // Renda alimenta o % de "renda comprometida" e o Plano de Pagamento
-    // no Dashboard, além da própria tela do Plano — sem isso, os dois
-    // continuam mostrando os números antigos até o cache expirar.
-    revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/plano");
-    redirect("/minha-conta/perfil?ok=renda");
-  }
 
   async function salvarFotoPerfil(formData: FormData) {
     "use server";
@@ -110,11 +87,6 @@ export default async function PerfilPage({
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Foto de perfil atualizada.</p>
         </div>
       )}
-      {ok === "renda" && (
-        <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
-          <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Renda mensal atualizada.</p>
-        </div>
-      )}
       {ok === "senha" && (
         <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Senha alterada com sucesso.</p>
@@ -138,32 +110,14 @@ export default async function PerfilPage({
         </p>
       </div>
 
-      <div className="card-head">
-        <p className="card-title" style={{ fontSize: 14 }}>
-          <span className="title-label">Renda mensal</span>
+      <div className="mc-card" style={{ marginBottom: 16 }}>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Renda mensal</p>
+        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--ink-faint)", lineHeight: 1.5 }}>
+          Sua renda é a soma das receitas que você lançar a cada mês (salário e outras fontes) —
+          não é mais um valor fixo separado. Lance ou confira em{" "}
+          <Link href="/minha-conta/receitas" style={{ color: "var(--blue)", fontWeight: 700 }}>Receitas</Link>.
         </p>
       </div>
-      <form action={salvarRenda} className="mc-form-card" style={{ marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-faint)", lineHeight: 1.5 }}>
-          Usada pra calcular seu Plano de Pagamento e o % da renda comprometida no início da tela.
-        </p>
-        <label className="mc-label">
-          Renda mensal
-          <input
-            name="rendaMensal"
-            type="text"
-            inputMode="decimal"
-            defaultValue={cliente.rendaMensal != null ? String(cliente.rendaMensal).replace(".", ",") : ""}
-            placeholder={cliente.rendaMensal != null ? fmtValor(cliente.rendaMensal) : "Ex: 3500,00"}
-            className="mc-input"
-          />
-        </label>
-        <div>
-          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
-            Salvar renda
-          </button>
-        </div>
-      </form>
 
       <div className="card-head">
         <p className="card-title" style={{ fontSize: 14 }}>

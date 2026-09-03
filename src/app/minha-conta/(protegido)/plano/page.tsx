@@ -43,15 +43,23 @@ export default async function PlanoPage() {
   });
 
   let totalDespesasMes = 0;
+  let totalReceitasMes = 0;
   for (const l of lancamentosDoMes) {
     if (l.tipo === "DESPESA_FIXA" || l.tipo === "DESPESA_VARIAVEL" || l.tipo === "COMPRA_CARTAO") {
       totalDespesasMes += l.valor;
+    } else if (l.tipo === "RECEITA") {
+      totalReceitasMes += l.valor;
     }
   }
 
+  // Mesma regra do Dashboard: renda = receitas lançadas no mês, com
+  // fallback pra Renda mensal declarada no Perfil enquanto nada foi
+  // lançado ainda — um só número de renda em todo o app.
+  const rendaEfetiva = totalReceitasMes > 0 ? totalReceitasMes : (cliente.rendaMensal ?? null);
+
   const resumo = await resumoPlanoSimplificado({
     clienteId: cliente.id,
-    rendaMensal: cliente.rendaMensal ?? null,
+    rendaMensal: rendaEfetiva,
     totalDespesasMes,
     inicioMes,
     fimMes,

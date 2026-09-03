@@ -133,9 +133,15 @@ export default async function MinhaContaPage({
   const totalSaidasMes = totalFixasMes + totalVariaveisMes + totalCartaoMes;
   const resultadoMes = totalReceitasMes - totalSaidasMes;
 
+  // Renda = o que foi lançado como receita este mês (salário + outras
+  // fontes). Só cai pra "Renda mensal" declarada no Perfil enquanto o
+  // cliente ainda não lançou nenhuma receita no mês — não existem mais
+  // dois números de renda diferentes andando em paralelo.
+  const rendaEfetiva = totalReceitasMes > 0 ? totalReceitasMes : (cliente.rendaMensal ?? null);
+
   const resumoPlano = await resumoPlanoSimplificado({
     clienteId: cliente.id,
-    rendaMensal: cliente.rendaMensal ?? null,
+    rendaMensal: rendaEfetiva,
     totalDespesasMes: totalSaidasMes,
     inicioMes,
     fimMes,
@@ -228,7 +234,7 @@ export default async function MinhaContaPage({
               </span>
               <span className="stat-text">
                 <p className="stat-label">Renda mensal</p>
-                <p className="stat-value">{cliente.rendaMensal != null ? fmtValor(cliente.rendaMensal) : "—"}</p>
+                <p className="stat-value">{rendaEfetiva != null ? fmtValor(rendaEfetiva) : "—"}</p>
               </span>
             </div>
             <div className="hero-glass-divider" />
