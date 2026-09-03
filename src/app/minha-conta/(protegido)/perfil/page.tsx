@@ -31,6 +31,11 @@ export default async function PerfilPage({
     }
 
     await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { rendaMensal: renda } });
+    // Renda alimenta o % de "renda comprometida" e o Plano de Pagamento
+    // no Dashboard, além da própria tela do Plano — sem isso, os dois
+    // continuam mostrando os números antigos até o cache expirar.
+    revalidatePath("/minha-conta", "layout");
+    revalidatePath("/minha-conta/plano");
     redirect("/minha-conta/perfil?ok=renda");
   }
 
