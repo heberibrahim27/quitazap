@@ -31,7 +31,7 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
       <nav className="bottom-nav" aria-label="Navegação">
         <div className="bn-side">
           <Link href="/minha-conta" className={`bn-item ${naHome ? "active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
             Início
           </Link>
           <Link href="/minha-conta/movimentacoes" className={`bn-item ${naMovimentacoes ? "active" : ""}`}>
@@ -48,7 +48,7 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
 
         <div className="bn-side">
           <Link href="/minha-conta/plano" className={`bn-item ${naPlano ? "active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M15 9l-3 6-3-2 3-6z" /></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M13 7l-4.5 6.2H12l-1 4L15.5 11H12l1-4z" /></svg>
             Plano
           </Link>
           <Link href="/minha-conta/cartoes" className={`bn-item ${naCartoes ? "active" : ""}`}>
@@ -84,7 +84,7 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
         </Link>
         <Link href="/minha-conta/despesas" className="fab-sheet-option" onClick={fecharTudo}>
           <span className="fab-sheet-icon blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10l9-7 9 7" /><path d="M5 9v11h14V9" /></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
           </span>
           Despesas
         </Link>
@@ -96,13 +96,13 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
         </Link>
         <Link href="/minha-conta/agenda" className="fab-sheet-option" onClick={fecharTudo}>
           <span className="fab-sheet-icon blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="4" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /><circle cx="9" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="15" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="9" cy="18" r="1.15" fill="currentColor" stroke="none" /></svg>
           </span>
           Agenda
         </Link>
         <Link href="/minha-conta/metas" className="fab-sheet-option" onClick={fecharTudo}>
           <span className="fab-sheet-icon green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" /></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
           </span>
           Metas
         </Link>
