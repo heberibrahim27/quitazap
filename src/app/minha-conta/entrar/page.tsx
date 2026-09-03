@@ -63,7 +63,7 @@ export default function EntrarPage() {
         <div className="qz-zone-top">
           <div className="qz-brand-row">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="qz-brand-logo" src="/minha-conta/logo-oficial.webp" alt="QuitaZAP" />
+            <img className="qz-brand-logo" src="/minha-conta/logo-simbolo.webp" alt="QuitaZAP" />
             <div className="qz-brand-sub">Minha Conta</div>
           </div>
           <h1 className={`qz-headline ${anton.className}`}>
