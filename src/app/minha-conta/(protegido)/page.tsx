@@ -203,7 +203,7 @@ export default async function MinhaContaPage({
         <div className="hero-shell">
           <div className="hero-header-row">
             <Link href="/minha-conta">
-              <img className="brand-logo" src="/minha-conta/logo-oficial.webp" alt="QuitaZap" />
+              <img className="brand-logo" src="/minha-conta/logo-simbolo.webp" alt="QuitaZap" />
             </Link>
             <div className="header-user">
               <span className="header-greeting">Olá, {cliente.nome.split(" ")[0]}</span>
