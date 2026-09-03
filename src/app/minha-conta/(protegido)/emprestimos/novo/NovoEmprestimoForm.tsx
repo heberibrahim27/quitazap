@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 function fmtValor(v: number) {
@@ -94,10 +95,13 @@ export function NovoEmprestimoForm({ criarEmprestimo }: { criarEmprestimo: (fd: 
         última) e ajustar o valor pago em caso de desconto por antecipação.
       </p>
 
-      <div>
-        <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <button type="submit" className="mc-btn-primary" style={{ border: "none", flex: 1 }}>
           Criar empréstimo
         </button>
+        <Link href="/minha-conta/emprestimos" className="mc-btn-secondary">
+          Cancelar
+        </Link>
       </div>
     </form>
   );

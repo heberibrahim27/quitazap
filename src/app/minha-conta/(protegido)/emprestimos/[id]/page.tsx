@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
+import { ParcelasAccordion } from "./ParcelasAccordion";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -162,12 +163,19 @@ export default async function DetalheEmprestimoPage({
           <span className="title-label">Parcelas</span>
         </p>
       </div>
-      <div className="mc-card" style={{ maxHeight: "52vh", overflowY: "auto" }}>
-        {emprestimo.parcelas.length === 0 ? (
-          <p className="mc-empty">Esse empréstimo não tem parcelas cadastradas.</p>
-        ) : (
-          <div className="mc-list">
-            {emprestimo.parcelas.map((p) => (
+      <ParcelasAccordion
+        resumo={
+          emprestimo.parcelas.length === 0
+            ? "Nenhuma parcela cadastrada"
+            : `${parcelasPagas} de ${emprestimo.parcelas.length} parcelas pagas — toque para ver`
+        }
+      >
+        <div style={{ maxHeight: "52vh", overflowY: "auto" }}>
+          {emprestimo.parcelas.length === 0 ? (
+            <p className="mc-empty">Esse empréstimo não tem parcelas cadastradas.</p>
+          ) : (
+            <div className="mc-list">
+              {emprestimo.parcelas.map((p) => (
               <div key={p.id} className="parcela-row">
                 <div className="parcela-info">
                   <span className={`parcela-check ${p.status === "PAGA" ? "checked" : ""}`}>
@@ -201,10 +209,11 @@ export default async function DetalheEmprestimoPage({
                   </form>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </ParcelasAccordion>
 
       <div style={{ marginTop: 16 }}>
         <ExcluirForm
