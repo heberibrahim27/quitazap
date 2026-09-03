@@ -16,6 +16,12 @@
 .mc-shell {
   /* tokens novos (design system claro) */
   --bg: #F1F6FC;
+  /* Fundo cinza suave (estilo "glass morphism") — dá contraste de
+     verdade pros cards de vidro fosco, que em cima do --bg quase branco
+     de antes praticamente não mostravam efeito nenhum. --bg continua
+     existindo só pra bordas que precisam de uma cor sólida (ex: anel do
+     botão "+"), não mais como fundo da página. */
+  --bg-gradient: radial-gradient(ellipse 90% 55% at 50% 0%, #EDEEF1 0%, #CDD0D6 55%, #AEB2BA 100%);
   --card: #FFFFFF;
   --card-tint: #F8FBFF;
   --ink: #0B1E33;
@@ -58,7 +64,7 @@
 
   position: relative;
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--bg-gradient);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
