@@ -6,6 +6,7 @@ import { AnimarAoAparecer } from "../AnimarAoAparecer";
 import { ValorLista } from "../ValorLista";
 import { CategoriaAccordion } from "./CategoriaAccordion";
 import { GastosDonut } from "./GastosDonut";
+import { salvarOrcamento, removerOrcamento } from "./orcamento-actions";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -76,15 +77,19 @@ export default async function GastosPage({
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
   const nomeMes = NOMES_MES[mes - 1];
 
-  const gastos = await prisma.lancamento.findMany({
-    where: {
-      clienteId: cliente.id,
-      tipo: { in: ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"] },
-      data: { gte: inicioMes, lt: fimMes },
-    },
-    include: { cartao: { select: { nome: true } } },
-    orderBy: { data: "desc" },
-  });
+  const [gastos, orcamentos] = await Promise.all([
+    prisma.lancamento.findMany({
+      where: {
+        clienteId: cliente.id,
+        tipo: { in: ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"] },
+        data: { gte: inicioMes, lt: fimMes },
+      },
+      include: { cartao: { select: { nome: true } } },
+      orderBy: { data: "desc" },
+    }),
+    prisma.orcamentoCategoria.findMany({ where: { clienteId: cliente.id } }),
+  ]);
+  const limitePorCategoria = new Map(orcamentos.map((o) => [o.categoria, o.limiteMensal]));
 
   const totalGeral = gastos.reduce((soma, g) => soma + g.valor, 0);
 
@@ -148,7 +153,19 @@ export default async function GastosPage({
           <AnimarAoAparecer>
             {categorias.map((c, indice) => {
               return (
-                <CategoriaAccordion key={c.nome} nome={c.nome} valorFmt={fmtNumero(c.total)} percentual={c.percentual} cor={c.cor} indice={indice}>
+                <CategoriaAccordion
+                  key={c.nome}
+                  nome={c.nome}
+                  valorFmt={fmtNumero(c.total)}
+                  percentual={c.percentual}
+                  cor={c.cor}
+                  indice={indice}
+                  total={c.total}
+                  limiteMensal={limitePorCategoria.get(c.nome) ?? null}
+                  estourou={(limitePorCategoria.get(c.nome) ?? Infinity) < c.total}
+                  salvarOrcamento={salvarOrcamento}
+                  removerOrcamento={removerOrcamento}
+                >
                   <div className="mc-list">
                     {c.itens.map((item) => (
                       <div key={item.id} className="mc-list-row">
