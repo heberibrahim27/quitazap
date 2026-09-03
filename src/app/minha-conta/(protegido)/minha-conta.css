@@ -93,6 +93,21 @@
   padding: max(8px, env(safe-area-inset-top)) 18px 8px;
   border-bottom-color: var(--line);
 }
+/* Dashboard: sem fundo próprio em repouso (a hero atrás é que dá a cor,
+   formando um bloco único); ganha fundo sólido navy só quando compacta. */
+.header-hero {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom-color: transparent;
+}
+.header-hero.compact {
+  background: rgba(7, 27, 61, 0.92);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.header-hero .header-greeting { color: #fff; }
 .brand-logo {
   display: block; height: 48px; width: auto;
   filter: drop-shadow(0 1px 3px rgba(11, 30, 51, 0.18));
@@ -135,10 +150,15 @@
 }
 
 /* ── Hero ───────────────────────────────────────── */
-.hero { position: relative; margin-bottom: 34px; }
+/* Sobe atrás do cabeçalho fixo (84px, mesma altura do .header-spacer) e
+   estica até a borda da tela (cancela o padding lateral do .mc-main),
+   formando um bloco único com o cabeçalho transparente por cima dela —
+   ver Header.tsx / .header-hero. Sem cantos arredondados no topo: encosta
+   flush na borda da tela, só a base continua arredondada. */
+.hero { position: relative; margin: -84px -16px 34px; }
 .hero-shell {
   position: relative; overflow: hidden;
-  border-radius: 28px; padding: 22px 22px 52px;
+  border-radius: 0 0 28px 28px; padding: calc(84px + 22px) 22px 52px;
   background:
     radial-gradient(ellipse 55% 45% at 82% 8%, rgba(23, 180, 216, 0.32), transparent 62%),
     radial-gradient(ellipse 70% 55% at 10% -10%, rgba(255,255,255,0.08), transparent 55%),
@@ -174,7 +194,7 @@
 .ring-caption { margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.75); text-align: center; max-width: 11ch; line-height: 1.35; }
 
 .hero-glass {
-  position: relative; z-index: 2; margin: -34px 12px 0;
+  position: relative; z-index: 2; margin: -34px 28px 0;
   display: flex; align-items: stretch;
   border-radius: 18px; padding: 16px 18px;
   background: var(--card);
