@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { NovoEmprestimoForm } from "./NovoEmprestimoForm";
 
 export default async function NovoEmprestimoPage({
   searchParams,
@@ -19,18 +20,46 @@ export default async function NovoEmprestimoPage({
     if (!clienteAtual) redirect("/minha-conta/entrar");
 
     const credor = String(formData.get("credor") || "").trim();
-    const valorTotal = Number(String(formData.get("valorTotal") || "").replace(",", "."));
+    const valorTotalTexto = String(formData.get("valorTotal") || "").replace(",", ".").trim();
+    const valorParcelaTexto = String(formData.get("valorParcela") || "").replace(",", ".").trim();
     const totalParcelas = Number(String(formData.get("parcelas") || "").trim());
     const primeiraDataTexto = String(formData.get("primeiraData") || "");
 
-    if (!credor || !Number.isFinite(valorTotal) || valorTotal <= 0) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Digite quem emprestou e um valor total válido.")}`);
+    const valorTotalInformado = valorTotalTexto ? Number(valorTotalTexto) : null;
+    const valorParcelaInformado = valorParcelaTexto ? Number(valorParcelaTexto) : null;
+
+    if (!credor) {
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Digite quem emprestou.")}`);
     }
     if (!Number.isInteger(totalParcelas) || totalParcelas <= 0 || totalParcelas > 360) {
       redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Digite uma quantidade de parcelas válida.")}`);
     }
     if (!primeiraDataTexto) {
       redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Escolha a data da primeira parcela.")}`);
+    }
+    if (valorTotalTexto && (!Number.isFinite(valorTotalInformado) || (valorTotalInformado as number) <= 0)) {
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("O valor total tomado emprestado é inválido.")}`);
+    }
+    if (valorParcelaTexto && (!Number.isFinite(valorParcelaInformado) || (valorParcelaInformado as number) <= 0)) {
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("O valor da parcela é inválido.")}`);
+    }
+    if (valorTotalInformado == null && valorParcelaInformado == null) {
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Preencha o valor total ou o valor da parcela.")}`);
+    }
+
+    // Se o valor da parcela foi informado, ele manda (é o que o contrato do
+    // empréstimo realmente cobra por mês, já com juros embutidos — não faz
+    // sentido recalcular). Sem ele, cai pro rateio simples do valor total
+    // dividido igualmente pelas parcelas (a última absorve o resto do
+    // arredondamento, ex: R$1.000 em 3x = 333,33 + 333,33 + 333,34).
+    let valorPorParcela: number;
+    let valorTotalFinal: number;
+    if (valorParcelaInformado != null) {
+      valorPorParcela = Math.round(valorParcelaInformado * 100) / 100;
+      valorTotalFinal = valorTotalInformado ?? Math.round(valorPorParcela * totalParcelas * 100) / 100;
+    } else {
+      valorTotalFinal = valorTotalInformado as number;
+      valorPorParcela = Math.floor((valorTotalFinal / totalParcelas) * 100) / 100;
     }
 
     const primeiraData = new Date(`${primeiraDataTexto}T12:00:00`);
@@ -41,24 +70,25 @@ export default async function NovoEmprestimoPage({
         credor,
         tipo: "EMPRESTIMO",
         status: "ATIVA",
-        valorTotal,
+        valorTotal: valorTotalFinal,
         totalParcelas,
         diaVencimento: primeiraData.getDate(),
       },
     });
 
-    // Parcelas mensais iguais; a última absorve o resto do arredondamento
-    // (ex: R$1.000 em 3x = 333,33 + 333,33 + 333,34) pra fechar exatamente
-    // o valor total.
-    const valorBase = Math.floor((valorTotal / totalParcelas) * 100) / 100;
-    const resto = Math.round((valorTotal - valorBase * totalParcelas) * 100) / 100;
+    const restoUltimaParcela =
+      valorParcelaInformado != null
+        ? 0
+        : Math.round((valorTotalFinal - valorPorParcela * totalParcelas) * 100) / 100;
+
     const parcelasData = Array.from({ length: totalParcelas }, (_, i) => {
       const vencimento = new Date(primeiraData);
       vencimento.setMonth(vencimento.getMonth() + i);
+      const ehUltima = i === totalParcelas - 1;
       return {
         dividaId: divida.id,
         numero: i + 1,
-        valor: i === totalParcelas - 1 ? Math.round((valorBase + resto) * 100) / 100 : valorBase,
+        valor: ehUltima ? Math.round((valorPorParcela + restoUltimaParcela) * 100) / 100 : valorPorParcela,
         vencimento,
         status: "PENDENTE",
       };
@@ -86,35 +116,7 @@ export default async function NovoEmprestimoPage({
         </div>
       )}
 
-      <form action={criarEmprestimo} className="mc-form-card">
-        <label className="mc-label">
-          Quem emprestou *
-          <input name="credor" required placeholder="Ex: Banco Inter, Nubank, João" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Valor total tomado emprestado *
-          <input name="valorTotal" required type="text" inputMode="decimal" placeholder="Ex: 5000,00" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Quantidade de parcelas *
-          <input name="parcelas" required type="number" min={1} max={360} placeholder="Ex: 12" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Data da primeira parcela *
-          <input name="primeiraData" required type="date" className="mc-input" />
-        </label>
-        <p style={{ margin: 0, fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.5 }}>
-          As parcelas são geradas mensais e iguais a partir da primeira data — a data da última parcela é calculada
-          automaticamente (primeira parcela + número de parcelas). Depois de criado, você pode marcar cada parcela
-          como paga, adiantar o pagamento de qualquer uma (inclusive a última) e ajustar o valor pago em caso de
-          desconto por antecipação.
-        </p>
-        <div>
-          <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
-            Criar empréstimo
-          </button>
-        </div>
-      </form>
+      <NovoEmprestimoForm criarEmprestimo={criarEmprestimo} />
     </div>
   );
 }

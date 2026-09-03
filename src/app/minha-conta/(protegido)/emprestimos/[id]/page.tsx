@@ -109,6 +109,8 @@ export default async function DetalheEmprestimoPage({
 
   const saldoDevedor = emprestimo.valorTotal - emprestimo.valorPago;
   const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "PAGA").length;
+  const totalDasParcelas = emprestimo.parcelas.reduce((soma, p) => soma + p.valor, 0);
+  const jurosTotal = Math.round((totalDasParcelas - emprestimo.valorTotal) * 100) / 100;
 
   return (
     <div>
@@ -145,6 +147,14 @@ export default async function DetalheEmprestimoPage({
             {fmtValor(emprestimo.valorTotal)}
           </p>
         </div>
+        {jurosTotal > 0.01 && (
+          <div>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Juros total</p>
+            <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--orange)", fontFamily: "'IBM Plex Mono', monospace" }}>
+              {fmtValor(jurosTotal)}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="card-head">
