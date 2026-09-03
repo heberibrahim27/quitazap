@@ -45,7 +45,7 @@
   /* Sombra de elevação: o card "flutua" sobre o fundo (sombra suave só
      embaixo, sem luz do outro lado) + friso interno bem fino e claro no
      topo, como o brilho de vidro pegando luz. */
-  --shadow-card: 0 22px 44px -20px rgba(90, 100, 118, 0.4), 0 8px 18px -10px rgba(90, 100, 118, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.75);
+  --shadow-card: 0 36px 60px -16px rgba(60, 70, 90, 0.35), 0 14px 26px -8px rgba(60, 70, 90, 0.28), inset 0 1.5px 1px rgba(255, 255, 255, 0.85);
   --shadow-hero: 0 20px 40px -18px rgba(7, 27, 61, 0.45);
 
   /* tokens antigos — mantidos pelas telas que ainda não migraram
@@ -225,7 +225,7 @@
   position: relative; z-index: 2; margin: -34px 28px 0;
   display: flex; align-items: stretch;
   border-radius: 18px; padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -273,7 +273,7 @@
 /* ── Cards genéricos (novo design) ────────────────── */
 .card {
   position: relative;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -319,7 +319,7 @@
   display: block; text-decoration: none; color: inherit;
   position: relative; overflow: hidden;
   border-radius: 22px; padding: 20px 20px 22px;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid var(--brand-line);
@@ -511,7 +511,7 @@
 .alerta-card {
   position: relative;
   border-radius: 18px; padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(226, 59, 92, 0.4);
@@ -787,7 +787,7 @@
 
 .mc-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -891,7 +891,7 @@
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
