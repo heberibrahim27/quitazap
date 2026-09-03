@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // Sticky compacta ao rolar: logo grande + saudação no topo da página,
 // encolhe (logo menor, saudação recolhida) depois de ~24px de scroll —
 // nunca some por completo, ao contrário do header do resto do app.
+// No Dashboard (Início), o cabeçalho nasce transparente pra formar um
+// bloco único com a hero navy logo abaixo (sem fundo próprio) — só
+// ganha fundo sólido navy quando compacta (rolado), continuando
+// acessível sem quebrar a integração visual do topo.
 export function Header({ nome, fotoUrl }: { nome: string; fotoUrl?: string | null }) {
   const [compacto, setCompacto] = useState(false);
+  const naHome = usePathname() === "/minha-conta";
 
   useEffect(() => {
     function aoRolar() {
@@ -19,7 +25,7 @@ export function Header({ nome, fotoUrl }: { nome: string; fotoUrl?: string | nul
 
   return (
     <>
-      <div className={`header${compacto ? " compact" : ""}`}>
+      <div className={`header${compacto ? " compact" : ""}${naHome ? " header-hero" : ""}`}>
         <Link href="/minha-conta">
           <img className="brand-logo" src="/minha-conta/logo-oficial.webp" alt="QuitaZap" />
         </Link>
