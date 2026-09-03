@@ -6,6 +6,7 @@ import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
 import { MesSwipe } from "./MesSwipe";
+import { AnimarAoAparecer } from "./AnimarAoAparecer";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -312,12 +313,13 @@ export default async function MinhaContaPage({
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
         </Link>
       </div>
+      <AnimarAoAparecer>
       <section className="card" id="resumo" style={{ paddingBottom: 0 }}>
         {lancamentosDoMes.length === 0 ? (
           <p className="mc-empty">Nenhum gasto ou receita registrado em {nomeMes}/{ano}.</p>
         ) : (
           <>
-            {resumoDoMes.map((linha) => (
+            {resumoDoMes.map((linha, indice) => (
               <div key={linha.rotulo} className="resumo-row">
                 <span className={`resumo-icon ${linha.classe}`}>
                   {linha.icone === "receita" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>}
@@ -330,7 +332,7 @@ export default async function MinhaContaPage({
                 <span className="resumo-bar-track">
                   <span
                     className="resumo-bar-fill"
-                    style={{ width: `${Math.min((linha.valor / maiorValorResumo) * 100, 100)}%`, background: `var(--${linha.classe})` }}
+                    style={{ "--to": Math.min(linha.valor / maiorValorResumo, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
                   />
                 </span>
                 <span className="resumo-value">{fmtValor(linha.valor)}</span>
@@ -351,6 +353,7 @@ export default async function MinhaContaPage({
           </>
         )}
       </section>
+      </AnimarAoAparecer>
 
       <div className="card-head">
         <p className="card-title">
