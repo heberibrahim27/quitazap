@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { MesSwipe } from "../MesSwipe";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -74,7 +75,10 @@ export default async function ReceitasPage({
   const total = receitas.reduce((soma, r) => soma + r.valor, 0);
 
   return (
-    <div>
+    <MesSwipe
+      hrefAnterior={`/minha-conta/receitas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+      hrefSeguinte={`/minha-conta/receitas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+    >
       <div className="card-head">
         <p className="card-title">
           <span className="title-icon">
@@ -82,10 +86,6 @@ export default async function ReceitasPage({
           </span>
           <span className="title-label">Receitas — {nomeMes}/{ano}</span>
         </p>
-        <div style={{ display: "flex", gap: 6 }}>
-          <Link href={`/minha-conta/receitas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`} className="card-link" aria-label="Mês anterior">‹</Link>
-          <Link href={`/minha-conta/receitas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`} className="card-link" aria-label="Próximo mês">›</Link>
-        </div>
       </div>
 
       <div className="mc-card" style={{ marginBottom: 16 }}>
@@ -120,6 +120,6 @@ export default async function ReceitasPage({
           </div>
         )}
       </div>
-    </div>
+    </MesSwipe>
   );
 }

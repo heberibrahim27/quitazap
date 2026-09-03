@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { listarMovimentacoes } from "@/lib/movimentacoes-service";
+import { MesSwipe } from "../MesSwipe";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -72,7 +73,10 @@ export default async function MovimentacoesPage({
   const saidas = movimentacoes.filter((m) => m.sinal === "saida").reduce((s, m) => s + m.valor, 0);
 
   return (
-    <div>
+    <MesSwipe
+      hrefAnterior={`/minha-conta/movimentacoes?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+      hrefSeguinte={`/minha-conta/movimentacoes?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+    >
       <div className="card-head">
         <p className="card-title">
           <span className="title-icon">
@@ -80,10 +84,6 @@ export default async function MovimentacoesPage({
           </span>
           <span className="title-label">Movimentações — {nomeMes}/{ano}</span>
         </p>
-        <div style={{ display: "flex", gap: 6 }}>
-          <Link href={`/minha-conta/movimentacoes?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`} className="card-link" aria-label="Mês anterior">‹</Link>
-          <Link href={`/minha-conta/movimentacoes?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`} className="card-link" aria-label="Próximo mês">›</Link>
-        </div>
       </div>
 
       <div className="mc-card" style={{ marginBottom: 16, display: "flex", gap: 24 }}>
@@ -139,6 +139,6 @@ export default async function MovimentacoesPage({
           </div>
         )}
       </div>
-    </div>
+    </MesSwipe>
   );
 }
