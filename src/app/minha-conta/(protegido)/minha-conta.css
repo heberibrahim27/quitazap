@@ -614,13 +614,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .cartao-hero-card::after {
   content: "";
   position: absolute;
-  top: -40%;
-  right: -15%;
-  width: 60%;
-  height: 180%;
-  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 65%);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  inset: 0;
+  background: radial-gradient(circle at 82% 12%, rgba(255,255,255,0.24), transparent 55%);
+  /* backdrop-filter tem borda reta (a caixa do próprio elemento) — cobrir
+     o cartão inteiro (inset:0, mesmo raio de borda do pai) e usar uma
+     máscara em degradê pra sumir a intensidade do efeito nas bordas evita
+     a "costura" visível que dava quando esse pseudo-elemento era só um
+     retângulo menor no canto. */
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  -webkit-mask-image: radial-gradient(circle at 82% 12%, black, transparent 60%);
+  mask-image: radial-gradient(circle at 82% 12%, black, transparent 60%);
   pointer-events: none;
 }
 .cartao-hero-top { display: flex; align-items: flex-start; justify-content: space-between; position: relative; z-index: 1; }
