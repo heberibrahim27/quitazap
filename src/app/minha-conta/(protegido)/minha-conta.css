@@ -679,21 +679,45 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .bn-icon svg { width: 20px; height: 20px; }
 .bn-item.active { color: var(--blue); }
 .bn-item.active .bn-icon { background: rgba(30, 99, 233, 0.12); color: var(--blue); }
-.bn-fab-wrap { flex: 0 0 64px; display: flex; justify-content: center; }
+.bn-fab-wrap { flex: 0 0 76px; display: flex; justify-content: center; position: relative; }
+/* Sombra "no chão" da barra, embaixo do botão — vende a sensação de
+   que o círculo está flutuando acima da barra, não só encostado nela. */
+.bn-fab-wrap::before {
+  content: "";
+  position: absolute;
+  bottom: 9px; left: 50%; transform: translateX(-50%);
+  width: 46px; height: 10px; border-radius: 50%;
+  background: rgba(7, 27, 61, 0.22);
+  filter: blur(5px);
+  z-index: 0;
+}
 .bn-fab {
-  position: relative; overflow: hidden;
-  width: 52px; height: 52px; border-radius: 50%; margin-top: -28px;
+  position: relative; z-index: 1; overflow: hidden;
+  width: 64px; height: 64px; border-radius: 50%; margin-top: -40px;
   background: linear-gradient(135deg, var(--blue-deep), var(--blue));
-  color: #fff; border: 4px solid var(--bg);
+  color: #fff; border: 5px solid var(--bg);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 12px 24px -8px rgba(30, 99, 233, 0.6);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.4),
+    inset 0 -4px 8px rgba(7, 27, 61, 0.2),
+    0 18px 30px -8px rgba(30, 99, 233, 0.65),
+    0 8px 16px -6px rgba(7, 27, 61, 0.4);
   text-decoration: none; cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bn-fab:active {
+  transform: scale(0.94);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.4),
+    inset 0 -2px 5px rgba(7, 27, 61, 0.25),
+    0 10px 20px -8px rgba(30, 99, 233, 0.6),
+    0 4px 10px -4px rgba(7, 27, 61, 0.35);
 }
 .bn-fab::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit;
-  background: linear-gradient(115deg, rgba(255,255,255,0.35) 0%, transparent 35%, transparent 65%, rgba(255,255,255,0.1) 100%);
+  background: linear-gradient(115deg, rgba(255,255,255,0.4) 0%, transparent 35%, transparent 65%, rgba(255,255,255,0.12) 100%);
 }
-.bn-fab svg { position: relative; z-index: 1; width: 24px; height: 24px; }
+.bn-fab svg { position: relative; z-index: 1; width: 30px; height: 30px; }
 
 /* ── Sheet do botão "+" (Novo lançamento) ────────── */
 .fab-backdrop {
