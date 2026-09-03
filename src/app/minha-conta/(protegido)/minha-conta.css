@@ -93,18 +93,10 @@
   padding: max(8px, env(safe-area-inset-top)) 18px 8px;
   border-bottom-color: var(--line);
 }
-/* Dashboard: não é fixo — rola junto com a hero, formando um bloco
-   único (mesmo tom navy do topo do gradiente da hero-shell, ver abaixo).
-   Fixo + fundo sólido foi testado antes, mas a cor batia diferente da
-   hero durante o scroll, destacando a emenda. */
-.header-hero-inline {
-  position: static;
-  background: var(--navy-deep);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-bottom: none;
-}
-.header-hero-inline .header-greeting { color: #fff; }
+/* Dashboard: logo/saudação/avatar vivem dentro do próprio card da hero
+   (ver .hero-header-row mais abaixo) — não existe cabeçalho separado
+   nessa tela, então nunca há duas cores pra bater (mesmo bem parecidas,
+   sempre sobrava uma diferença sutil visível na emenda). */
 .brand-logo {
   display: block; height: 48px; width: auto;
   filter: drop-shadow(0 1px 3px rgba(11, 30, 51, 0.18));
@@ -155,7 +147,10 @@
 .hero { position: relative; margin: 0 -16px 34px; }
 .hero-shell {
   position: relative; overflow: hidden;
-  border-radius: 0 0 28px 28px; padding: 22px 22px 52px;
+  border-radius: 0 0 28px 28px;
+  /* Sem cabeçalho separado por cima, a hero é quem precisa abrir espaço
+     pro notch/status bar (env(safe-area-inset-top) some se não houver). */
+  padding: calc(env(safe-area-inset-top) + 22px) 22px 52px;
   background:
     radial-gradient(ellipse 55% 45% at 82% 8%, rgba(23, 180, 216, 0.32), transparent 62%),
     radial-gradient(ellipse 70% 55% at 10% -10%, rgba(255,255,255,0.08), transparent 55%),
@@ -168,6 +163,15 @@
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(115deg, rgba(255,255,255,0.10) 0%, transparent 28%, transparent 72%, rgba(255,255,255,0.05) 100%);
 }
+/* Logo/saudação/avatar dentro do próprio card da hero (Dashboard) —
+   ver page.tsx. Reaproveita as classes do cabeçalho padrão
+   (.brand-logo, .header-user, .header-greeting, .avatar), só forçando
+   a saudação em branco (o resto já funciona igual em qualquer fundo). */
+.hero-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 20px; position: relative; z-index: 1;
+}
+.hero-header-row .header-greeting { color: #fff; }
 .hero-top { display: flex; align-items: center; justify-content: space-between; }
 .hero-eyebrow { margin: 0; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.78); }
 .hero-more {

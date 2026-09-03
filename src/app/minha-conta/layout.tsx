@@ -12,6 +12,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "QuitaZap",
   },
+  // O Next só emite a tag genérica "mobile-web-app-capable" a partir de
+  // appleWebApp.capable — sem a tag específica da Apple abaixo, o iOS
+  // ignora o status-bar-style e desenha a barra de status opaca branca
+  // por cima do conteúdo, em vez de deixar o app ocupar até o topo.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
   icons: {
     icon: [
       { url: "/minha-conta/icons/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -21,8 +28,9 @@ export const metadata: Metadata = {
   },
 };
 
-// Só themeColor aqui — width/initialScale já vêm do <meta viewport> manual
-// no layout raiz; declarar de novo geraria duas tags <meta name="viewport">.
+// Só themeColor aqui — width/initialScale/viewportFit já vêm do viewport
+// exportado pelo layout raiz (src/app/layout.tsx); o Next mescla os dois
+// numa única tag <meta name="viewport">, sem duplicar.
 export const viewport: Viewport = {
   themeColor: "#071B3D",
 };
