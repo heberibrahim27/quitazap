@@ -601,7 +601,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 18px 34px -18px rgba(7, 27, 61, 0.5);
+  /* Bordas em cada lado com opacidade diferente simulam luz pegando numa
+     borda de vidro (mais clara em cima, mais escura embaixo) — mesmo
+     truque do glassmorphism, sem depender do backdrop-filter "pegar" o
+     que tem atrás (o cartão é opaco, tem que ser a cor real do banco). */
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 28px rgba(7, 27, 61, 0.35), 0 18px 34px -18px rgba(7, 27, 61, 0.5);
 }
 .cartao-hero-card::after {
   content: "";
@@ -611,6 +619,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   width: 60%;
   height: 180%;
   background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 65%);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
   pointer-events: none;
 }
 .cartao-hero-top { display: flex; align-items: flex-start; justify-content: space-between; position: relative; z-index: 1; }
