@@ -96,7 +96,7 @@ export default async function CartoesPage() {
         id: l.id,
         descricao: l.descricao,
         categoria: l.categoria,
-        valorFmt: fmtValor(l.valor),
+        valor: l.valor,
         dataFmt: fmtData(l.data),
       })),
     };

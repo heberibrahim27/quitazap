@@ -3,10 +3,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { ValorLista } from "../ValorLista";
 
-function fmtValor(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 function fmtData(d: Date) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
@@ -79,9 +77,11 @@ export default async function AgendaPage({
                   <div className="mc-list-meta">{t.vencimento ? fmtData(t.vencimento) : "Sem data marcada"}</div>
                 </div>
                 <div className="mc-list-side" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div>
-                    <div className="mc-list-value">{t.valor != null ? fmtValor(t.valor) : ""}</div>
-                  </div>
+                  {t.valor != null && (
+                    <div>
+                      <ValorLista valor={t.valor} />
+                    </div>
+                  )}
                   {aba === "pendentes" && (
                     <form action={concluirTarefa}>
                       <input type="hidden" name="id" value={t.id} />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -67,7 +68,7 @@ export default async function EmprestimosPage() {
                     </div>
                   </div>
                   <div className="mc-list-side">
-                    <div className="mc-list-value">{fmtValor(e.valorTotal - e.valorPago)}</div>
+                    <ValorLista valor={e.valorTotal - e.valorPago} />
                     <div className="mc-list-sub">de {fmtValor(e.valorTotal)}</div>
                   </div>
                 </Link>
@@ -93,7 +94,7 @@ export default async function EmprestimosPage() {
                     <div className="mc-list-meta">Quitado</div>
                   </div>
                   <div className="mc-list-side">
-                    <div className="mc-list-value">{fmtValor(e.valorTotal)}</div>
+                    <ValorLista valor={e.valorTotal} />
                   </div>
                 </Link>
               ))}

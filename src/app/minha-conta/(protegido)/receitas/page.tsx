@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
+import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -185,7 +186,7 @@ export default async function ReceitasPage({
                   <div className="mc-list-meta">{r.recorrente ? "Recorrente" : "Receita"}</div>
                 </div>
                 <div className="mc-list-side">
-                  <div className="mc-list-value mc-list-value-pos">+{fmtValor(r.valor)}</div>
+                  <ValorLista valor={r.valor} sinal="+" cor="pos" />
                   <div className="mc-list-sub">
                     {fmtData(r.data)} · <Link href={`/minha-conta/lancamento/${r.id}/editar`}>editar</Link>
                   </div>

@@ -3,6 +3,7 @@ import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
 import { AnimarAoAparecer } from "../AnimarAoAparecer";
+import { ValorLista } from "../ValorLista";
 import { CategoriaAccordion } from "./CategoriaAccordion";
 
 function fmtValor(v: number) {
@@ -140,7 +141,7 @@ export default async function GastosPage({
                           </div>
                         </div>
                         <div className="mc-list-side">
-                          <div className="mc-list-value">-{fmtValor(item.valor)}</div>
+                          <ValorLista valor={item.valor} sinal="-" />
                           <div className="mc-list-sub">{fmtData(item.data)}</div>
                         </div>
                       </div>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { listarMovimentacoes } from "@/lib/movimentacoes-service";
 import { MesSwipe } from "../MesSwipe";
+import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -126,9 +127,7 @@ export default async function MovimentacoesPage({
                   <div className="mc-list-meta">{m.meta}</div>
                 </div>
                 <div className="mc-list-side">
-                  <div className={`mc-list-value ${m.sinal === "entrada" ? "mc-list-value-pos" : ""}`}>
-                    {m.sinal === "entrada" ? "+" : "-"}{fmtValor(m.valor)}
-                  </div>
+                  <ValorLista valor={m.valor} sinal={m.sinal === "entrada" ? "+" : "-"} cor={m.sinal === "entrada" ? "pos" : undefined} />
                   <div className="mc-list-sub">
                     {fmtData(m.data)}
                     {m.editarUrl && <> · <Link href={m.editarUrl}>editar</Link></>}
