@@ -160,7 +160,7 @@
 .hero-more svg { width: 16px; height: 16px; }
 
 .hero-body { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.hero-main { min-width: 0; }
+.hero-main { min-width: 0; overflow: hidden; }
 .hero-label-row { display: flex; align-items: center; gap: 5px; }
 .hero-label { margin: 0; font-size: 13.5px; color: rgba(255,255,255,0.8); }
 .hero-info { width: 14px; height: 14px; color: rgba(255,255,255,0.55); flex-shrink: 0; }

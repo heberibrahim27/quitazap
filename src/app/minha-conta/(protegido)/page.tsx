@@ -19,7 +19,10 @@ function tamanhoValorHero(texto: string): string | undefined {
   if (texto.length <= LIMITE) return undefined;
   const BASE = 48;
   const MINIMO = 22;
-  const maximo = Math.max(MINIMO, BASE - (texto.length - LIMITE) * 3);
+  // Proporcional (não linear): a fonte cai na mesma proporção em que o
+  // texto cresce, então a largura ocupada fica ~constante em vez de só
+  // reduzir um pouco e continuar invadindo o anel ao lado.
+  const maximo = Math.max(MINIMO, Math.round((BASE * LIMITE) / texto.length));
   return `clamp(${MINIMO}px, min(11vw, ${maximo}px), ${maximo}px)`;
 }
 function fmtData(d: Date) {
