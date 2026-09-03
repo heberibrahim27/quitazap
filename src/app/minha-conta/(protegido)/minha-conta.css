@@ -762,6 +762,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .fab-sheet-icon.green { background: var(--green-soft); color: var(--green); }
 .fab-sheet-icon.red { background: var(--red-soft); color: var(--red); }
 .fab-sheet-icon.blue { background: rgba(30,99,233,0.12); color: var(--blue); }
+.fab-sheet-icon.orange { background: var(--orange-soft); color: var(--orange); }
 
 /* ── Abas (Despesas, Agenda, Dívidas...) ──────────── */
 /* Trilho único (segmented control), em vez de pills soltas — a aba
