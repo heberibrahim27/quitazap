@@ -371,7 +371,24 @@
 }
 .resumo-label { flex-shrink: 0; width: 106px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .resumo-bar-track { flex: 1; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.resumo-bar-fill { display: block; height: 100%; border-radius: 999px; }
+/* Barra preenche com scaleX (mais leve que animar width) — --to vem
+   inline por barra (ex: --to:.92 = 92%), --i escalona o atraso entre
+   as barras. Só anima quando o card entra na tela (ver
+   AnimarAoAparecer.tsx, que adiciona a classe .run no wrapper). */
+.resumo-bar-fill {
+  display: block; width: 100%; height: 100%; border-radius: 999px;
+  transform-origin: left; transform: scaleX(0);
+}
+.animar.run .resumo-bar-fill {
+  animation: resumo-bar-preenche 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 120ms);
+}
+@keyframes resumo-bar-preenche {
+  to { transform: scaleX(var(--to, 0)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .resumo-bar-fill { animation: none !important; transform: scaleX(var(--to, 0)); }
+}
 .resumo-value { flex-shrink: 0; width: 88px; text-align: right; font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
 .resumo-footer {
   display: flex; align-items: center; justify-content: space-between;
@@ -379,15 +396,12 @@
   border-radius: 0 0 22px 22px;
 }
 .resumo-footer.neg { background: var(--red-soft); }
-.resumo-footer.pos { background: var(--green-soft); }
 .resumo-footer-label { font-size: 13.5px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 8px; }
-.resumo-footer-label svg { width: 16px; height: 16px; flex-shrink: 0; }
+.resumo-footer-label svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--ink-dim); }
 .resumo-footer.neg .resumo-footer-label svg { color: var(--red); }
-.resumo-footer.pos .resumo-footer-label svg { color: var(--green); }
 .resumo-footer-sub { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-faint); margin-top: 2px; }
-.resumo-footer-value { font-size: 18px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; }
+.resumo-footer-value { font-size: 18px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
 .resumo-footer.neg .resumo-footer-value { color: var(--red); }
-.resumo-footer.pos .resumo-footer-value { color: var(--green); }
 
 /* ── Últimos lançamentos ────────────────────────── */
 .lanc-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1; }
