@@ -971,6 +971,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   border: 1px solid var(--mc-line); border-radius: 10px; padding: 7px 10px; font-size: 11.5px; font-weight: 700;
   background: none; color: var(--ink-faint); cursor: pointer; white-space: nowrap;
 }
+.emprestimo-juros-preview {
+  border: 1px dashed var(--mc-line); border-radius: 12px; padding: 12px 14px;
+  font-size: 13px; font-weight: 700; color: var(--ink-dim); background: var(--card-tint);
+}
 
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {
