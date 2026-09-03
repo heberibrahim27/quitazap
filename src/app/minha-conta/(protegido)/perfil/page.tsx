@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
@@ -107,15 +106,6 @@ export default async function PerfilPage({
         <p style={{ margin: "4px 0 0", fontSize: 15, fontWeight: 700 }}>{cliente.telefone}</p>
         <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "var(--ink-faint)" }}>
           Pra trocar nome ou telefone, fale com a gente pelo WhatsApp.
-        </p>
-      </div>
-
-      <div className="mc-card" style={{ marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Renda mensal</p>
-        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--ink-faint)", lineHeight: 1.5 }}>
-          Sua renda é a soma das receitas que você lançar a cada mês (salário e outras fontes) —
-          não é mais um valor fixo separado. Lance ou confira em{" "}
-          <Link href="/minha-conta/receitas" style={{ color: "var(--blue)", fontWeight: 700 }}>Receitas</Link>.
         </p>
       </div>
 
