@@ -466,6 +466,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 .gasto-categoria-conteudo { padding: 0 0 10px 44px; }
 
+.gastos-donut-wrap { position: relative; width: 168px; height: 168px; margin: 4px auto 16px; }
+.gastos-donut-svg { width: 100%; height: 100%; transform: rotate(0deg); }
+.gastos-donut-svg circle { transition: stroke-dasharray 0.6s ease; }
+.gastos-donut-centro {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+}
+.gastos-donut-centro-label { font-size: 11.5px; font-weight: 600; color: var(--ink-faint); }
+.gastos-donut-centro-valor { font-size: 17px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: var(--ink); margin-top: 2px; }
+.gastos-legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; padding: 0 6px; }
+.gastos-legenda-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+.gastos-legenda-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
 /* ── Últimos lançamentos ────────────────────────── */
 .lanc-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1; }
 .lanc-recorrente { display: inline-flex; vertical-align: -2px; width: 12px; height: 12px; margin-left: 4px; color: var(--ink-faint); }

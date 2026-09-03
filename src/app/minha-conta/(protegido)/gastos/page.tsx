@@ -5,6 +5,7 @@ import { MesSwipe } from "../MesSwipe";
 import { AnimarAoAparecer } from "../AnimarAoAparecer";
 import { ValorLista } from "../ValorLista";
 import { CategoriaAccordion } from "./CategoriaAccordion";
+import { GastosDonut } from "./GastosDonut";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -96,7 +97,12 @@ export default async function GastosPage({
   }
   const categorias = Array.from(porCategoria.entries())
     .map(([nome, itens]) => ({ nome, itens, total: itens.reduce((soma, i) => soma + i.valor, 0) }))
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => b.total - a.total)
+    .map((c, indice) => ({
+      ...c,
+      cor: CORES[indice % CORES.length],
+      percentual: totalGeral > 0 ? Math.round((c.total / totalGeral) * 100) : 0,
+    }));
 
   return (
     <MesSwipe
@@ -112,14 +118,28 @@ export default async function GastosPage({
         </p>
       </div>
 
-      <div className="mc-card" style={{ marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>
-          Total gasto em {nomeMes.toLowerCase()}
-        </p>
-        <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
-          {fmtValor(totalGeral)}
-        </p>
-      </div>
+      {categorias.length === 0 ? (
+        <div className="mc-card" style={{ marginBottom: 16 }}>
+          <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>
+            Total gasto em {nomeMes.toLowerCase()}
+          </p>
+          <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
+            {fmtValor(totalGeral)}
+          </p>
+        </div>
+      ) : (
+        <div className="mc-card" style={{ marginBottom: 16 }}>
+          <GastosDonut categorias={categorias} totalFmt={fmtValor(totalGeral)} />
+          <div className="gastos-legenda">
+            {categorias.map((c) => (
+              <span key={c.nome} className="gastos-legenda-item">
+                <span className="gastos-legenda-dot" style={{ background: `var(--${c.cor})` }} />
+                {c.nome} · {c.percentual}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mc-card">
         {categorias.length === 0 ? (
@@ -127,10 +147,8 @@ export default async function GastosPage({
         ) : (
           <AnimarAoAparecer>
             {categorias.map((c, indice) => {
-              const cor = CORES[indice % CORES.length];
-              const percentual = totalGeral > 0 ? Math.round((c.total / totalGeral) * 100) : 0;
               return (
-                <CategoriaAccordion key={c.nome} nome={c.nome} valorFmt={fmtNumero(c.total)} percentual={percentual} cor={cor} indice={indice}>
+                <CategoriaAccordion key={c.nome} nome={c.nome} valorFmt={fmtNumero(c.total)} percentual={c.percentual} cor={c.cor} indice={indice}>
                   <div className="mc-list">
                     {c.itens.map((item) => (
                       <div key={item.id} className="mc-list-row">
