@@ -6,6 +6,8 @@ import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
 import { subirFotoPerfil } from "@/lib/supabase-storage";
 import { FotoPerfilForm } from "./FotoPerfilForm";
 import { NotificacoesPush } from "../NotificacoesPush";
+import { ResetTotalForm } from "./ResetTotalForm";
+import { resetarDadosFinanceiros } from "./reset-actions";
 
 export default async function PerfilPage({
   searchParams,
@@ -92,6 +94,13 @@ export default async function PerfilPage({
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Senha alterada com sucesso.</p>
         </div>
       )}
+      {ok === "reset" && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>
+            Dados financeiros resetados. Seu controle começa do zero a partir de agora.
+          </p>
+        </div>
+      )}
       {erro && (
         <div className="mc-card" style={{ marginBottom: 16, background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
           <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
@@ -138,6 +147,13 @@ export default async function PerfilPage({
           </button>
         </div>
       </form>
+
+      <div className="card-head" style={{ marginTop: 24 }}>
+        <p className="card-title" style={{ fontSize: 14 }}>
+          <span className="title-label">Zona de risco</span>
+        </p>
+      </div>
+      <ResetTotalForm acao={resetarDadosFinanceiros} />
     </div>
   );
 }
