@@ -51,7 +51,7 @@ export default async function AgendaPage({
       <div className="card-head">
         <p className="card-title">
           <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="4" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /><circle cx="9" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="15" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="9" cy="18" r="1.15" fill="currentColor" stroke="none" /></svg>
           </span>
           <span className="title-label">Agenda</span>
         </p>

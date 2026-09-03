@@ -103,7 +103,7 @@ export default async function ReceitasPage({
             {receitas.map((r) => (
               <div key={r.id} className="mc-list-row">
                 <div className="mc-list-icon" style={{ background: "var(--green-soft)", color: "var(--green)" }}>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5" /><circle cx="12" cy="12" r="2.6" /></svg>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
                 </div>
                 <div className="mc-list-body">
                   <div className="mc-list-desc">{r.descricao}</div>
