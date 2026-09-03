@@ -11,6 +11,9 @@ import { AnimarAoAparecer } from "./AnimarAoAparecer";
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+function fmtNumero(v: number) {
+  return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 function fmtData(d: Date) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
@@ -348,7 +351,10 @@ export default async function MinhaContaPage({
                     style={{ "--to": Math.min(linha.valor / maiorValorResumo, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
                   />
                 </span>
-                <span className="resumo-value">{fmtValor(linha.valor)}</span>
+                <span className="resumo-value">
+                  <span className="resumo-value-cifrao">R$</span>
+                  <span className="resumo-value-numero">{fmtNumero(linha.valor)}</span>
+                </span>
               </div>
             ))}
             <div className={`resumo-footer ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
