@@ -140,7 +140,7 @@ export default async function PerfilPage({
           <input name="confirmarSenha" type="password" required minLength={6} className="mc-input" />
         </label>
         <div>
-          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
             Alterar senha
           </button>
         </div>
