@@ -520,21 +520,21 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 /* ── Cartões: carrossel horizontal de heros ── */
 .cartao-carrossel-track {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 2px 34px 2px 2px;
+  padding: 2px 20px 2px 2px;
   margin: 0 -2px 12px;
 }
 .cartao-carrossel-track::-webkit-scrollbar { display: none; }
 .cartao-hero-card {
-  flex: 0 0 84%;
+  flex: 0 0 94%;
   scroll-snap-align: start;
   border-radius: 24px;
-  padding: 22px 20px;
-  min-height: 168px;
+  padding: 26px 22px;
+  min-height: 192px;
   position: relative;
   overflow: hidden;
   color: #fff;
