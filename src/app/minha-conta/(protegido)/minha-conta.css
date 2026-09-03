@@ -273,34 +273,31 @@
 }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 18px 10px; }
 .section-eyebrow {
-  margin: 0 18px 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0 18px 10px; font-size: 13.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
   font-family: 'Space Grotesk', 'Inter', sans-serif;
-  color: var(--ink-dim); display: flex; align-items: center; gap: 8px;
+  color: var(--ink); display: flex; align-items: center; gap: 10px;
 }
-.section-eyebrow .title-icon { width: 24px; height: 24px; border-radius: 8px; }
-.section-eyebrow .title-icon svg { width: 13px; height: 13px; }
+.section-eyebrow .title-icon { width: 22px; height: 22px; }
+.section-eyebrow .title-icon svg { width: 20px; height: 20px; }
 .card-title {
   min-width: 0; flex: 1; margin: 0; font-size: 15.5px; font-weight: 700;
   font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.01em;
   display: flex; align-items: center; gap: 10px;
 }
 .title-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Badge de vidro neutro (em vez do círculo de cor chapada de antes) —
-   a cor do ícone continua marcando a categoria, mas o badge em si fica
-   discreto/premium, não uma bolha colorida estilo emoji de chat. */
+/* Ícone "nu", sem badge/bolha — a cor forte + o brilho (drop-shadow
+   acompanhando o próprio traço do ícone) que dão o destaque premium,
+   em vez de uma caixinha em volta estilo emoji de chat. */
 .title-icon {
-  width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0;
+  width: 30px; height: 30px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: #fff;
-  border: 1.5px solid var(--cyan);
   color: var(--cyan);
-  box-shadow: 0 6px 14px -6px rgba(23,180,216,0.55), 0 0 0 4px rgba(23,180,216,0.1);
+  filter: drop-shadow(0 3px 6px rgba(23,180,216,0.5));
 }
-.title-icon svg { width: 16px; height: 16px; stroke-width: 1.6; }
+.title-icon svg { width: 24px; height: 24px; stroke-width: 2; }
 .title-icon.red {
   color: var(--red);
-  border-color: var(--red);
-  box-shadow: 0 6px 14px -6px rgba(226,59,92,0.55), 0 0 0 4px rgba(226,59,92,0.1);
+  filter: drop-shadow(0 3px 6px rgba(226,59,92,0.5));
 }
 .card-link { flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--blue); text-decoration: none; display: flex; align-items: center; gap: 3px; }
 .card-link svg { width: 13px; height: 13px; }
@@ -319,12 +316,12 @@
 }
 .plano-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .plano-eyebrow {
-  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0; font-size: 13.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
   font-family: 'Space Grotesk', 'Inter', sans-serif;
-  color: var(--ink-dim); display: flex; align-items: center; gap: 8px;
+  color: var(--ink); display: flex; align-items: center; gap: 10px;
 }
-.plano-eyebrow .title-icon { width: 24px; height: 24px; border-radius: 8px; }
-.plano-eyebrow .title-icon svg { width: 13px; height: 13px; }
+.plano-eyebrow .title-icon { width: 22px; height: 22px; }
+.plano-eyebrow .title-icon svg { width: 20px; height: 20px; }
 .plano-icon {
   position: relative; overflow: hidden;
   width: 42px; height: 42px; border-radius: 15px; flex-shrink: 0;
