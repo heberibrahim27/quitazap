@@ -29,12 +29,14 @@ export default async function NovoCartaoPage({
 
     const diaFechamentoTexto = String(formData.get("diaFechamento") || "").trim();
     const diaVencimentoTexto = String(formData.get("diaVencimento") || "").trim();
+    const limiteTexto = String(formData.get("limite") || "").trim().replace(",", ".");
     const diaFechamento = diaFechamentoTexto ? Number(diaFechamentoTexto) : null;
     const diaVencimento = diaVencimentoTexto ? Number(diaVencimentoTexto) : null;
+    const limite = limiteTexto ? Number(limiteTexto) : null;
 
     try {
       await prisma.cartao.create({
-        data: { clienteId: clienteAtual.id, nome, diaFechamento, diaVencimento },
+        data: { clienteId: clienteAtual.id, nome, diaFechamento, diaVencimento, limite },
       });
     } catch (err: unknown) {
       // P2002: já existe um cartão com esse nome pra esse cliente (constraint única).
@@ -92,6 +94,11 @@ export default async function NovoCartaoPage({
         <label className="mc-label">
           Dia de vencimento da fatura
           <input name="diaVencimento" type="number" min={1} max={31} placeholder="Ex: 27" className="mc-input" />
+        </label>
+
+        <label className="mc-label">
+          Limite total do cartão
+          <input name="limite" type="text" inputMode="decimal" placeholder="Ex: 3.000,00" className="mc-input" />
         </label>
 
         <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>

@@ -43,6 +43,7 @@ export default async function EditarCartaoPage({
 
     const diaFechamentoTexto = String(formData.get("diaFechamento") || "").trim();
     const diaVencimentoTexto = String(formData.get("diaVencimento") || "").trim();
+    const limiteTexto = String(formData.get("limite") || "").trim().replace(",", ".");
 
     try {
       await prisma.cartao.update({
@@ -51,6 +52,7 @@ export default async function EditarCartaoPage({
           nome,
           diaFechamento: diaFechamentoTexto ? Number(diaFechamentoTexto) : null,
           diaVencimento: diaVencimentoTexto ? Number(diaVencimentoTexto) : null,
+          limite: limiteTexto ? Number(limiteTexto) : null,
         },
       });
     } catch (err: unknown) {
@@ -120,6 +122,18 @@ export default async function EditarCartaoPage({
         <label className="mc-label">
           Dia de vencimento da fatura
           <input name="diaVencimento" type="number" min={1} max={31} defaultValue={cartao.diaVencimento ?? ""} className="mc-input" />
+        </label>
+
+        <label className="mc-label">
+          Limite total do cartão
+          <input
+            name="limite"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex: 3.000,00"
+            defaultValue={cartao.limite != null ? cartao.limite.toFixed(2).replace(".", ",") : ""}
+            className="mc-input"
+          />
         </label>
 
         <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>

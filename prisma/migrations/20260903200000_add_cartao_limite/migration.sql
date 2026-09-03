@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Cartao" ADD COLUMN "limite" DOUBLE PRECISION;
