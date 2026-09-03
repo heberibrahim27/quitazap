@@ -433,7 +433,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 @media (prefers-reduced-motion: reduce) {
   .resumo-bar-fill { animation: none !important; transform: scaleX(var(--to, 0)); }
 }
-.resumo-value { flex-shrink: 0; width: 112px; white-space: nowrap; text-align: right; font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
+.resumo-value { flex-shrink: 0; width: 112px; white-space: nowrap; text-align: left; font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
 .resumo-footer {
   display: flex; align-items: center; justify-content: space-between;
   margin: 8px -18px 0; padding: 18px 18px;
