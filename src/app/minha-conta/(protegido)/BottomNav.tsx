@@ -75,9 +75,20 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
-        <p style={{ margin: "0 0 4px", fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.5 }}>
-          Por enquanto, receitas, despesas e compras no cartão são registradas por texto ou áudio direto no
-          WhatsApp — o QuitaZAP organiza tudo automaticamente aqui no Controle.
+        <Link href="/minha-conta/despesas" className="fab-sheet-option" onClick={fecharTudo}>
+          <span className="fab-sheet-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
+          </span>
+          Nova despesa
+        </Link>
+        <Link href="/minha-conta/receitas" className="fab-sheet-option" onClick={fecharTudo}>
+          <span className="fab-sheet-icon green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
+          </span>
+          Nova receita
+        </Link>
+        <p style={{ margin: "10px 4px 0", fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.5 }}>
+          Também dá pra lançar tudo isso por texto ou áudio direto no WhatsApp.
         </p>
       </div>
 
