@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 const TAMANHO_MINIMO = 20;
 
@@ -8,11 +8,18 @@ const TAMANHO_MINIMO = 20;
 // elemento pai (medida de verdade no navegador, não estimativa) — sem
 // isso, um valor com mais dígitos cresce e invade o que está ao lado
 // (o anel de % na hero). Parte sempre do tamanho definido no CSS
-// (clamp responsivo) e só reduz quando realmente não cabe.
+// (clamp responsivo) e reage a mudanças de tamanho de tela via
+// ResizeObserver.
+//
+// scrollWidth só reflete a largura real do conteúdo (sem quebrar linha)
+// quando o próprio elemento tem overflow diferente de "visible" — por
+// isso o overflow:hidden aqui é essencial, não só estético: sem ele o
+// navegador reporta scrollWidth igual ao clientWidth (a caixa, já
+// encolhida pelo flex), nunca detectando o estouro de verdade.
 export function ValorAutoAjustavel({ texto, className }: { texto: string; className?: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     const pai = el?.parentElement;
     if (!el || !pai) return;
@@ -34,7 +41,7 @@ export function ValorAutoAjustavel({ texto, className }: { texto: string; classN
   }, [texto]);
 
   return (
-    <p ref={ref} className={className} style={{ whiteSpace: "nowrap" }}>
+    <p ref={ref} className={className} style={{ whiteSpace: "nowrap", overflow: "hidden" }}>
       {texto}
     </p>
   );
