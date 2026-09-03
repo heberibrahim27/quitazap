@@ -48,6 +48,10 @@ export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }
   { categoria: "Dívidas/Cartões", palavras: ["cartao", "nubank", "fatura", "emprestimo", "parcela"] },
 ];
 
+// Lista de nomes pra popular selects no Controle (web) — mesma ordem do
+// catálogo acima, com "Outros" (o fallback do bot) no fim.
+export const NOMES_CATEGORIAS_GASTO: CategoriaGasto[] = [...CATEGORIAS.map((c) => c.categoria), "Outros"];
+
 const PALAVRAS_GASTO = [
   "gastei",
   "gasto",
