@@ -33,14 +33,34 @@ model Cliente {
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
-  dividas        Divida[]
-  pagamentos     Pagamento[]
-  planosEnviados PlanoEnviado[]
-  botSessoes     BotSessao[]
-  cobrancas      Cobranca[]
-  tarefas        Tarefa[]
-  lancamentos    Lancamento[]
-  cartoes        Cartao[]
+  dividas            Divida[]
+  pagamentos         Pagamento[]
+  planosEnviados     PlanoEnviado[]
+  botSessoes         BotSessao[]
+  cobrancas          Cobranca[]
+  tarefas            Tarefa[]
+  lancamentos        Lancamento[]
+  cartoes            Cartao[]
+  pushSubscriptions  PushSubscription[]
+}
+
+// ─────────────────────────────────────────
+// PUSH SUBSCRIPTION (notificações do PWA)
+// ─────────────────────────────────────────
+// Uma linha por navegador/dispositivo inscrito (o mesmo cliente pode ter
+// vários: celular + desktop, por exemplo). endpoint é único por inscrição
+// (a própria URL do provedor de push já identifica o dispositivo).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  clienteId String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  criadoEm  DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
 }
 
 // ─────────────────────────────────────────

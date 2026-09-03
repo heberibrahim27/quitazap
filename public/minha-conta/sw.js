@@ -34,3 +34,40 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request).catch(() => caches.match(OFFLINE_URL))
   );
 });
+
+// ── Push notifications ──────────────────────
+// Payload sempre é um JSON simples { titulo, corpo, url } (ver
+// src/lib/push-service.ts) — nunca dado financeiro sensível na notificação
+// em si, só o aviso ("categoria X estourou o orçamento", por exemplo).
+self.addEventListener("push", (event) => {
+  let dados = { titulo: "QuitaZAP", corpo: "Você tem uma novidade no app." };
+  try {
+    if (event.data) dados = { ...dados, ...event.data.json() };
+  } catch {
+    // payload não veio em JSON — usa o texto puro como corpo
+    if (event.data) dados.corpo = event.data.text();
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(dados.titulo, {
+      body: dados.corpo,
+      icon: "/minha-conta/icons/icon-192.png",
+      badge: "/minha-conta/icons/icon-192.png",
+      data: { url: dados.url || "/minha-conta" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/minha-conta";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      for (const janela of janelas) {
+        if (janela.url.includes(url) && "focus" in janela) return janela.focus();
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
