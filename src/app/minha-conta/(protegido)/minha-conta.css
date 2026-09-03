@@ -273,19 +273,17 @@
 }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 18px 10px; }
 .section-eyebrow {
-  margin: 0 18px 10px; font-size: 13.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
+  margin: 0 18px 10px; font-size: 17px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase;
   font-family: 'Space Grotesk', 'Inter', sans-serif;
   color: var(--navy-deep); display: flex; align-items: center; gap: 10px;
 }
-.section-eyebrow .title-icon { width: 22px; height: 22px; }
-.section-eyebrow .title-icon svg { width: 20px; height: 20px; }
 .card-title {
   min-width: 0; flex: 1; margin: 0; font-size: 17px; font-weight: 800;
   font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: 0.02em;
   text-transform: uppercase; color: var(--navy-deep);
   display: flex; align-items: center; gap: 10px;
 }
-.title-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-label { line-height: 1.2; }
 /* Ícone "nu", sem badge/bolha — a cor forte + o brilho (drop-shadow
    acompanhando o próprio traço do ícone) que dão o destaque premium,
    em vez de uma caixinha em volta estilo emoji de chat. */
@@ -316,13 +314,6 @@
   margin-bottom: 16px;
 }
 .plano-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.plano-eyebrow {
-  margin: 0; font-size: 13.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  color: var(--navy-deep); display: flex; align-items: center; gap: 10px;
-}
-.plano-eyebrow .title-icon { width: 22px; height: 22px; }
-.plano-eyebrow .title-icon svg { width: 20px; height: 20px; }
 .plano-icon {
   position: relative; overflow: hidden;
   width: 42px; height: 42px; border-radius: 15px; flex-shrink: 0;
