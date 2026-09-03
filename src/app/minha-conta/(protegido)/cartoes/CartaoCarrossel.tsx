@@ -22,43 +22,92 @@ export type CartaoCarrosselItem = {
   compras: CompraCartaoView[];
 };
 
+function CartaoHero({ c }: { c: CartaoCarrosselItem }) {
+  return (
+    <div className="cartao-hero-card" style={{ background: `linear-gradient(155deg, ${c.cor[0]}, ${c.cor[1]})` }}>
+      <div className="cartao-hero-top">
+        <span className="cartao-hero-chip" />
+        <div>
+          <p className="cartao-hero-nome">{c.nome}</p>
+          <p className="cartao-hero-vencimento">{c.vencimentoTexto}</p>
+        </div>
+      </div>
+      <div className="cartao-hero-limites">
+        <div>
+          <p className="cartao-hero-limite-label">Limite total</p>
+          <p className="cartao-hero-limite-valor">{c.limiteFmt ?? "Não definido"}</p>
+        </div>
+        <div>
+          <p className="cartao-hero-limite-label">Disponível</p>
+          <p className="cartao-hero-limite-valor">{c.disponivelFmt ?? "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Carrossel horizontal com scroll-snap: cada cartão ocupa a maior parte da
 // tela e deixa uma "espiada" do próximo na borda direita. Detecta qual
 // cartão está mais centralizado a cada scroll (com debounce via
 // requestAnimationFrame) e troca a lista de compras exibida embaixo —
 // tudo client-side, sem navegar de página a cada arrastada.
+//
+// Loop infinito: um clone do primeiro cartão é colocado depois do último
+// na fita. Quando o scroll assenta nesse clone (visualmente idêntico ao
+// primeiro cartão de verdade), pulamos a posição de volta pro início sem
+// animação — o clone disfarça o "salto", dando a sensação de loop.
 export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [ativo, setAtivo] = useState(0);
   const pendente = useRef(false);
+  const assentarTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loop = cartoes.length > 1;
 
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
 
-    function aoRolar() {
-      if (pendente.current) return;
-      pendente.current = true;
-      requestAnimationFrame(() => {
-        pendente.current = false;
-        if (!track) return;
-        const itens = Array.from(track.children) as HTMLElement[];
-        let maisProximo = 0;
-        let menorDistancia = Infinity;
-        for (let i = 0; i < itens.length; i++) {
-          const distancia = Math.abs(itens[i].offsetLeft - track.scrollLeft);
-          if (distancia < menorDistancia) {
-            menorDistancia = distancia;
-            maisProximo = i;
-          }
+    function indiceMaisProximo(): number {
+      const itens = Array.from(track!.children) as HTMLElement[];
+      let maisProximo = 0;
+      let menorDistancia = Infinity;
+      for (let i = 0; i < itens.length; i++) {
+        const distancia = Math.abs(itens[i].offsetLeft - track!.scrollLeft);
+        if (distancia < menorDistancia) {
+          menorDistancia = distancia;
+          maisProximo = i;
         }
-        setAtivo((atual) => (atual === maisProximo ? atual : maisProximo));
-      });
+      }
+      return maisProximo;
+    }
+
+    function aoRolar() {
+      if (!pendente.current) {
+        pendente.current = true;
+        requestAnimationFrame(() => {
+          pendente.current = false;
+          if (!track) return;
+          const indice = indiceMaisProximo() % cartoes.length;
+          setAtivo((atual) => (atual === indice ? atual : indice));
+        });
+      }
+
+      if (assentarTimeout.current) clearTimeout(assentarTimeout.current);
+      assentarTimeout.current = setTimeout(() => {
+        if (!track || !loop) return;
+        if (indiceMaisProximo() === cartoes.length) {
+          track.scrollLeft = 0;
+          setAtivo(0);
+        }
+      }, 120);
     }
 
     track.addEventListener("scroll", aoRolar, { passive: true });
-    return () => track.removeEventListener("scroll", aoRolar);
-  }, []);
+    return () => {
+      track.removeEventListener("scroll", aoRolar);
+      if (assentarTimeout.current) clearTimeout(assentarTimeout.current);
+    };
+  }, [cartoes.length, loop]);
 
   const cartaoAtivo = cartoes[ativo];
 
@@ -66,26 +115,9 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
     <div>
       <div className="cartao-carrossel-track" ref={trackRef}>
         {cartoes.map((c) => (
-          <div key={c.id} className="cartao-hero-card" style={{ background: `linear-gradient(155deg, ${c.cor[0]}, ${c.cor[1]})` }}>
-            <div className="cartao-hero-top">
-              <span className="cartao-hero-chip" />
-              <div>
-                <p className="cartao-hero-nome">{c.nome}</p>
-                <p className="cartao-hero-vencimento">{c.vencimentoTexto}</p>
-              </div>
-            </div>
-            <div className="cartao-hero-limites">
-              <div>
-                <p className="cartao-hero-limite-label">Limite total</p>
-                <p className="cartao-hero-limite-valor">{c.limiteFmt ?? "Não definido"}</p>
-              </div>
-              <div>
-                <p className="cartao-hero-limite-label">Disponível</p>
-                <p className="cartao-hero-limite-valor">{c.disponivelFmt ?? "—"}</p>
-              </div>
-            </div>
-          </div>
+          <CartaoHero key={c.id} c={c} />
         ))}
+        {loop && <CartaoHero key="__clone-primeiro" c={cartoes[0]} />}
       </div>
 
       {cartoes.length > 1 && (
