@@ -21,7 +21,7 @@
      de antes praticamente não mostravam efeito nenhum. --bg continua
      existindo só pra bordas que precisam de uma cor sólida (ex: anel do
      botão "+"), não mais como fundo da página. */
-  --bg-gradient: radial-gradient(ellipse 90% 55% at 50% 0%, #EDEEF1 0%, #CDD0D6 55%, #AEB2BA 100%);
+  --bg-gradient: radial-gradient(ellipse 140vw 75vh at 50% 0, #F1F2F4 0%, #E1E3E7 50%, #CDD0D5 100%);
   --card: #FFFFFF;
   --card-tint: #F8FBFF;
   --ink: #0B1E33;
