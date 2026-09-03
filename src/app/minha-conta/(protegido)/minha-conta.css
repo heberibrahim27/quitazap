@@ -413,6 +413,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   background: linear-gradient(160deg, rgba(226,59,92,0.20), rgba(226,59,92,0.07));
   color: var(--red); box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 5px 10px -6px rgba(226,59,92,0.5);
 }
+.resumo-icon.orange {
+  background: linear-gradient(160deg, rgba(245,158,11,0.20), rgba(245,158,11,0.07));
+  color: var(--orange); box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 5px 10px -6px rgba(245,158,11,0.5);
+}
 .resumo-label { flex-shrink: 0; width: 106px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .resumo-bar-track { flex: 1; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
 /* Barra preenche com scaleX (mais leve que animar width) — --to vem
@@ -448,6 +452,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .resumo-footer-sub { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-faint); margin-top: 2px; }
 .resumo-footer-value { font-size: 18px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
 .resumo-footer.neg .resumo-footer-value { color: var(--red); }
+
+/* ── "Onde está indo meu dinheiro": categorias expansíveis ── */
+.gasto-categoria-toggle {
+  all: unset;
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  width: 100%; cursor: pointer; box-sizing: border-box;
+  border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1;
+}
+.gasto-categoria-conteudo { padding: 0 0 10px 44px; }
 
 /* ── Últimos lançamentos ────────────────────────── */
 .lanc-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1; }
@@ -525,16 +538,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 2px 20px 2px 2px;
-  margin: 0 -2px 12px;
+  /* Cancela o padding lateral do .mc-main (16px) só do lado esquerdo, pra
+     o cartão colar na borda de verdade e ganhar espaço — a direita
+     mantém uma folga igual, que é o que sobra pra "espiar" o próximo. */
+  padding: 2px 16px 2px 0;
+  margin: 0 -16px 12px -16px;
 }
 .cartao-carrossel-track::-webkit-scrollbar { display: none; }
 .cartao-hero-card {
-  flex: 0 0 94%;
+  flex: 0 0 90%;
   scroll-snap-align: start;
   border-radius: 24px;
-  padding: 26px 22px;
-  min-height: 192px;
+  padding: 28px 22px;
+  min-height: 220px;
   position: relative;
   overflow: hidden;
   color: #fff;
