@@ -161,7 +161,8 @@
     radial-gradient(ellipse 70% 55% at 10% -10%, rgba(255,255,255,0.08), transparent 55%),
     linear-gradient(165deg, var(--navy-deep) 0%, var(--navy-mid) 55%, var(--navy-glow) 100%);
   border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: var(--shadow-hero), inset 0 1px 0 rgba(255,255,255,0.14), inset 0 0 60px rgba(255,255,255,0.03);
+  border-top: none;
+  box-shadow: var(--shadow-hero), inset 0 0 60px rgba(255,255,255,0.03);
 }
 .hero-shell::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
