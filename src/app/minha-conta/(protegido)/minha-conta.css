@@ -1196,6 +1196,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   color: var(--mc-ink);
 }
 
+/* input[type=date] no Safari/iOS renderiza o valor centralizado dentro
+   de um pseudo-elemento próprio (::-webkit-date-and-time-value), que
+   não segue o text-align normal do input — sem isso, a data fica
+   visualmente deslocada pra direita/centro comparada aos outros campos
+   do mesmo formulário, que são alinhados à esquerda. */
+.mc-input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .mc-btn-primary,
 .mc-btn-secondary {
   border-radius: 12px;
