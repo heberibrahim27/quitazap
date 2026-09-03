@@ -148,9 +148,7 @@
 .hero-shell {
   position: relative; overflow: hidden;
   border-radius: 0 0 28px 28px;
-  /* Sem cabeçalho separado por cima, a hero é quem precisa abrir espaço
-     pro notch/status bar (env(safe-area-inset-top) some se não houver). */
-  padding: calc(env(safe-area-inset-top) + 22px) 22px 52px;
+  padding: 22px 22px 52px;
   background:
     radial-gradient(ellipse 55% 45% at 82% 8%, rgba(23, 180, 216, 0.32), transparent 62%),
     radial-gradient(ellipse 70% 55% at 10% -10%, rgba(255,255,255,0.08), transparent 55%),
@@ -169,7 +167,10 @@
    a saudação em branco (o resto já funciona igual em qualquer fundo). */
 .hero-header-row {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 20px; position: relative; z-index: 1;
+  gap: 12px;
+  position: sticky; top: 0; z-index: 3;
+  padding: max(14px, env(safe-area-inset-top)) 22px 14px;
+  background: var(--navy-deep);
 }
 .hero-header-row .header-greeting { color: #fff; }
 .hero-top { display: flex; align-items: center; justify-content: space-between; }
