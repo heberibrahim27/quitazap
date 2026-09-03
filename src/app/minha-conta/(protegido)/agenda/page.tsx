@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 
@@ -38,6 +39,8 @@ export default async function AgendaPage({
       where: { id },
       data: { status: "CONCLUIDA", concluidaEm: new Date() },
     });
+    revalidatePath("/minha-conta/agenda");
+    revalidatePath("/minha-conta");
     redirect("/minha-conta/agenda");
   }
 

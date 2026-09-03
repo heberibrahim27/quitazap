@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { CATEGORIAS } from "@/lib/gasto-flow";
@@ -26,6 +27,19 @@ async function carregarLancamentoDoDono(id: string): Promise<Lancamento> {
   if (!lancamento || lancamento.clienteId !== cliente.id) notFound();
 
   return lancamento;
+}
+
+// O Dashboard, Receitas, Despesas, Movimentações e Cartões cada um
+// calcula seu próprio total a partir dos mesmos lançamentos — sem
+// revalidar todos, o Next continua servindo o RSC em cache de cada
+// rota com os totais antigos depois do redirect, mesmo com o banco
+// já atualizado.
+function revalidarTelasDependentes() {
+  revalidatePath("/minha-conta", "layout");
+  revalidatePath("/minha-conta/receitas");
+  revalidatePath("/minha-conta/despesas");
+  revalidatePath("/minha-conta/movimentacoes");
+  revalidatePath("/minha-conta/cartoes");
 }
 
 export default async function EditarLancamentoPage({
@@ -71,6 +85,7 @@ export default async function EditarLancamentoPage({
       redirect("/minha-conta");
     }
 
+    revalidarTelasDependentes();
     redirect("/minha-conta");
   }
 
@@ -80,6 +95,7 @@ export default async function EditarLancamentoPage({
 
     try {
       await prisma.lancamento.delete({ where: { id } });
+      revalidarTelasDependentes();
     } catch (err) {
       console.error("[MINHA-CONTA] Erro ao apagar lançamento:", err);
     }

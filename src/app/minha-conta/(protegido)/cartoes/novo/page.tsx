@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { NOMES_CARTOES_CONHECIDOS } from "@/lib/cartoes-conhecidos";
@@ -44,6 +45,8 @@ export default async function NovoCartaoPage({
       redirect("/minha-conta/cartoes/novo?erro=Não foi possível salvar o cartão. Tente de novo.");
     }
 
+    revalidatePath("/minha-conta/cartoes");
+    revalidatePath("/minha-conta");
     redirect("/minha-conta/cartoes");
   }
 
