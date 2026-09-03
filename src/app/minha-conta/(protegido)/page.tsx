@@ -274,18 +274,13 @@ export default async function MinhaContaPage({
           <Link href="/minha-conta/plano" className="plano-card">
             <div className="plano-top">
               <div>
-                {resumoPlano.saldoProjetado >= 0 ? (
-                  <p className="plano-headline">
-                    Sobram <span className="destaque pos">{fmtValor(resumoPlano.saldoProjetado)}</span> este mês
-                  </p>
-                ) : (
-                  <p className="plano-headline">
-                    Faltam <span className="destaque">{fmtValor(Math.abs(resumoPlano.saldoProjetado))}</span> para fechar {nomeMes.toLowerCase()}
-                  </p>
-                )}
-                <p className="plano-caption">
-                  {fmtValor(resumoPlano.rendaDisponivel)} de renda · {fmtValor(resumoPlano.totalComprometido)} comprometidos este mês
+                <p className="plano-label">Saldo do mês</p>
+                <p className={`plano-headline ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
+                  {resumoPlano.saldoProjetado >= 0 ? "" : "− "}{fmtValor(Math.abs(resumoPlano.saldoProjetado))}
                 </p>
+                {resumoPlano.saldoProjetado < 0 && (
+                  <p className="plano-headline-sub">Faltam pra fechar {nomeMes.toLowerCase()}</p>
+                )}
               </div>
               <span className={`plano-icon ${resumoPlano.saldoProjetado >= 0 ? "pos" : ""}`}>
                 {resumoPlano.saldoProjetado >= 0 ? (
@@ -294,6 +289,17 @@ export default async function MinhaContaPage({
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>
                 )}
               </span>
+            </div>
+            <div className="plano-stats">
+              <div className="plano-stat">
+                <span className="plano-stat-label">Renda</span>
+                <span className="plano-stat-value">{fmtValor(resumoPlano.rendaDisponivel)}</span>
+              </div>
+              <div className="plano-stat-divider" />
+              <div className="plano-stat">
+                <span className="plano-stat-label">Comprometido</span>
+                <span className="plano-stat-value">{fmtValor(resumoPlano.totalComprometido)}</span>
+              </div>
             </div>
             <span className="plano-cta">
               Ver meu plano
