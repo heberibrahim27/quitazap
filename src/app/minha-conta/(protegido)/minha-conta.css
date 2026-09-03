@@ -11,7 +11,7 @@
    sem prefixo, vindas direto do protótipo aprovado.
    ───────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=IBM+Plex+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap');
 
 .mc-shell {
   /* tokens novos (design system claro) */
@@ -281,15 +281,15 @@
 }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 18px 10px; }
 .section-eyebrow {
-  margin: 0 18px 10px; font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em;
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  margin: 0 18px 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
   color: var(--ink-dim); display: flex; align-items: center; gap: 8px;
 }
 .section-eyebrow .title-icon { width: 24px; height: 24px; border-radius: 8px; }
 .section-eyebrow .title-icon svg { width: 13px; height: 13px; }
 .card-title {
   min-width: 0; flex: 1; margin: 0; font-size: 15.5px; font-weight: 700;
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; letter-spacing: -0.01em;
+  font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.01em;
   display: flex; align-items: center; gap: 10px;
 }
 .title-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -299,17 +299,16 @@
 .title-icon {
   width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: #fff;
+  border: 1.5px solid var(--cyan);
   color: var(--cyan);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 10px -6px rgba(15,30,51,0.28);
+  box-shadow: 0 6px 14px -6px rgba(23,180,216,0.55), 0 0 0 4px rgba(23,180,216,0.1);
 }
 .title-icon svg { width: 16px; height: 16px; stroke-width: 1.6; }
 .title-icon.red {
   color: var(--red);
-  border-color: rgba(226,59,92,0.3);
+  border-color: var(--red);
+  box-shadow: 0 6px 14px -6px rgba(226,59,92,0.55), 0 0 0 4px rgba(226,59,92,0.1);
 }
 .card-link { flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--blue); text-decoration: none; display: flex; align-items: center; gap: 3px; }
 .card-link svg { width: 13px; height: 13px; }
@@ -328,8 +327,8 @@
 }
 .plano-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .plano-eyebrow {
-  margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em;
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
   color: var(--ink-dim); display: flex; align-items: center; gap: 8px;
 }
 .plano-eyebrow .title-icon { width: 24px; height: 24px; border-radius: 8px; }
@@ -524,7 +523,7 @@
 }
 .alerta-title {
   min-width: 0; flex: 1; margin: 0; font-size: 14.5px; font-weight: 700;
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
   color: var(--ink); display: flex; align-items: center; gap: 10px;
 }
 .alerta-link { flex-shrink: 0; font-size: 12.5px; font-weight: 700; color: var(--ink-faint); text-decoration: none; display: flex; align-items: center; gap: 3px; }
