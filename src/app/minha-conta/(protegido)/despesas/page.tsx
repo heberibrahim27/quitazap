@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { MesSwipe } from "../MesSwipe";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -84,7 +85,10 @@ export default async function DespesasPage({
   const sufixoMes = `mes=${paramMes(ano, mes)}`;
 
   return (
-    <div>
+    <MesSwipe
+      hrefAnterior={`/minha-conta/despesas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}&aba=${aba}`}
+      hrefSeguinte={`/minha-conta/despesas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}&aba=${aba}`}
+    >
       <div className="card-head">
         <p className="card-title">
           <span className="title-icon">
@@ -92,10 +96,6 @@ export default async function DespesasPage({
           </span>
           <span className="title-label">Despesas — {nomeMes}/{ano}</span>
         </p>
-        <div style={{ display: "flex", gap: 6 }}>
-          <Link href={`/minha-conta/despesas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}&aba=${aba}`} className="card-link" aria-label="Mês anterior">‹</Link>
-          <Link href={`/minha-conta/despesas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}&aba=${aba}`} className="card-link" aria-label="Próximo mês">›</Link>
-        </div>
       </div>
 
       <div className="mc-tabs">
@@ -148,6 +148,6 @@ export default async function DespesasPage({
           </div>
         )}
       </div>
-    </div>
+    </MesSwipe>
   );
 }

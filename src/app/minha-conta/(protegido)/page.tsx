@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
+import { MesSwipe } from "./MesSwipe";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -169,20 +170,14 @@ export default async function MinhaContaPage({
 
   return (
     <div>
+      <MesSwipe
+        hrefAnterior={`/minha-conta?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+        hrefSeguinte={ehMesAtual ? null : `/minha-conta?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+      >
       <div className="hero">
         <div className="hero-shell">
           <div className="hero-top">
             <p className="hero-eyebrow">{ehMesAtual ? "Resumo do mês" : `Resumo de ${nomeMes}/${ano}`}</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Link href={`/minha-conta?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`} className="hero-more" aria-label="Mês anterior">
-                ‹
-              </Link>
-              {!ehMesAtual && (
-                <Link href={`/minha-conta?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`} className="hero-more" aria-label="Próximo mês">
-                  ›
-                </Link>
-              )}
-            </div>
           </div>
 
           <div className="hero-body">
@@ -237,6 +232,7 @@ export default async function MinhaContaPage({
           </div>
         </div>
       </div>
+      </MesSwipe>
 
       {resumoPlano.calculavel && (
         <>
