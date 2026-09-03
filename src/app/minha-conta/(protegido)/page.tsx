@@ -462,7 +462,7 @@ export default async function MinhaContaPage({
                   <p className="cartoes-total-value">{fmtValor(totalCartaoMes)}</p>
                 </span>
                 <span className="cartoes-total-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
+                  <span className="cartoes-total-icon-chip" />
                 </span>
               </div>
             </div>
