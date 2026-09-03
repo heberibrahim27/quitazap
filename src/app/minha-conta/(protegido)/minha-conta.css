@@ -21,7 +21,7 @@
      de antes praticamente não mostravam efeito nenhum. --bg continua
      existindo só pra bordas que precisam de uma cor sólida (ex: anel do
      botão "+"), não mais como fundo da página. */
-  --bg-gradient: radial-gradient(ellipse 140vw 75vh at 50% 0, #F1F2F4 0%, #E1E3E7 50%, #CDD0D5 100%);
+  --bg-gradient: radial-gradient(ellipse 140vw 75vh at 50% 0, #F5F6F8 0%, #EBEDF0 55%, #E1E4E8 100%);
   --card: #FFFFFF;
   --card-tint: #F8FBFF;
   --ink: #0B1E33;
@@ -44,7 +44,7 @@
   --red-soft: rgba(226, 59, 92, 0.1);
   /* Sombra dupla (neumorphism): clara em cima-esquerda + escura embaixo-
      direita, simulando o card "extrudado" do próprio fundo em degradê. */
-  --shadow-card: -10px -10px 22px rgba(255, 255, 255, 0.9), 14px 16px 30px rgba(110, 118, 130, 0.5);
+  --shadow-card: -6px -6px 14px rgba(255, 255, 255, 0.85), 7px 9px 16px rgba(130, 138, 150, 0.25);
   --shadow-hero: 0 20px 40px -18px rgba(7, 27, 61, 0.45);
 
   /* tokens antigos — mantidos pelas telas que ainda não migraram
@@ -224,7 +224,7 @@
   position: relative; z-index: 2; margin: -34px 28px 0;
   display: flex; align-items: stretch;
   border-radius: 18px; padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -262,7 +262,7 @@
   position: absolute; inset: 0;
   border-radius: inherit;
   padding: 2px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.45) 45%, rgba(255, 255, 255, 0.05) 75%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(196, 226, 250, 0.5) 45%, rgba(130, 170, 210, 0.1) 75%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -272,7 +272,7 @@
 /* ── Cards genéricos (novo design) ────────────────── */
 .card {
   position: relative;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -318,7 +318,7 @@
   display: block; text-decoration: none; color: inherit;
   position: relative; overflow: hidden;
   border-radius: 22px; padding: 20px 20px 22px;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid var(--brand-line);
@@ -510,7 +510,7 @@
 .alerta-card {
   position: relative;
   border-radius: 18px; padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(226, 59, 92, 0.4);
@@ -786,7 +786,7 @@
 
 .mc-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -890,7 +890,7 @@
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.5);
