@@ -16,7 +16,6 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
   const pathname = usePathname();
   const naHome = pathname === "/minha-conta";
   const naMovimentacoes = pathname === "/minha-conta/movimentacoes";
-  const naPlano = pathname === "/minha-conta/plano";
   const naCartoes = pathname.startsWith("/minha-conta/cartoes");
 
   const [fabAberto, setFabAberto] = useState(false);
@@ -31,11 +30,15 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
       <nav className="bottom-nav" aria-label="Navegação">
         <div className="bn-side">
           <Link href="/minha-conta" className={`bn-item ${naHome ? "active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
+            <span className="bn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
+            </span>
             Início
           </Link>
           <Link href="/minha-conta/movimentacoes" className={`bn-item ${naMovimentacoes ? "active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l3 3v15H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+            <span className="bn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l3 3v15H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+            </span>
             Extrato
           </Link>
         </div>
@@ -47,16 +50,16 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
         </span>
 
         <div className="bn-side">
-          <Link href="/minha-conta/plano" className={`bn-item ${naPlano ? "active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M13 7l-4.5 6.2H12l-1 4L15.5 11H12l1-4z" /></svg>
-            Plano
-          </Link>
           <Link href="/minha-conta/cartoes" className={`bn-item ${naCartoes ? "active" : ""}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
+            <span className="bn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
+            </span>
             Cartões
           </Link>
-          <button type="button" className="bn-item" onClick={() => setMaisAberto(true)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+          <button type="button" className={`bn-item ${maisAberto ? "active" : ""}`} onClick={() => setMaisAberto(true)}>
+            <span className="bn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+            </span>
             Mais
           </button>
         </div>
@@ -65,8 +68,13 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
       <div className={`fab-backdrop ${fabAberto || maisAberto ? "open" : ""}`} onClick={fecharTudo} />
 
       <div className={`fab-sheet ${fabAberto ? "open" : ""}`}>
-        <span className="fab-sheet-handle" />
-        <p className="fab-sheet-title">Novo lançamento</p>
+        <button type="button" className="fab-sheet-handle" onClick={fecharTudo} aria-label="Fechar" />
+        <div className="fab-sheet-head">
+          <p className="fab-sheet-title">Novo lançamento</p>
+          <button type="button" className="fab-sheet-close" onClick={fecharTudo} aria-label="Fechar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
         <p style={{ margin: "0 0 4px", fontSize: 13.5, color: "var(--ink-dim)", lineHeight: 1.5 }}>
           Por enquanto, receitas, despesas e compras no cartão são registradas por texto ou áudio direto no
           WhatsApp — o QuitaZAP organiza tudo automaticamente aqui no Controle.
@@ -74,8 +82,13 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
       </div>
 
       <div className={`fab-sheet ${maisAberto ? "open" : ""}`} style={{ maxHeight: "80vh", overflowY: "auto" }}>
-        <span className="fab-sheet-handle" />
-        <p className="fab-sheet-title">Mais</p>
+        <button type="button" className="fab-sheet-handle" onClick={fecharTudo} aria-label="Fechar" />
+        <div className="fab-sheet-head">
+          <p className="fab-sheet-title">Mais</p>
+          <button type="button" className="fab-sheet-close" onClick={fecharTudo} aria-label="Fechar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
         <Link href="/minha-conta/receitas" className="fab-sheet-option" onClick={fecharTudo}>
           <span className="fab-sheet-icon green">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
@@ -100,6 +113,12 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
           </span>
           Agenda
         </Link>
+        <Link href="/minha-conta/plano" className="fab-sheet-option" onClick={fecharTudo}>
+          <span className="fab-sheet-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M13 7l-4.5 6.2H12l-1 4L15.5 11H12l1-4z" /></svg>
+          </span>
+          Plano de pagamento
+        </Link>
         <Link href="/minha-conta/metas" className="fab-sheet-option" onClick={fecharTudo}>
           <span className="fab-sheet-icon green">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
@@ -113,8 +132,10 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
           Perfil
         </Link>
         <form action={sair}>
-          <button type="submit" className="mais-sheet-option">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
+          <button type="submit" className="fab-sheet-option" style={{ borderTop: "1px solid var(--line)" }}>
+            <span className="fab-sheet-icon red">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
+            </span>
             Sair da conta
           </button>
         </form>

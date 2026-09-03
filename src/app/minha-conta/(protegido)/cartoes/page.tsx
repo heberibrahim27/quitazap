@@ -69,15 +69,17 @@ export default async function CartoesPage() {
       </div>
 
       {cartoes.length > 0 && (
-        <div className="cartoes-total" style={{ marginBottom: 16 }}>
-          <div className="cartoes-total-top">
-            <span>
-              <p className="cartoes-total-label">Compras no cartão este mês</p>
-              <p className="cartoes-total-value">{fmtValor(totalMes)}</p>
-            </span>
-            <span className="cartoes-total-icon">
-              <span className="cartoes-total-icon-chip" />
-            </span>
+        <div className="mc-card" style={{ marginBottom: 16 }}>
+          <div className="cartoes-total">
+            <div className="cartoes-total-top">
+              <span>
+                <p className="cartoes-total-label">Compras no cartão este mês</p>
+                <p className="cartoes-total-value">{fmtValor(totalMes)}</p>
+              </span>
+              <span className="cartoes-total-icon">
+                <span className="cartoes-total-icon-chip" />
+              </span>
+            </div>
           </div>
         </div>
       )}
