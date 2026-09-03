@@ -170,10 +170,7 @@
   /* Sem cabeçalho separado por cima, a hero é quem precisa abrir espaço
      pro notch/status bar (mesma fórmula do cabeçalho clássico). */
   padding: max(14px, env(safe-area-inset-top)) 22px 52px;
-  background:
-    radial-gradient(ellipse 55% 45% at 82% 8%, rgba(23, 180, 216, 0.32), transparent 62%),
-    radial-gradient(ellipse 70% 55% at 10% -10%, rgba(255,255,255,0.08), transparent 55%),
-    linear-gradient(165deg, var(--navy-deep) 0%, var(--navy-mid) 55%, var(--navy-glow) 100%);
+  background: var(--navy-deep);
   border: 1px solid rgba(255,255,255,0.1);
   border-top: none;
   box-shadow: var(--shadow-hero), inset 0 0 60px rgba(255,255,255,0.03);
