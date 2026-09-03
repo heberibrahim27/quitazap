@@ -5,10 +5,15 @@
 //
 // 1. Avança tarefas recorrentes cujo vencimento já passou (< hoje) para a
 //    próxima ocorrência, voltando o status para PENDENTE.
-// 2. Envia lembrete de WhatsApp pras tarefas PENDENTE que vencem hoje. O
-//    horarioEnvio configurado em cada tarefa não é respeitado à risca (só há
-//    1 execução por dia no plano atual) — todo lembrete do dia sai junto,
-//    no horário em que o cron roda.
+// 2. Envia lembrete pras tarefas PENDENTE que vencem amanhã (véspera, D-1)
+//    ou hoje (D+0) — por WhatsApp (se o cliente tiver telefone) e por push
+//    (se tiver alguma inscrição ativa no PWA); dispara os dois canais
+//    quando disponíveis, não é um ou outro. Dedupe por dia via
+//    ultimoLembrete, então cada tarefa recebe no máximo um lembrete por
+//    dia de execução do cron (o de véspera hoje, o do dia amanhã). O
+//    horarioEnvio configurado em cada tarefa não é respeitado à risca (só
+//    há 1 execução por dia no plano atual) — todo lembrete do dia sai
+//    junto, no horário em que o cron roda.
 // 3. Limpa registros velhos de MensagemProcessada (dedupe do webhook Z-API) —
 //    a janela de dedupe é de só 10 minutos, reter por 24h já é folga generosa.
 // ─────────────────────────────────────────
@@ -17,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp } from "@/lib/zapi";
 import { calcularProximaOcorrencia } from "@/lib/tarefa-flow";
+import { enviarPush } from "@/lib/push-service";
 
 const FUSO = "America/Sao_Paulo";
 
@@ -83,8 +89,14 @@ export async function GET(req: NextRequest) {
     console.error("[CRON TAREFAS] Erro ao avançar recorrências:", err);
   }
 
-  // ── 2. Envia lembretes do dia ──────────────────────────────
+  // ── 2. Envia lembretes — véspera (D-1) e dia do vencimento (D+0) ──
+  // Cada tarefa recebe no máximo 1 lembrete por dia de execução do cron
+  // (dedupe via ultimoLembrete), então uma tarefa que vence amanhã ganha
+  // o aviso de véspera hoje, e o aviso "vence hoje" no dia seguinte —
+  // dois lembretes distintos, sem duplicar no mesmo dia.
   try {
+    const amanhaBrasil = dataBrasil(new Date(agora.getTime() + 24 * 60 * 60 * 1000));
+
     const candidatasHoje = await prisma.tarefa.findMany({
       where: {
         status: "PENDENTE",
@@ -94,29 +106,51 @@ export async function GET(req: NextRequest) {
     });
 
     for (const t of candidatasHoje) {
-      if (!t.vencimento || dataBrasil(t.vencimento) !== hojeBrasil) continue;
+      if (!t.vencimento) continue;
+      const dataVenc = dataBrasil(t.vencimento);
+      const ehHoje = dataVenc === hojeBrasil;
+      const ehAmanha = dataVenc === amanhaBrasil;
+      if (!ehHoje && !ehAmanha) continue;
       if (t.ultimoLembrete && dataBrasil(t.ultimoLembrete) === hojeBrasil) continue;
-
-      const telefone = t.cliente?.telefone;
-      if (!telefone) continue;
 
       const valorTexto =
         t.valor != null
           ? ` — ${t.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
           : "";
-      const mensagem =
-        `🔔 *Lembrete:* ${t.descricao}${valorTexto}\n\n` +
-        `Se já resolveu, responda: *"concluí ${t.descricao.toLowerCase()}"*`;
+      const corpo = `${t.descricao}${valorTexto}`;
+      const mensagemWhatsApp = ehHoje
+        ? `🔔 *Lembrete:* ${corpo}\n\nSe já resolveu, responda: *"concluí ${t.descricao.toLowerCase()}"*`
+        : `📅 *Lembrete:* ${corpo} vence amanhã\n\nSe já resolveu, responda: *"concluí ${t.descricao.toLowerCase()}"*`;
+
+      let enviouAlgo = false;
+
+      const telefone = t.cliente?.telefone;
+      if (telefone) {
+        try {
+          await sendWhatsApp(telefone, mensagemWhatsApp);
+          enviouAlgo = true;
+        } catch (err) {
+          erros.push(`whatsapp ${t.id} (${t.descricao}): ${err}`);
+        }
+      }
 
       try {
-        await sendWhatsApp(telefone, mensagem);
+        const enviosPush = await enviarPush(t.clienteId, {
+          titulo: ehHoje ? "Vence hoje" : "Vence amanhã",
+          corpo,
+          url: "/minha-conta/agenda",
+        });
+        if (enviosPush > 0) enviouAlgo = true;
+      } catch (err) {
+        erros.push(`push ${t.id} (${t.descricao}): ${err}`);
+      }
+
+      if (enviouAlgo) {
         await prisma.tarefa.update({
           where: { id: t.id },
           data: { ultimoLembrete: agora },
         });
         lembretesEnviados++;
-      } catch (err) {
-        erros.push(`${t.id} (${t.descricao}): ${err}`);
       }
 
       await new Promise((r) => setTimeout(r, 400));
