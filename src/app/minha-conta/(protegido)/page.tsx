@@ -146,7 +146,21 @@ export default async function MinhaContaPage({
     inicioMes,
     fimMes,
   });
-  const dividasDoMesValor = resumoPlano.calculavel ? resumoPlano.totalComprometido - totalSaidasMes : 0;
+  // Separa empréstimos do resto das dívidas pra ter uma linha própria no
+  // Resumo — mesma parcela que já entra no "comprometido" do plano acima,
+  // só reclassificada aqui pra exibição (não soma de novo em lugar nenhum).
+  const parcelasDoMesComTipo = resumoPlano.calculavel
+    ? await prisma.parcela.findMany({
+        where: { status: "PENDENTE", vencimento: { gte: inicioMes, lt: fimMes }, divida: { clienteId: cliente.id, status: "ATIVA" } },
+        select: { valor: true, divida: { select: { tipo: true } } },
+      })
+    : [];
+  let totalEmprestimosMes = 0;
+  let totalOutrasDividasMes = 0;
+  for (const p of parcelasDoMesComTipo) {
+    if (p.divida.tipo === "EMPRESTIMO") totalEmprestimosMes += p.valor;
+    else totalOutrasDividasMes += p.valor;
+  }
 
   // Hero: quando dá pra calcular o plano (renda cadastrada), mostra o
   // resultado já projetado com parcelas de dívida do mês; sem renda
@@ -164,7 +178,8 @@ export default async function MinhaContaPage({
     { rotulo: "Despesas fixas", valor: totalFixasMes, icone: "fixa", classe: "blue" },
     { rotulo: "Desp. variáveis", valor: totalVariaveisMes, icone: "variavel", classe: "cyan" },
     { rotulo: "Cartões", valor: totalCartaoMes, icone: "cartao", classe: "blue" },
-    { rotulo: "Dívidas do mês", valor: dividasDoMesValor, icone: "divida", classe: "blue" },
+    { rotulo: "Empréstimos", valor: totalEmprestimosMes, icone: "divida", classe: "blue" },
+    { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
   ].filter((linha) => linha.valor > 0);
   const maiorValorResumo = Math.max(totalReceitasMes, 1);
 

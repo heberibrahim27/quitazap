@@ -941,6 +941,37 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   padding: 6px 0;
 }
 
+/* ── Parcelas de empréstimo (marcar paga, com valor editável) ────── */
+.parcela-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--mc-line-soft);
+}
+.parcela-row:last-child { border-bottom: none; padding-bottom: 0; }
+.parcela-row:first-child { padding-top: 0; }
+.parcela-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.parcela-check {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--mc-line); display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.parcela-check.checked { background: var(--green); border-color: var(--green); }
+.parcela-check svg { width: 13px; height: 13px; }
+.parcela-acao { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.parcela-input-valor {
+  width: 84px; border: 1px solid var(--mc-line); border-radius: 10px;
+  padding: 8px 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace;
+  text-align: right; background: var(--card-tint); color: var(--mc-ink);
+}
+.parcela-marcar {
+  border: none; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 700;
+  background: var(--blue); color: #fff; cursor: pointer; white-space: nowrap;
+}
+.parcela-valor-pago { font-size: 13.5px; font-weight: 700; color: var(--green); font-family: 'IBM Plex Mono', monospace; }
+.parcela-desfazer {
+  border: 1px solid var(--mc-line); border-radius: 10px; padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+  background: none; color: var(--ink-faint); cursor: pointer; white-space: nowrap;
+}
+
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {
   position: relative;

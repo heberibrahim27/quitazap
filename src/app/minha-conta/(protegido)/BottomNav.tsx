@@ -101,6 +101,12 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
           </span>
           Despesas
         </Link>
+        <Link href="/minha-conta/emprestimos" className="fab-sheet-option" onClick={fecharTudo}>
+          <span className="fab-sheet-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M4 21V10l8-6 8 6v11" /><path d="M9 21v-7h6v7" /></svg>
+          </span>
+          Empréstimos
+        </Link>
         <Link href="/minha-conta/dividas" className="fab-sheet-option" onClick={fecharTudo}>
           <span className="fab-sheet-icon red">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>
