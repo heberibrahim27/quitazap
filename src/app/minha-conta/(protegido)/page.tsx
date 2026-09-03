@@ -217,46 +217,42 @@ export default async function MinhaContaPage({
                 {resumoPlano.calculavel ? "Após despesas, dívidas e compras no cartão" : "Após despesas e compras no cartão"}
               </p>
             </div>
-            {percentualComprometido != null && (
-              <div className="hero-ring-col">
-                <div className="ring">
-                  <svg viewBox="0 0 74 74">
-                    <circle cx="37" cy="37" r="31" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="5" />
-                    <circle
-                      cx="37" cy="37" r="31" fill="none" stroke="#fff" strokeWidth="5"
-                      strokeDasharray="194.8"
-                      strokeDashoffset={194.8 * (1 - percentualComprometido)}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className="ring-label">{Math.round(percentualComprometido * 100)}%</span>
-                </div>
-                <p className="ring-caption">da renda comprometida</p>
-              </div>
-            )}
           </div>
         </div>
 
         <div className="hero-glass">
-          <div className="hero-glass-item">
-            <span className="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
-            </span>
-            <span className="stat-text">
-              <p className="stat-label">Renda mensal</p>
-              <p className="stat-value">{cliente.rendaMensal != null ? fmtValor(cliente.rendaMensal) : "—"}</p>
-            </span>
+          <div className="hero-glass-stats">
+            <div className="hero-glass-item">
+              <span className="stat-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
+              </span>
+              <span className="stat-text">
+                <p className="stat-label">Renda mensal</p>
+                <p className="stat-value">{cliente.rendaMensal != null ? fmtValor(cliente.rendaMensal) : "—"}</p>
+              </span>
+            </div>
+            <div className="hero-glass-divider" />
+            <div className="hero-glass-item">
+              <span className="stat-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6 3" /></svg>
+              </span>
+              <span className="stat-text">
+                <p className="stat-label">Comprometido no mês</p>
+                <p className="stat-value">{fmtValor(heroComprometido)}</p>
+              </span>
+            </div>
           </div>
-          <div className="hero-glass-divider" />
-          <div className="hero-glass-item">
-            <span className="stat-icon blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6 3" /></svg>
-            </span>
-            <span className="stat-text">
-              <p className="stat-label">Comprometido no mês</p>
-              <p className="stat-value">{fmtValor(heroComprometido)}</p>
-            </span>
-          </div>
+          {percentualComprometido != null && (
+            <div className="hero-glass-bar">
+              <div className="hero-glass-bar-top">
+                <span>Da renda comprometida</span>
+                <span className="hero-glass-bar-value">{Math.round(percentualComprometido * 100)}%</span>
+              </div>
+              <div className="hero-glass-bar-track">
+                <div className="hero-glass-bar-fill" style={{ width: `${Math.min(percentualComprometido * 100, 100)}%` }} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
       </MesSwipe>
