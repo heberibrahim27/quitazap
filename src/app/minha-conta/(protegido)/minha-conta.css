@@ -789,6 +789,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   background: var(--bg); color: var(--ink-dim); border: none; cursor: pointer;
 }
 .fab-sheet-close svg { width: 15px; height: 15px; }
+.fab-sheet-back {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--bg); color: var(--ink-dim); border: none; cursor: pointer;
+}
+.fab-sheet-back svg { width: 16px; height: 16px; }
 .fab-sheet-option {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 12px 4px; text-decoration: none; color: var(--ink);

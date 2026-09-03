@@ -1,29 +1,86 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { NOMES_CATEGORIAS_GASTO } from "@/lib/gasto-flow";
+import { criarDespesaRapida, criarReceitaRapida } from "./lancamento-actions";
+
+type VisaoFab = "menu" | "despesa" | "receita";
+
+function hojeStr(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
 
 // Componente à parte (client) só pra saber a rota atual — o layout continua
 // Server Component.
 //
-// O "+" central abre um sheet — hoje só explica que lançamentos ainda são
-// registrados por texto/áudio no WhatsApp (não existe formulário de "novo
-// lançamento" no Controle web ainda). "Mais" abre um sheet com o resto das
-// páginas (Receitas, Despesas, Dívidas, Agenda, Metas, Perfil) e o Sair, já
-// que o cabeçalho não mostra mais o botão de sair.
-export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
+// O "+" central abre um sheet com atalhos ("Nova despesa"/"Nova receita")
+// que trocam o conteúdo do MESMO sheet pelo formulário — sem navegar pra
+// outra página, então o cliente não perde o lugar onde estava nem precisa
+// rolar por um formulário fixo no topo da tela pra ver a lista. "Mais" abre
+// um sheet com o resto das páginas (Receitas, Despesas, Dívidas, Agenda,
+// Metas, Perfil) e o Sair, já que o cabeçalho não mostra mais esse botão.
+export function BottomNav({
+  sair,
+  cartoes,
+}: {
+  sair: (fd: FormData) => Promise<void>;
+  cartoes: { id: string; nome: string }[];
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const naHome = pathname === "/minha-conta";
   const naMovimentacoes = pathname === "/minha-conta/movimentacoes";
   const naCartoes = pathname.startsWith("/minha-conta/cartoes");
 
   const [fabAberto, setFabAberto] = useState(false);
+  const [fabVisao, setFabVisao] = useState<VisaoFab>("menu");
   const [maisAberto, setMaisAberto] = useState(false);
+  const [erroForm, setErroForm] = useState<string | null>(null);
+  const [enviando, startTransition] = useTransition();
+
   const fecharTudo = () => {
     setFabAberto(false);
     setMaisAberto(false);
+    setFabVisao("menu");
+    setErroForm(null);
   };
+
+  const voltarAoMenu = () => {
+    setFabVisao("menu");
+    setErroForm(null);
+  };
+
+  function aoEnviarDespesa(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setErroForm(null);
+    startTransition(async () => {
+      const resultado = await criarDespesaRapida(formData);
+      if (resultado.erro) {
+        setErroForm(resultado.erro);
+        return;
+      }
+      fecharTudo();
+      router.refresh();
+    });
+  }
+
+  function aoEnviarReceita(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setErroForm(null);
+    startTransition(async () => {
+      const resultado = await criarReceitaRapida(formData);
+      if (resultado.erro) {
+        setErroForm(resultado.erro);
+        return;
+      }
+      fecharTudo();
+      router.refresh();
+    });
+  }
 
   return (
     <>
@@ -67,29 +124,124 @@ export function BottomNav({ sair }: { sair: (fd: FormData) => Promise<void> }) {
 
       <div className={`fab-backdrop ${fabAberto || maisAberto ? "open" : ""}`} onClick={fecharTudo} />
 
-      <div className={`fab-sheet ${fabAberto ? "open" : ""}`}>
+      <div className={`fab-sheet ${fabAberto ? "open" : ""}`} style={{ maxHeight: "85vh", overflowY: "auto" }}>
         <button type="button" className="fab-sheet-handle" onClick={fecharTudo} aria-label="Fechar" />
         <div className="fab-sheet-head">
-          <p className="fab-sheet-title">Novo lançamento</p>
+          {fabVisao !== "menu" && (
+            <button type="button" className="fab-sheet-back" onClick={voltarAoMenu} aria-label="Voltar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+            </button>
+          )}
+          <p className="fab-sheet-title">
+            {fabVisao === "menu" ? "Novo lançamento" : fabVisao === "despesa" ? "Nova despesa" : "Nova receita"}
+          </p>
           <button type="button" className="fab-sheet-close" onClick={fecharTudo} aria-label="Fechar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
-        <Link href="/minha-conta/despesas" className="fab-sheet-option" onClick={fecharTudo}>
-          <span className="fab-sheet-icon blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
-          </span>
-          Nova despesa
-        </Link>
-        <Link href="/minha-conta/receitas" className="fab-sheet-option" onClick={fecharTudo}>
-          <span className="fab-sheet-icon green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
-          </span>
-          Nova receita
-        </Link>
-        <p style={{ margin: "10px 4px 0", fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.5 }}>
-          Também dá pra lançar tudo isso por texto ou áudio direto no WhatsApp.
-        </p>
+
+        {fabVisao === "menu" && (
+          <>
+            <button type="button" className="fab-sheet-option" onClick={() => setFabVisao("despesa")}>
+              <span className="fab-sheet-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
+              </span>
+              Nova despesa
+            </button>
+            <button type="button" className="fab-sheet-option" onClick={() => setFabVisao("receita")}>
+              <span className="fab-sheet-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
+              </span>
+              Nova receita
+            </button>
+            <p style={{ margin: "10px 4px 0", fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.5 }}>
+              Também dá pra lançar tudo isso por texto ou áudio direto no WhatsApp.
+            </p>
+          </>
+        )}
+
+        {fabVisao === "despesa" && (
+          <form onSubmit={aoEnviarDespesa} className="mc-form-card" style={{ padding: "4px 0 0", background: "none", backdropFilter: "none", WebkitBackdropFilter: "none", boxShadow: "none" }}>
+            {erroForm && (
+              <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--red)" }}>{erroForm}</p>
+            )}
+            <label className="mc-label">
+              Descrição *
+              <input name="descricao" required placeholder="Ex: Mercado, Aluguel, Uber" className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Categoria
+              <select name="categoria" defaultValue="Outros" className="mc-input">
+                {NOMES_CATEGORIAS_GASTO.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label className="mc-label">
+              Valor *
+              <input name="valor" required type="text" inputMode="decimal" placeholder="Ex: 150,00" className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Data
+              <input name="data" type="date" defaultValue={hojeStr()} className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Tipo
+              <select name="tipo" defaultValue="DESPESA_VARIAVEL" className="mc-input">
+                <option value="DESPESA_VARIAVEL">Despesa variável</option>
+                <option value="DESPESA_FIXA">Despesa fixa (repete todo mês)</option>
+              </select>
+            </label>
+            {cartoes.length > 0 && (
+              <label className="mc-label">
+                Cartão (só se for compra no cartão)
+                <select name="cartaoId" defaultValue="" className="mc-input">
+                  <option value="">Nenhum — despesa direto</option>
+                  {cartoes.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="mc-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input name="recorrente" type="checkbox" style={{ width: 16, height: 16 }} />
+              Recorrente (repete todo mês)
+            </label>
+            <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }} disabled={enviando}>
+              {enviando ? "Salvando..." : "Adicionar despesa"}
+            </button>
+          </form>
+        )}
+
+        {fabVisao === "receita" && (
+          <form onSubmit={aoEnviarReceita} className="mc-form-card" style={{ padding: "4px 0 0", background: "none", backdropFilter: "none", WebkitBackdropFilter: "none", boxShadow: "none" }}>
+            {erroForm && (
+              <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--red)" }}>{erroForm}</p>
+            )}
+            <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-faint)", lineHeight: 1.5 }}>
+              Lance seu salário e outras fontes de renda aqui — é isso que vira sua &quot;Renda&quot; no Dashboard e no Plano de Pagamento.
+            </p>
+            <label className="mc-label">
+              Descrição *
+              <input name="descricao" required placeholder="Ex: Salário, Freelance, Aluguel recebido" className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Valor *
+              <input name="valor" required type="text" inputMode="decimal" placeholder="Ex: 3500,00" className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Data
+              <input name="data" type="date" defaultValue={hojeStr()} className="mc-input" />
+            </label>
+            <label className="mc-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input name="recorrente" type="checkbox" style={{ width: 16, height: 16 }} />
+              Recorrente (repete todo mês, ex: salário fixo)
+            </label>
+            <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }} disabled={enviando}>
+              {enviando ? "Salvando..." : "Adicionar receita"}
+            </button>
+          </form>
+        )}
       </div>
 
       <div className={`fab-sheet ${maisAberto ? "open" : ""}`} style={{ maxHeight: "80vh", overflowY: "auto" }}>
