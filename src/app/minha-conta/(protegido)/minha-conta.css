@@ -79,6 +79,16 @@
   touch-action: pan-y;
 }
 
+/* Esconde a barra de rolagem lateral (só visual — o scroll continua
+   funcionando normal, com o dedo/mouse/teclado). */
+html, body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge legado */
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge novo */
+}
+
 .mc-shell * { box-sizing: border-box; }
 .mc-shell a { color: inherit; }
 .mc-shell svg { display: block; }
