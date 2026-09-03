@@ -228,7 +228,6 @@
   background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 14px 28px -10px rgba(7, 27, 61, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 .hero-glass-item { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -257,22 +256,6 @@
 .stat-label { margin: 0; font-size: 11.5px; color: var(--ink-dim); line-height: 1.25; }
 .stat-value { margin: 3px 0 0; font-size: 16px; font-weight: 800; color: var(--ink); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
 
-/* Borda com brilho diagonal nos cards de vidro fosco — imita luz
-   refletindo na borda do vidro (clara no canto superior-esquerdo,
-   esmaece pro canto oposto), bem mais convincente que uma borda lisa.
-   border-radius: inherit garante que acompanha o raio de cada card. */
-.card::before, .mc-card::before, .plano-card::before, .alerta-card::before,
-.mc-form-card::before, .hero-glass::before {
-  content: "";
-  position: absolute; inset: 0;
-  border-radius: inherit;
-  padding: 2.5px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.75) 30%, rgba(255, 255, 255, 0.3) 60%, rgba(215, 220, 227, 0.1) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
 
 /* ── Cards genéricos (novo design) ────────────────── */
 .card {
@@ -280,7 +263,6 @@
   background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 22px; padding: 18px 18px 6px;
   box-shadow: var(--shadow-card); margin-bottom: 16px;
 }
@@ -821,7 +803,6 @@
   background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: var(--shadow-card);
   border-radius: 20px;
   padding: 18px;
@@ -925,7 +906,6 @@
   background: rgba(255, 255, 255, 0.58);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: var(--shadow-card);
   border-radius: 22px;
   padding: 22px;
