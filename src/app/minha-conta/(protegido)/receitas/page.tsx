@@ -164,7 +164,7 @@ export default async function ReceitasPage({
           Recorrente (repete todo mês, ex: salário fixo)
         </label>
         <div>
-          <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
             Adicionar receita
           </button>
         </div>
