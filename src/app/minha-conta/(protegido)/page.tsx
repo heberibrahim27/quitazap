@@ -8,6 +8,20 @@ import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+// O valor da hero divide espaço com o anel de % ao lado — sem isso, um
+// valor com mais dígitos (ex: R$ 12.345,67) cresce e invade o anel.
+// "R$ 1.234,56" (11 caracteres) é o maior texto que cabe no tamanho padrão
+// (o clamp() já definido no CSS); acima disso reduz o teto do clamp
+// proporcionalmente, mantendo a mesma responsividade por vw.
+function tamanhoValorHero(texto: string): string | undefined {
+  const LIMITE = 11;
+  if (texto.length <= LIMITE) return undefined;
+  const BASE = 48;
+  const MINIMO = 22;
+  const maximo = Math.max(MINIMO, BASE - (texto.length - LIMITE) * 3);
+  return `clamp(${MINIMO}px, min(11vw, ${maximo}px), ${maximo}px)`;
+}
 function fmtData(d: Date) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
@@ -189,7 +203,9 @@ export default async function MinhaContaPage({
               <div className="hero-label-row">
                 <p className="hero-label">Disponível no mês</p>
               </div>
-              <p className="hero-amount">{fmtValor(heroDisponivel)}</p>
+              <p className="hero-amount" style={{ fontSize: tamanhoValorHero(fmtValor(heroDisponivel)) }}>
+                {fmtValor(heroDisponivel)}
+              </p>
               <p className="hero-caption">
                 {resumoPlano.calculavel ? "Após despesas, dívidas e compras no cartão" : "Após despesas e compras no cartão"}
               </p>
