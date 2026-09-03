@@ -42,9 +42,10 @@
   --orange-soft: rgba(245, 158, 11, 0.12);
   --red: #E23B5C;
   --red-soft: rgba(226, 59, 92, 0.1);
-  /* Sombra dupla (neumorphism): clara em cima-esquerda + escura embaixo-
-     direita, simulando o card "extrudado" do próprio fundo em degradê. */
-  --shadow-card: -6px -6px 14px rgba(255, 255, 255, 0.85), 7px 9px 16px rgba(130, 138, 150, 0.25);
+  /* Sombra de elevação: o card "flutua" sobre o fundo (sombra suave só
+     embaixo, sem luz do outro lado) + friso interno bem fino e claro no
+     topo, como o brilho de vidro pegando luz. */
+  --shadow-card: 0 22px 44px -20px rgba(90, 100, 118, 0.4), 0 8px 18px -10px rgba(90, 100, 118, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.75);
   --shadow-hero: 0 20px 40px -18px rgba(7, 27, 61, 0.45);
 
   /* tokens antigos — mantidos pelas telas que ainda não migraram
