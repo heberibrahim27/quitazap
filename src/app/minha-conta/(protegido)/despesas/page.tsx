@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
-import { NOMES_CATEGORIAS_GASTO } from "@/lib/gasto-flow";
-import { verificarOrcamentoEAvisar } from "@/lib/orcamento-service";
 import { MesSwipe } from "../MesSwipe";
 import { ValorLista } from "../ValorLista";
 
@@ -50,13 +47,12 @@ function paramMes(ano: number, mes: number): string {
 export default async function DespesasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string | string[]; aba?: string | string[]; erro?: string | string[] }>;
+  searchParams: Promise<{ mes?: string | string[]; aba?: string | string[] }>;
 }) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
-  const { mes: mesParamBruto, aba: abaParamBruto, erro: erroBruto } = await searchParams;
-  const erro = Array.isArray(erroBruto) ? erroBruto[0] : erroBruto;
+  const { mes: mesParamBruto, aba: abaParamBruto } = await searchParams;
   const mesParam = Array.isArray(mesParamBruto) ? mesParamBruto[0] : mesParamBruto;
   const abaParam = Array.isArray(abaParamBruto) ? abaParamBruto[0] : abaParamBruto;
   const aba: Aba = ABAS.includes(abaParam as Aba) ? (abaParam as Aba) : "todas";
@@ -81,75 +77,13 @@ export default async function DespesasPage({
 
   const tipos = aba === "fixas" ? ["DESPESA_FIXA"] : aba === "variaveis" ? ["DESPESA_VARIAVEL"] : ["DESPESA_FIXA", "DESPESA_VARIAVEL"];
 
-  const [despesas, cartoes] = await Promise.all([
-    prisma.lancamento.findMany({
-      where: { clienteId: cliente.id, tipo: { in: tipos }, data: { gte: inicioMes, lt: fimMes } },
-      orderBy: { data: "desc" },
-    }),
-    prisma.cartao.findMany({ where: { clienteId: cliente.id }, orderBy: { nome: "asc" } }),
-  ]);
+  const despesas = await prisma.lancamento.findMany({
+    where: { clienteId: cliente.id, tipo: { in: tipos }, data: { gte: inicioMes, lt: fimMes } },
+    orderBy: { data: "desc" },
+  });
   const total = despesas.reduce((soma, d) => soma + d.valor, 0);
 
   const sufixoMes = `mes=${paramMes(ano, mes)}`;
-  const hojeStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-  const dataPadrao = hojeStr.slice(0, 7) === paramMes(ano, mes) ? hojeStr : `${paramMes(ano, mes)}-01`;
-
-  async function criarDespesa(formData: FormData) {
-    "use server";
-    const clienteAtual = await getClienteAtual();
-    if (!clienteAtual) redirect("/minha-conta/entrar");
-
-    const descricao = String(formData.get("descricao") || "").trim();
-    const categoria = String(formData.get("categoria") || "Outros").trim();
-    const valorTexto = String(formData.get("valor") || "").replace(",", ".").trim();
-    const valor = Number(valorTexto);
-    const dataTexto = String(formData.get("data") || "");
-    const recorrente = formData.get("recorrente") === "on";
-    const tipoSelecionado = String(formData.get("tipo") || "DESPESA_VARIAVEL");
-    const cartaoIdTexto = String(formData.get("cartaoId") || "").trim();
-
-    if (!descricao || !Number.isFinite(valor) || valor <= 0) {
-      redirect(`/minha-conta/despesas?${sufixoMes}&aba=${aba}&erro=${encodeURIComponent("Descrição e valor (maior que zero) são obrigatórios.")}`);
-    }
-
-    let cartaoId: string | null = null;
-    if (cartaoIdTexto) {
-      const cartao = await prisma.cartao.findUnique({ where: { id: cartaoIdTexto } });
-      if (!cartao || cartao.clienteId !== clienteAtual.id) {
-        redirect(`/minha-conta/despesas?${sufixoMes}&aba=${aba}&erro=${encodeURIComponent("Cartão inválido.")}`);
-      }
-      cartaoId = cartaoIdTexto;
-    }
-
-    const tipo = cartaoId ? "COMPRA_CARTAO" : tipoSelecionado === "DESPESA_FIXA" ? "DESPESA_FIXA" : "DESPESA_VARIAVEL";
-    const dataLancamento = dataTexto ? new Date(`${dataTexto}T12:00:00`) : new Date();
-
-    await prisma.lancamento.create({
-      data: {
-        clienteId: clienteAtual.id,
-        tipo,
-        descricao,
-        categoria,
-        valor,
-        data: dataLancamento,
-        recorrente,
-        cartaoId,
-        origem: "WEB",
-      },
-    });
-
-    await verificarOrcamentoEAvisar(clienteAtual.id, categoria, valor, dataLancamento).catch((err) =>
-      console.error("[DESPESAS] Erro ao verificar orçamento:", err)
-    );
-
-    revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/despesas");
-    revalidatePath("/minha-conta/plano");
-    revalidatePath("/minha-conta/movimentacoes");
-    revalidatePath("/minha-conta/gastos");
-    if (cartaoId) revalidatePath("/minha-conta/cartoes");
-    redirect(`/minha-conta/despesas?${sufixoMes}&aba=${aba}`);
-  }
 
   return (
     <MesSwipe
@@ -181,62 +115,6 @@ export default async function DespesasPage({
           {fmtValor(total)}
         </p>
       </div>
-
-      {erro && (
-        <div className="mc-card" style={{ marginBottom: 16, background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
-          <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
-        </div>
-      )}
-
-      <form action={criarDespesa} className="mc-form-card" style={{ marginBottom: 16 }}>
-        <label className="mc-label">
-          Descrição *
-          <input name="descricao" required placeholder="Ex: Mercado, Aluguel, Uber" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Categoria
-          <select name="categoria" defaultValue="Outros" className="mc-input">
-            {NOMES_CATEGORIAS_GASTO.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label className="mc-label">
-          Valor *
-          <input name="valor" required type="text" inputMode="decimal" placeholder="Ex: 150,00" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Data
-          <input name="data" type="date" defaultValue={dataPadrao} className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Tipo
-          <select name="tipo" defaultValue="DESPESA_VARIAVEL" className="mc-input">
-            <option value="DESPESA_VARIAVEL">Despesa variável</option>
-            <option value="DESPESA_FIXA">Despesa fixa (repete todo mês)</option>
-          </select>
-        </label>
-        {cartoes.length > 0 && (
-          <label className="mc-label">
-            Cartão (só se for compra no cartão)
-            <select name="cartaoId" defaultValue="" className="mc-input">
-              <option value="">Nenhum — despesa direto</option>
-              {cartoes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="mc-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <input name="recorrente" type="checkbox" style={{ width: 16, height: 16 }} />
-          Recorrente (repete todo mês)
-        </label>
-        <div>
-          <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
-            Adicionar despesa
-          </button>
-        </div>
-      </form>
 
       <div className="mc-card">
         {despesas.length === 0 ? (

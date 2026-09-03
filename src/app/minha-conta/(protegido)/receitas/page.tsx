@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
@@ -44,13 +43,12 @@ function paramMes(ano: number, mes: number): string {
 export default async function ReceitasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string | string[]; erro?: string | string[] }>;
+  searchParams: Promise<{ mes?: string | string[] }>;
 }) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
-  const { mes: mesParamBruto, erro: erroBruto } = await searchParams;
-  const erro = Array.isArray(erroBruto) ? erroBruto[0] : erroBruto;
+  const { mes: mesParamBruto } = await searchParams;
   const mesParam = Array.isArray(mesParamBruto) ? mesParamBruto[0] : mesParamBruto;
   const { ano: anoAtual, mes: mesAtualNum } = anoMesAtualBrasil(new Date());
 
@@ -77,46 +75,6 @@ export default async function ReceitasPage({
   });
   const total = receitas.reduce((soma, r) => soma + r.valor, 0);
 
-  const hojeStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-  const dataPadrao = hojeStr.slice(0, 7) === paramMes(ano, mes) ? hojeStr : `${paramMes(ano, mes)}-01`;
-
-  async function criarReceita(formData: FormData) {
-    "use server";
-    const clienteAtual = await getClienteAtual();
-    if (!clienteAtual) redirect("/minha-conta/entrar");
-
-    const descricao = String(formData.get("descricao") || "").trim();
-    const valorTexto = String(formData.get("valor") || "").replace(",", ".").trim();
-    const valor = Number(valorTexto);
-    const dataTexto = String(formData.get("data") || "");
-    const recorrente = formData.get("recorrente") === "on";
-
-    if (!descricao || !Number.isFinite(valor) || valor <= 0) {
-      redirect(`/minha-conta/receitas?mes=${paramMes(ano, mes)}&erro=${encodeURIComponent("Descrição e valor (maior que zero) são obrigatórios.")}`);
-    }
-
-    await prisma.lancamento.create({
-      data: {
-        clienteId: clienteAtual.id,
-        tipo: "RECEITA",
-        descricao,
-        valor,
-        data: dataTexto ? new Date(`${dataTexto}T12:00:00`) : new Date(),
-        recorrente,
-        origem: "WEB",
-      },
-    });
-
-    // Receita alimenta a Renda usada no Dashboard e no Plano de
-    // Pagamento inteiro — sem isso, os dois continuam mostrando os
-    // números antigos até o cache expirar sozinho.
-    revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/receitas");
-    revalidatePath("/minha-conta/plano");
-    revalidatePath("/minha-conta/movimentacoes");
-    redirect(`/minha-conta/receitas?mes=${paramMes(ano, mes)}`);
-  }
-
   return (
     <MesSwipe
       hrefAnterior={`/minha-conta/receitas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
@@ -137,39 +95,6 @@ export default async function ReceitasPage({
           {fmtValor(total)}
         </p>
       </div>
-
-      {erro && (
-        <div className="mc-card" style={{ marginBottom: 16, background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
-          <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
-        </div>
-      )}
-
-      <form action={criarReceita} className="mc-form-card" style={{ marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-faint)", lineHeight: 1.5 }}>
-          Lance seu salário e outras fontes de renda aqui — é isso que vira sua "Renda" no Dashboard e no Plano de Pagamento.
-        </p>
-        <label className="mc-label">
-          Descrição *
-          <input name="descricao" required placeholder="Ex: Salário, Freelance, Aluguel recebido" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Valor *
-          <input name="valor" required type="text" inputMode="decimal" placeholder="Ex: 3500,00" className="mc-input" />
-        </label>
-        <label className="mc-label">
-          Data
-          <input name="data" type="date" defaultValue={dataPadrao} className="mc-input" />
-        </label>
-        <label className="mc-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <input name="recorrente" type="checkbox" style={{ width: 16, height: 16 }} />
-          Recorrente (repete todo mês, ex: salário fixo)
-        </label>
-        <div>
-          <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
-            Adicionar receita
-          </button>
-        </div>
-      </form>
 
       <div className="mc-card">
         {receitas.length === 0 ? (
