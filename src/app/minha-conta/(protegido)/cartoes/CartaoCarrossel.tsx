@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ValorLista } from "../ValorLista";
+import { ParcelasAccordion } from "../emprestimos/[id]/ParcelasAccordion";
 
 export type CompraCartaoView = {
   id: string;
@@ -21,6 +22,8 @@ export type CartaoCarrosselItem = {
   disponivelFmt: string | null;
   faturaFechada: boolean;
   compras: CompraCartaoView[];
+  proximasParcelas: CompraCartaoView[];
+  proximasParcelasTotalFmt: string;
 };
 
 function CartaoHero({ c }: { c: CartaoCarrosselItem }) {
@@ -182,6 +185,37 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
               </div>
             )}
           </div>
+
+          {cartaoAtivo.proximasParcelas.length > 0 && (
+            <>
+              <div className="card-head" style={{ marginTop: 16 }}>
+                <p className="card-title" style={{ fontSize: 14 }}>
+                  <span className="title-label">Próximas parcelas</span>
+                </p>
+              </div>
+              <ParcelasAccordion
+                resumo={`${cartaoAtivo.proximasParcelas.length} parcela(s) agendada(s) — ${cartaoAtivo.proximasParcelasTotalFmt}`}
+              >
+                <div className="mc-list">
+                  {cartaoAtivo.proximasParcelas.map((parcela) => (
+                    <div key={parcela.id} className="mc-list-row">
+                      <div className="mc-list-icon" style={{ background: "rgba(30,99,233,0.1)", color: "var(--blue)" }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 2" /></svg>
+                      </div>
+                      <div className="mc-list-body">
+                        <div className="mc-list-desc">{parcela.descricao}</div>
+                        <div className="mc-list-meta">{parcela.categoria ?? "Sem categoria"}</div>
+                      </div>
+                      <div className="mc-list-side">
+                        <ValorLista valor={parcela.valor} sinal="-" />
+                        <div className="mc-list-sub">{parcela.dataFmt}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ParcelasAccordion>
+            </>
+          )}
         </>
       )}
     </div>
