@@ -39,6 +39,10 @@ const LANDING_CSS = `
     display: flex; justify-content: center;
   }
   .qz-phone-notch { width: 33%; height: 100%; border-radius: 0 0 12px 12px; background: #000; }
+  .qz-hero-thumbs { display: none; }
+  .qz-hero-side { margin-top: 8px; }
+  .qz-feat-img { aspect-ratio: 16 / 9; }
+  .qz-price-card { padding: 28px 22px; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -53,6 +57,10 @@ const LANDING_CSS = `
     .qz-h2-sm { font-size: 30px; }
     .qz-h2-md { font-size: 36px; }
     .qz-h2-lg { font-size: 48px; }
+    .qz-hero-thumbs { display: flex; }
+    .qz-hero-side { margin-top: 32px; }
+    .qz-feat-img { aspect-ratio: 4 / 3; }
+    .qz-price-card { padding: 40px 36px; }
   }
   @media (min-width: 1280px) {
     .qz-phone-mock {
@@ -255,7 +263,7 @@ export default async function LandingPage() {
 
         {/* grid grid-cols-1 md:grid-cols-12 gap-8 items-end — px-6 md:px-12 pb-12 md:pb-24 */}
         <div className="qz-grid12 qz-hero-pad" style={{ position: "relative", zIndex: 10, padding: "0 24px 48px", alignItems: "end" }}>
-          <div className="qz-col-8">
+          <div className="qz-col-7">
             <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.05em" }}>
               <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 200, opacity: 0.8, marginBottom: 8 }}>
                 Descubra quanto do seu dinheiro
@@ -268,7 +276,7 @@ export default async function LandingPage() {
             {/* Linha de miniaturas — na referência são 3 fotos de portfólio;
                 aqui viram placeholders "print em breve" (mesma ideia da
                 seção de funcionalidades) até termos capturas reais do app. */}
-            <div className="qz-reveal" style={{ display: "flex", gap: 16, marginTop: 32, "--qz-delay": "140ms" } as React.CSSProperties}>
+            <div className="qz-reveal qz-hero-thumbs" style={{ gap: 16, marginTop: 32, "--qz-delay": "140ms" } as React.CSSProperties}>
               {[1, 2, 3].map((n) => (
                 <div key={n} style={{
                   width: 64, height: 48, borderRadius: 6, overflow: "hidden",
@@ -281,7 +289,7 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="qz-col-4" style={{ color: "#fff", marginTop: 32 }}>
+          <div className="qz-col-5 qz-hero-side" style={{ color: "#fff" }}>
             <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.025em" }} className="qz-reveal">
               Direto no WhatsApp.
             </h2>
@@ -439,8 +447,8 @@ export default async function LandingPage() {
                 {/* Placeholder de screenshot real do app — trocar por print
                     de tela verdadeira desta funcionalidade assim que
                     disponível. */}
-                <div style={{
-                  aspectRatio: "4 / 3", background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
+                <div className="qz-feat-img" style={{
+                  background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
@@ -473,9 +481,9 @@ export default async function LandingPage() {
           </div>
 
           <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
-            <div style={{
+            <div className="qz-price-card" style={{
               background: "#fff", border: "2px solid #22c55e", borderRadius: 16,
-              padding: "40px 36px", boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
+              boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
             }}>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
                 <div>
