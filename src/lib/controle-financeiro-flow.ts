@@ -49,6 +49,18 @@ export type ConfirmacaoPendenteControle = {
   cartao: string;
   valorAnterior: number;
   novoValor: number;
+} | {
+  tipo: "confirmar_gasto_duplicado";
+  item: ItemParaPersistirControle;
+  respostaOriginal: string;
+};
+
+/** Lançamento recente já persistido (buscado pelo route.ts via Prisma antes
+ * de chamar registrarGastoControle) — usado só pra detectar duplicidade,
+ * nunca pra recalcular nada financeiro. */
+export type ItemRecenteControle = {
+  descricao: string;
+  valor: number;
 };
 
 export type UltimoGastoControle = {
@@ -2297,11 +2309,71 @@ export function corrigirOrigemUltimoGastoControle(
   };
 }
 
+// Chave de comparação pra detecção de duplicado — mesmo padrão de
+// normalização de chaveDespesaFixa (case/acento/espaço fora da conta).
+function chaveComparacaoGasto(descricao: string): string {
+  return normalizarTexto(descricao).replace(/\s+/g, "");
+}
+
+function encontrarLancamentoDuplicado(
+  descricaoGasto: string,
+  valorGasto: number,
+  lancamentosRecentes: ItemRecenteControle[]
+): ItemRecenteControle | null {
+  const chaveGasto = chaveComparacaoGasto(descricaoGasto);
+  if (!chaveGasto) return null;
+  return (
+    lancamentosRecentes.find(
+      (item) => valoresIguais(item.valor, valorGasto) && chaveComparacaoGasto(item.descricao) === chaveGasto
+    ) ?? null
+  );
+}
+
+function detectarRespostaConfirmacaoGastoDuplicado(mensagem: string): "confirmar" | "negar" | null {
+  const texto = normalizarTexto(mensagem);
+  if (/^(1|sim|confirmar|registrar|pode registrar|de novo|registra de novo)$/.test(texto)) return "confirmar";
+  if (/^(2|nao|cancelar|nao registrar|deixa)$/.test(texto)) return "negar";
+  return null;
+}
+
+// Igual em espírito a processarConfirmacaoPendenteDespesaFixa: só resolve
+// quando a pendência é ESTA (confirmar_gasto_duplicado); qualquer outro tipo
+// (ou ausência de pendência) devolve null pra cair no fluxo normal.
+function processarConfirmacaoPendenteGastoDuplicado(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  const pendente = estadoAtual.confirmacaoPendente;
+  if (!pendente || pendente.tipo !== "confirmar_gasto_duplicado") return null;
+
+  const resposta = detectarRespostaConfirmacaoGastoDuplicado(mensagem);
+  if (!resposta) return null;
+
+  if (resposta === "negar") {
+    return {
+      resposta: "Beleza, não registrei de novo. 👌",
+      estado: { ...estadoAtual, confirmacaoPendente: undefined },
+      atualizouEstado: true,
+    };
+  }
+
+  return {
+    resposta: pendente.respostaOriginal,
+    estado: { ...estadoAtual, confirmacaoPendente: undefined },
+    atualizouEstado: true,
+    itensParaPersistir: [pendente.item],
+  };
+}
+
 export function registrarGastoControle(
   mensagem: string,
   estadoAtual: EstadoControleFinanceiro,
-  agora = new Date()
+  agora = new Date(),
+  lancamentosRecentes: ItemRecenteControle[] = []
 ): ResultadoGastoControle | null {
+  const confirmacaoDuplicado = processarConfirmacaoPendenteGastoDuplicado(mensagem, estadoAtual);
+  if (confirmacaoDuplicado) return confirmacaoDuplicado;
+
   if (detectarPagamentoFaturaCartao(mensagem) || detectarFechamentoFaturaCartao(mensagem)) return null;
   if (deveBloquearGastoUnicoPorMultiplosValores(mensagem)) return null;
 
@@ -2382,20 +2454,39 @@ export function registrarGastoControle(
     final +
     alertaApostas;
 
+  const item: ItemParaPersistirControle = {
+    tipo: cartao ? "COMPRA_CARTAO" : "DESPESA_VARIAVEL",
+    descricao: gasto.descricao || gasto.categoria,
+    categoria: gasto.categoria,
+    valor: gasto.valor,
+    recorrente: false,
+    cartaoNome: cartao,
+    data: gasto.data,
+  };
+
+  // Lançamento duplicado: mesmo valor + mesmo estabelecimento já registrado
+  // recentemente (janela definida por quem monta lancamentosRecentes, ver
+  // route.ts) — pergunta antes de gravar de novo, em vez de duplicar.
+  const duplicado = encontrarLancamentoDuplicado(item.descricao, item.valor, lancamentosRecentes);
+  if (duplicado) {
+    return {
+      resposta:
+        `🔁 Parece que você já registrou ${formatarValorBR(duplicado.valor)} em "${duplicado.descricao}" hoje.\n\n` +
+        "Quer registrar de novo mesmo assim?\n\n" +
+        "1️⃣ Sim, registrar de novo\n" +
+        "2️⃣ Não, já registrei",
+      estado: {
+        ...estado,
+        confirmacaoPendente: { tipo: "confirmar_gasto_duplicado", item, respostaOriginal: resposta },
+      },
+      atualizouEstado: true,
+    };
+  }
+
   return {
     resposta,
     estado,
     atualizouEstado: true,
-    itensParaPersistir: [
-      {
-        tipo: cartao ? "COMPRA_CARTAO" : "DESPESA_VARIAVEL",
-        descricao: gasto.descricao || gasto.categoria,
-        categoria: gasto.categoria,
-        valor: gasto.valor,
-        recorrente: false,
-        cartaoNome: cartao,
-        data: gasto.data,
-      },
-    ],
+    itensParaPersistir: [item],
   };
 }
