@@ -581,6 +581,22 @@ Exemplos:
   }
 }
 
+// Meia-noite de hoje em Brasília (fixo UTC-3) — mesma técnica de
+// limitesDoMes em motor.ts, usada aqui só pra janela do detector de
+// lançamento duplicado.
+function inicioDoDiaBrasil(agora: Date): Date {
+  const [ano, mes, dia] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(agora)
+    .split("-")
+    .map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia, 3, 0, 0, 0));
+}
+
 // ── Deduplicação de mensagens ─────────────
 // O carimbo de "já processado" é gravado ANTES do processamento em si (não dá
 // pra marcar só no fim — a função tem dezenas de `return` espalhados pelo
@@ -1583,7 +1599,18 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const gastoRapido = registrarGastoControle(mensagem, estadoAntesGasto);
+    // Detector de lançamento duplicado (Skill Analista): busca só o
+    // suficiente pra registrarGastoControle comparar valor+estabelecimento
+    // contra o que já foi lançado hoje — nunca recalcula nada financeiro,
+    // só compara texto/valor bruto.
+    const lancamentosRecentesControle = sessao.clienteId
+      ? await prisma.lancamento.findMany({
+          where: { clienteId: sessao.clienteId, data: { gte: inicioDoDiaBrasil(new Date()) } },
+          select: { descricao: true, valor: true },
+        })
+      : [];
+
+    const gastoRapido = registrarGastoControle(mensagem, estadoAntesGasto, new Date(), lancamentosRecentesControle);
     if (gastoRapido) {
       await sendWhatsApp(telefone, gastoRapido.resposta);
 
