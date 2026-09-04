@@ -109,8 +109,6 @@ export default async function PerfilPage({
 
       <FotoPerfilForm fotoAtual={cliente.fotoUrl} enviarFoto={salvarFotoPerfil} />
 
-      <NotificacoesPush />
-
       <div className="mc-card" style={{ marginBottom: 16 }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Nome</p>
         <p style={{ margin: "4px 0 14px", fontSize: 15, fontWeight: 700 }}>{cliente.nome}</p>
@@ -120,6 +118,8 @@ export default async function PerfilPage({
           Pra trocar nome ou telefone, fale com a gente pelo WhatsApp.
         </p>
       </div>
+
+      <NotificacoesPush />
 
       <div className="card-head">
         <p className="card-title" style={{ fontSize: 14 }}>

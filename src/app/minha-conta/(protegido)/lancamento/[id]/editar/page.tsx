@@ -29,17 +29,14 @@ async function carregarLancamentoDoDono(id: string): Promise<Lancamento> {
   return lancamento;
 }
 
-// O Dashboard, Receitas, Despesas, Movimentações e Cartões cada um
-// calcula seu próprio total a partir dos mesmos lançamentos — sem
-// revalidar todos, o Next continua servindo o RSC em cache de cada
-// rota com os totais antigos depois do redirect, mesmo com o banco
-// já atualizado.
+// O Dashboard, Receitas, Despesas, Movimentações e Cartões cada um calcula
+// seu próprio total a partir dos mesmos lançamentos — sem revalidar,
+// continuariam servindo o RSC em cache com os totais antigos depois do
+// redirect. O modo "layout" já cobre toda essa subárvore de uma vez, sem
+// precisar de uma chamada por rota (cada chamada extra só atrasa o redirect
+// à toa, sem revalidar nada a mais).
 function revalidarTelasDependentes() {
   revalidatePath("/minha-conta", "layout");
-  revalidatePath("/minha-conta/receitas");
-  revalidatePath("/minha-conta/despesas");
-  revalidatePath("/minha-conta/movimentacoes");
-  revalidatePath("/minha-conta/cartoes");
 }
 
 export default async function EditarLancamentoPage({

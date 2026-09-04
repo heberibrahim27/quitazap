@@ -80,47 +80,52 @@ export default async function CartoesPage() {
     );
   }
 
-  // "Últimas compras" é histórico — só o que já aconteceu (até o fim do mês
-  // atual). Sem esse corte, parcelas futuras de uma compra parcelada (datadas
-  // pros próximos meses) apareciam misturadas aqui, inclusive antes de
-  // parcelas mais antigas já realizadas (por causa do orderBy desc por data).
-  const comprasPorCartao = await Promise.all(
-    cartoes.map((c) =>
-      prisma.lancamento.findMany({
-        where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { lt: fimMes } },
-        orderBy: { data: "desc" },
-        take: 15,
-      })
-    )
-  );
-
-  // Parcelas já agendadas pros próximos meses — pra dar visibilidade de onde
-  // o limite comprometido (calculado abaixo) está "preso", já que elas não
-  // aparecem em "Últimas compras" (que é só histórico do que já aconteceu).
-  const proximasParcelasPorCartao = await Promise.all(
-    cartoes.map((c) =>
-      prisma.lancamento.findMany({
-        where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: fimMes } },
-        orderBy: { data: "asc" },
-        take: 24,
-      })
-    )
-  );
-
-  // "Disponível" precisa descontar o valor TOTAL comprometido no limite, não
-  // só a fatura deste mês — uma compra parcelada reserva o valor inteiro no
-  // limite assim que é feita (mesmo comportamento do cartão de verdade), não
-  // só a parcela que cai na fatura atual. Por isso soma tudo a partir do
-  // início do mês atual (mês atual + parcelas futuras já agendadas); meses
-  // anteriores já viraram fatura paga e não pesam mais no limite.
-  const comprometidoPorCartao = await Promise.all(
-    cartoes.map((c) =>
-      prisma.lancamento.aggregate({
-        where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: inicioMes } },
-        _sum: { valor: true },
-      })
-    )
-  );
+  // As três buscas abaixo são independentes entre si (cada uma só depende
+  // da lista de cartões, já carregada) — um Promise.all só por fora, em vez
+  // de três `await` em sequência, dispara todas de uma vez em vez de
+  // esperar uma terminar pra começar a próxima.
+  const [comprasPorCartao, proximasParcelasPorCartao, comprometidoPorCartao] = await Promise.all([
+    // "Últimas compras" é histórico — só o que já aconteceu (até o fim do
+    // mês atual). Sem esse corte, parcelas futuras de uma compra parcelada
+    // (datadas pros próximos meses) apareciam misturadas aqui, inclusive
+    // antes de parcelas mais antigas já realizadas (orderBy desc por data).
+    Promise.all(
+      cartoes.map((c) =>
+        prisma.lancamento.findMany({
+          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { lt: fimMes } },
+          orderBy: { data: "desc" },
+          take: 15,
+        })
+      )
+    ),
+    // Parcelas já agendadas pros próximos meses — pra dar visibilidade de
+    // onde o limite comprometido (calculado abaixo) está "preso", já que
+    // elas não aparecem em "Últimas compras" (só histórico do que já
+    // aconteceu).
+    Promise.all(
+      cartoes.map((c) =>
+        prisma.lancamento.findMany({
+          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: fimMes } },
+          orderBy: { data: "asc" },
+          take: 24,
+        })
+      )
+    ),
+    // "Disponível" precisa descontar o valor TOTAL comprometido no limite,
+    // não só a fatura deste mês — uma compra parcelada reserva o valor
+    // inteiro no limite assim que é feita (mesmo comportamento do cartão de
+    // verdade), não só a parcela que cai na fatura atual. Por isso soma
+    // tudo a partir do início do mês atual (mês atual + parcelas futuras já
+    // agendadas); meses anteriores já viraram fatura paga.
+    Promise.all(
+      cartoes.map((c) =>
+        prisma.lancamento.aggregate({
+          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: inicioMes } },
+          _sum: { valor: true },
+        })
+      )
+    ),
+  ]);
 
   const itens: CartaoCarrosselItem[] = cartoes.map((c, i) => {
     const comprometido = comprometidoPorCartao[i]._sum.valor ?? 0;

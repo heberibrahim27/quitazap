@@ -106,8 +106,6 @@ export default async function NovoEmprestimoPage({
     }
 
     revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/emprestimos");
-    revalidatePath("/minha-conta/dividas");
     redirect(`/minha-conta/emprestimos/${dividaId}`);
   }
 

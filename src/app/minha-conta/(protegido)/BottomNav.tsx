@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { NOMES_CATEGORIAS_GASTO } from "@/lib/gasto-flow";
+import { NOMES_CATEGORIAS_GASTO, definirCategoriaGasto } from "@/lib/gasto-flow";
 import { criarDespesaRapida, criarReceitaRapida } from "./lancamento-actions";
 
 type VisaoFab = "menu" | "despesa" | "receita";
@@ -40,6 +40,8 @@ export function BottomNav({
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
   const [cartaoSelecionado, setCartaoSelecionado] = useState(false);
+  const [categoria, setCategoria] = useState("Outros");
+  const [categoriaEditadaManualmente, setCategoriaEditadaManualmente] = useState(false);
 
   const fecharTudo = () => {
     setFabAberto(false);
@@ -47,12 +49,16 @@ export function BottomNav({
     setFabVisao("menu");
     setErroForm(null);
     setCartaoSelecionado(false);
+    setCategoria("Outros");
+    setCategoriaEditadaManualmente(false);
   };
 
   const voltarAoMenu = () => {
     setFabVisao("menu");
     setErroForm(null);
     setCartaoSelecionado(false);
+    setCategoria("Outros");
+    setCategoriaEditadaManualmente(false);
   };
 
   function aoEnviarDespesa(e: React.FormEvent<HTMLFormElement>) {
@@ -170,11 +176,30 @@ export function BottomNav({
             )}
             <label className="mc-label">
               Descrição *
-              <input name="descricao" required placeholder="Ex: Mercado, Aluguel, Uber" className="mc-input" />
+              <input
+                name="descricao"
+                required
+                placeholder="Ex: Mercado, Aluguel, Uber"
+                className="mc-input"
+                onChange={(e) => {
+                  // Sugere a categoria a partir do que foi digitado, mas só
+                  // enquanto o cliente não mexeu no select manualmente —
+                  // depois disso, a escolha dele manda.
+                  if (!categoriaEditadaManualmente) setCategoria(definirCategoriaGasto(e.target.value));
+                }}
+              />
             </label>
             <label className="mc-label">
               Categoria
-              <select name="categoria" defaultValue="Outros" className="mc-input">
+              <select
+                name="categoria"
+                value={categoria}
+                onChange={(e) => {
+                  setCategoria(e.target.value);
+                  setCategoriaEditadaManualmente(true);
+                }}
+                className="mc-input"
+              >
                 {NOMES_CATEGORIAS_GASTO.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}

@@ -20,8 +20,11 @@ export default async function DividasPage() {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
+  // Empréstimo é um tipo de Dívida no schema, mas já tem tela própria
+  // (Empréstimos, com controle de parcelas) — mostrar aqui também duplicava
+  // o mesmo lançamento em duas telas diferentes.
   const dividas = await prisma.divida.findMany({
-    where: { clienteId: cliente.id },
+    where: { clienteId: cliente.id, tipo: { not: "EMPRESTIMO" } },
     orderBy: [{ status: "asc" }, { prioridade: "desc" }, { criadoEm: "asc" }],
   });
 

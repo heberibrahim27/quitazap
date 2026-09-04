@@ -78,10 +78,9 @@ export default async function DetalheEmprestimoPage({
       await prisma.divida.update({ where: { id: parcela.dividaId }, data: { status: "QUITADA" } });
     }
 
+    // "layout" já cobre emprestimos, a dívida específica e dividas — todos
+    // nested sob /minha-conta.
     revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/emprestimos");
-    revalidatePath(`/minha-conta/emprestimos/${parcela.dividaId}`);
-    revalidatePath("/minha-conta/dividas");
     redirect(`/minha-conta/emprestimos/${parcela.dividaId}`);
   }
 
@@ -107,9 +106,6 @@ export default async function DetalheEmprestimoPage({
     await prisma.divida.update({ where: { id: parcela.dividaId }, data: { status: "ATIVA" } });
 
     revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/emprestimos");
-    revalidatePath(`/minha-conta/emprestimos/${parcela.dividaId}`);
-    revalidatePath("/minha-conta/dividas");
     redirect(`/minha-conta/emprestimos/${parcela.dividaId}`);
   }
 
@@ -123,8 +119,6 @@ export default async function DetalheEmprestimoPage({
     await prisma.divida.delete({ where: { id } });
 
     revalidatePath("/minha-conta", "layout");
-    revalidatePath("/minha-conta/emprestimos");
-    revalidatePath("/minha-conta/dividas");
     redirect("/minha-conta/emprestimos");
   }
 
