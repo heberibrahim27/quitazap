@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { inscreverPush, removerInscricaoPush } from "./push-actions";
+import { inscreverPush, removerInscricaoPush, enviarPushTeste } from "./push-actions";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -20,6 +20,8 @@ export function NotificacoesPush() {
   const [estado, setEstado] = useState<Estado>("carregando");
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [testeMsg, setTesteMsg] = useState<string | null>(null);
+  const [enviandoTeste, setEnviandoTeste] = useState(false);
 
   useEffect(() => {
     async function verificar() {
@@ -58,6 +60,21 @@ export function NotificacoesPush() {
       setErro("Não consegui ativar as notificações. Se você estiver no iPhone, adicione o QuitaZAP à Tela de Início primeiro (Compartilhar → Adicionar à Tela de Início) e tente de novo por lá.");
     } finally {
       setProcessando(false);
+    }
+  }
+
+  async function testar() {
+    setTesteMsg(null);
+    setEnviandoTeste(true);
+    try {
+      const resultado = await enviarPushTeste();
+      if ("erro" in resultado) {
+        setTesteMsg(resultado.erro);
+      } else {
+        setTesteMsg("Teste enviado! Deve chegar no seu celular em instantes.");
+      }
+    } finally {
+      setEnviandoTeste(false);
     }
   }
 
@@ -114,6 +131,24 @@ export function NotificacoesPush() {
         )}
       </div>
       {erro && <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--red)", lineHeight: 1.5 }}>{erro}</p>}
+      {estado === "ativo" && (
+        <>
+          <button
+            type="button"
+            className="mc-btn-secondary"
+            style={{ marginTop: 10, width: "100%" }}
+            onClick={testar}
+            disabled={enviandoTeste}
+          >
+            {enviandoTeste ? "Enviando..." : "Enviar notificação de teste"}
+          </button>
+          {testeMsg && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: testeMsg.startsWith("Teste enviado") ? "var(--green)" : "var(--red)", lineHeight: 1.5 }}>
+              {testeMsg}
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }
