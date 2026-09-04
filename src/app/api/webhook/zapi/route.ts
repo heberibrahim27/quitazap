@@ -26,6 +26,7 @@ import {
 } from "@/lib/controle-financeiro-flow";
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
+import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -1108,6 +1109,32 @@ Pode mandar tudo em uma mensagem só.`;
               ...servidorHistoricoSessao,
               { role: "user", content: mensagem },
               { role: "assistant", content: respostaConsulta },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // Simulador "essa parcela cabe?" (Skill Analista, próxima leva) — só
+    // dispara em frase hipotética com "em Nx"/"N vezes" explícito (ex: "se
+    // eu comprar R$1.800 em 10x, como ficam meus próximos salários?").
+    // Leitura pura (nunca registra nada), por isso roda antes da cascata
+    // de registro de gasto, igual à consulta financeira acima.
+    if (sessao.clienteId) {
+      const deteccaoSimulacao = detectarSimulacaoParcela(mensagem);
+      if (deteccaoSimulacao) {
+        const respostaSimulacao = await responderSimulacaoParcela(sessao.clienteId, mensagem, isGratuito, deteccaoSimulacao);
+        await sendWhatsApp(telefone, respostaSimulacao);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaSimulacao },
             ]),
           },
         });
