@@ -72,8 +72,8 @@ export default async function Home() {
     return { label: NOMES_MES_CURTO[d.getMonth()], mrr: qtd * PRECO_MENSAL };
   });
 
-  // Receita total estimada (meses ativos × R$29,90) — acumulado histórico,
-  // não é o DRE do mês, fica de fora da unificação.
+  // Receita total estimada (meses ativos × PRECO_MENSAL) — acumulado
+  // histórico, não é o DRE do mês, fica de fora da unificação.
   const receitaTotal = pagantes.reduce((acc, c) => {
     const meses = Math.max(1, Math.floor(
       (Date.now() - new Date(c.criadoEm).getTime()) / (1000 * 60 * 60 * 24 * 30)

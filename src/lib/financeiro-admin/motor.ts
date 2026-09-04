@@ -6,7 +6,11 @@
 import { prisma } from "@/lib/prisma";
 import type { DreAdminResumo, FonteReceita, LinhaCusto } from "./motor-contrato";
 
-export const PRECO_MENSAL = 29.90;
+// Preço Fundador vigente (R$14,90) — não o preço futuro do "QuitaZap
+// Conectado" com Open Finance, que ainda não existe. Esse valor só é usado
+// como estimativa quando não há receita observada de fato via Cakto (ver
+// FonteReceita); ajuste aqui se o preço mudar no checkout.
+export const PRECO_MENSAL = 14.90;
 export const COMISSAO_CAKTO = 0.053; // 5,3% via PIX
 // Câmbio fixo — mesmo valor hardcoded que já existia em /painel e
 // /financeiro antes desta unificação. Trocar por cotação real (ex: API de

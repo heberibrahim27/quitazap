@@ -9,7 +9,7 @@ const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
 export const metadata = {
   title: "QuitaZAP — Organize suas dívidas com IA pelo WhatsApp",
   description:
-    "82,8 milhões de brasileiros estão endividados. O QuitaZAP organiza todas as suas dívidas pelo WhatsApp, calcula seu QuitaScore e monta um plano de quitação simples. A partir de R$29,90/mês.",
+    "82,8 milhões de brasileiros estão endividados. O QuitaZAP organiza todas as suas dívidas pelo WhatsApp, calcula seu QuitaScore e monta um plano de quitação simples. A partir de R$14,90/mês.",
   openGraph: {
     title: "QuitaZAP — Organize suas dívidas com IA pelo WhatsApp",
     description: "Diagnóstico financeiro, QuitaScore e plano de quitação direto no WhatsApp.",
@@ -316,7 +316,7 @@ export default function OfertaPage() {
               padding: "16px 32px", borderRadius: 10,
               textDecoration: "none", display: "inline-block",
             }}>
-              Quero meu plano agora — R$ 29,90/mês
+              Quero meu plano agora — R$ 14,90/mês
             </a>
             <a href="#relatorio" style={{
               background: "rgba(255,255,255,0.07)", color: "#fff",
@@ -969,7 +969,7 @@ Sobra estimada         R$  -530,00`}
                 <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 29,90</div>
+                <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 14,90</div>
                 <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
               </div>
             </div>
@@ -1001,7 +1001,7 @@ Sobra estimada         R$  -530,00`}
               padding: "16px 24px", borderRadius: 12,
               textDecoration: "none", textAlign: "center",
             }}>
-              Assinar por R$ 29,90/mês
+              Assinar por R$ 14,90/mês
             </a>
 
             <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
@@ -1029,7 +1029,7 @@ Sobra estimada         R$  -530,00`}
             {[
               { label: "Consultor financeiro humano", valor: "R$ 500–800/mês", strike: true },
               { label: "Continuar pagando só o mínimo do cartão", valor: "R$ ∞ em juros", strike: true },
-              { label: "QuitaZAP", valor: "R$ 29,90/mês", strike: false },
+              { label: "QuitaZAP", valor: "R$ 14,90/mês", strike: false },
             ].map((item) => (
               <div key={item.label} style={{
                 display: "flex", justifyContent: "space-between",
@@ -1167,7 +1167,7 @@ Sobra estimada         R$  -530,00`}
             padding: "18px 48px", borderRadius: 12,
             textDecoration: "none",
           }}>
-            Começar agora — R$ 29,90/mês
+            Começar agora — R$ 14,90/mês
           </a>
 
           <p style={{ marginTop: 16, fontSize: 13, color: "#475569" }}>
