@@ -449,6 +449,18 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .resumo-value { flex-shrink: 0; width: 112px; white-space: nowrap; display: flex; align-items: baseline; justify-content: space-between; font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
 .resumo-value-cifrao { flex-shrink: 0; opacity: 0.7; }
 .resumo-value-numero { flex-shrink: 0; }
+/* Separa a Receita do resto (saídas) e resume tudo antes do resultado
+   final — mesma leitura de uma DRE (receita, deduções, subtotal,
+   resultado). */
+.resumo-divisor { height: 1px; margin: 4px 4px 8px; border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1; }
+.resumo-subtotal {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 4px; margin-top: 2px;
+  border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1;
+}
+.resumo-subtotal-label { font-size: 12.5px; font-weight: 700; color: var(--ink-dim); }
+.resumo-subtotal-value { font-size: 13.5px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: var(--ink); }
+
 .resumo-footer {
   display: flex; align-items: center; justify-content: space-between;
   margin: 8px -18px 0; padding: 18px 18px;

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
@@ -204,6 +205,10 @@ export default async function MinhaContaPage({
     { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
   ].filter((linha) => linha.valor > 0);
   const maiorValorResumo = Math.max(totalReceitasMes, 1);
+  // Subtotal de tudo que não é Receita — mesma soma que já entra no
+  // resultado final, só exibida como um passo intermediário (visual de
+  // DRE: receita, cada dedução, total de saídas, resultado).
+  const totalSaidasResumo = resumoDoMes.filter((linha) => linha.rotulo !== "Receitas").reduce((soma, linha) => soma + linha.valor, 0);
 
   const dividasEmAtraso = dividas.filter((d) => d.emAtraso).slice(0, 2);
 
@@ -366,27 +371,40 @@ export default async function MinhaContaPage({
         ) : (
           <>
             {resumoDoMes.map((linha, indice) => (
-              <div key={linha.rotulo} className="resumo-row">
-                <span className={`resumo-icon ${linha.classe}`}>
-                  {linha.icone === "receita" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>}
-                  {linha.icone === "fixa" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>}
-                  {linha.icone === "variavel" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>}
-                  {linha.icone === "cartao" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>}
-                  {linha.icone === "divida" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>}
-                </span>
-                <span className="resumo-label">{linha.rotulo}</span>
-                <span className="resumo-bar-track">
-                  <span
-                    className="resumo-bar-fill"
-                    style={{ "--to": Math.min(linha.valor / maiorValorResumo, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
-                  />
-                </span>
-                <span className="resumo-value">
-                  <span className="resumo-value-cifrao">R$</span>
-                  <span className="resumo-value-numero">{fmtNumero(linha.valor)}</span>
-                </span>
-              </div>
+              <Fragment key={linha.rotulo}>
+                <div className="resumo-row">
+                  <span className={`resumo-icon ${linha.classe}`}>
+                    {linha.icone === "receita" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>}
+                    {linha.icone === "fixa" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>}
+                    {linha.icone === "variavel" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>}
+                    {linha.icone === "cartao" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>}
+                    {linha.icone === "investimento" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>}
+                    {linha.icone === "divida" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>}
+                  </span>
+                  <span className="resumo-label">{linha.rotulo}</span>
+                  <span className="resumo-bar-track">
+                    <span
+                      className="resumo-bar-fill"
+                      style={{ "--to": Math.min(linha.valor / maiorValorResumo, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
+                    />
+                  </span>
+                  <span className="resumo-value">
+                    <span className="resumo-value-cifrao">R$</span>
+                    <span className="resumo-value-numero">{fmtNumero(linha.valor)}</span>
+                  </span>
+                </div>
+                {/* Separa a Receita (entrada) do resto (saídas) — mesma
+                    lógica visual de uma DRE: receita bruta em cima, uma
+                    linha, depois cada dedução até o resultado final. */}
+                {linha.rotulo === "Receitas" && <div className="resumo-divisor" />}
+              </Fragment>
             ))}
+            {totalSaidasResumo > 0 && (
+              <div className="resumo-subtotal">
+                <span className="resumo-subtotal-label">Total de saídas</span>
+                <span className="resumo-subtotal-value">{fmtValor(totalSaidasResumo)}</span>
+              </div>
+            )}
             <div className={`resumo-footer ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
               <span className="resumo-footer-label">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M7.5 10h9M7.5 14h9" /></svg>
