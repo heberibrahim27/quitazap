@@ -32,12 +32,18 @@ async function fatosLimiteSeguro(clienteId: string) {
 }
 
 function fallbackLimiteSeguro(f: Awaited<ReturnType<typeof fatosLimiteSeguro>>): string {
+  // "Livre até lá" já desconta compromissosRestantes — por isso ele
+  // aparece como explicação do valor livre, nunca como um segundo
+  // desconto ainda pendente (evita dar a entender dupla contagem).
+  const notaCompromissos = f.compromissosRestantes > 0
+    ? ` (já descontando ${fmt(f.compromissosRestantes)} em dívidas que ainda vencem este mês)`
+    : "";
   const base =
     f.diasRestantes > 0
-      ? `Faltam ${f.diasRestantes} dia${f.diasRestantes !== 1 ? "s" : ""} pro fim do mês. Você tem ${fmt(Math.max(f.saldoLivre, 0))} livres, com ${fmt(f.compromissosRestantes)} ainda em compromissos — limite seguro por dia: ${fmt(Math.max(f.limiteSeguroDiario, 0))}.`
-      : `O mês está no último dia. Sobra livre: ${fmt(Math.max(f.saldoLivre, 0))}, com ${fmt(f.compromissosRestantes)} ainda em compromissos.`;
+      ? `Faltam ${f.diasRestantes} dia${f.diasRestantes !== 1 ? "s" : ""} pro fim do mês. Você tem ${fmt(Math.max(f.saldoLivre, 0))} livres${notaCompromissos} — limite seguro por dia: ${fmt(Math.max(f.limiteSeguroDiario, 0))}.`
+      : `O mês está no último dia. Sobra livre: ${fmt(Math.max(f.saldoLivre, 0))}${notaCompromissos}.`;
   if (f.saldoLivre < 0) {
-    return `Atenção: sua sobra prevista até o fim do mês já está negativa (${fmt(f.saldoLivre)}), considerando os ${fmt(f.compromissosRestantes)} que ainda faltam vencer.`;
+    return `Atenção: sua sobra prevista até o fim do mês já está negativa (${fmt(f.saldoLivre)}) — esse valor já inclui os ${fmt(f.compromissosRestantes)} de dívidas que ainda vencem este mês.`;
   }
   if (f.diaApertado) {
     return `${base} Fique de olho no dia ${fmtDataDia(f.diaApertado.data)}: ${f.diaApertado.itens.length} contas vencem juntas nesse dia, somando ${fmt(f.diaApertado.totalNoDia)}.`;
@@ -53,7 +59,7 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. \"Próximo salário\" aqui é uma aproximação pro fim do mês corrente (o app não sabe a data exata do salário) — não afirme uma data de salário que não está nos dados. Se diaApertado não for null, avise claramente a data e quantas contas coincidem nela. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. \"Próximo salário\" aqui é uma aproximação pro fim do mês corrente (o app não sabe a data exata do salário) — não afirme uma data de salário que não está nos dados. saldoLivre JÁ desconta compromissosRestantes — nunca apresente os dois como se fossem descontos separados ou como se compromissosRestantes ainda fosse subtrair de saldoLivre; mencione compromissosRestantes só como explicação do que já está refletido em saldoLivre (ex: \"já descontando X em dívidas que ainda vencem\"). Se diaApertado não for null, avise claramente a data e quantas contas coincidem nela. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação.",
         },
         { role: "user", content: `Dados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],
