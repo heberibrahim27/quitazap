@@ -142,36 +142,22 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   padding: max(8px, env(safe-area-inset-top)) 18px 8px;
   border-bottom-color: var(--line);
 }
-/* Dashboard: logo/saudação/avatar vivem dentro do próprio card da hero
-   (ver .hero-header-row mais abaixo) — não existe cabeçalho separado
-   nessa tela, então nunca há duas cores pra bater (mesmo bem parecidas,
-   sempre sobrava uma diferença sutil visível na emenda). Só quando a
-   hero rola inteira pra fora da tela é que aparece um mini-cabeçalho
-   fixo (cor sólida) — nesse ponto o degradê já não está mais visível,
-   então a cor sólida não tem com o que destoar. */
-.header-mini {
-  background: var(--navy-deep);
+/* Dashboard: cabeçalho fixo e totalmente transparente por cima da hero
+   e do resto da página — sem cor própria pra bater com o degradê, e
+   sempre visível (nunca aparece/desaparece ao rolar). Só logo + avatar
+   (sem saudação, que perderia contraste num fundo que muda por baixo). */
+.header-transparent {
+  background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  border-bottom: none;
 }
-.header-mini.visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-.header-mini .header-greeting { color: #fff; }
 .brand-logo {
   display: block; height: 48px; width: auto;
   transition: height 0.25s ease;
 }
-/* Header.tsx (barra fixa do topo em toda página, e o header-mini da
-   Dashboard depois que a hero rola pra fora) usa o símbolo um pouco
-   menor que a hero, pensado pro mobile. */
+/* Header.tsx (barra fixa do topo nas páginas fora da Dashboard) usa o
+   símbolo um pouco menor que a hero, pensado pro mobile. */
 .header .brand-logo {
   height: 46px;
 }
@@ -227,9 +213,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .hero-shell {
   position: relative; overflow: hidden;
   border-radius: 0 0 28px 28px;
-  /* Sem cabeçalho separado por cima, a hero é quem precisa abrir espaço
-     pro notch/status bar (mesma fórmula do cabeçalho clássico). */
-  padding: max(14px, env(safe-area-inset-top)) 22px 52px;
+  /* Sem linha de logo/avatar própria (fica no cabeçalho fixo e
+     transparente por cima, ver .header-transparent) — o topo da hero
+     só precisa abrir espaço pra essa faixa fixa não cobrir o texto. */
+  padding: calc(max(14px, env(safe-area-inset-top)) + 66px) 22px 52px;
   background: linear-gradient(150deg, #0A2A57 0%, #0F4A8C 55%, #1470B8 100%);
   border: 1px solid rgba(255,255,255,0.1);
   border-top: none;
@@ -239,15 +226,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(115deg, rgba(255,255,255,0.10) 0%, transparent 28%, transparent 72%, rgba(255,255,255,0.05) 100%);
 }
-/* Logo/saudação/avatar dentro do próprio card da hero (Dashboard) —
-   ver page.tsx. Reaproveita as classes do cabeçalho padrão
-   (.brand-logo, .header-user, .header-greeting, .avatar), só forçando
-   a saudação em branco (o resto já funciona igual em qualquer fundo). */
-.hero-header-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 20px; position: relative; z-index: 1;
-}
-.hero-header-row .header-greeting { color: #fff; }
 .hero-top { display: flex; align-items: center; justify-content: space-between; }
 .hero-eyebrow { margin: 0; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.78); }
 .hero-more {
