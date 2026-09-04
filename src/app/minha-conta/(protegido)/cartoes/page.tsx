@@ -126,14 +126,14 @@ export default async function CartoesPage({
   const cartaoIds = cartoes.map((c) => c.id);
 
   const [comprasTodas, proximasParcelasTodas, comprometidoPorCartaoRaw, faturaSelPorCartaoRaw] = await Promise.all([
-    // "Últimas compras" é histórico — só o que já aconteceu (até o fim do
-    // mês atual). Sem esse corte, parcelas futuras de uma compra parcelada
-    // (datadas pros próximos meses) apareciam misturadas aqui, inclusive
-    // antes de parcelas mais antigas já realizadas (orderBy desc por data).
-    // Sem `take` por cartão (agora é uma query só) — a lista é fatiada por
-    // cartão depois, em memória.
+    // A lista de compras é o detalhamento da fatura do MÊS SELECIONADO no
+    // filtro (mesma janela usada no total de faturaSelPorCartao) — antes
+    // ficava sempre presa em "até hoje" independente do mês escolhido, e
+    // o cliente via o total de um mês em cima com compras de outro mês
+    // embaixo. Sem `take` por cartão (agora é uma query só) — a lista é
+    // fatiada por cartão depois, em memória.
     prisma.lancamento.findMany({
-      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { lt: fimMes } },
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMesSel, lt: fimMesSel } },
       orderBy: { data: "desc" },
     }),
     // Parcelas já agendadas pros próximos meses — pra dar visibilidade de
@@ -181,6 +181,11 @@ export default async function CartoesPage({
     proximasParcelasPorCartao.set(l.cartaoId, lista);
   }
 
+  const comprasLabel = mesSelEhAtual ? "Últimas compras" : `Compras de ${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}`;
+  const comprasVazioLabel = mesSelEhAtual
+    ? "Nenhuma compra registrada nesse cartão ainda."
+    : `Nenhuma compra em ${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}.`;
+
   const itens: CartaoCarrosselItem[] = cartoes.map((c) => {
     const comprometido = comprometidoPorCartao.get(c.id) ?? 0;
     const disponivel = c.limite != null ? c.limite - comprometido : null;
@@ -196,6 +201,8 @@ export default async function CartoesPage({
       faturaFechada: c.diaFechamento != null && diaAtual >= c.diaFechamento,
       faturaSelLabel: faturaSelFechadaCartao ? "Fatura fechada" : "Fatura em aberto",
       faturaSelValorFmt: fmtValor(faturaSelValor),
+      comprasLabel,
+      comprasVazioLabel,
       compras: (comprasPorCartao.get(c.id) ?? []).map((l) => ({
         id: l.id,
         descricao: l.descricao,
