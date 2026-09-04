@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { calcularResumoFinanceiro, calcularMediaMensal } from "@/lib/financeiro/motor";
 import { calcularSaudeFinanceira } from "@/lib/financeiro/saude-financeira";
 import { SaudeFinanceiraCard } from "./SaudeFinanceiraCard";
+import { calcularLimiteSeguro } from "@/lib/financeiro/limite-seguro";
+import { LimiteSeguroCard } from "./LimiteSeguroCard";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
 import { MesSwipe } from "./MesSwipe";
@@ -100,7 +102,7 @@ export default async function MinhaContaPage({
   const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 
-  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro, mediaMensal] = await Promise.all([
+  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro, mediaMensal, limiteSeguro] = await Promise.all([
     prisma.divida.findMany({
       where: { clienteId: cliente.id, status: "ATIVA" },
       orderBy: [{ prioridade: "desc" }, { criadoEm: "asc" }],
@@ -129,6 +131,11 @@ export default async function MinhaContaPage({
     // Média dos últimos 3 meses (mesmo motor) — só pro componente "ritmo"
     // da Saúde Financeira, ver src/lib/financeiro/saude-financeira.ts.
     calcularMediaMensal(cliente.id, { inicio: inicioMes, fim: fimMes }, 3),
+    // "Até o próximo salário" (src/lib/financeiro/limite-seguro.ts) é
+    // sempre sobre o mês ATUAL de verdade (a função usa a data real, não o
+    // período que o MesSwipe está mostrando) — só busca quando o cliente
+    // está olhando o mês corrente, senão não faz sentido nenhum mostrar.
+    ehMesAtual ? calcularLimiteSeguro(cliente.id) : Promise.resolve(null),
   ]);
 
   // Aliases 1:1 com os nomes que o JSX abaixo já usava antes da extração
@@ -363,6 +370,7 @@ export default async function MinhaContaPage({
       )}
 
       {saude && <SaudeFinanceiraCard saude={saude} />}
+      {limiteSeguro && <LimiteSeguroCard limite={limiteSeguro} />}
 
       <div className="card-head">
         <p className="card-title">
