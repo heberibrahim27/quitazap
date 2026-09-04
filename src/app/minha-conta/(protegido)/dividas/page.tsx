@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { ValorLista } from "../ValorLista";
+import { calcularRotaLivreDividas } from "@/lib/financeiro/rota-livre-dividas";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -32,6 +33,12 @@ export default async function DividasPage() {
   const outras = dividas.filter((d) => d.status !== "ATIVA");
   const totalDevedor = ativas.reduce((soma, d) => soma + (d.valorTotal - d.valorPago), 0);
 
+  // Rota pra ficar livre das dívidas (src/lib/financeiro/rota-livre-dividas.ts)
+  // — inclui TODAS as dívidas ativas, empréstimos inclusive (que não
+  // aparecem na lista abaixo, só em Empréstimos), porque a rota é sobre a
+  // dívida total, não só o que esta tela mostra.
+  const rota = await calcularRotaLivreDividas(cliente.id);
+
   return (
     <div>
       <div className="card-head">
@@ -49,6 +56,29 @@ export default async function DividasPage() {
           <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--red)", fontFamily: "'IBM Plex Mono', monospace" }}>
             {fmtValor(totalDevedor)}
           </p>
+        </div>
+      )}
+
+      {rota.porMenorSaldo.length >= 2 && (
+        <div className="mc-card" style={{ marginBottom: 16 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13.5, fontWeight: 700 }}>Rota pra ficar livre das dívidas</p>
+          <p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--ink-dim)" }}>
+            Por menor saldo primeiro: comece por <strong>{rota.porMenorSaldo[0].credor}</strong> ({fmtValor(rota.porMenorSaldo[0].saldoDevedor)}).
+          </p>
+          {rota.prioridadeJuros ? (
+            <p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--ink-dim)" }}>
+              Por maior juros primeiro: <strong>{rota.prioridadeJuros.credor}</strong> ainda tem {fmtValor(rota.prioridadeJuros.jurosRestante ?? 0)} de juros embutido — quitando à vista, você economiza esse valor.
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 8px", fontSize: 12.5, color: "var(--ink-dim)" }}>
+              Por maior juros primeiro: nenhuma dívida com juros identificável nos dados cadastrados.
+            </p>
+          )}
+          {rota.dataLivreDeTudo && (
+            <p style={{ margin: 0, fontSize: 12, color: "var(--ink-faint)" }}>
+              Se nada mudar, você fica livre de tudo em {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(rota.dataLivreDeTudo)}.
+            </p>
+          )}
         </div>
       )}
 
