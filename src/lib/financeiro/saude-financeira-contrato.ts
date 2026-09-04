@@ -26,6 +26,13 @@ export interface ComponenteSaude {
   pontosMaximos: number;
 }
 
+/** Identificador da fórmula usada neste cálculo — grava junto de cada
+ * registro salvo (ver SaudeFinanceiraLog no schema) pra que uma futura
+ * revisão dos pesos não bagunce silenciosamente o histórico: um score
+ * antigo fica marcado com a versão que o gerou, nunca reinterpretado como
+ * se tivesse saído da fórmula nova. */
+export const VERSAO_FORMULA_SAUDE = "financial_health_v1";
+
 export interface SaudeFinanceira {
   score: number; // 0-100, soma dos componentes
   classificacao: ClassificacaoSaude;
@@ -33,6 +40,17 @@ export interface SaudeFinanceira {
   /** 2-3 razões concretas, as mais relevantes (negativas/atenção primeiro
    * quando existirem) — nunca texto genérico tipo "evite gastos". */
   razoes: RazaoSaude[];
+  /** Identificador da fórmula que gerou este score — sempre VERSAO_FORMULA_SAUDE
+   * (constante acima), nunca calculado condicionalmente. */
+  versaoFormula: string;
+  /** true quando renda, receita do período E ritmo de despesas variáveis
+   * são todos não-calculáveis ao mesmo tempo (conta praticamente vazia) —
+   * a única exceção é dívida em atraso: se existe uma real, nunca é "dados
+   * insuficientes" (é um sinal real, não ausência de dado). Quando true, a
+   * tela deve mostrar um estado de "ainda sem dados suficientes" em vez do
+   * score/classificação — um "78/100 Boa" pra conta recém-criada e vazia
+   * seria enganoso. */
+  dadosInsuficientes: boolean;
 }
 
 export interface EntradaSaudeFinanceira {

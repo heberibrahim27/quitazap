@@ -10,6 +10,7 @@
 //   20 pts — nenhuma dívida em atraso
 
 import type { ClassificacaoSaude, ComponenteSaude, EntradaSaudeFinanceira, RazaoSaude, SaudeFinanceira } from "./saude-financeira-contrato";
+import { VERSAO_FORMULA_SAUDE } from "./saude-financeira-contrato";
 
 function pontuarComprometimento(entrada: EntradaSaudeFinanceira): { pontos: number; razao: RazaoSaude } {
   const { calculavel, percentualComprometido: pct } = entrada.comprometimento;
@@ -88,5 +89,17 @@ export function calcularSaudeFinanceira(entrada: EntradaSaudeFinanceira): SaudeF
     .sort((a, b) => PRIORIDADE_TIPO[a.tipo] - PRIORIDADE_TIPO[b.tipo])
     .slice(0, 3);
 
-  return { score, classificacao: classificar(score), componentes, razoes };
+  // "Dados insuficientes" = os três componentes que dependem de histórico
+  // ficaram todos no valor neutro (nada de renda, nada de receita lançada,
+  // nada de média de despesas) — a mesma condição que cada pontuarX() usa
+  // pra decidir seu próprio "neutro", checada aqui de novo em cima da
+  // entrada crua pra não depender de expor esse detalhe de cada função.
+  // Dívida em atraso fica de fora de propósito: é sinal real, não ausência
+  // de dado, e não pode ser mascarado por "conta vazia".
+  const semRenda = !entrada.comprometimento.calculavel;
+  const semReceita = (entrada.comprometimento.rendaEfetiva ?? entrada.totais.receitas) <= 0;
+  const semHistoricoRitmo = entrada.mediaDespesasVariaveis <= 0;
+  const dadosInsuficientes = semRenda && semReceita && semHistoricoRitmo && !entrada.temDividaEmAtraso;
+
+  return { score, classificacao: classificar(score), componentes, razoes, versaoFormula: VERSAO_FORMULA_SAUDE, dadosInsuficientes };
 }

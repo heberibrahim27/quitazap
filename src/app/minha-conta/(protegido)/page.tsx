@@ -202,6 +202,37 @@ export default async function MinhaContaPage({
       })
     : null;
 
+  // Histórico do score (SaudeFinanceiraLog) — 1 registro por dia, versão da
+  // fórmula gravada junto (ver saude-financeira-contrato.ts). Persistência
+  // é só auditoria/histórico: nunca deve derrubar o carregamento da Home.
+  if (saude && ehMesAtual) {
+    const diaBrasil = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const componentesJson = JSON.parse(JSON.stringify(saude.componentes));
+    try {
+      await prisma.saudeFinanceiraLog.upsert({
+        where: { clienteId_dia: { clienteId: cliente.id, dia: diaBrasil } },
+        create: {
+          clienteId: cliente.id,
+          dia: diaBrasil,
+          versaoFormula: saude.versaoFormula,
+          score: saude.score,
+          classificacao: saude.classificacao,
+          dadosInsuficientes: saude.dadosInsuficientes,
+          componentes: componentesJson,
+        },
+        update: {
+          versaoFormula: saude.versaoFormula,
+          score: saude.score,
+          classificacao: saude.classificacao,
+          dadosInsuficientes: saude.dadosInsuficientes,
+          componentes: componentesJson,
+        },
+      });
+    } catch (err) {
+      console.error("[SaudeFinanceiraLog] Erro ao gravar histórico:", err);
+    }
+  }
+
   const hoje = new Date();
   const proximosCompromissos = tarefasPendentes
     .filter((t) => t.vencimento != null)
