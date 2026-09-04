@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ExcluirForm } from "@/components/ExcluirForm";
-import { criarDeposito, apagarMeta } from "./metas-actions";
+import { criarDeposito, criarSaque, apagarMeta } from "./metas-actions";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -18,31 +18,40 @@ export type MetaView = {
   depositos: DepositoView[];
 };
 
+type ModoForm = "fechado" | "depositar" | "sacar";
+
 export function MetaCard({ meta }: { meta: MetaView }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [valorDeposito, setValorDeposito] = useState("");
+  const [modoForm, setModoForm] = useState<ModoForm>("fechado");
+  const [valorForm, setValorForm] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
 
   const percentual = meta.valorAlvo > 0 ? Math.min(100, (meta.guardado / meta.valorAlvo) * 100) : 0;
   const atingida = meta.guardado >= meta.valorAlvo;
 
-  function aoDepositar(e: React.FormEvent<HTMLFormElement>) {
+  function abrirForm(modo: ModoForm) {
+    setErro(null);
+    setValorForm("");
+    setModoForm((atual) => (atual === modo ? "fechado" : modo));
+  }
+
+  function aoConfirmar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErro(null);
     const formData = new FormData();
     formData.set("metaId", meta.id);
-    formData.set("valor", valorDeposito);
+    formData.set("valor", valorForm);
+    const acao = modoForm === "sacar" ? criarSaque : criarDeposito;
     startTransition(async () => {
-      const resultado = await criarDeposito(formData);
+      const resultado = await acao(formData);
       if (resultado.erro) {
         setErro(resultado.erro);
         return;
       }
-      setValorDeposito("");
-      setMostrarForm(false);
+      setValorForm("");
+      setModoForm("fechado");
       setAberto(true);
       router.refresh();
     });
@@ -86,9 +95,18 @@ export function MetaCard({ meta }: { meta: MetaView }) {
           type="button"
           className="mc-btn-primary"
           style={{ border: "none", flex: 1 }}
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => abrirForm("depositar")}
         >
           + Depositar
+        </button>
+        <button
+          type="button"
+          className="mc-btn-secondary"
+          style={{ flex: 1 }}
+          onClick={() => abrirForm("sacar")}
+          disabled={meta.guardado <= 0}
+        >
+          Sacar
         </button>
         <button
           type="button"
@@ -109,16 +127,16 @@ export function MetaCard({ meta }: { meta: MetaView }) {
         </button>
       </div>
 
-      {mostrarForm && (
-        <form onSubmit={aoDepositar} style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
+      {modoForm !== "fechado" && (
+        <form onSubmit={aoConfirmar} style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
           <div style={{ flex: 1 }}>
             <input
               type="text"
               inputMode="decimal"
-              placeholder="Ex: 100,00"
+              placeholder={modoForm === "sacar" ? `Máx. ${fmtValor(meta.guardado)}` : "Ex: 100,00"}
               className="mc-input"
-              value={valorDeposito}
-              onChange={(e) => setValorDeposito(e.target.value)}
+              value={valorForm}
+              onChange={(e) => setValorForm(e.target.value)}
               autoFocus
             />
             {erro && <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 600, color: "var(--red)" }}>{erro}</p>}
@@ -135,19 +153,27 @@ export function MetaCard({ meta }: { meta: MetaView }) {
             <p className="mc-empty">Nenhum depósito ainda.</p>
           ) : (
             <div className="mc-list">
-              {meta.depositos.map((d) => (
-                <div key={d.id} className="mc-list-row">
-                  <div className="mc-list-body">
-                    <div className="mc-list-desc">Depósito</div>
-                    <div className="mc-list-meta">{d.dataFmt}</div>
+              {meta.depositos.map((d) => {
+                const saque = d.valor < 0;
+                return (
+                  <div key={d.id} className="mc-list-row">
+                    <div className="mc-list-body">
+                      <div className="mc-list-desc">{saque ? "Saque" : "Depósito"}</div>
+                      <div className="mc-list-meta">{d.dataFmt}</div>
+                    </div>
+                    <div className="mc-list-side">
+                      <span
+                        style={{
+                          fontSize: 13.5, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace",
+                          color: saque ? "var(--red)" : "var(--green)",
+                        }}
+                      >
+                        {saque ? "-" : "+"}{fmtValor(Math.abs(d.valor))}
+                      </span>
+                    </div>
                   </div>
-                  <div className="mc-list-side">
-                    <span style={{ fontSize: 13.5, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", color: "var(--green)" }}>
-                      +{fmtValor(d.valor)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
