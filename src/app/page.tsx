@@ -171,14 +171,8 @@ export default async function LandingPage() {
           classes Tailwind do arquivo de referência — não são invenção. */}
       {/* ══════════════════════════════════════ */}
       <section style={{ position: "relative", overflow: "hidden", minHeight: 640 }} className="qz-hero">
-        {/*
-          Vídeo de fundo (gerado no Veo3) ainda não foi enviado — usando o
-          gradiente de marca como poster/frame estático por enquanto. Quando
-          o arquivo chegar, trocar por:
-          <video autoPlay muted loop playsInline style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", zIndex:0 }}>
-            <source src="/hero.mp4" type="video/mp4" />
-          </video>
-        */}
+        {/* Gradiente de marca como poster — cobre o instante antes do vídeo
+            decodificar o primeiro frame (e o fallback se autoplay falhar). */}
         <div style={{
           position: "absolute", inset: 0, zIndex: 0,
           background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)",
@@ -188,6 +182,15 @@ export default async function LandingPage() {
           backgroundImage: "linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }} />
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{ position: "absolute", inset: 0, zIndex: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        >
+          <source src="/videos/hero-loop.mp4" type="video/mp4" />
+        </video>
         {/* Overlay 1 — bg-neutral-900/50 mix-blend-multiply na referência */}
         <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "rgba(0,0,0,0.5)", mixBlendMode: "multiply" }} />
         {/* Overlay 2 — bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/90 */}
