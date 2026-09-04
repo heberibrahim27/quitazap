@@ -234,7 +234,13 @@ model BotSessao {
   nome         String?
   dividasTemp  String   @default("[]") // JSON: [{texto, valor, parcelas}]
   renda        Float?
-  criadoEm     DateTime @default(now())
+  // Boleto extraído de PDF aguardando confirmação (sim/não) do cliente pra
+  // virar Divida — ver src/lib/boleto-flow.ts. Campo isolado de propósito,
+  // não entra no dividasTemp/confirmacaoPendente do fluxo de texto (são
+  // preocupações diferentes: confirmação de documento vs. continuação de
+  // conversa em texto).
+  boletoPendente Json?
+  criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
   cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
