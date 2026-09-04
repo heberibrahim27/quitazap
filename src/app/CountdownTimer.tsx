@@ -58,7 +58,7 @@ export function CountdownTimer() {
   return (
     <span style={{
       fontFamily: "var(--font-mono, monospace)", fontSize: 13, fontWeight: 600,
-      color: "#22e07a", letterSpacing: "0.03em",
+      color: "rgba(255,255,255,0.85)", letterSpacing: "0.03em",
     }}>
       {texto}
     </span>

@@ -247,8 +247,8 @@ export default async function LandingPage() {
           background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)",
         }} />
         <div style={{
-          position: "absolute", inset: 0, zIndex: 0, opacity: 0.06,
-          backgroundImage: "linear-gradient(#22e07a 1px, transparent 1px), linear-gradient(90deg, #22e07a 1px, transparent 1px)",
+          position: "absolute", inset: 0, zIndex: 0, opacity: 0.05,
+          backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }} />
         <video
@@ -285,7 +285,7 @@ export default async function LandingPage() {
           <div className="qz-col-7">
             <p className="qz-reveal" style={{
               margin: "0 0 20px", fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600,
-              color: "#22e07a", letterSpacing: "0.14em", textTransform: "uppercase",
+              color: "rgba(255,255,255,0.6)", letterSpacing: "0.14em", textTransform: "uppercase",
             }}>
               Controle financeiro pelo WhatsApp
             </p>
@@ -340,7 +340,7 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1080, margin: "0 auto", position: "relative" }}>
           <div className="qz-grid12" style={{ marginBottom: 56 }}>
             <div className="qz-col-8 qz-reveal">
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>TODO MÊS A MESMA HISTÓRIA</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>TODO MÊS A MESMA HISTÓRIA</p>
               <h2 className="qz-h2-sm" style={{ margin: 0, color: "#fff", textAlign: "left" }}>
                 Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
               </h2>
@@ -384,7 +384,7 @@ export default async function LandingPage() {
                 background: "#0a140d", padding: "24px 20px",
                 "--qz-delay": `${i * 70}ms`,
               } as React.CSSProperties}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.05em" }}>{String(i + 1).padStart(2, "0")}</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>{String(i + 1).padStart(2, "0")}</span>
                 <p style={{ margin: "10px 0 4px", fontSize: 14, fontWeight: 700, color: "#fff" }}>{d.titulo}</p>
                 <p style={{ margin: 0, fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{d.texto}</p>
               </div>
@@ -553,7 +553,7 @@ export default async function LandingPage() {
         }} />
         <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "center", position: "relative" }}>
           <div className="qz-col-5 qz-reveal">
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>CONDIÇÃO ESPECIAL</p>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>CONDIÇÃO ESPECIAL</p>
             <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff", textAlign: "left" }}>
               <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano só.</span> Sem letra miúda, sem surpresa.
             </h2>
@@ -563,12 +563,12 @@ export default async function LandingPage() {
           </div>
 
           <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
-            {/* Card "vidro" — brilho de borda bem sutil (10-20% da intensidade
-                de uma referência glass-pricing comum: se ficar forte demais
-                parece cassino neon e derruba a confiança do preço). */}
+            {/* Card "vidro" — brilho neutro (branco), não verde: o verde fica
+                reservado só pro CTA e pra barra de progresso das vagas,
+                não pra moldura inteira do card. */}
             <div className="qz-price-card" style={{
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(34,224,122,0.25)", borderRadius: 20,
-              boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 40px -12px rgba(34,224,122,0.15)",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20,
+              boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px -12px rgba(255,255,255,0.06)",
               backdropFilter: "blur(16px)", textAlign: "left",
             }}>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 24 }}>
@@ -587,7 +587,7 @@ export default async function LandingPage() {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>VAGAS DISPONÍVEIS</span>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.05em" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: "0.05em" }}>
                       {vagasRestantes.toLocaleString("pt-BR")} / {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
                     </span>
                   </div>
@@ -610,7 +610,7 @@ export default async function LandingPage() {
                   "Cancelamento a qualquer momento",
                 ].map((item) => (
                   <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 10 }}>
-                    <span style={{ color: "#22e07a", fontWeight: 700, flexShrink: 0 }}>✓</span>
+                    <span style={{ color: "rgba(255,255,255,0.55)", fontWeight: 700, flexShrink: 0 }}>✓</span>
                     {item}
                   </div>
                 ))}
