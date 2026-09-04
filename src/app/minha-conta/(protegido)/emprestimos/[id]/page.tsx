@@ -5,6 +5,7 @@ import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import { ParcelasAccordion } from "./ParcelasAccordion";
+import { ParcelasLista } from "./ParcelasLista";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -21,18 +22,25 @@ async function carregarParcelaDoDono(parcelaId: string, clienteId: string) {
   return parcela;
 }
 
+async function atualizarStatusSeQuitado(dividaId: string) {
+  const restantes = await prisma.parcela.count({ where: { dividaId, status: { not: "PAGA" } } });
+  if (restantes === 0) {
+    await prisma.divida.update({ where: { id: dividaId }, data: { status: "QUITADA" } });
+  }
+}
+
 export default async function DetalheEmprestimoPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ erro?: string }>;
+  searchParams: Promise<{ erro?: string; parcelasAbertas?: string }>;
 }) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
   const { id } = await params;
-  const { erro } = await searchParams;
+  const { erro, parcelasAbertas } = await searchParams;
 
   const emprestimo = await prisma.divida.findUnique({
     where: { id },
@@ -51,7 +59,7 @@ export default async function DetalheEmprestimoPage({
     if (!parcela) notFound();
 
     if (!Number.isFinite(valorPago) || valorPago <= 0) {
-      redirect(`/minha-conta/emprestimos/${parcela.dividaId}?erro=${encodeURIComponent("Digite um valor pago válido.")}`);
+      redirect(`/minha-conta/emprestimos/${parcela.dividaId}?parcelasAbertas=1&erro=${encodeURIComponent("Digite um valor pago válido.")}`);
     }
 
     // updateMany com status na cláusula where evita corrida de duplo toque:
@@ -70,18 +78,56 @@ export default async function DetalheEmprestimoPage({
     });
 
     if (jaEstavaPaga) {
-      redirect(`/minha-conta/emprestimos/${parcela.dividaId}?erro=${encodeURIComponent("Essa parcela já estava marcada como paga.")}`);
+      redirect(`/minha-conta/emprestimos/${parcela.dividaId}?parcelasAbertas=1&erro=${encodeURIComponent("Essa parcela já estava marcada como paga.")}`);
     }
 
-    const restantes = await prisma.parcela.count({ where: { dividaId: parcela.dividaId, status: { not: "PAGA" } } });
-    if (restantes === 0) {
-      await prisma.divida.update({ where: { id: parcela.dividaId }, data: { status: "QUITADA" } });
-    }
+    await atualizarStatusSeQuitado(parcela.dividaId);
 
     // "layout" já cobre emprestimos, a dívida específica e dividas — todos
-    // nested sob /minha-conta.
+    // nested sob /minha-conta. parcelasAbertas=1 mantém o accordion de
+    // parcelas aberto depois do redirect — sem isso, o cliente marcava uma
+    // parcela paga e a lista fechava sozinha, tendo que abrir de novo pra
+    // conferir o resultado.
     revalidatePath("/minha-conta", "layout");
-    redirect(`/minha-conta/emprestimos/${parcela.dividaId}`);
+    redirect(`/minha-conta/emprestimos/${parcela.dividaId}?parcelasAbertas=1`);
+  }
+
+  // Paga várias parcelas PENDENTES de uma vez, cada uma pelo valor já
+  // agendado (sem pedir valor customizado por parcela, que não faria
+  // sentido numa seleção múltipla). Mesmo padrão race-safe do pagamento
+  // individual, uma parcela por vez dentro da mesma transação.
+  async function pagarVariasParcelas(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const parcelaIds = formData.getAll("parcelaId").map((v) => String(v)).filter(Boolean);
+    if (parcelaIds.length === 0) redirect(`/minha-conta/emprestimos/${id}?parcelasAbertas=1`);
+
+    let dividaId: string | null = null;
+    let algumaPaga = false;
+
+    await prisma.$transaction(async (tx) => {
+      for (const parcelaId of parcelaIds) {
+        const parcela = await tx.parcela.findUnique({ where: { id: parcelaId }, include: { divida: true } });
+        if (!parcela || parcela.divida.clienteId !== clienteAtual.id) continue;
+        dividaId = parcela.dividaId;
+
+        const resultado = await tx.parcela.updateMany({
+          where: { id: parcelaId, status: { not: "PAGA" } },
+          data: { status: "PAGA" },
+        });
+        if (resultado.count === 0) continue;
+        await tx.divida.update({ where: { id: parcela.dividaId }, data: { valorPago: { increment: parcela.valor } } });
+        algumaPaga = true;
+      }
+    });
+
+    if (!dividaId) redirect(`/minha-conta/emprestimos/${id}?parcelasAbertas=1`);
+    if (algumaPaga) await atualizarStatusSeQuitado(dividaId);
+
+    revalidatePath("/minha-conta", "layout");
+    redirect(`/minha-conta/emprestimos/${dividaId}?parcelasAbertas=1`);
   }
 
   async function desfazerPagamento(formData: FormData) {
@@ -106,7 +152,7 @@ export default async function DetalheEmprestimoPage({
     await prisma.divida.update({ where: { id: parcela.dividaId }, data: { status: "ATIVA" } });
 
     revalidatePath("/minha-conta", "layout");
-    redirect(`/minha-conta/emprestimos/${parcela.dividaId}`);
+    redirect(`/minha-conta/emprestimos/${parcela.dividaId}?parcelasAbertas=1`);
   }
 
   async function apagarEmprestimo(_fd: FormData) {
@@ -192,55 +238,25 @@ export default async function DetalheEmprestimoPage({
         </p>
       </div>
       <ParcelasAccordion
+        defaultAberto={parcelasAbertas === "1"}
         resumo={
           emprestimo.parcelas.length === 0
             ? "Nenhuma parcela cadastrada"
             : `${parcelasPagas} de ${emprestimo.parcelas.length} parcelas pagas — toque para ver`
         }
       >
-        <div style={{ maxHeight: "52vh", overflowY: "auto" }}>
-          {emprestimo.parcelas.length === 0 ? (
-            <p className="mc-empty">Esse empréstimo não tem parcelas cadastradas.</p>
-          ) : (
-            <div className="mc-list">
-              {emprestimo.parcelas.map((p) => (
-              <div key={p.id} className="parcela-row">
-                <div className="parcela-info">
-                  <span className={`parcela-check ${p.status === "PAGA" ? "checked" : ""}`}>
-                    {p.status === "PAGA" && (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
-                    )}
-                  </span>
-                  <div>
-                    <div className="mc-list-desc">Parcela {p.numero}</div>
-                    <div className="mc-list-meta">Vence {fmtData(p.vencimento)}</div>
-                  </div>
-                </div>
-                {p.status === "PAGA" ? (
-                  <form action={desfazerPagamento} className="parcela-acao">
-                    <input type="hidden" name="parcelaId" value={p.id} />
-                    <span className="parcela-valor-pago">{fmtValor(p.valor)}</span>
-                    <button type="submit" className="parcela-desfazer">Desfazer</button>
-                  </form>
-                ) : (
-                  <form action={marcarParcelaPaga} className="parcela-acao">
-                    <input type="hidden" name="parcelaId" value={p.id} />
-                    <input
-                      name="valorPago"
-                      type="text"
-                      inputMode="decimal"
-                      defaultValue={p.valor.toFixed(2).replace(".", ",")}
-                      className="parcela-input-valor"
-                      aria-label={`Valor pago da parcela ${p.numero}`}
-                    />
-                    <button type="submit" className="parcela-marcar">Marcar paga</button>
-                  </form>
-                )}
-              </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ParcelasLista
+          parcelas={emprestimo.parcelas.map((p) => ({
+            id: p.id,
+            numero: p.numero,
+            valor: p.valor,
+            vencimentoFmt: fmtData(p.vencimento),
+            status: p.status,
+          }))}
+          marcarParcelaPaga={marcarParcelaPaga}
+          desfazerPagamento={desfazerPagamento}
+          pagarVariasParcelas={pagarVariasParcelas}
+        />
       </ParcelasAccordion>
 
       <div style={{ marginTop: 16 }}>

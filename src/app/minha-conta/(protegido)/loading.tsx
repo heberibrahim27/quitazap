@@ -10,23 +10,48 @@ export default function CarregandoMinhaConta() {
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: "40vh",
+        gap: 6,
+        minHeight: "60vh",
         padding: "60px 0",
       }}
     >
-      <span
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: "50%",
-          border: "3px solid rgba(30,99,233,0.15)",
-          borderTopColor: "#1E63E9",
-          animation: "mc-spin 0.7s linear infinite",
-        }}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/minha-conta/logo-simbolo.webp"
+        alt=""
+        width={46}
+        height={42}
+        style={{ animation: "mc-pulso 1.3s ease-in-out infinite" }}
       />
-      <style>{`@keyframes mc-spin { to { transform: rotate(360deg); } }`}</style>
+      <svg width="72" height="22" viewBox="0 0 72 22" style={{ overflow: "visible" }}>
+        <path
+          d="M3 12 Q 12 2, 21 12 T 39 12 T 57 12 T 69 12"
+          fill="none"
+          stroke="#1E63E9"
+          strokeWidth="3"
+          strokeLinecap="round"
+          className="mc-rabisco-path"
+        />
+      </svg>
+      <style>{`
+        @keyframes mc-pulso {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(0.88); opacity: 0.7; }
+        }
+        .mc-rabisco-path {
+          stroke-dasharray: 100;
+          stroke-dashoffset: 100;
+          animation: mc-rabisco 1.3s ease-in-out infinite;
+        }
+        @keyframes mc-rabisco {
+          0% { stroke-dashoffset: 100; }
+          45%, 55% { stroke-dashoffset: 0; }
+          100% { stroke-dashoffset: -100; }
+        }
+      `}</style>
     </div>
   );
 }
