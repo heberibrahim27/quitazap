@@ -32,6 +32,9 @@ async function fatosLimiteSeguro(clienteId: string) {
 }
 
 function fallbackLimiteSeguro(f: Awaited<ReturnType<typeof fatosLimiteSeguro>>): string {
+  if (f.semDadosSuficientes) {
+    return "Ainda não consigo calcular seu limite seguro — cadastre sua renda no Perfil ou lance sua primeira receita do mês.";
+  }
   // "Livre até lá" já desconta compromissosRestantes — por isso ele
   // aparece como explicação do valor livre, nunca como um segundo
   // desconto ainda pendente (evita dar a entender dupla contagem).
@@ -77,6 +80,7 @@ const NOTA_TRANSPARENCIA = "\n\n_Análise baseada nas informações registradas 
 
 export async function responderLimiteSeguro(clienteId: string, gratuito: boolean): Promise<string> {
   const fatos = await fatosLimiteSeguro(clienteId);
+  if (fatos.semDadosSuficientes) return `${fallbackLimiteSeguro(fatos)}${NOTA_TRANSPARENCIA}`;
   const resposta = await frasearComIA(fatos, clienteId, gratuito, () => fallbackLimiteSeguro(fatos));
   return `${resposta}${NOTA_TRANSPARENCIA}`;
 }

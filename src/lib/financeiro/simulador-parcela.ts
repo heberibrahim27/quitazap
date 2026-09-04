@@ -13,6 +13,7 @@
 // de dívida JÁ existente é buscada por período real (varia mês a mês de
 // verdade, conforme dívidas vão terminando de pagar).
 
+import { prisma } from "@/lib/prisma";
 import { calcularResumoFinanceiro, limitesDoMes, anoMesAtualBrasil } from "./motor";
 import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
 
@@ -55,7 +56,8 @@ export async function simularParcela(
   const hoje = new Date();
   const { ano: anoAtualRef, mes: mesAtualRef } = anoMesAtualBrasil(hoje);
   const periodoAtual = limitesDoMes(anoAtualRef, mesAtualRef);
-  const resumoAtual = await calcularResumoFinanceiro({ clienteId, periodo: periodoAtual });
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
+  const resumoAtual = await calcularResumoFinanceiro({ clienteId, periodo: periodoAtual, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
   const rendaBase = resumoAtual.comprometimento.rendaEfetiva;
   const despesasBase = resumoAtual.totais.totalSaidasSemDividas;
 
