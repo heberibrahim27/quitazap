@@ -5,6 +5,31 @@
 // ─────────────────────────────────────────
 
 import { prisma } from "@/lib/prisma";
+import { ScrollReveal } from "./ScrollReveal";
+
+// Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
+// nas referências de design (Aura Build) pra tirar a sensação de fundo
+// chapado/genérico. Opacidade bem baixa, fixed, não intercepta clique.
+const GRAIN_SVG =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+
+// Grid assimétrico de 12 colunas + reveal on-scroll — CSS puro porque
+// estilo inline não faz media query; classes com prefixo qz- pra não
+// colidir com nada do resto do app (essa página não compartilha layout
+// com o produto logado). Stagger de cards usa --qz-delay setado inline.
+const LANDING_CSS = `
+  .qz-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); transition-delay: var(--qz-delay, 0ms); }
+  .qz-reveal.qz-visible { opacity: 1; transform: none; }
+  .qz-grid12 { display: grid; grid-template-columns: 1fr; gap: 28px; }
+  @media (min-width: 900px) {
+    .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
+    .qz-col-4 { grid-column: span 4; }
+    .qz-col-5 { grid-column: span 5; }
+    .qz-col-6 { grid-column: span 6; }
+    .qz-col-7 { grid-column: span 7; }
+    .qz-col-8 { grid-column: span 8; }
+  }
+`;
 
 // Contador de vagas do Preço Fundador é lido do banco a cada request —
 // nunca pode ser congelado no build (teria que ser "force-dynamic" mesmo
@@ -120,7 +145,15 @@ export default async function LandingPage() {
   const vagaAtual = Math.min(assinantesFundador + 1, VAGAS_FUNDADOR);
 
   return (
-    <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden" }}>
+    <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden", position: "relative" }}>
+      <style dangerouslySetInnerHTML={{ __html: LANDING_CSS }} />
+      <ScrollReveal />
+
+      {/* Grain sutil por cima de tudo — puramente decorativo, não intercepta clique. */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 40, pointerEvents: "none",
+        backgroundImage: `url("${GRAIN_SVG}")`, opacity: 0.045,
+      }} />
 
       {/* ══════════════════════════════════════ */}
       {/* HERO */}
@@ -173,73 +206,75 @@ export default async function LandingPage() {
             </a>
           </nav>
 
-          {/* Hero content */}
-          <div style={{ maxWidth: 820, margin: "48px auto 0", textAlign: "center" }}>
-            <h1 style={{
-              margin: "0 0 24px",
-              fontSize: "clamp(32px, 6vw, 60px)",
-              fontWeight: 800,
-              lineHeight: 1.1,
-              color: "#ffffff",
-              letterSpacing: "-1.5px",
-            }}>
-              Descubra quanto do seu dinheiro<br />ainda é <span style={{ color: "#22c55e" }}>realmente seu.</span>
-            </h1>
-
-            <p style={{
-              margin: "0 0 12px",
-              fontSize: "clamp(16px, 2vw, 19px)",
-              color: "#cbd5e1",
-              lineHeight: 1.65,
-              maxWidth: 620,
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}>
-              Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar.
-            </p>
-
-            <p style={{
-              margin: "0 0 36px",
-              fontSize: 14,
-              color: "#94a3b8",
-              lineHeight: 1.6,
-              maxWidth: 560,
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}>
-              Feito pra quem quer parar de descobrir só no fim do mês que o dinheiro acabou — jovem, aposentado, CLT ou autônomo.
-            </p>
-
-            <a href={CAKTO_URL} style={{
-              background: "#22c55e", color: "#000",
-              fontWeight: 700, fontSize: 16,
-              padding: "17px 32px", borderRadius: 10,
-              textDecoration: "none", display: "inline-block",
-            }}>
-              Garantir Preço Fundador — R$14,90/mês
-            </a>
-
-            <div style={{ marginTop: 16, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 4 }}>
-              <p style={{ margin: 0, fontSize: 12.5, color: "#94a3b8" }}>
-                Sem precisar conectar sua conta bancária. Comece pelo WhatsApp, contando sua renda e seus gastos.
-              </p>
-              <p style={{ margin: 0, fontSize: 12.5, color: "#94a3b8" }}>
-                Seus dados financeiros não são vendidos. Tudo que você registra é usado só pra gerar suas análises.
-              </p>
+          {/* Hero content — tipografia editorial (duas linhas de peso bem
+              diferente) + grid assimétrico 12 colunas, headline à esquerda
+              ocupando 8 colunas, CTA/subheadline num bloco menor ao lado. */}
+          <div className="qz-grid12" style={{ maxWidth: 1120, margin: "48px auto 0", alignItems: "end" }}>
+            <div className="qz-col-8">
+              <h1 style={{ margin: "0 0 8px", textAlign: "left" }}>
+                <span className="qz-reveal" style={{
+                  display: "block", fontSize: "clamp(20px, 3.2vw, 34px)", fontWeight: 200,
+                  color: "rgba(255,255,255,0.78)", letterSpacing: "-0.5px", marginBottom: 6,
+                }}>
+                  Descubra quanto do seu dinheiro
+                </span>
+                <span className="qz-reveal" style={{
+                  display: "block", fontSize: "clamp(52px, 10.5vw, 128px)", fontWeight: 600,
+                  letterSpacing: "-4px", lineHeight: 0.92, marginLeft: "-2px", color: "#ffffff",
+                  "--qz-delay": "80ms",
+                } as React.CSSProperties}>
+                  ainda é <span style={{ color: "#22c55e" }}>seu.</span>
+                </span>
+              </h1>
             </div>
 
-            <div style={{ marginTop: 20 }}>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)",
-                borderRadius: 99, padding: "7px 16px",
-                fontSize: 13, color: "#86efac", fontWeight: 600,
-              }}>
-                🔥 Primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")} assinantes — vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
-              </span>
-              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
-                R$14,90/mês enquanto sua assinatura permanecer ativa. Válido pros primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")} assinantes.
+            <div className="qz-col-4" style={{ textAlign: "left" }}>
+              <p className="qz-reveal" style={{
+                margin: "0 0 14px", fontSize: 16, color: "#cbd5e1", lineHeight: 1.6,
+                "--qz-delay": "160ms",
+              } as React.CSSProperties}>
+                Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar.
               </p>
+
+              <p className="qz-reveal" style={{
+                margin: "0 0 24px", fontSize: 13, color: "#94a3b8", lineHeight: 1.6,
+                "--qz-delay": "220ms",
+              } as React.CSSProperties}>
+                Feito pra quem quer parar de descobrir só no fim do mês que o dinheiro acabou — jovem, aposentado, CLT ou autônomo.
+              </p>
+
+              <a href={CAKTO_URL} className="qz-reveal" style={{
+                background: "#22c55e", color: "#000",
+                fontWeight: 700, fontSize: 15,
+                padding: "15px 22px", borderRadius: 6,
+                textDecoration: "none", display: "block", textAlign: "center",
+                "--qz-delay": "280ms",
+              } as React.CSSProperties}>
+                Garantir Preço Fundador — R$14,90/mês
+              </a>
+
+              <div style={{ marginTop: 14, display: "flex", flexDirection: "column" as const, gap: 4 }}>
+                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
+                  Sem precisar conectar sua conta bancária. Comece pelo WhatsApp, contando sua renda e seus gastos.
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
+                  Seus dados financeiros não são vendidos. Tudo que você registra é usado só pra gerar suas análises.
+                </p>
+              </div>
+
+              <div style={{ marginTop: 18 }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)",
+                  borderRadius: 6, padding: "7px 14px",
+                  fontSize: 12.5, color: "#86efac", fontWeight: 600,
+                }}>
+                  🔥 Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
+                </span>
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#64748b" }}>
+                  R$14,90/mês enquanto sua assinatura permanecer ativa. Válido pros primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")} assinantes.
+                </p>
+              </div>
             </div>
           </div>
         </div>
