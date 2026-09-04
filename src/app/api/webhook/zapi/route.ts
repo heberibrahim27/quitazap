@@ -855,7 +855,9 @@ export async function POST(req: NextRequest) {
       try {
         await sendWhatsApp(sessao.telefone, "📷 Recebi sua imagem! Analisando...\n\n_Seu documento será usado para identificar informações financeiras e gerar seu Raio-X do Salário._");
         const analise = await analisarImagem(body.image.imageUrl, PROMPT_ANALISE_IMAGEM, { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "vision-webhook" });
-        console.log(`[Z-API] Imagem analisada: "${analise}"`);
+        // Não loga o texto da análise em claro: pode conter dados de contracheque
+        // (nome, cargo, salário) — só o suficiente pra depurar sem expor PII.
+        console.log(`[Z-API] Imagem analisada (${analise?.length ?? 0} chars, financeira=${!analise?.includes("[NAO_FINANCEIRA]")})`);
 
         if (!analise || analise.includes("[NAO_FINANCEIRA]")) {
           await sendWhatsApp(sessao.telefone, "Não identifiquei informações financeiras nessa imagem. Pode me descrever em texto (dívida, gasto, compra...)?");
