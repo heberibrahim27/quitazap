@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { NOMES_CATEGORIAS_GASTO, definirCategoriaGasto } from "@/lib/gasto-flow";
+import { NOMES_CATEGORIAS_GASTO, NOMES_CATEGORIAS_RECEITA, definirCategoriaGasto } from "@/lib/gasto-flow";
 import { criarDespesaRapida, criarReceitaRapida } from "./lancamento-actions";
 import { criarMeta } from "./metas/metas-actions";
 
@@ -295,6 +295,14 @@ export function BottomNav({
             <label className="mc-label">
               Descrição *
               <input name="descricao" required placeholder="Ex: Salário, Freelance, Aluguel recebido" className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Categoria
+              <select name="categoria" defaultValue="Salário" className="mc-input">
+                {NOMES_CATEGORIAS_RECEITA.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </label>
             <label className="mc-label">
               Valor *

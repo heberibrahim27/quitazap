@@ -108,6 +108,7 @@ export async function criarReceitaRapida(formData: FormData): Promise<{ erro?: s
   if (!cliente) return { erro: "Sessão expirada. Entre novamente." };
 
   const descricao = String(formData.get("descricao") || "").trim();
+  const categoria = String(formData.get("categoria") || "").trim();
   const valorTexto = String(formData.get("valor") || "").replace(",", ".").trim();
   const valor = Number(valorTexto);
   const dataTexto = String(formData.get("data") || "");
@@ -122,6 +123,7 @@ export async function criarReceitaRapida(formData: FormData): Promise<{ erro?: s
       clienteId: cliente.id,
       tipo: "RECEITA",
       descricao,
+      categoria: categoria || null,
       valor,
       data: dataTexto ? new Date(`${dataTexto}T12:00:00`) : new Date(),
       recorrente,
