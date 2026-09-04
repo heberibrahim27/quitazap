@@ -25,6 +25,10 @@ const LANDING_CSS = `
   .qz-hero-pad { padding-left: 24px; padding-right: 24px; }
   .qz-hero-light { font-size: 48px; }
   .qz-hero-heavy { font-size: 72px; line-height: 0.95; }
+  .qz-section { padding: 64px 24px; }
+  .qz-h2-sm { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25; }
+  .qz-h2-md { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
+  .qz-h2-lg { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -35,6 +39,10 @@ const LANDING_CSS = `
     .qz-hero-pad { padding-left: 48px; padding-right: 48px; }
     .qz-hero-light { font-size: 72px; }
     .qz-hero-heavy { font-size: 128px; margin-top: -16px; }
+    .qz-section { padding: 96px 48px; }
+    .qz-h2-sm { font-size: 30px; }
+    .qz-h2-md { font-size: 36px; }
+    .qz-h2-lg { font-size: 48px; }
   }
 `;
 
@@ -296,11 +304,11 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* SEÇÃO DOR */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "80px 24px", background: "#ffffff" }}>
+      <section className="qz-section" style={{ background: "#ffffff" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 40 }}>
             <div className="qz-col-7 qz-reveal">
-              <h2 style={{ margin: 0, fontSize: "clamp(24px, 3.2vw, 32px)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.35, color: "#0f172a", textAlign: "left" }}>
+              <h2 className="qz-h2-sm" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
                 Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
               </h2>
             </div>
@@ -324,12 +332,12 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* COMO FUNCIONA */}
       {/* ══════════════════════════════════════ */}
-      <section id="como-funciona" style={{ padding: "80px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+      <section id="como-funciona" className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
               <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
-              <h2 style={{ margin: 0, fontSize: "clamp(26px, 3.6vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+              <h2 className="qz-h2-md" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
                 Simples assim, direto no WhatsApp.
               </h2>
             </div>
@@ -357,12 +365,12 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* FUNCIONALIDADES */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "80px 24px", background: "#ffffff" }}>
+      <section className="qz-section" style={{ background: "#ffffff" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
               <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
-              <h2 style={{ margin: 0, fontSize: "clamp(26px, 3.6vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+              <h2 className="qz-h2-md" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
                 Tudo isso, direto no seu WhatsApp.
               </h2>
             </div>
@@ -397,11 +405,11 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* PREÇO */}
       {/* ══════════════════════════════════════ */}
-      <section id="preco" style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+      <section id="preco" className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "start" }}>
           <div className="qz-col-5 qz-reveal">
             <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
-            <h2 style={{ margin: "0 0 12px", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+            <h2 className="qz-h2-lg" style={{ margin: "0 0 12px", color: "#0f172a", textAlign: "left" }}>
               Preço Fundador
             </h2>
             <p style={{ margin: 0, fontSize: 15, color: "#64748b", lineHeight: 1.6, textAlign: "left" }}>
@@ -468,11 +476,11 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* FAQ */}
       {/* ══════════════════════════════════════ */}
-      <section id="faq" style={{ padding: "96px 24px", background: "#ffffff" }}>
+      <section id="faq" className="qz-section" style={{ background: "#ffffff" }}>
         <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-col-4 qz-reveal">
             <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
-            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+            <h2 className="qz-h2-lg" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
               Perguntas frequentes
             </h2>
           </div>
@@ -506,14 +514,14 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* CTA FINAL */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "88px 24px", background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)", position: "relative", overflow: "hidden", textAlign: "center" }}>
+      <section className="qz-section" style={{ background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)", position: "relative", overflow: "hidden", textAlign: "center" }}>
         <div style={{
           position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
           width: "600px", height: "400px", maxWidth: "150vw",
           background: "radial-gradient(ellipse, rgba(34,197,94,0.1) 0%, transparent 70%)",
         }} />
         <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: "-1px" }}>
+          <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff" }}>
             Descubra hoje quanto do seu dinheiro é realmente seu.
           </h2>
           <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
