@@ -36,9 +36,9 @@ const LANDING_CSS = `
   }
   .qz-phone-notch-band {
     position: absolute; top: 0; left: 0; right: 0; height: 24px; z-index: 2;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; justify-content: center;
   }
-  .qz-phone-notch { width: 80px; height: 6px; border-radius: 999px; background: #000; }
+  .qz-phone-notch { width: 33%; height: 100%; border-radius: 0 0 12px 12px; background: #000; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
