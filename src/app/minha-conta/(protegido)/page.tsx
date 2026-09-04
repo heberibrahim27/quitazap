@@ -111,8 +111,11 @@ export default async function MinhaContaPage({
       include: { cartao: { select: { nome: true } } },
     }),
     prisma.cartao.findMany({ where: { clienteId: cliente.id }, orderBy: { nome: "asc" } }),
+    // Só o que já aconteceu (até o fim do mês atual) — sem esse corte, uma
+    // parcela futura de compra parcelada no cartão (datada pros próximos
+    // meses) aparecia aqui como se fosse o lançamento mais recente.
     prisma.lancamento.findMany({
-      where: { clienteId: cliente.id },
+      where: { clienteId: cliente.id, data: { lt: fimMes } },
       orderBy: { data: "desc" },
       take: 3,
       include: { cartao: { select: { nome: true } } },

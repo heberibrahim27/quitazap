@@ -11,6 +11,12 @@ function fmtValor(v: number) {
 function fmtData(d: Date) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
+// Parcela futura pode cair num ano diferente do atual (ex: compra em 12x
+// feita em outubro termina no ano seguinte) — sem o ano, "03/06" fica
+// ambíguo entre "mês que vem" e "daqui a um ano e meio".
+function fmtDataComAno(d: Date) {
+  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
 
 // Mesma âncora em Brasília usada no resto do Controle — ver page.tsx da home.
 function anoMesAtualBrasil(agora: Date): { ano: number; mes: number; dia: number } {
@@ -76,6 +82,19 @@ export default async function CartoesPage() {
     )
   );
 
+  // Parcelas já agendadas pros próximos meses — pra dar visibilidade de onde
+  // o limite comprometido (calculado abaixo) está "preso", já que elas não
+  // aparecem em "Últimas compras" (que é só histórico do que já aconteceu).
+  const proximasParcelasPorCartao = await Promise.all(
+    cartoes.map((c) =>
+      prisma.lancamento.findMany({
+        where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: fimMes } },
+        orderBy: { data: "asc" },
+        take: 24,
+      })
+    )
+  );
+
   // "Disponível" precisa descontar o valor TOTAL comprometido no limite, não
   // só a fatura deste mês — uma compra parcelada reserva o valor inteiro no
   // limite assim que é feita (mesmo comportamento do cartão de verdade), não
@@ -109,6 +128,16 @@ export default async function CartoesPage() {
         valor: l.valor,
         dataFmt: fmtData(l.data),
       })),
+      proximasParcelas: proximasParcelasPorCartao[i].map((l) => ({
+        id: l.id,
+        descricao: l.descricao,
+        categoria: l.categoria,
+        valor: l.valor,
+        dataFmt: fmtDataComAno(l.data),
+      })),
+      proximasParcelasTotalFmt: fmtValor(
+        proximasParcelasPorCartao[i].reduce((soma, l) => soma + l.valor, 0)
+      ),
     };
   });
 
