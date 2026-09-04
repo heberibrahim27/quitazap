@@ -4,10 +4,22 @@
 // pro redirecionamento mantido por compatibilidade)
 // ─────────────────────────────────────────
 
+import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
 import { prisma } from "@/lib/prisma";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
 import { CountdownTimer } from "./CountdownTimer";
+
+// Inter nunca foi de fato carregada nesta página (o fontFamily só citava
+// o nome, sem @font-face nem next/font) — sempre caiu pro fallback
+// (Segoe UI/Arial) em qualquer sistema sem Inter instalada. Corrigido
+// aqui via next/font (auto-hospedado, sem request externo) e aproveitado
+// pra trazer as duas fontes da identidade "Hero Ousado" (serifada
+// itálica pros acentos, mono pros rótulos) — escopado só a esta página,
+// não mexe na tipografia do resto do produto logado.
+const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-inter" });
+const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], weight: ["300", "500", "600"], variable: "--font-fraunces" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-mono" });
 
 // Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
 // nas referências de design (Aura Build) pra tirar a sensação de fundo
@@ -41,7 +53,6 @@ const LANDING_CSS = `
   }
   .qz-phone-notch { width: 33%; height: 100%; border-radius: 0 0 12px 12px; background: #000; }
   .qz-panel-phone { width: 200px; height: 412px; margin: 0 auto; border-radius: 30px; padding: 2px; background: linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.05)); box-shadow: 0 30px 60px -20px rgba(15,23,42,.35); }
-  .qz-hero-thumbs { display: none; }
   .qz-hero-side { margin-top: 8px; }
   .qz-feat-img { aspect-ratio: 16 / 9; }
   .qz-price-card { padding: 28px 22px; }
@@ -59,7 +70,6 @@ const LANDING_CSS = `
     .qz-h2-sm { font-size: 30px; }
     .qz-h2-md { font-size: 36px; }
     .qz-h2-lg { font-size: 48px; }
-    .qz-hero-thumbs { display: flex; }
     .qz-hero-side { margin-top: 32px; }
     .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
     .qz-feat-img { aspect-ratio: 4 / 3; }
@@ -205,7 +215,7 @@ export default async function LandingPage() {
   const vagasRestantes = Math.max(VAGAS_FUNDADOR - assinantesFundador, 0);
 
   return (
-    <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden", position: "relative" }}>
+    <div className={`${inter.variable} ${fraunces.variable} ${mono.variable}`} style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden", position: "relative" }}>
       <style dangerouslySetInnerHTML={{ __html: LANDING_CSS }} />
       <ScrollReveal />
 
@@ -232,7 +242,7 @@ export default async function LandingPage() {
         }} />
         <div style={{
           position: "absolute", inset: 0, zIndex: 0, opacity: 0.06,
-          backgroundImage: "linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(#22e07a 1px, transparent 1px), linear-gradient(90deg, #22e07a 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }} />
         <video
@@ -267,29 +277,20 @@ export default async function LandingPage() {
         {/* grid grid-cols-1 md:grid-cols-12 gap-8 items-end — px-6 md:px-12 pb-12 md:pb-24 */}
         <div className="qz-grid12 qz-hero-pad" style={{ position: "relative", zIndex: 10, padding: "0 24px 48px", alignItems: "end" }}>
           <div className="qz-col-7">
+            <p className="qz-reveal" style={{
+              margin: "0 0 20px", fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600,
+              color: "#22e07a", letterSpacing: "0.14em", textTransform: "uppercase",
+            }}>
+              Controle financeiro pelo WhatsApp
+            </p>
             <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.05em" }}>
-              <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 200, opacity: 0.8, marginBottom: 8 }}>
+              <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 200, opacity: 0.8, marginBottom: 8, "--qz-delay": "60ms" } as React.CSSProperties}>
                 Descubra quanto do seu dinheiro
               </span>
-              <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "80ms" } as React.CSSProperties}>
-                ainda é <span style={{ color: "#22c55e" }}>seu.</span>
+              <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "120ms" } as React.CSSProperties}>
+                ainda é <span style={{ color: "#22e07a", fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>seu.</span>
               </span>
             </h1>
-
-            {/* Linha de miniaturas — na referência são 3 fotos de portfólio;
-                aqui viram placeholders "print em breve" (mesma ideia da
-                seção de funcionalidades) até termos capturas reais do app. */}
-            <div className="qz-reveal qz-hero-thumbs" style={{ gap: 16, marginTop: 32, "--qz-delay": "140ms" } as React.CSSProperties}>
-              {[1, 2, 3].map((n) => (
-                <div key={n} style={{
-                  width: 64, height: 48, borderRadius: 6, overflow: "hidden",
-                  border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.06)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>APP</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div className="qz-col-5 qz-hero-side" style={{ color: "#fff" }}>
@@ -302,7 +303,7 @@ export default async function LandingPage() {
             <a href={CAKTO_URL} className="qz-reveal" style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               borderRadius: 999, padding: "13px 26px", fontSize: 14, fontWeight: 600,
-              background: "#22c55e", color: "#000", textDecoration: "none",
+              background: "#22e07a", color: "#000", textDecoration: "none",
             }}>
               Quero garantir R$14,90/mês
             </a>
@@ -380,7 +381,7 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
               <h2 className="qz-h2-md" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
                 Simples assim, direto no WhatsApp.
               </h2>
@@ -393,7 +394,7 @@ export default async function LandingPage() {
                 "--qz-delay": `${i * 90}ms`,
               } as React.CSSProperties}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: 8, background: "#22c55e",
+                  width: 36, height: 36, borderRadius: 8, background: "#22e07a",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontWeight: 800, fontSize: 16, color: "#000", marginBottom: 16,
                 }}>
@@ -415,7 +416,7 @@ export default async function LandingPage() {
       <section className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "center" }}>
           <div className="qz-col-7 qz-reveal">
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>WHATSAPP + PAINEL</p>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>WHATSAPP + PAINEL</p>
             <h2 className="qz-h2-md" style={{ margin: "0 0 16px", color: "#0f172a", textAlign: "left" }}>
               Por trás da conversa, um painel de verdade.
             </h2>
@@ -490,7 +491,7 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
               <h2 className="qz-h2-md" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
                 Tudo isso, direto no seu WhatsApp.
               </h2>
@@ -526,58 +527,62 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* PREÇO */}
       {/* ══════════════════════════════════════ */}
-      <section id="preco" className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "start" }}>
+      <section id="preco" className="qz-section" style={{ background: "linear-gradient(160deg, #050b07 0%, #0d1a10 100%)", position: "relative", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
+          backgroundImage: `url("${GRAIN_SVG}")`,
+        }} />
+        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "center", position: "relative" }}>
           <div className="qz-col-5 qz-reveal">
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
-            <h2 className="qz-h2-lg" style={{ margin: "0 0 12px", color: "#0f172a", textAlign: "left" }}>
-              Condição Especial QuitaZap
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>CONDIÇÃO ESPECIAL</p>
+            <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff", textAlign: "left" }}>
+              <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano.</span> Sem tier, sem surpresa.
             </h2>
-            <p style={{ margin: "0 0 20px", fontSize: 15, color: "#64748b", lineHeight: 1.6, textAlign: "left" }}>
-              1.000 vagas disponibilizadas nesta condição. Um plano só, sem tier, sem surpresa.
+            <p style={{ margin: 0, fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "left" }}>
+              1.000 vagas disponibilizadas nesta condição. Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
             </p>
-            <p style={{ margin: "0 0 24px", fontSize: 15, fontWeight: 700, color: "#0f172a", textAlign: "left" }}>
-              {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis
-            </p>
-
-            {/* Countdown evergreen por visitante — 24h a partir do primeiro
-                acesso (persistido em localStorage, ver CountdownTimer.tsx).
-                Não é uma data fixa de campanha, é a mesma janela pra
-                qualquer pessoa a partir de quando ela chega na página. */}
-            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 18px", maxWidth: 320 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "#0f172a", letterSpacing: "0.02em" }}>
-                Esta condição termina em:
-              </p>
-              <CountdownTimer />
-            </div>
           </div>
 
           <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
+            {/* Card "vidro" — brilho de borda bem sutil (10-20% da intensidade
+                de uma referência glass-pricing comum: se ficar forte demais
+                parece cassino neon e derruba a confiança do preço). */}
             <div className="qz-price-card" style={{
-              background: "#fff", border: "2px solid #22c55e", borderRadius: 16,
-              boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(34,224,122,0.25)", borderRadius: 20,
+              boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 40px -12px rgba(34,224,122,0.15)",
+              backdropFilter: "blur(16px)", textAlign: "left",
             }}>
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 24 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>QuitaZAP</div>
+                <div style={{ textAlign: "right", lineHeight: 1 }}>
+                  <span style={{ fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.5)", verticalAlign: "top" }}>R$ </span>
+                  <span style={{ fontFamily: "var(--font-fraunces)", fontSize: "clamp(40px, 9vw, 56px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>14,90</span>
+                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>/mês</span>
+                </div>
+              </div>
+
+              {/* Instrumentos de urgência — vagas restantes com barra de
+                  progresso e countdown evergreen, tratados como dado da
+                  própria interface, não banner de promoção. */}
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", borderBottom: "1px solid rgba(255,255,255,0.1)", padding: "18px 0", marginBottom: 24, display: "flex", flexDirection: "column" as const, gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4, whiteSpace: "nowrap" }}>CONDIÇÃO ESPECIAL</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>VAGAS DISPONÍVEIS</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.05em" }}>
+                      {assinantesFundador.toLocaleString("pt-BR")} / {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                  <div style={{ height: 3, borderRadius: 999, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min((assinantesFundador / VAGAS_FUNDADOR) * 100, 100)}%`, background: "#22e07a", borderRadius: 999 }} />
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "clamp(28px, 8vw, 40px)", fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1, whiteSpace: "nowrap" }}>R$ 14,90</div>
-                  <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>TEMPO RESTANTE</span>
+                  <CountdownTimer />
                 </div>
               </div>
 
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 14px", marginBottom: 24 }}>
-                <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#166534", fontWeight: 700 }}>
-                  Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-                  Depois que as {VAGAS_FUNDADOR.toLocaleString("pt-BR")} vagas desta condição se esgotarem, o valor sobe pra novos assinantes.
-                </p>
-              </div>
-
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 20, marginBottom: 28 }}>
+              <div style={{ marginBottom: 28 }}>
                 {[
                   "Registro de gastos e dívidas pelo WhatsApp",
                   "Raio-X do Salário e leitura de contracheque",
@@ -585,22 +590,22 @@ export default async function LandingPage() {
                   "Analista financeiro por IA, 24h",
                   "Cancelamento a qualquer momento",
                 ].map((item) => (
-                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#374151", marginBottom: 10 }}>
-                    <span style={{ color: "#22c55e", fontWeight: 700, flexShrink: 0 }}>✓</span>
+                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 10 }}>
+                    <span style={{ color: "#22e07a", fontWeight: 700, flexShrink: 0 }}>✓</span>
                     {item}
                   </div>
                 ))}
               </div>
 
               <a href={CAKTO_URL} style={{
-                display: "block", background: "#22c55e", color: "#000",
-                fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 8,
+                display: "block", background: "#22e07a", color: "#000",
+                fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 10,
                 textDecoration: "none", textAlign: "center",
               }}>
                 Quero garantir R$14,90/mês
               </a>
 
-              <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+              <p style={{ margin: "12px 0 0", fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
                 7 dias de garantia. Cancele quando quiser.
               </p>
             </div>
@@ -614,7 +619,7 @@ export default async function LandingPage() {
       <section id="faq" className="qz-section" style={{ background: "#ffffff" }}>
         <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-col-4 qz-reveal">
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
             <h2 className="qz-h2-lg" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
               Perguntas frequentes
             </h2>
@@ -653,7 +658,7 @@ export default async function LandingPage() {
         <div style={{
           position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
           width: "600px", height: "400px", maxWidth: "150vw",
-          background: "radial-gradient(ellipse, rgba(34,197,94,0.1) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, rgba(34,224,122,0.1) 0%, transparent 70%)",
         }} />
         <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff" }}>
@@ -663,7 +668,7 @@ export default async function LandingPage() {
             {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis nesta condição · Cancele quando quiser
           </p>
           <a href={CAKTO_URL} style={{
-            display: "inline-block", background: "#22c55e", color: "#000", fontWeight: 800, fontSize: 18,
+            display: "inline-block", background: "#22e07a", color: "#000", fontWeight: 800, fontSize: 18,
             padding: "18px 48px", borderRadius: 8, textDecoration: "none",
           }}>
             Quero garantir R$14,90/mês

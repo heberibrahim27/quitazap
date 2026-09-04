@@ -51,31 +51,16 @@ export function CountdownTimer() {
     };
   })();
 
-  const blocos = partes
-    ? [
-        { valor: unidade(partes.h), rotulo: "H" },
-        { valor: unidade(partes.m), rotulo: "M" },
-        { valor: unidade(partes.s), rotulo: "S" },
-      ]
-    : [
-        { valor: "--", rotulo: "H" },
-        { valor: "--", rotulo: "M" },
-        { valor: "--", rotulo: "S" },
-      ];
+  const texto = partes
+    ? `${unidade(partes.h)}:${unidade(partes.m)}:${unidade(partes.s)}`
+    : "--:--:--";
 
   return (
-    <div style={{ display: "flex", gap: 8 }}>
-      {blocos.map((b) => (
-        <div key={b.rotulo} style={{ flex: 1, textAlign: "center" }}>
-          <div style={{
-            background: "#f1f5f9", borderRadius: 6, padding: "8px 0",
-            fontFamily: "monospace", fontSize: 16, fontWeight: 700, color: "#0f172a",
-          }}>
-            {b.valor}
-          </div>
-          <div style={{ marginTop: 3, fontSize: 9.5, color: "#94a3b8", fontWeight: 600 }}>{b.rotulo}</div>
-        </div>
-      ))}
-    </div>
+    <span style={{
+      fontFamily: "var(--font-mono, monospace)", fontSize: 13, fontWeight: 600,
+      color: "#22e07a", letterSpacing: "0.03em",
+    }}>
+      {texto}
+    </span>
   );
 }
