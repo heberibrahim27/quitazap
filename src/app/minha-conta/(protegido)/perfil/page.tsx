@@ -8,6 +8,7 @@ import { FotoPerfilForm } from "./FotoPerfilForm";
 import { NotificacoesPush } from "../NotificacoesPush";
 import { ResetTotalForm } from "./ResetTotalForm";
 import { resetarDadosFinanceiros } from "./reset-actions";
+import { HORAS_TRABALHO_MENSAL_PADRAO } from "@/lib/financeiro/horas-trabalho";
 
 export default async function PerfilPage({
   searchParams,
@@ -73,6 +74,26 @@ export default async function PerfilPage({
     redirect("/minha-conta/perfil?ok=senha");
   }
 
+  async function salvarJornadaMensal(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const texto = String(formData.get("jornadaMensalHoras") || "").trim();
+    if (!texto) {
+      await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { jornadaMensalHoras: null } });
+      redirect("/minha-conta/perfil?ok=jornada");
+    }
+
+    const horas = Number(texto.replace(",", "."));
+    if (!Number.isFinite(horas) || horas <= 0 || horas > 320) {
+      redirect("/minha-conta/perfil?erro=Digite uma jornada mensal válida (até 320h) ou deixe em branco pra usar o padrão.");
+    }
+
+    await prisma.cliente.update({ where: { id: clienteAtual.id }, data: { jornadaMensalHoras: horas } });
+    redirect("/minha-conta/perfil?ok=jornada");
+  }
+
   return (
     <div>
       <div className="card-head">
@@ -92,6 +113,11 @@ export default async function PerfilPage({
       {ok === "senha" && (
         <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Senha alterada com sucesso.</p>
+        </div>
+      )}
+      {ok === "jornada" && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--green-soft)", border: "1px solid rgba(23,166,90,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5, fontWeight: 600 }}>Jornada mensal atualizada.</p>
         </div>
       )}
       {ok === "reset" && (
@@ -144,6 +170,34 @@ export default async function PerfilPage({
         <div>
           <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
             Alterar senha
+          </button>
+        </div>
+      </form>
+
+      <div className="card-head" style={{ marginTop: 24 }}>
+        <p className="card-title" style={{ fontSize: 14 }}>
+          <span className="title-label">Jornada mensal de trabalho</span>
+        </p>
+      </div>
+      <form action={salvarJornadaMensal} className="mc-form-card">
+        <label className="mc-label">
+          Horas trabalhadas por mês (opcional)
+          <input
+            name="jornadaMensalHoras"
+            type="text"
+            inputMode="decimal"
+            placeholder={`Deixe em branco pra usar o padrão (${HORAS_TRABALHO_MENSAL_PADRAO}h/mês, CLT)`}
+            defaultValue={cliente.jornadaMensalHoras ?? ""}
+            className="mc-input"
+          />
+        </label>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.5 }}>
+          Usada só pra converter uma compra em "quantas horas de trabalho custou" no WhatsApp. Sem preencher, usamos o
+          padrão CLT de 44h semanais ({HORAS_TRABALHO_MENSAL_PADRAO}h/mês).
+        </p>
+        <div>
+          <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }}>
+            Salvar jornada
           </button>
         </div>
       </form>
