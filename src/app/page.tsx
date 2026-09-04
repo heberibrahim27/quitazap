@@ -22,13 +22,19 @@ const LANDING_CSS = `
   .qz-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); transition-delay: var(--qz-delay, 0ms); }
   .qz-reveal.qz-visible { opacity: 1; transform: none; }
   .qz-grid12 { display: grid; grid-template-columns: 1fr; gap: 28px; }
-  @media (min-width: 900px) {
+  .qz-hero-pad { padding-left: 24px; padding-right: 24px; }
+  .qz-hero-light { font-size: 48px; }
+  .qz-hero-heavy { font-size: 72px; line-height: 0.95; }
+  @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
     .qz-col-5 { grid-column: span 5; }
     .qz-col-6 { grid-column: span 6; }
     .qz-col-7 { grid-column: span 7; }
     .qz-col-8 { grid-column: span 8; }
+    .qz-hero-pad { padding-left: 48px; padding-right: 48px; }
+    .qz-hero-light { font-size: 72px; }
+    .qz-hero-heavy { font-size: 128px; margin-top: -16px; }
   }
 `;
 
@@ -157,126 +163,94 @@ export default async function LandingPage() {
       }} />
 
       {/* ══════════════════════════════════════ */}
-      {/* HERO */}
+      {/* HERO — porte fiel do export Aura Build (Bloomava) que o Ibrahim
+          mandou como referência. Mesma estrutura/escala exata (grid-cols-12,
+          col-span-8/4, text-5xl→9xl, font-extralight→semibold, tracking-
+          tighter, leading-none, breakpoint md=768px), conteúdo adaptado pro
+          QuitaZap. Valores em px/rem abaixo são a tradução literal das
+          classes Tailwind do arquivo de referência — não são invenção. */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ position: "relative", overflow: "hidden" }}>
+      <section style={{ position: "relative", overflow: "hidden", minHeight: 640 }} className="qz-hero">
         {/*
           Vídeo de fundo (gerado no Veo3) ainda não foi enviado — usando o
-          gradiente de marca como poster/frame estático por enquanto, com
-          overlay escuro de ~35% por cima (mesmo efeito visual que o vídeo
-          vai ter). Quando o arquivo chegar, trocar a div "posterPlaceholder"
-          abaixo por:
-          <video autoPlay muted loop playsInline poster="/hero-poster.jpg" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}>
+          gradiente de marca como poster/frame estático por enquanto. Quando
+          o arquivo chegar, trocar por:
+          <video autoPlay muted loop playsInline style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", zIndex:0 }}>
             <source src="/hero.mp4" type="video/mp4" />
           </video>
         */}
         <div style={{
-          position: "absolute", inset: 0,
+          position: "absolute", inset: 0, zIndex: 0,
           background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)",
         }} />
         <div style={{
-          position: "absolute", inset: 0, opacity: 0.06,
+          position: "absolute", inset: 0, zIndex: 0, opacity: 0.06,
           backgroundImage: "linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }} />
+        {/* Overlay 1 — bg-neutral-900/50 mix-blend-multiply na referência */}
+        <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "rgba(0,0,0,0.5)", mixBlendMode: "multiply" }} />
+        {/* Overlay 2 — bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/90 */}
         <div style={{
-          position: "absolute", top: "-200px", left: "50%", transform: "translateX(-50%)",
-          width: "800px", height: "600px", maxWidth: "150vw",
-          background: "radial-gradient(ellipse, rgba(34,197,94,0.14) 0%, transparent 70%)",
+          position: "absolute", inset: 0, zIndex: 0,
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent, rgba(0,0,0,0.9))",
         }} />
-        {/* Overlay escuro (papel do vídeo quando ele entrar) */}
-        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
 
-        <div style={{ position: "relative", zIndex: 1, padding: "0 24px 96px" }}>
-          {/* Nav */}
-          <nav style={{
-            maxWidth: 1080, margin: "0 auto", padding: "28px 0",
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 9, background: "#22c55e",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {WHATSAPP_ICON}
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 18, color: "#ffffff", letterSpacing: "-0.3px" }}>QuitaZAP</span>
+        {/* header — px-6 md:px-12 py-8 */}
+        <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff" }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {WHATSAPP_ICON}
             </div>
-            <a href="/minha-conta/entrar" style={{ color: "#d1fae5", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
-              Já sou cliente
+            <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.05em", textTransform: "uppercase" }}>QuitaZAP</span>
+          </div>
+          <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85 }}>
+            Já sou cliente
+          </a>
+        </header>
+
+        {/* grid grid-cols-1 md:grid-cols-12 gap-8 items-end — px-6 md:px-12 pb-12 md:pb-24 */}
+        <div className="qz-grid12 qz-hero-pad" style={{ position: "relative", zIndex: 10, padding: "0 24px 48px", alignItems: "end" }}>
+          <div className="qz-col-8">
+            <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.05em" }}>
+              <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 200, opacity: 0.8, marginBottom: 8 }}>
+                Descubra quanto do seu dinheiro
+              </span>
+              <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "80ms" } as React.CSSProperties}>
+                ainda é <span style={{ color: "#22c55e" }}>seu.</span>
+              </span>
+            </h1>
+
+            {/* Linha de miniaturas — na referência são 3 fotos de portfólio;
+                aqui viram placeholders "print em breve" (mesma ideia da
+                seção de funcionalidades) até termos capturas reais do app. */}
+            <div className="qz-reveal" style={{ display: "flex", gap: 16, marginTop: 32, "--qz-delay": "140ms" } as React.CSSProperties}>
+              {[1, 2, 3].map((n) => (
+                <div key={n} style={{
+                  width: 64, height: 48, borderRadius: 6, overflow: "hidden",
+                  border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.06)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>APP</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="qz-col-4" style={{ color: "#fff", marginTop: 32 }}>
+            <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.025em" }} className="qz-reveal">
+              Direto no WhatsApp.
+            </h2>
+            <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
+              Controle seus gastos, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar — sem conectar conta bancária.
+            </p>
+            <a href={CAKTO_URL} className="qz-reveal" style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 999, padding: "13px 26px", fontSize: 14, fontWeight: 600,
+              background: "#22c55e", color: "#000", textDecoration: "none",
+            }}>
+              Garantir Preço Fundador — R$14,90/mês
             </a>
-          </nav>
-
-          {/* Hero content — tipografia editorial (duas linhas de peso bem
-              diferente) + grid assimétrico 12 colunas, headline à esquerda
-              ocupando 8 colunas, CTA/subheadline num bloco menor ao lado. */}
-          <div className="qz-grid12" style={{ maxWidth: 1120, margin: "48px auto 0", alignItems: "end" }}>
-            <div className="qz-col-8">
-              <h1 style={{ margin: "0 0 8px", textAlign: "left" }}>
-                <span className="qz-reveal" style={{
-                  display: "block", fontSize: "clamp(20px, 3.2vw, 34px)", fontWeight: 200,
-                  color: "rgba(255,255,255,0.78)", letterSpacing: "-0.5px", marginBottom: 6,
-                }}>
-                  Descubra quanto do seu dinheiro
-                </span>
-                <span className="qz-reveal" style={{
-                  display: "block", fontSize: "clamp(52px, 10.5vw, 128px)", fontWeight: 600,
-                  letterSpacing: "-4px", lineHeight: 0.92, marginLeft: "-2px", color: "#ffffff",
-                  "--qz-delay": "80ms",
-                } as React.CSSProperties}>
-                  ainda é <span style={{ color: "#22c55e" }}>seu.</span>
-                </span>
-              </h1>
-            </div>
-
-            <div className="qz-col-4" style={{ textAlign: "left" }}>
-              <p className="qz-reveal" style={{
-                margin: "0 0 14px", fontSize: 16, color: "#cbd5e1", lineHeight: 1.6,
-                "--qz-delay": "160ms",
-              } as React.CSSProperties}>
-                Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar.
-              </p>
-
-              <p className="qz-reveal" style={{
-                margin: "0 0 24px", fontSize: 13, color: "#94a3b8", lineHeight: 1.6,
-                "--qz-delay": "220ms",
-              } as React.CSSProperties}>
-                Feito pra quem quer parar de descobrir só no fim do mês que o dinheiro acabou — jovem, aposentado, CLT ou autônomo.
-              </p>
-
-              <a href={CAKTO_URL} className="qz-reveal" style={{
-                background: "#22c55e", color: "#000",
-                fontWeight: 700, fontSize: 15,
-                padding: "15px 22px", borderRadius: 6,
-                textDecoration: "none", display: "block", textAlign: "center",
-                "--qz-delay": "280ms",
-              } as React.CSSProperties}>
-                Garantir Preço Fundador — R$14,90/mês
-              </a>
-
-              <div style={{ marginTop: 14, display: "flex", flexDirection: "column" as const, gap: 4 }}>
-                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
-                  Sem precisar conectar sua conta bancária. Comece pelo WhatsApp, contando sua renda e seus gastos.
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
-                  Seus dados financeiros não são vendidos. Tudo que você registra é usado só pra gerar suas análises.
-                </p>
-              </div>
-
-              <div style={{ marginTop: 18 }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 7,
-                  background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)",
-                  borderRadius: 6, padding: "7px 14px",
-                  fontSize: 12.5, color: "#86efac", fontWeight: 600,
-                }}>
-                  🔥 Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
-                </span>
-                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#64748b" }}>
-                  R$14,90/mês enquanto sua assinatura permanecer ativa. Válido pros primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")} assinantes.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
