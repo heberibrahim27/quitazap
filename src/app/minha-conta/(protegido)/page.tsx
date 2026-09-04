@@ -172,7 +172,18 @@ export default async function MinhaContaPage({
     { rotulo: "Empréstimos", valor: totalEmprestimosMes, icone: "divida", classe: "blue" },
     { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
   ].filter((linha) => linha.valor > 0);
-  const maiorValorResumo = Math.max(totalReceitasMes, 1);
+  // Base de cálculo ÚNICA pra todas as barrinhas do Resumo (incluindo a de
+  // Investimentos, renderizada à parte logo abaixo): o maior valor entre
+  // TODAS as linhas mostradas, não só a Receita. Usar só a Receita como
+  // referência (bug anterior) fazia a barra de qualquer categoria de
+  // despesa/investimento menor que a receita do mês parecer artificialmente
+  // vazia mesmo quando ela já era a maior categoria de saída — e, no caso
+  // oposto (mês com dívida/despesa maior que a receita), forçava mais de
+  // uma barra a bater 100% ao mesmo tempo, sem diferenciação nenhuma.
+  const maiorValorResumo = Math.max(
+    totalReceitasMes, totalFixasMes, totalVariaveisMes, totalCartaoMes,
+    totalEmprestimosMes, totalOutrasDividasMes, Math.abs(totalMetasMes), 1,
+  );
   // totalSaidasOperacionais/resultadoAntesInvestimentos já vêm prontos do
   // motor (mesma fórmula de antes) — sem resomar `resumoDoMes` aqui.
   const totalSaidasOperacionais = totais.totalSaidasOperacionais;
@@ -322,8 +333,12 @@ export default async function MinhaContaPage({
           <Link href="/minha-conta/plano" className="plano-card">
             <div className="plano-top">
               <div>
+                {/* "Saúde financeira" como veredito é só do card dedicado
+                    abaixo (SaudeFinanceiraCard) — esse aqui fala só do
+                    plano de pagamento deste mês, pra nunca contradizer o
+                    outro (ex: saldo positivo aqui + dívida em atraso lá). */}
                 <p className={`plano-headline ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
-                  {resumoPlano.saldoProjetado >= 0 ? "Sua saúde financeira está em dia" : "Suas contas estão no vermelho"}
+                  {resumoPlano.saldoProjetado >= 0 ? "Seu plano de pagamento está em dia" : "Suas contas estão no vermelho"}
                 </p>
                 <p className="plano-caption">
                   {resumoPlano.saldoProjetado >= 0
