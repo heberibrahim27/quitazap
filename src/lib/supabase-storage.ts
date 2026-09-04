@@ -9,7 +9,11 @@ const BUCKET = "avatars";
 export async function subirFotoPerfil(clienteId: string, imagemJpeg: Blob): Promise<string> {
   const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!chave) {
-    throw new Error("Upload de foto indisponível no momento (variável SUPABASE_SERVICE_ROLE_KEY não configurada).");
+    // Detalhe de configuração (nome da env var) só no log do servidor — a
+    // mensagem que sobe pro cliente (via perfil/page.tsx) é o que vira texto
+    // na tela, não é o lugar de expor detalhe de infraestrutura interna.
+    console.error("[UPLOAD FOTO] SUPABASE_SERVICE_ROLE_KEY não configurada.");
+    throw new Error("Upload de foto indisponível no momento. Tente novamente mais tarde.");
   }
 
   const caminho = `clientes/${clienteId}.jpg`;

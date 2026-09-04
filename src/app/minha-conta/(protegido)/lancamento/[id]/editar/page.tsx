@@ -44,10 +44,13 @@ function revalidarTelasDependentes() {
 
 export default async function EditarLancamentoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ erro?: string }>;
 }) {
   const { id } = await params;
+  const { erro } = await searchParams;
   const lancamento = await carregarLancamentoDoDono(id);
 
   async function salvarLancamento(formData: FormData) {
@@ -62,7 +65,12 @@ export default async function EditarLancamentoPage({
     const recorrente = formData.get("recorrente") === "on";
 
     if (!descricao || !Number.isFinite(valor) || valor <= 0) {
-      throw new Error("Descrição e valor (maior que zero) são obrigatórios.");
+      redirect(`/minha-conta/lancamento/${id}/editar?erro=${encodeURIComponent("Descrição e valor (maior que zero) são obrigatórios.")}`);
+    }
+
+    const novaData = dataTexto ? new Date(`${dataTexto}T12:00:00`) : undefined;
+    if (novaData && Number.isNaN(novaData.getTime())) {
+      redirect(`/minha-conta/lancamento/${id}/editar?erro=${encodeURIComponent("Data inválida.")}`);
     }
 
     try {
@@ -72,17 +80,22 @@ export default async function EditarLancamentoPage({
           descricao,
           categoria: categoria || null,
           valor,
-          data: dataTexto ? new Date(`${dataTexto}T12:00:00`) : undefined,
+          data: novaData,
           recorrente,
         },
       });
     } catch (err) {
       // P2025 (registro não existe mais) pode acontecer numa corrida rara —
       // outra aba/o admin apagou entre a checagem acima e o update aqui.
-      // Trata como "já não existe" em vez de deixar o erro estourar pro
-      // usuário como uma tela de erro genérica.
+      // Só esse caso específico é tratado como "já não existe"; qualquer
+      // outro erro (conexão, constraint etc.) volta pro formulário com
+      // aviso em vez de fingir sucesso e mandar o cliente pro dashboard
+      // achando que salvou.
       console.error("[MINHA-CONTA] Erro ao salvar lançamento:", err);
-      redirect("/minha-conta");
+      if ((err as { code?: string } | null)?.code === "P2025") {
+        redirect("/minha-conta");
+      }
+      redirect(`/minha-conta/lancamento/${id}/editar?erro=${encodeURIComponent("Não foi possível salvar agora. Tente de novo.")}`);
     }
 
     revalidarTelasDependentes();
@@ -111,6 +124,12 @@ export default async function EditarLancamentoPage({
         <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Editar lançamento</h1>
         <p style={{ color: "var(--mc-ink-dim)", marginTop: 4 }}>{ROTULO_TIPO[lancamento.tipo] ?? lancamento.tipo}</p>
       </div>
+
+      {erro && (
+        <div className="mc-card" style={{ marginBottom: 16, background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
+        </div>
+      )}
 
       <form action={salvarLancamento} className="mc-form-card" style={{ marginBottom: 16 }}>
         <label className="mc-label">

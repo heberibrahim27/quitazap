@@ -54,10 +54,24 @@ export default async function DetalheEmprestimoPage({
       redirect(`/minha-conta/emprestimos/${parcela.dividaId}?erro=${encodeURIComponent("Digite um valor pago válido.")}`);
     }
 
-    await prisma.$transaction([
-      prisma.parcela.update({ where: { id: parcelaId }, data: { status: "PAGA", valor: valorPago } }),
-      prisma.divida.update({ where: { id: parcela.dividaId }, data: { valorPago: { increment: valorPago } } }),
-    ]);
+    // updateMany com status na cláusula where evita corrida de duplo toque:
+    // se "marcar paga" disparar duas vezes rápido (ex: conexão lenta), só a
+    // primeira chamada realmente encontra a parcela ainda não-paga e soma
+    // no valorPago da dívida — a segunda não acha nada pra atualizar e não
+    // soma de novo (sem isso, o saldo devedor ficava artificialmente baixo).
+    const jaEstavaPaga = await prisma.$transaction(async (tx) => {
+      const resultado = await tx.parcela.updateMany({
+        where: { id: parcelaId, status: { not: "PAGA" } },
+        data: { status: "PAGA", valor: valorPago },
+      });
+      if (resultado.count === 0) return true;
+      await tx.divida.update({ where: { id: parcela.dividaId }, data: { valorPago: { increment: valorPago } } });
+      return false;
+    });
+
+    if (jaEstavaPaga) {
+      redirect(`/minha-conta/emprestimos/${parcela.dividaId}?erro=${encodeURIComponent("Essa parcela já estava marcada como paga.")}`);
+    }
 
     const restantes = await prisma.parcela.count({ where: { dividaId: parcela.dividaId, status: { not: "PAGA" } } });
     if (restantes === 0) {
@@ -80,10 +94,16 @@ export default async function DetalheEmprestimoPage({
     const parcela = await carregarParcelaDoDono(parcelaId, clienteAtual.id);
     if (!parcela) notFound();
 
-    await prisma.$transaction([
-      prisma.parcela.update({ where: { id: parcelaId }, data: { status: "PENDENTE" } }),
-      prisma.divida.update({ where: { id: parcela.dividaId }, data: { valorPago: { decrement: parcela.valor } } }),
-    ]);
+    // Mesma trava do marcarParcelaPaga, no sentido contrário: só decrementa
+    // se a parcela realmente estava PAGA no momento do update.
+    await prisma.$transaction(async (tx) => {
+      const resultado = await tx.parcela.updateMany({
+        where: { id: parcelaId, status: "PAGA" },
+        data: { status: "PENDENTE" },
+      });
+      if (resultado.count === 0) return;
+      await tx.divida.update({ where: { id: parcela.dividaId }, data: { valorPago: { decrement: parcela.valor } } });
+    });
     await prisma.divida.update({ where: { id: parcela.dividaId }, data: { status: "ATIVA" } });
 
     revalidatePath("/minha-conta", "layout");

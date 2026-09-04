@@ -44,16 +44,26 @@ export default async function EditarCartaoPage({
     const diaFechamentoTexto = String(formData.get("diaFechamento") || "").trim();
     const diaVencimentoTexto = String(formData.get("diaVencimento") || "").trim();
     const limiteTexto = String(formData.get("limite") || "").trim().replace(",", ".");
+    const diaFechamento = diaFechamentoTexto ? Number(diaFechamentoTexto) : null;
+    const diaVencimento = diaVencimentoTexto ? Number(diaVencimentoTexto) : null;
+    const limite = limiteTexto ? Number(limiteTexto) : null;
+
+    // Mesma trava do cadastro (cartoes/novo) — o <input min/max> só protege
+    // contra digitação normal, não contra um POST manual fora da faixa.
+    if (diaFechamento != null && (!Number.isInteger(diaFechamento) || diaFechamento < 1 || diaFechamento > 31)) {
+      redirect(`/minha-conta/cartoes/${id}/editar?erro=${encodeURIComponent("Dia de fechamento precisa ser um número entre 1 e 31.")}`);
+    }
+    if (diaVencimento != null && (!Number.isInteger(diaVencimento) || diaVencimento < 1 || diaVencimento > 31)) {
+      redirect(`/minha-conta/cartoes/${id}/editar?erro=${encodeURIComponent("Dia de vencimento precisa ser um número entre 1 e 31.")}`);
+    }
+    if (limite != null && (!Number.isFinite(limite) || limite <= 0)) {
+      redirect(`/minha-conta/cartoes/${id}/editar?erro=${encodeURIComponent("Limite precisa ser maior que zero.")}`);
+    }
 
     try {
       await prisma.cartao.update({
         where: { id },
-        data: {
-          nome,
-          diaFechamento: diaFechamentoTexto ? Number(diaFechamentoTexto) : null,
-          diaVencimento: diaVencimentoTexto ? Number(diaVencimentoTexto) : null,
-          limite: limiteTexto ? Number(limiteTexto) : null,
-        },
+        data: { nome, diaFechamento, diaVencimento, limite },
       });
     } catch (err: unknown) {
       if (err && typeof err === "object" && "code" in err && err.code === "P2002") {

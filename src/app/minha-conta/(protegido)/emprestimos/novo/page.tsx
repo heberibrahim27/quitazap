@@ -63,42 +63,52 @@ export default async function NovoEmprestimoPage({
     }
 
     const primeiraData = new Date(`${primeiraDataTexto}T12:00:00`);
-
-    const divida = await prisma.divida.create({
-      data: {
-        clienteId: clienteAtual.id,
-        credor,
-        tipo: "EMPRESTIMO",
-        status: "ATIVA",
-        valorTotal: valorTotalFinal,
-        totalParcelas,
-        diaVencimento: primeiraData.getDate(),
-      },
-    });
+    if (Number.isNaN(primeiraData.getTime())) {
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Data da primeira parcela inválida.")}`);
+    }
 
     const restoUltimaParcela =
       valorParcelaInformado != null
         ? 0
         : Math.round((valorTotalFinal - valorPorParcela * totalParcelas) * 100) / 100;
 
-    const parcelasData = Array.from({ length: totalParcelas }, (_, i) => {
-      const vencimento = new Date(primeiraData);
-      vencimento.setMonth(vencimento.getMonth() + i);
-      const ehUltima = i === totalParcelas - 1;
-      return {
-        dividaId: divida.id,
-        numero: i + 1,
-        valor: ehUltima ? Math.round((valorPorParcela + restoUltimaParcela) * 100) / 100 : valorPorParcela,
-        vencimento,
-        status: "PENDENTE",
-      };
-    });
-    await prisma.parcela.createMany({ data: parcelasData });
+    let dividaId: string;
+    try {
+      const divida = await prisma.divida.create({
+        data: {
+          clienteId: clienteAtual.id,
+          credor,
+          tipo: "EMPRESTIMO",
+          status: "ATIVA",
+          valorTotal: valorTotalFinal,
+          totalParcelas,
+          diaVencimento: primeiraData.getDate(),
+        },
+      });
+      dividaId = divida.id;
+
+      const parcelasData = Array.from({ length: totalParcelas }, (_, i) => {
+        const vencimento = new Date(primeiraData);
+        vencimento.setMonth(vencimento.getMonth() + i);
+        const ehUltima = i === totalParcelas - 1;
+        return {
+          dividaId,
+          numero: i + 1,
+          valor: ehUltima ? Math.round((valorPorParcela + restoUltimaParcela) * 100) / 100 : valorPorParcela,
+          vencimento,
+          status: "PENDENTE",
+        };
+      });
+      await prisma.parcela.createMany({ data: parcelasData });
+    } catch (err) {
+      console.error("[MINHA-CONTA] Erro ao criar empréstimo:", err);
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Não foi possível salvar o empréstimo. Tente de novo.")}`);
+    }
 
     revalidatePath("/minha-conta", "layout");
     revalidatePath("/minha-conta/emprestimos");
     revalidatePath("/minha-conta/dividas");
-    redirect(`/minha-conta/emprestimos/${divida.id}`);
+    redirect(`/minha-conta/emprestimos/${dividaId}`);
   }
 
   return (
