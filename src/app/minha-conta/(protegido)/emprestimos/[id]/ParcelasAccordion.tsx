@@ -5,11 +5,13 @@ import { useState } from "react";
 export function ParcelasAccordion({
   resumo,
   children,
+  defaultAberto = false,
 }: {
   resumo: string;
   children: React.ReactNode;
+  defaultAberto?: boolean;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(defaultAberto);
 
   return (
     <div className="mc-card" style={{ padding: 0 }}>

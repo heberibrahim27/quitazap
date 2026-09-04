@@ -635,6 +635,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .cartao-hero-limite-label { font-size: 10.5px; color: rgba(255,255,255,0.65); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; margin: 0; }
 .cartao-hero-limite-valor { font-size: 15px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; margin: 3px 0 0; color: #fff; }
 
+/* Linha própria (não divide espaço com Limite/Disponível) — o valor tem a
+   largura da linha inteira do cartão pra crescer, então mais casas
+   decimais nunca fazem os três valores brigarem por espaço/quebrarem. */
+.cartao-hero-fatura {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.16);
+  position: relative; z-index: 1; gap: 10px;
+}
+.cartao-hero-fatura-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.02em; flex-shrink: 0; }
+.cartao-hero-fatura-valor { font-size: 16px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: #fff; text-align: right; }
+
 .cartao-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
 .cartao-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(15, 30, 51, 0.18); border: none; padding: 0; transition: all 0.2s ease; }
 .cartao-dot.active { width: 18px; background: var(--blue); }

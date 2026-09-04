@@ -4,6 +4,7 @@ import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { CartaoCarrossel, type CartaoCarrosselItem } from "./CartaoCarrossel";
+import { MesFiltro } from "../MesFiltro";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -50,12 +51,47 @@ function limitesDoMes(ano: number, mes: number) {
   return { inicio, fim };
 }
 
-export default async function CartoesPage() {
+function paramMes(ano: number, mes: number): string {
+  return `${ano}-${String(mes).padStart(2, "0")}`;
+}
+
+export default async function CartoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string | string[] }>;
+}) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
-  const { ano, mes, dia: diaAtual } = anoMesAtualBrasil(new Date());
-  const { inicio: inicioMes, fim: fimMes } = limitesDoMes(ano, mes);
+  const { ano: anoAtual, mes: mesAtual, dia: diaAtual } = anoMesAtualBrasil(new Date());
+
+  // Mês selecionado no filtro (mesmo padrão de Receitas/Despesas) — separado
+  // do mês atual porque "Limite"/"Disponível" continuam sendo "agora",
+  // só a fatura do card é que navega por mês.
+  const { mes: mesParamBruto } = await searchParams;
+  const mesParam = Array.isArray(mesParamBruto) ? mesParamBruto[0] : mesParamBruto;
+  let anoSel = anoAtual;
+  let mesSel = mesAtual;
+  const match = mesParam?.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    const anoInformado = Number(match[1]);
+    const mesInformado = Number(match[2]);
+    if (anoInformado >= 2000 && anoInformado <= 2100 && mesInformado >= 1 && mesInformado <= 12) {
+      anoSel = anoInformado;
+      mesSel = mesInformado;
+    }
+  }
+  const mesAnterior = mesSel === 1 ? { ano: anoSel - 1, mes: 12 } : { ano: anoSel, mes: mesSel - 1 };
+  const mesSeguinte = mesSel === 12 ? { ano: anoSel + 1, mes: 1 } : { ano: anoSel, mes: mesSel + 1 };
+
+  const { inicio: inicioMes, fim: fimMes } = limitesDoMes(anoAtual, mesAtual);
+  const { inicio: inicioMesSel, fim: fimMesSel } = limitesDoMes(anoSel, mesSel);
+  // A fatura do mês selecionado já fechou? Qualquer mês antes do atual
+  // sempre fechou; o mês atual só fecha quando o dia de hoje alcança o dia
+  // de fechamento cadastrado no cartão (sem essa data, nunca consideramos
+  // fechada — fica sempre "em aberto").
+  const mesSelEhAnterior = anoSel < anoAtual || (anoSel === anoAtual && mesSel < mesAtual);
+  const mesSelEhAtual = anoSel === anoAtual && mesSel === mesAtual;
 
   const cartoes = await prisma.cartao.findMany({ where: { clienteId: cliente.id }, orderBy: { nome: "asc" } });
 
@@ -84,7 +120,7 @@ export default async function CartoesPage() {
   // da lista de cartões, já carregada) — um Promise.all só por fora, em vez
   // de três `await` em sequência, dispara todas de uma vez em vez de
   // esperar uma terminar pra começar a próxima.
-  const [comprasPorCartao, proximasParcelasPorCartao, comprometidoPorCartao] = await Promise.all([
+  const [comprasPorCartao, proximasParcelasPorCartao, comprometidoPorCartao, faturaSelPorCartao] = await Promise.all([
     // "Últimas compras" é histórico — só o que já aconteceu (até o fim do
     // mês atual). Sem esse corte, parcelas futuras de uma compra parcelada
     // (datadas pros próximos meses) apareciam misturadas aqui, inclusive
@@ -125,11 +161,23 @@ export default async function CartoesPage() {
         })
       )
     ),
+    // Total da fatura do mês escolhido no filtro (independente do mês
+    // atual) — o que o cliente navega pra conferir meses passados/futuros.
+    Promise.all(
+      cartoes.map((c) =>
+        prisma.lancamento.aggregate({
+          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: inicioMesSel, lt: fimMesSel } },
+          _sum: { valor: true },
+        })
+      )
+    ),
   ]);
 
   const itens: CartaoCarrosselItem[] = cartoes.map((c, i) => {
     const comprometido = comprometidoPorCartao[i]._sum.valor ?? 0;
     const disponivel = c.limite != null ? c.limite - comprometido : null;
+    const faturaSelValor = faturaSelPorCartao[i]._sum.valor ?? 0;
+    const faturaSelFechadaCartao = mesSelEhAnterior || (mesSelEhAtual && c.diaFechamento != null && diaAtual >= c.diaFechamento);
     return {
       id: c.id,
       nome: c.nome,
@@ -138,6 +186,8 @@ export default async function CartoesPage() {
       limiteFmt: c.limite != null ? fmtValor(c.limite) : null,
       disponivelFmt: disponivel != null ? fmtValor(disponivel) : null,
       faturaFechada: c.diaFechamento != null && diaAtual >= c.diaFechamento,
+      faturaSelLabel: faturaSelFechadaCartao ? "Fatura fechada" : "Fatura em aberto",
+      faturaSelValorFmt: fmtValor(faturaSelValor),
       compras: comprasPorCartao[i].map((l) => ({
         id: l.id,
         descricao: l.descricao,
@@ -173,6 +223,12 @@ export default async function CartoesPage() {
           + Adicionar
         </Link>
       </div>
+
+      <MesFiltro
+        hrefAnterior={`/minha-conta/cartoes?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+        hrefSeguinte={`/minha-conta/cartoes?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        label={`${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}`}
+      />
 
       <CartaoCarrossel cartoes={itens} />
     </div>

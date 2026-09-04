@@ -26,6 +26,8 @@ export type CartaoCarrosselItem = {
   limiteFmt: string | null;
   disponivelFmt: string | null;
   faturaFechada: boolean;
+  faturaSelLabel: string;
+  faturaSelValorFmt: string;
   compras: CompraCartaoView[];
   proximasParcelas: ParcelaFuturaView[];
   proximasParcelasTotalFmt: string;
@@ -115,6 +117,13 @@ function CartaoHero({ c }: { c: CartaoCarrosselItem }) {
           <p className="cartao-hero-limite-label">Disponível</p>
           <p className="cartao-hero-limite-valor">{c.disponivelFmt ?? "—"}</p>
         </div>
+      </div>
+      {/* Linha própria (não dividindo espaço com Limite/Disponível) — cresce
+          livre em largura conforme o mês navegado tem fatura maior, sem
+          quebrar o layout dos outros dois valores ao lado. */}
+      <div className="cartao-hero-fatura">
+        <span className="cartao-hero-fatura-label">{c.faturaSelLabel}</span>
+        <span className="cartao-hero-fatura-valor">{c.faturaSelValorFmt}</span>
       </div>
     </div>
   );
