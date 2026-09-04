@@ -9,6 +9,7 @@ import { ExcluirForm } from "@/components/ExcluirForm";
 import { IconWallet, IconTrendUp, IconTarget, IconCheckCircle, IconAlertTriangle } from "@/components/icons";
 import { QaReveal } from "@/components/QaReveal";
 import { QaRing } from "@/components/QaRing";
+import { calcularDreAdmin, mesAtualBrasil, PRECO_MENSAL, COMISSAO_CAKTO } from "@/lib/financeiro-admin/motor";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +21,7 @@ function pct(v: number) {
   return (v * 100).toFixed(1) + "%";
 }
 
-function mesAtualBrasil(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" })
-    .format(new Date())
-    .slice(0, 7);
-}
-
 const NOMES_MES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-
-const PRECO_MENSAL = 29.90;
-const COMISSAO_CAKTO = 0.053; // 5,3% via PIX
 
 const ROTULO_METRICA: Record<string, string> = {
   clientes_pagos: "Clientes pagos",
@@ -50,41 +42,31 @@ export default async function FinanceiroPage() {
   const mesAtual = mesAtualBrasil();
   const [ano, mesNum] = mesAtual.split("-").map(Number);
 
-  // Início do mês corrente em horário de Brasília (meia-noite BRT = 03:00
-  // UTC) — mesma convenção usada em /minha-conta, pra não desalinhar do
-  // "mes" (YYYY-MM em BR) usado no filtro dos custos manuais. Calcular isso
-  // com Date local do servidor (UTC na Vercel) faria o custo de IA já
-  // contar o dia 1 (UTC) enquanto ainda é dia 31 (BR) — achado da
-  // auto-revisão.
-  const inicioMesBrasil = new Date(Date.UTC(ano, mesNum - 1, 1, 3, 0, 0, 0));
-
-  const [pagantes, totalGratuitos, custosDoMes, metas, custoIA] = await Promise.all([
-    prisma.cliente.count({ where: { gratuito: false } }),
-    prisma.cliente.count({ where: { gratuito: true } }),
+  // Motor DRE Admin (src/lib/financeiro-admin/motor.ts) — única fonte dos
+  // números de receita/custo/resultado do negócio. /painel consome o
+  // mesmo motor; antes desta unificação, cada tela calculava "lucro" do
+  // seu próprio jeito (uma ignorava comissão Cakto e custo manual).
+  const [dre, custosDoMes, metas] = await Promise.all([
+    calcularDreAdmin(mesAtual),
     prisma.custoMensal.findMany({ where: { mes: mesAtual }, orderBy: { criadoEm: "asc" } }),
     prisma.metaFinanceira.findMany(),
-    (async () => {
-      const r = await prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { criadoEm: { gte: inicioMesBrasil } } });
-      return (r._sum.custoUSD ?? 0) * 5.7; // USD → BRL
-    })(),
   ]);
 
-  const totalAssinantes = pagantes;
+  const {
+    totalAssinantes,
+    totalGratuitos,
+    receitaBruta,
+    receitaFonte,
+    comissaoCakto,
+    receitaLiquida,
+    custoIA,
+    custoManual: custoManualMes,
+    resultadoOperacional,
+    margem,
+  } = dre;
   const totalClientesAtivos = totalAssinantes + totalGratuitos;
-
-  // Receita
-  const receitaBruta = totalAssinantes * PRECO_MENSAL;
-  const comissaoCakto = receitaBruta * COMISSAO_CAKTO;
-  const receitaLiquida = receitaBruta - comissaoCakto;
-
-  // Custos: comissão + IA (automáticos, dados reais) + o que o fundador lançou manualmente esse mês
-  const custoManualMes = custosDoMes.reduce((soma, c) => soma + c.valor, 0);
   const custoTotal = comissaoCakto + custoIA + custoManualMes;
   const custoVariavelPorCliente = totalClientesAtivos > 0 ? custoIA / totalClientesAtivos : 0;
-
-  // Resultado
-  const lucroLiquido = receitaLiquida - custoIA - custoManualMes;
-  const margem = receitaLiquida > 0 ? lucroLiquido / receitaLiquida : 0;
 
   // Break-even: quantos assinantes cobrem o custo fixo do mês (custo manual)
   // + a fatia variável de IA por cliente, considerando a comissão da CAKTO
@@ -92,7 +74,7 @@ export default async function FinanceiroPage() {
   const margemPorCliente = PRECO_MENSAL * (1 - COMISSAO_CAKTO) - custoVariavelPorCliente;
   const breakEvenClientes = margemPorCliente > 0 ? Math.ceil(custoManualMes / margemPorCliente) : null;
   const clientesFaltam = breakEvenClientes != null ? Math.max(0, breakEvenClientes - totalAssinantes) : null;
-  const lucroPositivo = lucroLiquido >= 0;
+  const resultadoPositivo = resultadoOperacional >= 0;
 
   const metaClientes = metas.find((m) => m.metrica === "clientes_pagos");
   const metaMrr = metas.find((m) => m.metrica === "mrr");
@@ -155,16 +137,29 @@ export default async function FinanceiroPage() {
         </div>
       </div>
 
+      {receitaFonte === "ESTIMADA" && (
+        <div className="qa-alert qa-alert-amber" style={{ marginBottom: 14 }}>
+          <IconAlertTriangle size={18} />
+          <div>
+            <strong style={{ display: "block" }}>Receita estimada, não observada</strong>
+            <span style={{ opacity: 0.85 }}>
+              Nenhum pagamento real da Cakto com valor identificado neste mês ainda — a receita abaixo é contagem de
+              assinantes × {fmt(PRECO_MENSAL)}, não o valor de fato recebido.
+            </span>
+          </div>
+        </div>
+      )}
+
       <QaReveal className="qa-hero">
         <div>
-          <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconTrendUp size={14} /> Lucro líquido do mês</p>
-          <strong className="qa-hero-value" style={{ color: lucroPositivo ? undefined : "#fca5a5" }}>{fmt(lucroLiquido)}</strong>
+          <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconTrendUp size={14} /> Resultado operacional do mês</p>
+          <strong className="qa-hero-value" style={{ color: resultadoPositivo ? undefined : "#fca5a5" }}>{fmt(resultadoOperacional)}</strong>
           <p className="qa-hero-caption">Receita líquida {fmt(receitaLiquida)} · Custos {fmt(custoIA + custoManualMes)}</p>
         </div>
         <QaRing
-          value={margem}
-          color={lucroPositivo ? "#10b981" : "#ef4444"}
-          label={`${Math.round(margem * 100)}%`}
+          value={margem ?? 0}
+          color={resultadoPositivo ? "#10b981" : "#ef4444"}
+          label={`${Math.round((margem ?? 0) * 100)}%`}
         />
       </QaReveal>
 
@@ -177,7 +172,7 @@ export default async function FinanceiroPage() {
         <QaReveal className="qa-stat-card" delay={0.05}>
           <p className="qa-stat-label"><IconWallet size={13} /> Receita bruta/mês</p>
           <strong className="qa-stat-value">{fmt(receitaBruta)}</strong>
-          <p className="qa-stat-caption">{totalAssinantes} × {fmt(PRECO_MENSAL)}</p>
+          <p className="qa-stat-caption">{receitaFonte === "OBSERVADA" ? "valor real recebido (Cakto)" : `${totalAssinantes} × ${fmt(PRECO_MENSAL)} (estimado)`}</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.1}>
           <p className="qa-stat-label">Comissão CAKTO (5,3%)</p>
@@ -185,9 +180,9 @@ export default async function FinanceiroPage() {
           <p className="qa-stat-caption">Descontado automaticamente</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.15}>
-          <p className="qa-stat-label"><IconTrendUp size={13} /> Lucro líquido/mês</p>
-          <strong className="qa-stat-value" style={{ color: lucroPositivo ? "#6ee7b7" : "#fca5a5" }}>{fmt(lucroLiquido)}</strong>
-          <p className="qa-stat-caption">Margem: {pct(margem)}</p>
+          <p className="qa-stat-label"><IconTrendUp size={13} /> Resultado operacional/mês</p>
+          <strong className="qa-stat-value" style={{ color: resultadoPositivo ? "#6ee7b7" : "#fca5a5" }}>{fmt(resultadoOperacional)}</strong>
+          <p className="qa-stat-caption">Margem: {pct(margem ?? 0)}</p>
         </QaReveal>
       </div>
 
@@ -356,7 +351,7 @@ export default async function FinanceiroPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
             <thead>
               <tr>
-                {["Assinantes", "Receita Bruta", "- CAKTO", "- Custos", "Lucro Líquido", "Margem"].map((h) => (
+                {["Assinantes", "Receita Bruta", "- CAKTO", "- Custos", "Resultado Operacional", "Margem"].map((h) => (
                   <th key={h} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, color: "var(--qa-gray-400)", borderBottom: "1px solid var(--qa-line)" }}>{h}</th>
                 ))}
               </tr>
