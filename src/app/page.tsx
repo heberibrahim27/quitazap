@@ -30,27 +30,27 @@ const REDES_SOCIAIS = [
 ].filter((r): r is { nome: string; url: string } => Boolean(r.url));
 
 export const metadata = {
-  title: "QuitaZAP — Descubra quanto do seu salário ainda é seu",
+  title: "QuitaZAP — Descubra quanto do seu dinheiro ainda é seu",
   description:
-    "Controle seus gastos pelo WhatsApp, entenda seus consignados e contracheque, e pergunte ao QuitaZap antes de gastar. A partir de R$14,90/mês.",
+    "Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar. A partir de R$14,90/mês.",
   openGraph: {
-    title: "QuitaZAP — Descubra quanto do seu salário ainda é seu",
-    description: "Controle seus gastos, dívidas e contracheque direto no WhatsApp.",
+    title: "QuitaZAP — Descubra quanto do seu dinheiro ainda é seu",
+    description: "Controle seus gastos, dívidas e contas direto no WhatsApp.",
     type: "website",
   },
 };
 
 const doresMinicards = [
-  { icone: "🏦", titulo: "Consignado", texto: "Desconto direto na folha, sem controle." },
   { icone: "💳", titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi." },
   { icone: "📄", titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo." },
-  { icone: "🧾", titulo: "Contracheque confuso", texto: "Descontos que ninguém explica direito." },
+  { icone: "🏦", titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro." },
+  { icone: "🧾", titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
 ];
 
 const comoFunciona = [
-  { numero: 1, titulo: "Envie seu contracheque ou informe sua renda pelo WhatsApp." },
+  { numero: 1, titulo: "Informe sua renda pelo WhatsApp — ou envie seu contracheque, se tiver." },
   { numero: 2, titulo: "Registre seus gastos conversando com o QuitaZap." },
-  { numero: 3, titulo: "Veja quanto do salário está realmente livre — e pergunte “posso gastar R$300 hoje?” antes de gastar." },
+  { numero: 3, titulo: "Veja quanto do seu dinheiro está realmente livre — e pergunte “posso gastar R$300 hoje?” antes de gastar." },
 ];
 
 const funcionalidades = [
@@ -58,7 +58,7 @@ const funcionalidades = [
   { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento." },
   { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora." },
   { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando." },
-  { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos salários." },
+  { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos pagamentos." },
   { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas." },
 ];
 
@@ -183,7 +183,7 @@ export default async function LandingPage() {
               color: "#ffffff",
               letterSpacing: "-1.5px",
             }}>
-              Descubra quanto do seu salário<br />ainda é <span style={{ color: "#22c55e" }}>realmente seu.</span>
+              Descubra quanto do seu dinheiro<br />ainda é <span style={{ color: "#22c55e" }}>realmente seu.</span>
             </h1>
 
             <p style={{
@@ -195,7 +195,7 @@ export default async function LandingPage() {
               marginLeft: "auto",
               marginRight: "auto",
             }}>
-              Controle seus gastos pelo WhatsApp, entenda seus consignados e contracheque, e pergunte ao QuitaZap antes de gastar.
+              Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar.
             </p>
 
             <p style={{
@@ -207,7 +207,7 @@ export default async function LandingPage() {
               marginLeft: "auto",
               marginRight: "auto",
             }}>
-              Feito pra quem recebe salário, tem consignados, parcelas e quer parar de descobrir só no fim do mês que o dinheiro acabou.
+              Feito pra quem quer parar de descobrir só no fim do mês que o dinheiro acabou — jovem, aposentado, CLT ou autônomo.
             </p>
 
             <a href={CAKTO_URL} style={{
@@ -221,10 +221,10 @@ export default async function LandingPage() {
 
             <div style={{ marginTop: 16, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 4 }}>
               <p style={{ margin: 0, fontSize: 12.5, color: "#94a3b8" }}>
-                Sem precisar conectar sua conta bancária. Comece pelo WhatsApp e pelo seu contracheque.
+                Sem precisar conectar sua conta bancária. Comece pelo WhatsApp, contando sua renda e seus gastos.
               </p>
               <p style={{ margin: 0, fontSize: 12.5, color: "#94a3b8" }}>
-                Seus dados financeiros não são vendidos. O contracheque é usado apenas pra gerar suas análises.
+                Seus dados financeiros não são vendidos. Tudo que você registra é usado só pra gerar suas análises.
               </p>
             </div>
 
@@ -243,6 +243,14 @@ export default async function LandingPage() {
             </div>
           </div>
         </div>
+
+        {/* Transição em degradê pro branco da seção seguinte — evita o corte
+            seco entre o hero escuro e o fundo claro logo abaixo. */}
+        <div style={{
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 120,
+          background: "linear-gradient(to bottom, transparent, #ffffff)",
+          pointerEvents: "none",
+        }} />
       </section>
 
       {/* ══════════════════════════════════════ */}
@@ -255,9 +263,9 @@ export default async function LandingPage() {
             padding: "28px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20,
           }}>
             {[
-              { label: "Salário líquido", valor: "R$ 5.820", cor: "#0f172a" },
-              { label: "Consignados + contas", valor: "R$ 4.190", cor: "#ef4444" },
-              { label: "Salário realmente livre", valor: "R$ 1.630", cor: "#16a34a" },
+              { label: "Renda líquida", valor: "R$ 5.820", cor: "#0f172a" },
+              { label: "Contas e dívidas", valor: "R$ 4.190", cor: "#ef4444" },
+              { label: "Realmente livre", valor: "R$ 1.630", cor: "#16a34a" },
             ].map((item) => (
               <div key={item.label} style={{ textAlign: "center" }}>
                 <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>{item.label}</p>
@@ -277,7 +285,7 @@ export default async function LandingPage() {
       <section style={{ padding: "80px 24px", background: "#ffffff" }}>
         <div style={{ maxWidth: 780, margin: "0 auto", textAlign: "center" }}>
           <h2 style={{ margin: "0 0 40px", fontSize: "clamp(24px, 3.5vw, 32px)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.35, color: "#0f172a" }}>
-            Muita gente recebe o salário e, quando vê, quase tudo já foi em consignado, cartão e contas — e no fim do mês nem sabe direito onde o dinheiro foi.
+            Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
             {doresMinicards.map((d) => (
@@ -472,7 +480,7 @@ export default async function LandingPage() {
         }} />
         <div style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: "-1px" }}>
-            Descubra hoje quanto do seu salário é realmente seu.
+            Descubra hoje quanto do seu dinheiro é realmente seu.
           </h2>
           <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
             Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} no Preço Fundador · Cancele quando quiser
@@ -484,6 +492,15 @@ export default async function LandingPage() {
             Garantir Preço Fundador — R$14,90/mês
           </a>
         </div>
+
+        {/* Transição em degradê pro preto do rodapé — mesmo tratamento do
+            hero, fundo escuro pra fundo escuro (menos contraste, mas
+            mantém consistência de padrão entre as seções). */}
+        <div style={{
+          position: "absolute", left: 0, right: 0, bottom: 0, height: 80,
+          background: "linear-gradient(to bottom, transparent, #0a0a0a)",
+          pointerEvents: "none",
+        }} />
       </section>
 
       {/* ══════════════════════════════════════ */}
