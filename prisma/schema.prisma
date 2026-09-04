@@ -66,14 +66,22 @@ model Meta {
   @@index([clienteId])
 }
 
+// valor positivo = depósito (guardando), negativo = saque (resgatando) —
+// soma direto vira o "guardado" da meta sem precisar de outro campo pra
+// distinguir os dois casos. lancamentoId aponta pro Lancamento espelho
+// (RECEITA no saque, DESPESA_VARIAVEL no depósito) que faz esse valor
+// entrar/sair do saldo disponível do mês — sem isso, guardar numa meta não
+// tirava dinheiro de lugar nenhum na visão geral do app.
 model DepositoMeta {
-  id       String   @id @default(cuid())
-  metaId   String
-  valor    Float
-  data     DateTime @default(now())
-  criadoEm DateTime @default(now())
+  id           String   @id @default(cuid())
+  metaId       String
+  valor        Float
+  data         DateTime @default(now())
+  criadoEm     DateTime @default(now())
+  lancamentoId String?  @unique
 
-  meta Meta @relation(fields: [metaId], references: [id], onDelete: Cascade)
+  meta       Meta        @relation(fields: [metaId], references: [id], onDelete: Cascade)
+  lancamento Lancamento? @relation(fields: [lancamentoId], references: [id], onDelete: SetNull)
 
   @@index([metaId])
 }
@@ -358,8 +366,9 @@ model Lancamento {
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
-  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  cartao  Cartao? @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
+  cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cartao       Cartao?       @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
+  depositoMeta DepositoMeta?
 
   @@index([clienteId, data])
   @@index([clienteId, tipo])

@@ -131,8 +131,15 @@ export default async function MinhaContaPage({
   let totalFixasMes = 0;
   let totalVariaveisMes = 0;
   let totalCartaoMes = 0;
+  // Depósito/saque em meta (categoria "Metas", ver metas-actions.ts) não é
+  // receita nem despesa "de verdade" — é dinheiro só mudando de lugar entre
+  // a conta e o cofrinho. Fica de fora de Receitas/Despesas e vira sua
+  // própria linha ("Investimentos"), líquido do mês (depósitos - saques).
+  let totalMetasMes = 0;
   for (const l of lancamentosDoMes) {
-    if (l.tipo === "RECEITA") totalReceitasMes += l.valor;
+    if (l.categoria === "Metas") {
+      totalMetasMes += l.tipo === "RECEITA" ? -l.valor : l.valor;
+    } else if (l.tipo === "RECEITA") totalReceitasMes += l.valor;
     else if (l.tipo === "DESPESA_FIXA") totalFixasMes += l.valor;
     else if (l.tipo === "DESPESA_VARIAVEL") totalVariaveisMes += l.valor;
     else if (l.tipo === "COMPRA_CARTAO") {
@@ -140,7 +147,7 @@ export default async function MinhaContaPage({
       if (l.cartao) gastoCartaoMes.set(l.cartao.nome, (gastoCartaoMes.get(l.cartao.nome) ?? 0) + l.valor);
     }
   }
-  const totalSaidasMes = totalFixasMes + totalVariaveisMes + totalCartaoMes;
+  const totalSaidasMes = totalFixasMes + totalVariaveisMes + totalCartaoMes + totalMetasMes;
   const resultadoMes = totalReceitasMes - totalSaidasMes;
 
   // Renda = o que foi lançado como receita este mês (salário + outras
@@ -192,6 +199,7 @@ export default async function MinhaContaPage({
     { rotulo: "Despesas fixas", valor: totalFixasMes, icone: "fixa", classe: "blue" },
     { rotulo: "Desp. variáveis", valor: totalVariaveisMes, icone: "variavel", classe: "cyan" },
     { rotulo: "Cartões", valor: totalCartaoMes, icone: "cartao", classe: "blue" },
+    { rotulo: "Investimentos", valor: totalMetasMes, icone: "investimento", classe: "green" },
     { rotulo: "Empréstimos", valor: totalEmprestimosMes, icone: "divida", classe: "blue" },
     { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
   ].filter((linha) => linha.valor > 0);
