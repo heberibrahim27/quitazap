@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { ScrollReveal } from "./ScrollReveal";
+import { CountUp } from "./CountUp";
 
 // Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
 // nas referências de design (Aura Build) pra tirar a sensação de fundo
@@ -292,19 +293,21 @@ export default async function LandingPage() {
       {/* PROVA NUMÉRICA (exemplo ilustrativo) */}
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "56px 24px 0", background: "#ffffff" }}>
-        <div style={{ maxWidth: 780, margin: "0 auto" }}>
+        <div className="qz-reveal" style={{ maxWidth: 780, margin: "0 auto" }}>
           <div style={{
             background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16,
             padding: "28px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20,
           }}>
             {[
-              { label: "Renda líquida", valor: "R$ 5.820", cor: "#0f172a" },
-              { label: "Contas e dívidas", valor: "R$ 4.190", cor: "#ef4444" },
-              { label: "Realmente livre", valor: "R$ 1.630", cor: "#16a34a" },
+              { label: "Renda líquida", valor: 5820, cor: "#0f172a" },
+              { label: "Contas e dívidas", valor: 4190, cor: "#ef4444" },
+              { label: "Realmente livre", valor: 1630, cor: "#16a34a" },
             ].map((item) => (
               <div key={item.label} style={{ textAlign: "center" }}>
                 <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>{item.label}</p>
-                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.cor, letterSpacing: "-0.5px" }}>{item.valor}</p>
+                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.cor, letterSpacing: "-0.5px" }}>
+                  <CountUp valor={item.valor} />
+                </p>
               </div>
             ))}
           </div>
@@ -318,16 +321,21 @@ export default async function LandingPage() {
       {/* SEÇÃO DOR */}
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "80px 24px", background: "#ffffff" }}>
-        <div style={{ maxWidth: 780, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ margin: "0 0 40px", fontSize: "clamp(24px, 3.5vw, 32px)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.35, color: "#0f172a" }}>
-            Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
-          </h2>
+        <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+          <div className="qz-grid12" style={{ marginBottom: 40 }}>
+            <div className="qz-col-7 qz-reveal">
+              <h2 style={{ margin: 0, fontSize: "clamp(24px, 3.2vw, 32px)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.35, color: "#0f172a", textAlign: "left" }}>
+                Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
+              </h2>
+            </div>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
-            {doresMinicards.map((d) => (
-              <div key={d.titulo} style={{
+            {doresMinicards.map((d, i) => (
+              <div key={d.titulo} className="qz-reveal" style={{
                 background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14,
                 padding: "22px 16px", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 8,
-              }}>
+                "--qz-delay": `${i * 70}ms`,
+              } as React.CSSProperties}>
                 <span style={{ fontSize: 28 }}>{d.icone}</span>
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{d.titulo}</span>
                 <span style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.4 }}>{d.texto}</span>
@@ -341,18 +349,23 @@ export default async function LandingPage() {
       {/* COMO FUNCIONA */}
       {/* ══════════════════════════════════════ */}
       <section id="como-funciona" style={{ padding: "80px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
-            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a" }}>
-              Simples assim, direto no WhatsApp.
-            </h2>
+        <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+          <div className="qz-grid12" style={{ marginBottom: 48 }}>
+            <div className="qz-col-6 qz-reveal">
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
+              <h2 style={{ margin: 0, fontSize: "clamp(26px, 3.6vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+                Simples assim, direto no WhatsApp.
+              </h2>
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24 }}>
-            {comoFunciona.map((passo) => (
-              <div key={passo.numero} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "28px 24px" }}>
+            {comoFunciona.map((passo, i) => (
+              <div key={passo.numero} className="qz-reveal" style={{
+                background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "28px 24px",
+                "--qz-delay": `${i * 90}ms`,
+              } as React.CSSProperties}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10, background: "#22c55e",
+                  width: 36, height: 36, borderRadius: 8, background: "#22c55e",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontWeight: 800, fontSize: 16, color: "#000", marginBottom: 16,
                 }}>
@@ -370,15 +383,20 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       <section style={{ padding: "80px 24px", background: "#ffffff" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
-            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a" }}>
-              Tudo isso, direto no seu WhatsApp.
-            </h2>
+          <div className="qz-grid12" style={{ marginBottom: 48 }}>
+            <div className="qz-col-6 qz-reveal">
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
+              <h2 style={{ margin: 0, fontSize: "clamp(26px, 3.6vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+                Tudo isso, direto no seu WhatsApp.
+              </h2>
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-            {funcionalidades.map((f) => (
-              <div key={f.titulo} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden" }}>
+            {funcionalidades.map((f, i) => (
+              <div key={f.titulo} className="qz-reveal" style={{
+                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden",
+                "--qz-delay": `${i * 60}ms`,
+              } as React.CSSProperties}>
                 {/* Placeholder de screenshot real do app — trocar por print
                     de tela verdadeira desta funcionalidade assim que
                     disponível. */}
