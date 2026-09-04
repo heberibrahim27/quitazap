@@ -75,6 +75,13 @@ export async function POST(req: NextRequest) {
     // Registra TODO evento (payload bruto preservado) — não só aprovação —
     // antes de qualquer outra lógica. Se o resto da função falhar por
     // qualquer motivo, o evento já ficou salvo pra conferência/reprocesso.
+    //
+    // transacaoId é @unique no schema: se a Cakto reenviar o mesmo evento
+    // (retry de webhook), esse create falha por violação de constraint —
+    // é assim que detectamos duplicata e paramos antes de renovar
+    // assinatura ou reenviar boas-vindas de novo pro mesmo pagamento.
+    const transacaoId = extrairTransacaoId(body.data);
+    let eventoJaProcessado = false;
     try {
       await prisma.eventoCakto.create({
         data: {
@@ -82,12 +89,21 @@ export async function POST(req: NextRequest) {
           evento,
           status,
           valorPago: extrairValorPago(body.data),
-          transacaoId: extrairTransacaoId(body.data),
+          transacaoId,
           payloadBruto: body,
         },
       });
     } catch (e) {
-      console.error("[CAKTO] Erro ao registrar EventoCakto:", e);
+      if (transacaoId && (await prisma.eventoCakto.findUnique({ where: { transacaoId } }))) {
+        eventoJaProcessado = true;
+        console.log(`[CAKTO] Evento duplicado ignorado (transacaoId=${transacaoId} já processado).`);
+      } else {
+        console.error("[CAKTO] Erro ao registrar EventoCakto:", e);
+      }
+    }
+
+    if (eventoJaProcessado) {
+      return NextResponse.json({ ok: true, duplicate: true });
     }
 
     // Reembolso/cancelamento/chargeback: expira o acesso imediatamente
