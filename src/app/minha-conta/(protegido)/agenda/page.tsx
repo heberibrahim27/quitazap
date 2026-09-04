@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { ValorLista } from "../ValorLista";
+import { NovaTarefaForm } from "./NovaTarefaForm";
 
 function fmtData(d: Date) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -62,6 +63,8 @@ export default async function AgendaPage({
         <Link href="/minha-conta/agenda?aba=pendentes" className={`mc-tab ${aba === "pendentes" ? "active" : ""}`}>Pendentes</Link>
         <Link href="/minha-conta/agenda?aba=concluidas" className={`mc-tab ${aba === "concluidas" ? "active" : ""}`}>Concluídas</Link>
       </div>
+
+      <NovaTarefaForm />
 
       <div className="mc-card">
         {tarefas.length === 0 ? (
