@@ -7,6 +7,7 @@ import { ValorLista } from "../ValorLista";
 import { CategoriaAccordion } from "./CategoriaAccordion";
 import { GastosDonut } from "./GastosDonut";
 import { salvarOrcamento, removerOrcamento } from "./orcamento-actions";
+import { detectarVazamentosSalario } from "@/lib/financeiro/vazamentos-salario";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -76,8 +77,9 @@ export default async function GastosPage({
   const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
   const nomeMes = NOMES_MES[mes - 1];
+  const ehMesAtual = ano === anoAtual && mes === mesAtualNum;
 
-  const [gastos, orcamentos] = await Promise.all([
+  const [gastos, orcamentos, vazamentos] = await Promise.all([
     prisma.lancamento.findMany({
       where: {
         clienteId: cliente.id,
@@ -88,6 +90,11 @@ export default async function GastosPage({
       orderBy: { data: "desc" },
     }),
     prisma.orcamentoCategoria.findMany({ where: { clienteId: cliente.id } }),
+    // Vazamentos do salário (src/lib/financeiro/vazamentos-salario.ts) —
+    // análise fixa dos últimos 3 meses, independente do mês navegado aqui;
+    // só busca quando o cliente está no mês atual, senão não faz sentido
+    // repetir a mesma análise em toda página do histórico.
+    ehMesAtual ? detectarVazamentosSalario(cliente.id) : Promise.resolve([]),
   ]);
   const limitePorCategoria = new Map(orcamentos.map((o) => [o.categoria, o.limiteMensal]));
 
@@ -143,6 +150,32 @@ export default async function GastosPage({
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {vazamentos.length > 0 && (
+        <div className="mc-card" style={{ marginBottom: 16 }}>
+          <p style={{ margin: "0 0 4px", fontSize: 13.5, fontWeight: 700 }}>Vazamentos do salário</p>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--ink-faint)" }}>
+            Gastos recorrentes com valor estável nos últimos meses (assinaturas e afins)
+          </p>
+          <div className="mc-list">
+            {vazamentos.slice(0, 6).map((v) => (
+              <div key={v.descricao} className="mc-list-row">
+                <div className="mc-list-body">
+                  <div className="mc-list-desc">{v.descricao}</div>
+                  <div className="mc-list-meta">{fmtValor(v.valorMensal)}/mês</div>
+                </div>
+                <div className="mc-list-side">
+                  <ValorLista valor={v.valorAnualizado} sinal="-" />
+                  <div className="mc-list-sub">por ano</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: "10px 0 0", fontSize: 12.5, fontWeight: 700, textAlign: "right" }}>
+            Total: {fmtValor(vazamentos.reduce((s, v) => s + v.valorAnualizado, 0))}/ano
+          </p>
         </div>
       )}
 
