@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/insights-sombra",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/consignados",
+      "schedule": "0 15 * * *"
     }
   ]
 }

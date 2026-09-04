@@ -29,11 +29,14 @@ export async function resumoPlanoSimplificado(params: {
     };
   }
 
+  // divida.descontadoEmFolha=true = consignado, já refletido no salário
+  // líquido que o cliente lança/declara como `rendaMensal` — excluído
+  // aqui pra não abater a mesma dívida duas vezes do saldo projetado.
   const parcelasDoMes = await prisma.parcela.findMany({
     where: {
       status: "PENDENTE",
       vencimento: { gte: inicioMes, lt: fimMes },
-      divida: { clienteId, status: "ATIVA" },
+      divida: { clienteId, status: "ATIVA", descontadoEmFolha: false },
     },
     select: { valor: true },
   });

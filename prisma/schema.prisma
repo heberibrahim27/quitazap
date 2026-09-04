@@ -149,6 +149,15 @@ model Divida {
   emAtraso       Boolean   @default(false)
   diasAtraso     Int?
   dataReferencia DateTime?
+  // true = consignado/desconto direto em folha (ex: contracheque de
+  // servidor público). Essa parcela já está refletida no salário líquido
+  // que o cliente lança/declara como renda — motor.ts e
+  // saude-financeira.ts excluem essas parcelas do abatimento de
+  // saldo/renda pra não contar o desconto duas vezes. Baixa automática
+  // (ver cron consignados) marca como PAGA na data sem gerar nenhum
+  // evento de abatimento, já que o dinheiro nunca "saiu" de um saldo
+  // controlado pelo app.
+  descontadoEmFolha Boolean @default(false)
   criadoEm       DateTime  @default(now())
   atualizadoEm   DateTime  @updatedAt
 
