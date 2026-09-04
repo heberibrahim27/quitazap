@@ -195,20 +195,28 @@ export default async function MinhaContaPage({
       : null;
 
   const nomeMes = NOMES_MES[mes - 1];
+  // Investimentos (Metas) fica de fora da lista principal — não é uma
+  // despesa operacional junto de Despesas/Cartões/Dívidas, é um aporte,
+  // deduzido só depois num segundo passo (ver JSX): Receitas menos
+  // despesas e dívidas primeiro dá o "Resultado antes de investimentos";
+  // só depois de tirar o aporte é que chega na sobra livre de verdade.
   const resumoDoMes = [
     { rotulo: "Receitas", valor: totalReceitasMes, icone: "receita", classe: "green" },
     { rotulo: "Despesas fixas", valor: totalFixasMes, icone: "fixa", classe: "blue" },
     { rotulo: "Desp. variáveis", valor: totalVariaveisMes, icone: "variavel", classe: "cyan" },
     { rotulo: "Cartões", valor: totalCartaoMes, icone: "cartao", classe: "blue" },
-    { rotulo: "Investimentos", valor: totalMetasMes, icone: "investimento", classe: "green" },
     { rotulo: "Empréstimos", valor: totalEmprestimosMes, icone: "divida", classe: "blue" },
     { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
   ].filter((linha) => linha.valor > 0);
   const maiorValorResumo = Math.max(totalReceitasMes, 1);
-  // Subtotal de tudo que não é Receita — mesma soma que já entra no
-  // resultado final, só exibida como um passo intermediário (visual de
-  // DRE: receita, cada dedução, total de saídas, resultado).
-  const totalSaidasResumo = resumoDoMes.filter((linha) => linha.rotulo !== "Receitas").reduce((soma, linha) => soma + linha.valor, 0);
+  // Passo 1 da DRE: só despesas e dívidas "de verdade" (sem o aporte em
+  // Metas) — mesma soma que já compõe o resultado final do plano.
+  const totalSaidasOperacionais = resumoDoMes.filter((linha) => linha.rotulo !== "Receitas").reduce((soma, linha) => soma + linha.valor, 0);
+  const resultadoAntesInvestimentos = totalReceitasMes - totalSaidasOperacionais;
+  // totalMetasMes pode ser negativo (mês em que se sacou mais do que se
+  // guardou) — nesse caso o aporte "negativo" devolve dinheiro pra sobra,
+  // e ainda faz sentido mostrar a linha.
+  const temInvestimentosNoMes = totalMetasMes !== 0;
 
   const dividasEmAtraso = dividas.filter((d) => d.emAtraso).slice(0, 2);
 
@@ -352,7 +360,6 @@ export default async function MinhaContaPage({
                     {linha.icone === "fixa" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>}
                     {linha.icone === "variavel" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>}
                     {linha.icone === "cartao" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>}
-                    {linha.icone === "investimento" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>}
                     {linha.icone === "divida" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>}
                   </span>
                   <span className="resumo-label">{linha.rotulo}</span>
@@ -373,17 +380,38 @@ export default async function MinhaContaPage({
                 {linha.rotulo === "Receitas" && <div className="resumo-divisor" />}
               </Fragment>
             ))}
-            {totalSaidasResumo > 0 && (
+            {totalSaidasOperacionais > 0 && (
               <div className="resumo-subtotal">
-                <span className="resumo-subtotal-label">Total de saídas</span>
-                <span className="resumo-subtotal-value">{fmtValor(totalSaidasResumo)}</span>
+                <span className="resumo-subtotal-label">Resultado antes de investimentos</span>
+                <span className="resumo-subtotal-value">{fmtValor(resultadoAntesInvestimentos)}</span>
               </div>
+            )}
+            {temInvestimentosNoMes && (
+              <>
+                <div className="resumo-divisor" />
+                <div className="resumo-row">
+                  <span className="resumo-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
+                  </span>
+                  <span className="resumo-label">Investimentos</span>
+                  <span className="resumo-bar-track">
+                    <span
+                      className="resumo-bar-fill"
+                      style={{ "--to": Math.min(Math.abs(totalMetasMes) / maiorValorResumo, 1), "--i": resumoDoMes.length, background: "var(--green)" } as React.CSSProperties}
+                    />
+                  </span>
+                  <span className="resumo-value">
+                    <span className="resumo-value-cifrao">{totalMetasMes < 0 ? "+ R$" : "R$"}</span>
+                    <span className="resumo-value-numero">{fmtNumero(Math.abs(totalMetasMes))}</span>
+                  </span>
+                </div>
+              </>
             )}
             <div className={`resumo-footer ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
               <span className="resumo-footer-label">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M7.5 10h9M7.5 14h9" /></svg>
                 <span>
-                  {resumoPlano.saldoProjetado >= 0 ? "Sobra do mês" : "Déficit do mês"}
+                  {resumoPlano.saldoProjetado >= 0 ? "Sobra livre do mês" : "Déficit do mês"}
                   <span className="resumo-footer-sub">Resultado previsto de {nomeMes.toLowerCase()}</span>
                 </span>
               </span>
