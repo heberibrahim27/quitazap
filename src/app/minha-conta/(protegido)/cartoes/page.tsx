@@ -116,67 +116,75 @@ export default async function CartoesPage({
     );
   }
 
-  // As três buscas abaixo são independentes entre si (cada uma só depende
-  // da lista de cartões, já carregada) — um Promise.all só por fora, em vez
-  // de três `await` em sequência, dispara todas de uma vez em vez de
-  // esperar uma terminar pra começar a próxima.
-  const [comprasPorCartao, proximasParcelasPorCartao, comprometidoPorCartao, faturaSelPorCartao] = await Promise.all([
+  // Antes disparava até 4 queries POR CARTÃO em paralelo (uma pra cada
+  // grupo abaixo) — com o pool de conexões do Postgres limitado (5 no
+  // plano atual), um cliente com vários cartões estourava o pool e caía em
+  // "Timed out fetching a new connection" (P2024). Trocado por 4 queries
+  // FIXAS no total (uma por grupo, todos os cartões de uma vez via
+  // `cartaoId: { in: [...] }` ou `groupBy`), sem crescer com a quantidade
+  // de cartões do cliente.
+  const cartaoIds = cartoes.map((c) => c.id);
+
+  const [comprasTodas, proximasParcelasTodas, comprometidoPorCartaoRaw, faturaSelPorCartaoRaw] = await Promise.all([
     // "Últimas compras" é histórico — só o que já aconteceu (até o fim do
     // mês atual). Sem esse corte, parcelas futuras de uma compra parcelada
     // (datadas pros próximos meses) apareciam misturadas aqui, inclusive
     // antes de parcelas mais antigas já realizadas (orderBy desc por data).
-    Promise.all(
-      cartoes.map((c) =>
-        prisma.lancamento.findMany({
-          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { lt: fimMes } },
-          orderBy: { data: "desc" },
-          take: 15,
-        })
-      )
-    ),
+    // Sem `take` por cartão (agora é uma query só) — a lista é fatiada por
+    // cartão depois, em memória.
+    prisma.lancamento.findMany({
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { lt: fimMes } },
+      orderBy: { data: "desc" },
+    }),
     // Parcelas já agendadas pros próximos meses — pra dar visibilidade de
     // onde o limite comprometido (calculado abaixo) está "preso", já que
     // elas não aparecem em "Últimas compras" (só histórico do que já
     // aconteceu).
-    Promise.all(
-      cartoes.map((c) =>
-        prisma.lancamento.findMany({
-          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: fimMes } },
-          orderBy: { data: "asc" },
-          take: 24,
-        })
-      )
-    ),
+    prisma.lancamento.findMany({
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: fimMes } },
+      orderBy: { data: "asc" },
+    }),
     // "Disponível" precisa descontar o valor TOTAL comprometido no limite,
     // não só a fatura deste mês — uma compra parcelada reserva o valor
     // inteiro no limite assim que é feita (mesmo comportamento do cartão de
     // verdade), não só a parcela que cai na fatura atual. Por isso soma
     // tudo a partir do início do mês atual (mês atual + parcelas futuras já
     // agendadas); meses anteriores já viraram fatura paga.
-    Promise.all(
-      cartoes.map((c) =>
-        prisma.lancamento.aggregate({
-          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: inicioMes } },
-          _sum: { valor: true },
-        })
-      )
-    ),
+    prisma.lancamento.groupBy({
+      by: ["cartaoId"],
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMes } },
+      _sum: { valor: true },
+    }),
     // Total da fatura do mês escolhido no filtro (independente do mês
     // atual) — o que o cliente navega pra conferir meses passados/futuros.
-    Promise.all(
-      cartoes.map((c) =>
-        prisma.lancamento.aggregate({
-          where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: c.id, data: { gte: inicioMesSel, lt: fimMesSel } },
-          _sum: { valor: true },
-        })
-      )
-    ),
+    prisma.lancamento.groupBy({
+      by: ["cartaoId"],
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMesSel, lt: fimMesSel } },
+      _sum: { valor: true },
+    }),
   ]);
 
-  const itens: CartaoCarrosselItem[] = cartoes.map((c, i) => {
-    const comprometido = comprometidoPorCartao[i]._sum.valor ?? 0;
+  const comprometidoPorCartao = new Map(comprometidoPorCartaoRaw.map((g) => [g.cartaoId, g._sum.valor ?? 0]));
+  const faturaSelPorCartao = new Map(faturaSelPorCartaoRaw.map((g) => [g.cartaoId, g._sum.valor ?? 0]));
+  const comprasPorCartao = new Map<string, typeof comprasTodas>();
+  for (const l of comprasTodas) {
+    if (!l.cartaoId) continue;
+    const lista = comprasPorCartao.get(l.cartaoId) ?? [];
+    if (lista.length < 15) lista.push(l);
+    comprasPorCartao.set(l.cartaoId, lista);
+  }
+  const proximasParcelasPorCartao = new Map<string, typeof proximasParcelasTodas>();
+  for (const l of proximasParcelasTodas) {
+    if (!l.cartaoId) continue;
+    const lista = proximasParcelasPorCartao.get(l.cartaoId) ?? [];
+    if (lista.length < 24) lista.push(l);
+    proximasParcelasPorCartao.set(l.cartaoId, lista);
+  }
+
+  const itens: CartaoCarrosselItem[] = cartoes.map((c) => {
+    const comprometido = comprometidoPorCartao.get(c.id) ?? 0;
     const disponivel = c.limite != null ? c.limite - comprometido : null;
-    const faturaSelValor = faturaSelPorCartao[i]._sum.valor ?? 0;
+    const faturaSelValor = faturaSelPorCartao.get(c.id) ?? 0;
     const faturaSelFechadaCartao = mesSelEhAnterior || (mesSelEhAtual && c.diaFechamento != null && diaAtual >= c.diaFechamento);
     return {
       id: c.id,
@@ -188,14 +196,14 @@ export default async function CartoesPage({
       faturaFechada: c.diaFechamento != null && diaAtual >= c.diaFechamento,
       faturaSelLabel: faturaSelFechadaCartao ? "Fatura fechada" : "Fatura em aberto",
       faturaSelValorFmt: fmtValor(faturaSelValor),
-      compras: comprasPorCartao[i].map((l) => ({
+      compras: (comprasPorCartao.get(c.id) ?? []).map((l) => ({
         id: l.id,
         descricao: l.descricao,
         categoria: l.categoria,
         valor: l.valor,
         dataFmt: fmtData(l.data),
       })),
-      proximasParcelas: proximasParcelasPorCartao[i].map((l) => ({
+      proximasParcelas: (proximasParcelasPorCartao.get(c.id) ?? []).map((l) => ({
         id: l.id,
         descricao: l.descricao,
         categoria: l.categoria,
@@ -205,7 +213,7 @@ export default async function CartoesPage({
         mesLabel: mesLabel(l.data),
       })),
       proximasParcelasTotalFmt: fmtValor(
-        proximasParcelasPorCartao[i].reduce((soma, l) => soma + l.valor, 0)
+        (proximasParcelasPorCartao.get(c.id) ?? []).reduce((soma, l) => soma + l.valor, 0)
       ),
     };
   });
