@@ -96,12 +96,10 @@ export async function criarDespesaRapida(formData: FormData): Promise<{ erro?: s
     console.error("[LANCAMENTO] Erro ao verificar orçamento:", err)
   );
 
+  // "layout" já invalida toda a subárvore de /minha-conta (despesas, plano,
+  // movimentacoes, gastos, cartoes...) — chamar de novo rota por rota só
+  // atrasava o redirect à toa sem revalidar nada a mais.
   revalidatePath("/minha-conta", "layout");
-  revalidatePath("/minha-conta/despesas");
-  revalidatePath("/minha-conta/plano");
-  revalidatePath("/minha-conta/movimentacoes");
-  revalidatePath("/minha-conta/gastos");
-  if (cartaoId) revalidatePath("/minha-conta/cartoes");
   return {};
 }
 
@@ -131,12 +129,8 @@ export async function criarReceitaRapida(formData: FormData): Promise<{ erro?: s
     },
   });
 
-  // Receita alimenta a Renda usada no Dashboard e no Plano de Pagamento
-  // inteiro — sem isso, os dois continuam mostrando os números antigos
-  // até o cache expirar sozinho.
+  // "layout" já cobre receitas/plano/movimentacoes — ver comentário em
+  // criarDespesaRapida.
   revalidatePath("/minha-conta", "layout");
-  revalidatePath("/minha-conta/receitas");
-  revalidatePath("/minha-conta/plano");
-  revalidatePath("/minha-conta/movimentacoes");
   return {};
 }

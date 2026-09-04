@@ -62,8 +62,7 @@ export default async function NovoCartaoPage({
       redirect("/minha-conta/cartoes/novo?erro=Não foi possível salvar o cartão. Tente de novo.");
     }
 
-    revalidatePath("/minha-conta/cartoes");
-    revalidatePath("/minha-conta");
+    revalidatePath("/minha-conta", "layout");
     redirect("/minha-conta/cartoes");
   }
 

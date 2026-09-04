@@ -73,8 +73,7 @@ export default async function EditarCartaoPage({
       redirect(`/minha-conta/cartoes/${id}/editar?erro=${encodeURIComponent("Não foi possível salvar. Tente de novo.")}`);
     }
 
-    revalidatePath("/minha-conta/cartoes");
-    revalidatePath("/minha-conta");
+    revalidatePath("/minha-conta", "layout");
     redirect("/minha-conta/cartoes");
   }
 
@@ -85,8 +84,7 @@ export default async function EditarCartaoPage({
     // (onDelete: SetNull no schema) — não é preciso apagar nada mais.
     try {
       await prisma.cartao.delete({ where: { id } });
-      revalidatePath("/minha-conta/cartoes");
-      revalidatePath("/minha-conta");
+      revalidatePath("/minha-conta", "layout");
     } catch (err) {
       console.error("[MINHA-CONTA] Erro ao apagar cartão:", err);
     }
