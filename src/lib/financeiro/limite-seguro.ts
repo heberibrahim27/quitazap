@@ -29,6 +29,11 @@ export interface LimiteSeguro {
   compromissosRestantes: number;
   limiteSeguroDiario: number;
   diaApertado: DiaApertado | null;
+  // true quando não há renda lançada este mês NEM renda declarada no
+  // Perfil — nesse caso saldoLivre/limiteSeguroDiario abaixo são só "0
+  // menos despesas", não um saldo real, e não devem ser mostrados como se
+  // fossem (ver LimiteSeguroCard.tsx e limite-seguro-resolver.ts).
+  semDadosSuficientes: boolean;
 }
 
 export async function calcularLimiteSeguro(
@@ -37,7 +42,9 @@ export async function calcularLimiteSeguro(
 ): Promise<LimiteSeguro> {
   const { ano, mes } = anoMesAtualBrasil(referencia);
   const periodo = limitesDoMes(ano, mes);
-  const resumo = await calcularResumoFinanceiro({ clienteId, periodo });
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
+  const resumo = await calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
+  const semDadosSuficientes = !resumo.comprometimento.calculavel;
 
   const diasRestantes = resumo.previsao?.diasRestantes ?? 0;
   // Empréstimos/outras dívidas do mês (já excluindo consignado — ver
@@ -81,5 +88,5 @@ export async function calcularLimiteSeguro(
     }
   }
 
-  return { diasRestantes, saldoLivre, compromissosRestantes, limiteSeguroDiario, diaApertado };
+  return { diasRestantes, saldoLivre, compromissosRestantes, limiteSeguroDiario, diaApertado, semDadosSuficientes };
 }

@@ -32,10 +32,8 @@ export interface ConversaoHorasTrabalho {
 export async function calcularHorasTrabalho(clienteId: string, valor: number): Promise<ConversaoHorasTrabalho> {
   const { ano, mes } = anoMesAtualBrasil(new Date());
   const periodo = limitesDoMes(ano, mes);
-  const [resumo, cliente] = await Promise.all([
-    calcularResumoFinanceiro({ clienteId, periodo }),
-    prisma.cliente.findUnique({ where: { id: clienteId }, select: { jornadaMensalHoras: true } }),
-  ]);
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { jornadaMensalHoras: true, rendaMensal: true } });
+  const resumo = await calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
   const rendaLiquidaMensal = resumo.comprometimento.rendaEfetiva;
   const jornadaEhPadrao = !cliente?.jornadaMensalHoras || cliente.jornadaMensalHoras <= 0;
   const horasTrabalhoMensalAssumidas = jornadaEhPadrao ? HORAS_TRABALHO_MENSAL_PADRAO : (cliente!.jornadaMensalHoras as number);

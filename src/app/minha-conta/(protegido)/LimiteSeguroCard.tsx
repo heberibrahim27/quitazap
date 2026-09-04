@@ -19,22 +19,45 @@ function fmtDataDia(diaISO: string) {
 // dois como estatísticas independentes dava a entender que a dívida ainda
 // seria abatida de novo mais pra frente (achado reportado com print).
 //
+const CABECALHO = (
+  <div className="card-head">
+    <p className="card-title" style={{ fontSize: 14 }}>
+      <span className="title-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+      </span>
+      <span className="title-label">Até o próximo salário</span>
+    </p>
+  </div>
+);
+
 // Título fica FORA de .card (mesmo padrão do "Resumo"/"Saúde financeira"
 // na Home: card-head como irmão antes do card, não aninhado dentro dele).
 export function LimiteSeguroCard({ limite }: { limite: LimiteSeguro }) {
+  // Sem renda lançada este mês nem declarada no Perfil: saldoLivre/
+  // limiteSeguroDiario seriam só "0 menos despesas", não um saldo real —
+  // não mostra como se fosse (achado de auditoria de edge case, mesmo
+  // espírito do dadosInsuficientes do SaudeFinanceiraCard).
+  if (limite.semDadosSuficientes) {
+    return (
+      <>
+        {CABECALHO}
+        <div className="card" style={{ paddingBottom: 18 }}>
+          <div style={{ padding: "0 18px 14px" }}>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "var(--mc-ink-dim)" }}>
+              Ainda não consigo calcular seu limite seguro — cadastre sua renda no Perfil ou lance sua primeira receita do mês.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const negativo = limite.saldoLivre < 0;
   const cor = negativo ? "var(--red)" : "var(--green)";
 
   return (
     <>
-      <div className="card-head">
-        <p className="card-title" style={{ fontSize: 14 }}>
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
-          </span>
-          <span className="title-label">Até o próximo salário</span>
-        </p>
-      </div>
+      {CABECALHO}
 
       <div className="card" style={{ paddingBottom: 18 }}>
         <div style={{ padding: "0 18px 4px", display: "grid", gap: 10 }}>
