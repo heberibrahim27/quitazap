@@ -56,6 +56,9 @@ const LANDING_CSS = `
   .qz-hero-side { margin-top: 8px; }
   .qz-feat-img { aspect-ratio: 16 / 9; }
   .qz-price-card { padding: 28px 22px; }
+  .qz-dor-num-1 { font-size: 44px; }
+  .qz-dor-num-2 { font-size: 32px; }
+  .qz-dor-num-3 { font-size: 56px; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -74,6 +77,9 @@ const LANDING_CSS = `
     .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
     .qz-feat-img { aspect-ratio: 4 / 3; }
     .qz-price-card { padding: 40px 36px; }
+    .qz-dor-num-1 { font-size: 88px; }
+    .qz-dor-num-2 { font-size: 56px; }
+    .qz-dor-num-3 { font-size: 120px; }
   }
   @media (min-width: 1280px) {
     .qz-phone-mock {
@@ -120,10 +126,10 @@ export const metadata = {
 };
 
 const doresMinicards = [
-  { icone: "💳", titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi." },
-  { icone: "📄", titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo." },
-  { icone: "🏦", titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro." },
-  { icone: "🧾", titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
+  { titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi." },
+  { titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo." },
+  { titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro." },
+  { titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
 ];
 
 const comoFunciona = [
@@ -320,56 +326,69 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* SEÇÃO DOR — vem antes da prova numérica de propósito: primeiro
-          agita o problema em palavras, só depois mostra o número frio
-          como prova concreta (ordem sugerida pelo Ibrahim/ChatGPT). */}
+      {/* SEÇÃO DOR + PROVA — agita o problema em palavras, depois narrativa
+          de subtração editorial (não 3 cards iguais): renda cheia → o que
+          já está comprometido → o que sobra de verdade, em verde e maior,
+          entrando por último. Sem "wow moment" pesado aqui (isso fica pra
+          Hero/Como Funciona/WhatsApp+Painel) — só reveal e contador. */}
       {/* ══════════════════════════════════════ */}
-      <section className="qz-section" style={{ background: "#ffffff" }}>
-        <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-          <div className="qz-grid12" style={{ marginBottom: 40 }}>
-            <div className="qz-col-7 qz-reveal">
-              <h2 className="qz-h2-sm" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
+      <section className="qz-section" style={{ background: "linear-gradient(180deg, #050b07 0%, #0a140d 100%)", position: "relative", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
+          backgroundImage: `url("${GRAIN_SVG}")`,
+        }} />
+        <div style={{ maxWidth: 1080, margin: "0 auto", position: "relative" }}>
+          <div className="qz-grid12" style={{ marginBottom: 56 }}>
+            <div className="qz-col-8 qz-reveal">
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>TODO MÊS A MESMA HISTÓRIA</p>
+              <h2 className="qz-h2-sm" style={{ margin: 0, color: "#fff", textAlign: "left" }}>
                 Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
               </h2>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
-            {doresMinicards.map((d, i) => (
-              <div key={d.titulo} className="qz-reveal" style={{
-                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14,
-                padding: "22px 16px", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 8,
-                "--qz-delay": `${i * 70}ms`,
-              } as React.CSSProperties}>
-                <span style={{ fontSize: 28 }}>{d.icone}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{d.titulo}</span>
-                <span style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.4 }}>{d.texto}</span>
-              </div>
-            ))}
+
+          {/* Narrativa de subtração — renda cheia, o que já está
+              comprometido, o que sobra de verdade. Posições assimétricas,
+              não cards iguais; cada linha entra em cascata no scroll. */}
+          <div style={{ marginBottom: 56 }}>
+            <div className="qz-reveal">
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>RENDA LÍQUIDA</p>
+              <p className="qz-dor-num-1" style={{ margin: 0, fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <CountUp valor={5820} />
+              </p>
+            </div>
+
+            <div className="qz-reveal" style={{ marginTop: 20, marginLeft: "8%", "--qz-delay": "120ms" } as React.CSSProperties}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>− COMPROMETIDO COM CONTAS E DÍVIDAS</p>
+              <p className="qz-dor-num-2" style={{ margin: 0, fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "rgba(255,255,255,0.4)", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <CountUp valor={4190} />
+              </p>
+            </div>
+
+            <div className="qz-reveal" style={{
+              marginTop: 32, paddingTop: 32, borderTop: "1px solid rgba(255,255,255,0.15)", "--qz-delay": "260ms",
+            } as React.CSSProperties}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>REALMENTE LIVRE</p>
+              <p className="qz-dor-num-3" style={{ margin: 0, fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500, color: "#22e07a", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <CountUp valor={1630} />
+              </p>
+              <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.4)" }}>
+                Exemplo ilustrativo — os números do seu caso vêm do que você registrar no QuitaZap.
+              </p>
+            </div>
           </div>
 
-          {/* Prova numérica (exemplo ilustrativo) — logo abaixo da dor,
-              como evidência concreta do que acabou de ser descrito. */}
-          <div className="qz-reveal" style={{ maxWidth: 780, margin: "40px auto 0", "--qz-delay": "280ms" } as React.CSSProperties}>
-            <div style={{
-              background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16,
-              padding: "28px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20,
-            }}>
-              {[
-                { label: "Renda líquida", valor: 5820, cor: "#0f172a" },
-                { label: "Contas e dívidas", valor: 4190, cor: "#ef4444" },
-                { label: "Realmente livre", valor: 1630, cor: "#16a34a" },
-              ].map((item) => (
-                <div key={item.label} style={{ textAlign: "center" }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>{item.label}</p>
-                  <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.cor, letterSpacing: "-0.5px" }}>
-                    <CountUp valor={item.valor} />
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "#94a3b8", textAlign: "center" }}>
-              Exemplo ilustrativo — os números do seu caso vêm do que você registrar no QuitaZap.
-            </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 1, background: "rgba(255,255,255,0.08)" }}>
+            {doresMinicards.map((d, i) => (
+              <div key={d.titulo} className="qz-reveal" style={{
+                background: "#0a140d", padding: "24px 20px",
+                "--qz-delay": `${i * 70}ms`,
+              } as React.CSSProperties}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.05em" }}>{String(i + 1).padStart(2, "0")}</span>
+                <p style={{ margin: "10px 0 4px", fontSize: 14, fontWeight: 700, color: "#fff" }}>{d.titulo}</p>
+                <p style={{ margin: 0, fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{d.texto}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -536,7 +555,7 @@ export default async function LandingPage() {
           <div className="qz-col-5 qz-reveal">
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>CONDIÇÃO ESPECIAL</p>
             <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff", textAlign: "left" }}>
-              <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano.</span> Sem tier, sem surpresa.
+              <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano só.</span> Sem letra miúda, sem surpresa.
             </h2>
             <p style={{ margin: 0, fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "left" }}>
               1.000 vagas disponibilizadas nesta condição. Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
@@ -569,7 +588,7 @@ export default async function LandingPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>VAGAS DISPONÍVEIS</span>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.05em" }}>
-                      {assinantesFundador.toLocaleString("pt-BR")} / {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
+                      {vagasRestantes.toLocaleString("pt-BR")} / {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
                     </span>
                   </div>
                   <div style={{ height: 3, borderRadius: 999, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
