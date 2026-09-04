@@ -25,6 +25,7 @@ import {
   type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
+import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -1088,6 +1089,31 @@ Pode mandar tudo em uma mensagem só.`;
       });
 
       return NextResponse.json({ ok: true });
+    }
+
+    // Consulta financeira em linguagem natural (Skill Analista, prioridade
+    // 2) — sempre lê do motor central (src/lib/financeiro/motor.ts), nunca
+    // recalcula por conta própria. Leitura pura, sem efeito colateral, por
+    // isso roda sem confirmação e antes da cascata de registro de gasto.
+    if (sessao.clienteId) {
+      const tipoConsulta = detectarConsultaFinanceira(mensagem);
+      if (tipoConsulta) {
+        const respostaConsulta = await responderConsultaFinanceira(tipoConsulta, sessao.clienteId, mensagem, isGratuito);
+        await sendWhatsApp(telefone, respostaConsulta);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaConsulta },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
     }
 
     const loteGastosCartao = resolverLoteGastosCartao(mensagem);
