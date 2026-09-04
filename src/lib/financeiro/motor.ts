@@ -141,9 +141,12 @@ export async function calcularResumoFinanceiro(
   // reclassificada aqui. Só busca quando dá pra calcular o plano (mesmo
   // comportamento de hoje: sem renda cadastrada nem lançada, o Dashboard
   // não mostra empréstimos/outras dívidas do período).
+  // divida.descontadoEmFolha=true = consignado, já refletido no salário
+  // líquido que o cliente lança/declara como renda (ver schema.prisma) —
+  // excluído aqui pra não abater a mesma dívida duas vezes do saldo.
   const parcelasDoPeriodo = resumoPlano.calculavel
     ? await prisma.parcela.findMany({
-        where: { status: "PENDENTE", vencimento: { gte: periodo.inicio, lt: periodo.fim }, divida: { clienteId, status: "ATIVA" } },
+        where: { status: "PENDENTE", vencimento: { gte: periodo.inicio, lt: periodo.fim }, divida: { clienteId, status: "ATIVA", descontadoEmFolha: false } },
         select: { valor: true, divida: { select: { tipo: true } } },
       })
     : [];

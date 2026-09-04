@@ -24,6 +24,7 @@ export default async function NovoEmprestimoPage({
     const valorParcelaTexto = String(formData.get("valorParcela") || "").replace(",", ".").trim();
     const totalParcelas = Number(String(formData.get("parcelas") || "").trim());
     const primeiraDataTexto = String(formData.get("primeiraData") || "");
+    const descontadoEmFolha = formData.get("descontadoEmFolha") === "on";
 
     const valorTotalInformado = valorTotalTexto ? Number(valorTotalTexto) : null;
     const valorParcelaInformado = valorParcelaTexto ? Number(valorParcelaTexto) : null;
@@ -83,6 +84,7 @@ export default async function NovoEmprestimoPage({
           valorTotal: valorTotalFinal,
           totalParcelas,
           diaVencimento: primeiraData.getDate(),
+          descontadoEmFolha,
         },
       });
       dividaId = divida.id;

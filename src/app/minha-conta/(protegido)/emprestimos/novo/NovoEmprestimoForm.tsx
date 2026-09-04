@@ -77,6 +77,15 @@ export function NovoEmprestimoForm({ criarEmprestimo }: { criarEmprestimo: (fd: 
         <input name="primeiraData" required type="date" className="mc-input" />
       </label>
 
+      <label className="mc-label" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <input name="descontadoEmFolha" type="checkbox" style={{ width: 16, height: 16 }} />
+        É consignado (desconto direto na folha de pagamento)
+      </label>
+      <p style={{ margin: "-6px 0 0", fontSize: 11.5, color: "var(--ink-faint)", lineHeight: 1.4 }}>
+        Marque se o desconto já sai automaticamente do seu salário — assim a gente não conta esse valor duas vezes na
+        sua sobra do mês.
+      </p>
+
       <div>
         <span className="mc-label" style={{ marginBottom: 7, display: "block" }}>Juros total estimado</span>
         <div className="emprestimo-juros-preview">
