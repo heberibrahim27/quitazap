@@ -198,11 +198,10 @@ export default async function LandingPage() {
 
         {/* header — px-6 md:px-12 py-8 */}
         <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff" }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {WHATSAPP_ICON}
-            </div>
-            <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.05em", textTransform: "uppercase" }}>QuitaZAP</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-q-icon.png" alt="" style={{ height: 34, width: "auto", display: "block" }} />
+            <span style={{ color: "#fff", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>QuitaZap</span>
           </div>
           <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85 }}>
             Já sou cliente
@@ -542,13 +541,9 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 7, background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                  <path d="M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652C8.051 23.08 9.993 23.56 12 23.56h.008c6.572 0 11.92-5.334 11.928-11.894 0-3.174-1.25-6.16-3.42-8.217M12.045 21.58h-.007c-1.784 0-3.532-.48-5.057-1.38l-.363-.215-3.76.985 1.006-3.654-.237-.374a9.814 9.814 0 0 1-1.51-5.26c.001-5.45 4.452-9.878 9.92-9.878 2.648 0 5.135 1.03 7.007 2.9a9.836 9.836 0 0 1 2.907 6.988c-.002 5.45-4.455 9.888-9.906 9.888"/>
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.031-.967-.272-.099-.47-.148-.67.15-.197.297-.767.966-.94 1.164-.174.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.151-.172.2-.296.3-.495.099-.198.05-.371-.025-.52-.075-.149-.668-1.612-.916-2.207-.241-.579-.486-.5-.668-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
-                </svg>
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 16, color: "#fff" }}>QuitaZAP</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-q-icon.png" alt="" style={{ height: 28, width: "auto", display: "block" }} />
+              <span style={{ color: "#fff", fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>QuitaZap</span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
