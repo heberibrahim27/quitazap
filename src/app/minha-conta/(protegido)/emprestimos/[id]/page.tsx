@@ -126,6 +126,9 @@ export default async function DetalheEmprestimoPage({
   const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "PAGA").length;
   const totalDasParcelas = emprestimo.parcelas.reduce((soma, p) => soma + p.valor, 0);
   const jurosTotal = Math.round((totalDasParcelas - emprestimo.valorTotal) * 100) / 100;
+  const proximaParcela = emprestimo.parcelas
+    .filter((p) => p.status === "PENDENTE")
+    .sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())[0];
 
   return (
     <div>
@@ -149,9 +152,20 @@ export default async function DetalheEmprestimoPage({
         </div>
       )}
 
-      <div className="mc-card" style={{ marginBottom: 16, display: "flex", gap: 24 }}>
+      <div className="mc-card" style={{ marginBottom: 16, display: "flex", gap: 24, flexWrap: "wrap" }}>
+        {proximaParcela && (
+          <div>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Parcela mensal</p>
+            <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--blue)", fontFamily: "'IBM Plex Mono', monospace" }}>
+              {fmtValor(proximaParcela.valor)}
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--ink-faint)" }}>
+              vence {proximaParcela.vencimento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+            </p>
+          </div>
+        )}
         <div>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Saldo devedor</p>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Falta pagar</p>
           <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: saldoDevedor > 0 ? "var(--red)" : "var(--green)", fontFamily: "'IBM Plex Mono', monospace" }}>
             {fmtValor(saldoDevedor)}
           </p>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
+import { MesFiltro } from "../MesFiltro";
 import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
@@ -88,6 +89,12 @@ export default async function ReceitasPage({
           <span className="title-label">Receitas — {nomeMes}/{ano}</span>
         </p>
       </div>
+
+      <MesFiltro
+        hrefAnterior={`/minha-conta/receitas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+        hrefSeguinte={`/minha-conta/receitas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        label={`${nomeMes}/${ano}`}
+      />
 
       <div className="mc-card" style={{ marginBottom: 16 }}>
         <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>Total recebido em {nomeMes.toLowerCase()}</p>
