@@ -30,6 +30,7 @@ import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/si
 import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
 import { detectarRotaDividas, responderRotaDividas } from "@/lib/ia/rota-dividas-resolver";
 import { detectarConsultaVazamentos, responderConsultaVazamentos } from "@/lib/ia/vazamentos-resolver";
+import { detectarHorasTrabalho, responderHorasTrabalho } from "@/lib/ia/horas-trabalho-resolver";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -1220,6 +1221,28 @@ Pode mandar tudo em uma mensagem só.`;
               ...servidorHistoricoSessao,
               { role: "user", content: mensagem },
               { role: "assistant", content: respostaVazamentos },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // "Compra em horas de trabalho" (Skill Analista) — leitura pura, mesmo
+    // padrão das consultas acima.
+    if (sessao.clienteId) {
+      if (detectarHorasTrabalho(mensagem)) {
+        const respostaHoras = await responderHorasTrabalho(sessao.clienteId, mensagem, isGratuito);
+        await sendWhatsApp(telefone, respostaHoras);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaHoras },
             ]),
           },
         });
