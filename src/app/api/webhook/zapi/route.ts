@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────
 
 import { NextRequest, NextResponse, after } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone, variacoesTelefone } from "@/lib/zapi";
 import { processarMensagemIA, type Mensagem, type DividaIA } from "@/lib/ai-bot";
@@ -78,6 +79,7 @@ import {
   calcularTotalParcelas,
 } from "@/lib/plano";
 import { urlPainelCobrador } from "@/lib/cobrador-token";
+import { boletoValido, mensagemPreviaBoleto, detectarRespostaBoleto, salvarBoletoComoDivida, type BoletoDetectado } from "@/lib/boleto-flow";
 
 // GIF de celebração quando o cliente avisa que pagou uma dívida
 const GIF_PARABENS = "https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif";
@@ -224,16 +226,25 @@ type PDFContracheque = {
   associacoes: AssociacaoConsig[];
 };
 
+type PDFBoleto = {
+  tipo: "BOLETO";
+  beneficiario: string;
+  valor: number;
+  vencimento: string; // YYYY-MM-DD
+  linhaDigitavel: string | null;
+};
+
 type PDFOutro = {
   tipo: "OUTRO";
   texto: string;
 };
 
-type PDFResult = PDFContracheque | PDFOutro;
+type PDFResult = PDFContracheque | PDFBoleto | PDFOutro;
 
-// PDF/contracheque pausado no MVP — manter funções para futura versão beta.
-// uploadPDFOpenAI, deletePDFOpenAI, extrairPDF e buildDiagContracheque continuam definidas
-// abaixo, mas não são mais chamadas automaticamente no fluxo principal do webhook.
+// Contracheque continua pausado no MVP (motivo: erro nos valores extraídos
+// em alguns formatos, ver mensagem de fallback abaixo) — mas boleto
+// ("Boleto Inteligente") já está ativo, ver handler de tipoEntrada
+// === "documento" mais abaixo.
 // ── Upload de PDF para OpenAI Files API ──────────────────────────────────
 
 async function uploadPDFOpenAI(pdfUrl: string): Promise<{ fileId: string; apiKey: string }> {
@@ -396,7 +407,18 @@ VALIDAÇÃO FINAL ANTES DE RESPONDER:
 - Confira se todas as linhas com NNN/999 ou NNN/000 foram incluídas em associacoes.
 - Responda somente com JSON válido.
 
-Se NÃO for contracheque (for boleto, fatura, extrato, etc), responda com:
+Se for um BOLETO BANCÁRIO (título de cobrança com linha digitável/código de barras — conta, fatura, carnê, guia — não confundir com contracheque), responda APENAS com este JSON (sem markdown):
+
+{ "tipo": "BOLETO", "beneficiario": "nome de quem recebe o pagamento", "valor": 0.00, "vencimento": "AAAA-MM-DD", "linhaDigitavel": "00000.00000 00000.000000 00000.000000 0 00000000000000" }
+
+Regras para o boleto:
+- beneficiario: nome do cedente/beneficiário impresso no boleto (quem vai receber o pagamento), nunca o nome do pagador/sacado.
+- valor: o valor total do documento (campo "Valor do documento" ou "Valor cobrado"), sempre número, nunca string.
+- vencimento: data de vencimento no formato AAAA-MM-DD. Se não conseguir ler a data com certeza, use null.
+- linhaDigitavel: a linha digitável completa (os números abaixo do código de barras), como texto, mantendo os espaços. Se não conseguir ler com certeza, use null — nunca invente números.
+- Se não conseguir extrair valor OU vencimento com confiança, responda com tipo "OUTRO" em vez de arriscar um valor errado.
+
+Se não for contracheque nem boleto (for fatura de cartão, extrato, etc), responda com:
 { "tipo": "OUTRO", "texto": "descrição do documento em português" }`,
             },
           ],
@@ -414,9 +436,13 @@ response_format: { type: "json_object" },
     const chatData = await chatRes.json() as { choices: { message: { content: string } }[] };
     const raw = chatData.choices[0]?.message?.content?.trim() ?? "{}";
     const parsed = JSON.parse(raw) as PDFResult;
+    // Não loga valor/linha digitável/beneficiário em claro (dado financeiro
+    // sensível) — só o suficiente pra depurar qual ramo foi tomado.
     console.log(`[PDF] tipo="${parsed.tipo}"`, parsed.tipo === "CONTRACHEQUE"
-      ? `liq=${parsed.salarioLiquidoNormal} emp=${parsed.emprestimos.length} assoc=${parsed.associacoes.length}`
-      : "");
+      ? `emp=${parsed.emprestimos.length} assoc=${parsed.associacoes.length}`
+      : parsed.tipo === "BOLETO"
+        ? `temLinhaDigitavel=${parsed.linhaDigitavel != null}`
+        : "");
     return parsed;
 
   } finally {
@@ -873,13 +899,39 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Documento (PDF) ──────────────────────
-    // PDF/contracheque pausado no MVP — manter funções para futura versão beta.
-    // extrairPDF / uploadPDFOpenAI / deletePDFOpenAI / buildDiagContracheque seguem definidas acima,
-    // mas não são mais chamadas automaticamente aqui enquanto a leitura de PDF estiver pausada.
+    // Leitura de contracheque continua pausada no MVP (erro nos valores em
+    // alguns formatos) — mas "Boleto Inteligente" já está ativo: reaproveita
+    // o mesmo extrairPDF, só reage quando o retorno é BOLETO com dados
+    // completos (nunca cria compromisso sem confirmação do cliente).
     if (tipoEntrada === "documento") {
+      try {
+        const resultado = await extrairPDF(body.document.documentUrl);
+
+        if (resultado.tipo === "BOLETO" && sessao.clienteId) {
+          const boleto: BoletoDetectado = {
+            beneficiario: resultado.beneficiario,
+            valor: resultado.valor,
+            vencimento: resultado.vencimento,
+            linhaDigitavel: resultado.linhaDigitavel,
+          };
+          if (boletoValido(boleto)) {
+            await prisma.botSessao.updateMany({
+              where: { id: sessao.id },
+              data: { boletoPendente: boleto as unknown as Prisma.InputJsonValue },
+            });
+            await sendWhatsApp(sessao.telefone, mensagemPreviaBoleto(boleto));
+            return NextResponse.json({ ok: true });
+          }
+        }
+      } catch (err) {
+        console.error("[Z-API] Erro ao extrair PDF:", err);
+      }
+
+      // Contracheque, "OUTRO", boleto com dado incompleto, ou erro na
+      // extração — mesma orientação de fallback já usada pro contracheque.
       await sendWhatsApp(
         sessao.telefone,
-        `📄 Recebi seu PDF, mas a leitura automática de contracheque está em beta e foi pausada para evitar erro nos valores.\n\n` +
+        `📄 Recebi seu PDF, mas não consegui ler os dados com segurança (a leitura automática de contracheque está em beta e foi pausada para evitar erro nos valores).\n\n` +
           `Para eu montar seu diagnóstico com segurança, me envie os dados principais assim:\n\n` +
           `Salário líquido normal:\n` +
           `Líquido recebido este mês:\n` +
@@ -892,6 +944,34 @@ export async function POST(req: NextRequest) {
           `ASPRA 87,00`
       );
       return NextResponse.json({ ok: true });
+    }
+
+    // ── Confirmação de boleto pendente (Boleto Inteligente) ──
+    // Independente da etapa/estado de texto — se há um boleto aguardando
+    // confirmação, uma resposta sim/não resolve ele antes de qualquer outro
+    // fluxo. Uma mensagem que não seja claramente sim/não cai no fluxo
+    // normal (não trava a conversa esperando só essa resposta).
+    //
+    // Limitação conhecida: se o cliente também tiver uma
+    // confirmacaoPendente do fluxo de texto (ex: gasto duplicado) aberta ao
+    // mesmo tempo, um "sim" aqui resolve o boleto e deixa a outra pendência
+    // esperando uma segunda resposta — não perde nem duplica nada, só pode
+    // pedir a confirmação de novo. Cenário raro (exigiria as duas pendências
+    // abertas ao mesmo tempo); não justificou unificar os dois mecanismos
+    // de confirmação antes do lançamento.
+    if (sessao.boletoPendente && tipoEntrada === "texto") {
+      const resposta = detectarRespostaBoleto(mensagem);
+      if (resposta) {
+        const boletoPendente = sessao.boletoPendente as unknown as BoletoDetectado;
+        await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { boletoPendente: Prisma.JsonNull } });
+        if (resposta === "confirmar" && sessao.clienteId) {
+          await salvarBoletoComoDivida(sessao.clienteId, boletoPendente);
+          await sendWhatsApp(sessao.telefone, "✅ Salvei o boleto como um compromisso no seu Controle. Vou te lembrar antes do vencimento.");
+        } else {
+          await sendWhatsApp(sessao.telefone, "Beleza, não salvei. 👌");
+        }
+        return NextResponse.json({ ok: true });
+      }
     }
 
         // ── Comando RESETAR (funciona em qualquer etapa) ──
@@ -916,6 +996,10 @@ export async function POST(req: NextRequest) {
             { role: "assistant", content: respostaReset },
             { role: "assistant", content: respostaInicio },
           ]),
+          // Sem isso, um boleto detectado antes do reset ficaria pendente
+          // pra sempre — e um "sim" completamente sem relação, dias depois,
+          // recriaria uma dívida com dados velhos.
+          boletoPendente: Prisma.JsonNull,
         },
       });
 
