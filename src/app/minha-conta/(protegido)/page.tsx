@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
-import { calcularResumoFinanceiro } from "@/lib/financeiro/motor";
+import { calcularResumoFinanceiro, calcularMediaMensal } from "@/lib/financeiro/motor";
+import { calcularSaudeFinanceira } from "@/lib/financeiro/saude-financeira";
+import { SaudeFinanceiraCard } from "./SaudeFinanceiraCard";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
 import { MesSwipe } from "./MesSwipe";
@@ -98,7 +100,7 @@ export default async function MinhaContaPage({
   const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 
-  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro] = await Promise.all([
+  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro, mediaMensal] = await Promise.all([
     prisma.divida.findMany({
       where: { clienteId: cliente.id, status: "ATIVA" },
       orderBy: [{ prioridade: "desc" }, { criadoEm: "asc" }],
@@ -124,6 +126,9 @@ export default async function MinhaContaPage({
     // Motor financeiro central (src/lib/financeiro/motor.ts) — único lugar
     // autorizado a somar Lancamento/Parcela. Ver motor-contrato.ts.
     calcularResumoFinanceiro({ clienteId: cliente.id, periodo: { inicio: inicioMes, fim: fimMes }, rendaMensalDeclarada: cliente.rendaMensal }),
+    // Média dos últimos 3 meses (mesmo motor) — só pro componente "ritmo"
+    // da Saúde Financeira, ver src/lib/financeiro/saude-financeira.ts.
+    calcularMediaMensal(cliente.id, { inicio: inicioMes, fim: fimMes }, 3),
   ]);
 
   // Aliases 1:1 com os nomes que o JSX abaixo já usava antes da extração
@@ -178,6 +183,24 @@ export default async function MinhaContaPage({
   const temInvestimentosNoMes = totalMetasMes !== 0;
 
   const dividasEmAtraso = dividas.filter((d) => d.emAtraso).slice(0, 2);
+
+  // Saúde financeira (src/lib/financeiro/saude-financeira.ts) — score
+  // determinístico só a partir do que o motor já calculou acima + a média
+  // de 3 meses buscada junto no Promise.all. Só faz sentido mostrar
+  // quando já existe algum lançamento no mês (mesmo guard do Resumo).
+  const saude = quantidadeLancamentos > 0
+    ? calcularSaudeFinanceira({
+        totais: { despesasVariaveis: totalVariaveisMes, receitas: totalReceitasMes, resultadoSemPlano: resultadoMes },
+        comprometimento: {
+          calculavel: resumoPlano.calculavel,
+          percentualComprometido,
+          saldoProjetado: resumoPlano.saldoProjetado,
+          rendaEfetiva,
+        },
+        mediaDespesasVariaveis: mediaMensal.despesasVariaveis,
+        temDividaEmAtraso: dividasEmAtraso.length > 0,
+      })
+    : null;
 
   const hoje = new Date();
   const proximosCompromissos = tarefasPendentes
@@ -292,6 +315,8 @@ export default async function MinhaContaPage({
           </Link>
         </>
       )}
+
+      {saude && <SaudeFinanceiraCard saude={saude} />}
 
       <div className="card-head">
         <p className="card-title">
