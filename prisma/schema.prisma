@@ -45,6 +45,8 @@ model Cliente {
   orcamentos        OrcamentoCategoria[]
   metas             Meta[]
   eventosCakto      EventoCakto[]
+  insightsDetectados InsightDetectado[]
+  saudeFinanceiraLogs SaudeFinanceiraLog[]
 }
 
 // ─────────────────────────────────────────
@@ -594,4 +596,63 @@ model EventoCakto {
   @@index([clienteId])
   @@index([evento])
   @@index([criadoEm])
+}
+
+// ─────────────────────────────────────────
+// INSIGHT DETECTADO — insight proativo (Skill Analista, prioridade 3)
+// ─────────────────────────────────────────
+// Detecção 100% determinística (src/lib/financeiro/deteccao-anomalia.ts,
+// em cima do motor.ts) — a IA só é chamada pra REDIGIR o texto de um
+// insight que já foi decidido por código, nunca pra decidir se dispara.
+// Nasce em modo sombra (status SOMBRA): só fica registrado aqui pro
+// fundador revisar em /insights-sombra antes de decidir ligar o envio de
+// verdade (status ENVIADO, quando essa fase existir).
+// tipo:   hoje só "ANOMALIA_CATEGORIA" (categoria do mês > 1.3x a média
+//         dos últimos 3 meses) — campo aberto pra outros tipos futuros.
+// status: SOMBRA | ENVIADO
+// Único por (clienteId, categoria, mes): upsert idempotente no cron —
+// nunca duplica nem gasta IA de novo pra reavaliar a mesma anomalia no
+// mesmo mês.
+model InsightDetectado {
+  id                  String   @id @default(cuid())
+  clienteId           String
+  tipo                String   @default("ANOMALIA_CATEGORIA")
+  categoria           String
+  mes                 String // YYYY-MM
+  totalMesAtual       Float
+  mediaUltimosMeses   Float
+  multiplicador       Float
+  textoGerado         String
+  status              String   @default("SOMBRA")
+  criadoEm            DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, categoria, mes])
+  @@index([clienteId])
+  @@index([criadoEm])
+}
+
+// Histórico do score de Saúde Financeira (src/lib/financeiro/saude-financeira.ts).
+// 1 registro por (clienteId, dia) — upsert a cada carregamento da Home do
+// Controle, então múltiplas visitas no mesmo dia não duplicam, só atualizam
+// pro valor mais recente daquele dia. versaoFormula grava qual fórmula
+// gerou aquele score: se os pesos mudarem no futuro, o histórico antigo
+// continua marcado com a versão que realmente o calculou, em vez de ser
+// reinterpretado silenciosamente como se tivesse saído da fórmula nova.
+model SaudeFinanceiraLog {
+  id            String   @id @default(cuid())
+  clienteId     String
+  dia           String // YYYY-MM-DD, calendário de Brasília
+  versaoFormula String
+  score         Int
+  classificacao String
+  dadosInsuficientes Boolean @default(false)
+  componentes   Json
+  criadoEm      DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, dia])
+  @@index([clienteId])
 }

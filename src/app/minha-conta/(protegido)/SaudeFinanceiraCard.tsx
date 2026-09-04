@@ -13,20 +13,42 @@ const COR_RAZAO: Record<"positiva" | "atencao" | "negativa", string> = {
   negativa: "var(--red)",
 };
 
+const ICONE_CORACAO = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
+);
+
 // Score 0-100 determinístico (src/lib/financeiro/saude-financeira.ts) — a
 // IA não participa desse número. Só é chamado quando o mês já tem algum
-// lançamento (ver page.tsx); com zero dado, um score "neutro" mais
-// confundiria do que ajudaria.
+// lançamento (ver page.tsx); mesmo assim, `dadosInsuficientes` pode vir
+// true (ex: conta nova com só um lançamento de meta, sem renda/receita
+// nenhuma) — nesse caso não mostra número nenhum, pra não passar a
+// impressão de um "78/100 Boa" que a conta ainda não tem dado pra sustentar.
 export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
+  if (saude.dadosInsuficientes) {
+    return (
+      <div className="card" style={{ paddingBottom: 18 }}>
+        <div className="card-head">
+          <p className="card-title" style={{ fontSize: 14 }}>
+            <span className="title-icon">{ICONE_CORACAO}</span>
+            <span className="title-label">Saúde financeira</span>
+          </p>
+        </div>
+        <div style={{ padding: "0 18px 14px" }}>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "var(--mc-ink-dim)" }}>
+            Ainda não há renda, receita ou histórico de gastos suficientes este mês pra calcular sua saúde financeira. Continue lançando por aqui que o número aparece assim que tiver o que comparar.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const cor = COR_CLASSIFICACAO[saude.classificacao];
 
   return (
     <div className="card" style={{ paddingBottom: 18 }}>
       <div className="card-head">
         <p className="card-title" style={{ fontSize: 14 }}>
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
-          </span>
+          <span className="title-icon">{ICONE_CORACAO}</span>
           <span className="title-label">Saúde financeira</span>
         </p>
       </div>
