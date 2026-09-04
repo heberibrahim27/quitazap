@@ -28,6 +28,10 @@ model Cliente {
   rendaMensal           Float?
   despesasFixas         Float?
   valorDisponivelMensal Float?
+  // Horas trabalhadas por mês, opcional — quando não preenchido,
+  // src/lib/financeiro/horas-trabalho.ts usa o padrão CLT de 220h/mês
+  // (44h semanais, Súmula 431 TST) como estimativa.
+  jornadaMensalHoras    Float?
   gratuito              Boolean   @default(false)
   assinaturaVenceEm     DateTime?
   criadoEm              DateTime  @default(now())

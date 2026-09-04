@@ -30,10 +30,12 @@ function fallbackHorasTrabalho(f: Awaited<ReturnType<typeof calcularHorasTrabalh
   if (!f.calculavel || f.horas == null || f.diasUteis == null) {
     return "Ainda não consigo calcular isso — cadastre sua renda no Perfil ou lance sua receita do mês pra eu conseguir converter em horas de trabalho.";
   }
+  const notaJornada = f.jornadaEhPadrao
+    ? `jornada padrão de ${f.horasTrabalhoMensalAssumidas}h/mês (44h semanais, CLT) — cadastre a sua real no Perfil pra mais precisão`
+    : `sua jornada cadastrada de ${f.horasTrabalhoMensalAssumidas}h/mês`;
   return (
     `${fmt(f.valor)} equivale a ${fmtHoras(f.horas)}h de trabalho (~${fmtDias(f.diasUteis)} dias úteis), ` +
-    `considerando sua renda de ${fmt(f.rendaLiquidaMensal ?? 0)}/mês e uma jornada padrão de ${f.horasTrabalhoMensalAssumidas}h/mês ` +
-    `(44h semanais, CLT) — não temos sua jornada real cadastrada ainda.`
+    `considerando sua renda de ${fmt(f.rendaLiquidaMensal ?? 0)}/mês e ${notaJornada}.`
   );
 }
 
@@ -45,7 +47,7 @@ async function frasearComIA(pergunta: string, fatos: unknown, clienteId: string,
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. horasTrabalhoMensalAssumidas é um PADRÃO da CLT (44h semanais), não um dado real da pessoa — sempre deixe isso claro na resposta. Responda em português do Brasil, tom direto e amigável, no máximo 4 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Se jornadaEhPadrao for true, horasTrabalhoMensalAssumidas é um PADRÃO da CLT (44h semanais), não um dado real da pessoa — deixe isso claro e sugira cadastrar a jornada real no Perfil. Se jornadaEhPadrao for false, é a jornada que a pessoa mesma cadastrou — trate como dado real, sem ressalva de padrão. Responda em português do Brasil, tom direto e amigável, no máximo 4 linhas, emoji com moderação.",
         },
         { role: "user", content: `Pergunta do cliente: "${pergunta}"\n\nDados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],
