@@ -145,6 +145,22 @@ const faq = [
     p: "O preço vai aumentar pra quem já assinou?",
     r: "Não. Enquanto sua assinatura estiver ativa, o valor de R$14,90/mês não muda. O reajuste vale só pra quem assinar depois que as primeiras 1.000 vagas do Preço Fundador se esgotarem.",
   },
+  {
+    p: "Isso é seguro? Vocês têm acesso à minha conta bancária?",
+    r: "Não. Hoje o QuitaZap não acessa sua conta bancária nem movimenta seu dinheiro. Você informa os dados que quiser registrar, pelo WhatsApp ou pelo painel, e o QuitaZap usa essas informações para organizar e analisar suas finanças.",
+  },
+  {
+    p: "Por que confiar em mais um app financeiro?",
+    r: "Porque o QuitaZap mostra de onde vêm os números. As análises são baseadas nos dados que você registra e servem para te ajudar a entender melhor sua situação — sem promessa milagrosa e sem esconder informação atrás de um score misterioso.",
+  },
+  {
+    p: "Funciona com qualquer banco?",
+    r: "Sim. Como você não precisa conectar sua conta bancária, pode usar o QuitaZap independentemente do banco que utiliza. Cartões, gastos, receitas, dívidas e outros compromissos podem ser registrados normalmente.",
+  },
+  {
+    p: "Funciona em qualquer WhatsApp?",
+    r: "Sim. Você usa o WhatsApp normalmente para registrar gastos, receitas e fazer consultas ao QuitaZap. Não precisa instalar outro aplicativo de mensagens.",
+  },
 ];
 
 const WHATSAPP_ICON = (
