@@ -1186,6 +1186,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 .mc-input {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--mc-line);
   border-radius: 12px;
   padding: 12px 14px;
