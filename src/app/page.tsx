@@ -1199,11 +1199,12 @@ Sobra estimada         R$  -530,00`}
                 <a key={link} href={`#${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>{link}</a>
               ))}
               <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Já sou cliente</a>
+              <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Privacidade e Termos</a>
             </div>
           </div>
           <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 20 }}>
             <p style={{ margin: "0 0 8px", fontSize: 12, color: "#374151", lineHeight: 1.7 }}>
-              © 2026 QuitaZAP. Todos os direitos reservados.
+              © 2026 QuitaZAP. Todos os direitos reservados. · <a href="/privacidade" style={{ color: "#475569" }}>Privacidade e Termos de Uso</a>
             </p>
             <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.7 }}>
               O QuitaZAP é uma ferramenta de organização e apoio ao planejamento financeiro. Não é consultoria financeira regulamentada, não promete limpar nome, reduzir dívida ou garantir resultado. As decisões financeiras continuam sendo responsabilidade do usuário.

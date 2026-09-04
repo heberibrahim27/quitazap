@@ -73,7 +73,10 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
   }
 }
 
+const NOTA_TRANSPARENCIA = "\n\n_Análise baseada nas informações registradas no QuitaZap._";
+
 export async function responderLimiteSeguro(clienteId: string, gratuito: boolean): Promise<string> {
   const fatos = await fatosLimiteSeguro(clienteId);
-  return frasearComIA(fatos, clienteId, gratuito, () => fallbackLimiteSeguro(fatos));
+  const resposta = await frasearComIA(fatos, clienteId, gratuito, () => fallbackLimiteSeguro(fatos));
+  return `${resposta}${NOTA_TRANSPARENCIA}`;
 }

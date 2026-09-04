@@ -853,7 +853,7 @@ export async function POST(req: NextRequest) {
     // ── Processa imagem ──────────────────────
     if (tipoEntrada === "imagem") {
       try {
-        await sendWhatsApp(sessao.telefone, "📷 Recebi sua imagem! Analisando...");
+        await sendWhatsApp(sessao.telefone, "📷 Recebi sua imagem! Analisando...\n\n_Seu documento será usado para identificar informações financeiras e gerar seu Raio-X do Salário._");
         const analise = await analisarImagem(body.image.imageUrl, PROMPT_ANALISE_IMAGEM, { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "vision-webhook" });
         console.log(`[Z-API] Imagem analisada: "${analise}"`);
 

@@ -125,5 +125,6 @@ export async function responderSimulacaoParcela(
   deteccao: SimulacaoParcelaDetectada,
 ): Promise<string> {
   const fatos = await fatosSimulacaoParcela(clienteId, deteccao.valorParcela, deteccao.quantidadeParcelas);
-  return frasearComIA(mensagemOriginal, fatos, clienteId, gratuito, () => fallbackSimulacaoParcela(fatos));
+  const resposta = await frasearComIA(mensagemOriginal, fatos, clienteId, gratuito, () => fallbackSimulacaoParcela(fatos));
+  return `${resposta}\n\n_Análise baseada nas informações registradas no QuitaZap._`;
 }

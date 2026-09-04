@@ -72,6 +72,10 @@ export function LimiteSeguroCard({ limite }: { limite: LimiteSeguro }) {
               ⚠ Dia {fmtDataDia(limite.diaApertado.data)} aperta: {limite.diaApertado.itens.length} contas vencem juntas, somando {fmt(limite.diaApertado.totalNoDia)}.
             </p>
           )}
+
+          <p style={{ margin: 0, fontSize: 10.5, color: "var(--mc-ink-faint, var(--mc-ink-dim))" }}>
+            Análise baseada nas informações registradas no QuitaZap.
+          </p>
         </div>
       </div>
     </>

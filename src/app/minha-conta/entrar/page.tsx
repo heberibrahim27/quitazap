@@ -155,7 +155,11 @@ export default function EntrarPage() {
           </div>
         </div>
 
-        <div className="qz-zone-bottom" />
+        <div className="qz-zone-bottom">
+          <a href="/privacidade" style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)", textDecoration: "underline" }}>
+            Privacidade e Termos de Uso
+          </a>
+        </div>
       </div>
     </div>
   );
