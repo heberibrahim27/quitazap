@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/prisma";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
+import { CountdownTimer } from "./CountdownTimer";
 
 // Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
 // nas referências de design (Aura Build) pra tirar a sensação de fundo
@@ -39,6 +40,7 @@ const LANDING_CSS = `
     display: flex; justify-content: center;
   }
   .qz-phone-notch { width: 33%; height: 100%; border-radius: 0 0 12px 12px; background: #000; }
+  .qz-panel-phone { width: 200px; height: 412px; margin: 0 auto; border-radius: 30px; padding: 2px; background: linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.05)); box-shadow: 0 30px 60px -20px rgba(15,23,42,.35); }
   .qz-hero-thumbs { display: none; }
   .qz-hero-side { margin-top: 8px; }
   .qz-feat-img { aspect-ratio: 16 / 9; }
@@ -59,6 +61,7 @@ const LANDING_CSS = `
     .qz-h2-lg { font-size: 48px; }
     .qz-hero-thumbs { display: flex; }
     .qz-hero-side { margin-top: 32px; }
+    .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
     .qz-feat-img { aspect-ratio: 4 / 3; }
     .qz-price-card { padding: 40px 36px; }
   }
@@ -151,7 +154,7 @@ const faq = [
   },
   {
     p: "O preço vai aumentar pra quem já assinou?",
-    r: "Não. Enquanto sua assinatura estiver ativa, o valor de R$14,90/mês não muda. O reajuste vale só pra quem assinar depois que as primeiras 1.000 vagas do Preço Fundador se esgotarem.",
+    r: "Não. Enquanto sua assinatura estiver ativa, o valor de R$14,90/mês não muda. O reajuste vale só pra quem assinar depois que as 1.000 vagas desta condição se esgotarem.",
   },
   {
     p: "Por que confiar em mais um app financeiro?",
@@ -193,9 +196,13 @@ export default async function LandingPage() {
     assinantesFundador = await prisma.cliente.count({ where: { gratuito: false } });
   } catch {
     // Landing nunca pode cair por causa de uma falha de contagem — segue
-    // com 0 (mostra "vaga 1 de 1.000") em vez de derrubar a página inteira.
+    // com 0 (mostra "1.000 vagas ainda disponíveis") em vez de derrubar a
+    // página inteira.
   }
-  const vagaAtual = Math.min(assinantesFundador + 1, VAGAS_FUNDADOR);
+  // Contador regressivo (vagas ainda disponíveis, não "vaga número X") —
+  // pedido explícito: a mecânica de urgência é sobre quantas restam, não
+  // sobre implicar que já existem 1.000+ assinantes reais.
+  const vagasRestantes = Math.max(VAGAS_FUNDADOR - assinantesFundador, 0);
 
   return (
     <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden", position: "relative" }}>
@@ -297,7 +304,7 @@ export default async function LandingPage() {
               borderRadius: 999, padding: "13px 26px", fontSize: 14, fontWeight: 600,
               background: "#22c55e", color: "#000", textDecoration: "none",
             }}>
-              Garantir Preço Fundador — R$14,90/mês
+              Quero garantir R$14,90/mês
             </a>
           </div>
         </div>
@@ -312,35 +319,9 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* PROVA NUMÉRICA (exemplo ilustrativo) */}
-      {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "56px 24px 0", background: "#ffffff" }}>
-        <div className="qz-reveal" style={{ maxWidth: 780, margin: "0 auto" }}>
-          <div style={{
-            background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16,
-            padding: "28px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20,
-          }}>
-            {[
-              { label: "Renda líquida", valor: 5820, cor: "#0f172a" },
-              { label: "Contas e dívidas", valor: 4190, cor: "#ef4444" },
-              { label: "Realmente livre", valor: 1630, cor: "#16a34a" },
-            ].map((item) => (
-              <div key={item.label} style={{ textAlign: "center" }}>
-                <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>{item.label}</p>
-                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.cor, letterSpacing: "-0.5px" }}>
-                  <CountUp valor={item.valor} />
-                </p>
-              </div>
-            ))}
-          </div>
-          <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "#94a3b8", textAlign: "center" }}>
-            Exemplo ilustrativo — os números do seu caso vêm do que você registrar no QuitaZap.
-          </p>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════ */}
-      {/* SEÇÃO DOR */}
+      {/* SEÇÃO DOR — vem antes da prova numérica de propósito: primeiro
+          agita o problema em palavras, só depois mostra o número frio
+          como prova concreta (ordem sugerida pelo Ibrahim/ChatGPT). */}
       {/* ══════════════════════════════════════ */}
       <section className="qz-section" style={{ background: "#ffffff" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
@@ -363,6 +344,31 @@ export default async function LandingPage() {
                 <span style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.4 }}>{d.texto}</span>
               </div>
             ))}
+          </div>
+
+          {/* Prova numérica (exemplo ilustrativo) — logo abaixo da dor,
+              como evidência concreta do que acabou de ser descrito. */}
+          <div className="qz-reveal" style={{ maxWidth: 780, margin: "40px auto 0", "--qz-delay": "280ms" } as React.CSSProperties}>
+            <div style={{
+              background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16,
+              padding: "28px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20,
+            }}>
+              {[
+                { label: "Renda líquida", valor: 5820, cor: "#0f172a" },
+                { label: "Contas e dívidas", valor: 4190, cor: "#ef4444" },
+                { label: "Realmente livre", valor: 1630, cor: "#16a34a" },
+              ].map((item) => (
+                <div key={item.label} style={{ textAlign: "center" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>{item.label}</p>
+                  <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.cor, letterSpacing: "-0.5px" }}>
+                    <CountUp valor={item.valor} />
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "#94a3b8", textAlign: "center" }}>
+              Exemplo ilustrativo — os números do seu caso vêm do que você registrar no QuitaZap.
+            </p>
           </div>
         </div>
       </section>
@@ -396,6 +402,62 @@ export default async function LandingPage() {
                 <p style={{ margin: 0, fontSize: 15, color: "#374151", lineHeight: 1.55, fontWeight: 500 }}>{passo.titulo}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* WHATSAPP + PAINEL — prova de que existe um produto de verdade
+          por trás da conversa no WhatsApp. Celular sempre visível (não
+          só desktop, diferente do mockup decorativo da seção seguinte),
+          já que a maioria do público chega pelo celular. */}
+      {/* ══════════════════════════════════════ */}
+      <section className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "center" }}>
+          <div className="qz-col-7 qz-reveal">
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>WHATSAPP + PAINEL</p>
+            <h2 className="qz-h2-md" style={{ margin: "0 0 16px", color: "#0f172a", textAlign: "left" }}>
+              Por trás da conversa, um painel de verdade.
+            </h2>
+            <p style={{ margin: "0 0 28px", fontSize: 15, color: "#64748b", lineHeight: 1.6, maxWidth: 440 }}>
+              Você conversa normalmente pelo WhatsApp — e cada gasto, dívida e resposta vira informação organizada no seu painel, sempre atualizado.
+            </p>
+
+            {/* Mockup de conversa — texto de exemplo, não é print real de conversa de nenhum cliente. */}
+            <div style={{ background: "#e9edf1", border: "1px solid #dbe2e8", borderRadius: 16, padding: 20, maxWidth: 420 }}>
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
+                <div style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#dcf8c6", borderRadius: "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937" }}>
+                  gastei 45 no mercado
+                </div>
+                <div style={{ alignSelf: "flex-start", maxWidth: "85%", background: "#fff", borderRadius: "12px 12px 12px 2px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
+                  Anotado ✅ Esse mês você já gastou R$680 em mercado.
+                </div>
+                <div style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#dcf8c6", borderRadius: "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937" }}>
+                  posso gastar 300 hoje?
+                </div>
+                <div style={{ alignSelf: "flex-start", maxWidth: "85%", background: "#fff", borderRadius: "12px 12px 12px 2px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
+                  Pode! Depois disso ainda sobra R$1.330 até o fim do mês.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="qz-col-5 qz-reveal" style={{ marginTop: 40, "--qz-delay": "120ms" } as React.CSSProperties}>
+            <div className="qz-panel-phone" aria-hidden="true">
+              <div className="qz-phone-mock-inner">
+                <div className="qz-phone-notch-band">
+                  <div className="qz-phone-notch" />
+                </div>
+                <div style={{
+                  position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
+                }}>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em", textAlign: "center", padding: "0 24px" }}>
+                    PRINT DO PAINEL EM BREVE
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -469,11 +531,25 @@ export default async function LandingPage() {
           <div className="qz-col-5 qz-reveal">
             <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
             <h2 className="qz-h2-lg" style={{ margin: "0 0 12px", color: "#0f172a", textAlign: "left" }}>
-              Preço Fundador
+              Condição Especial QuitaZap
             </h2>
-            <p style={{ margin: 0, fontSize: 15, color: "#64748b", lineHeight: 1.6, textAlign: "left" }}>
-              Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} — enquanto durar. Um plano só, sem tier, sem surpresa.
+            <p style={{ margin: "0 0 20px", fontSize: 15, color: "#64748b", lineHeight: 1.6, textAlign: "left" }}>
+              1.000 vagas disponibilizadas nesta condição. Um plano só, sem tier, sem surpresa.
             </p>
+            <p style={{ margin: "0 0 24px", fontSize: 15, fontWeight: 700, color: "#0f172a", textAlign: "left" }}>
+              {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis
+            </p>
+
+            {/* Countdown evergreen por visitante — 24h a partir do primeiro
+                acesso (persistido em localStorage, ver CountdownTimer.tsx).
+                Não é uma data fixa de campanha, é a mesma janela pra
+                qualquer pessoa a partir de quando ela chega na página. */}
+            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 18px", maxWidth: 320 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "#0f172a", letterSpacing: "0.02em" }}>
+                Esta condição termina em:
+              </p>
+              <CountdownTimer />
+            </div>
           </div>
 
           <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
@@ -483,7 +559,7 @@ export default async function LandingPage() {
             }}>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4, whiteSpace: "nowrap" }}>PREÇO FUNDADOR</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4, whiteSpace: "nowrap" }}>CONDIÇÃO ESPECIAL</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -494,10 +570,10 @@ export default async function LandingPage() {
 
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 14px", marginBottom: 24 }}>
                 <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#166534", fontWeight: 700 }}>
-                  Enquanto sua assinatura estiver ativa, esse valor não muda.
+                  Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
                 </p>
                 <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-                  Depois dos primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")}, o valor sobe pra novos assinantes.
+                  Depois que as {VAGAS_FUNDADOR.toLocaleString("pt-BR")} vagas desta condição se esgotarem, o valor sobe pra novos assinantes.
                 </p>
               </div>
 
@@ -521,7 +597,7 @@ export default async function LandingPage() {
                 fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 8,
                 textDecoration: "none", textAlign: "center",
               }}>
-                Garantir minha vaga
+                Quero garantir R$14,90/mês
               </a>
 
               <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
@@ -584,13 +660,13 @@ export default async function LandingPage() {
             Descubra hoje quanto do seu dinheiro é realmente seu.
           </h2>
           <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
-            Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} no Preço Fundador · Cancele quando quiser
+            {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis nesta condição · Cancele quando quiser
           </p>
           <a href={CAKTO_URL} style={{
             display: "inline-block", background: "#22c55e", color: "#000", fontWeight: 800, fontSize: 18,
             padding: "18px 48px", borderRadius: 8, textDecoration: "none",
           }}>
-            Garantir Preço Fundador — R$14,90/mês
+            Quero garantir R$14,90/mês
           </a>
         </div>
 
