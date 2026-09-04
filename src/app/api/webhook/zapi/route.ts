@@ -27,6 +27,7 @@ import {
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
+import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -1135,6 +1136,28 @@ Pode mandar tudo em uma mensagem só.`;
               ...servidorHistoricoSessao,
               { role: "user", content: mensagem },
               { role: "assistant", content: respostaSimulacao },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // "Até o próximo salário" / limite seguro por dia (Skill Analista) —
+    // leitura pura, mesmo padrão das duas consultas acima.
+    if (sessao.clienteId) {
+      if (detectarLimiteSeguro(mensagem)) {
+        const respostaLimite = await responderLimiteSeguro(sessao.clienteId, isGratuito);
+        await sendWhatsApp(telefone, respostaLimite);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaLimite },
             ]),
           },
         });
