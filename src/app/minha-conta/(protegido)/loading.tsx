@@ -13,25 +13,27 @@ export default function CarregandoMinhaConta() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 6,
-        minHeight: "60vh",
-        padding: "60px 0",
+        gap: 10,
+        // Cobre a maior parte da área de conteúdo (entre cabeçalho e menu
+        // fixo embaixo) pra ficar centralizado de verdade na tela em
+        // qualquer página, não só numa faixa pequena no topo.
+        minHeight: "78vh",
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/minha-conta/logo-simbolo.webp"
         alt=""
-        width={46}
-        height={42}
+        width={88}
+        height={80}
         style={{ animation: "mc-pulso 1.3s ease-in-out infinite" }}
       />
-      <svg width="72" height="22" viewBox="0 0 72 22" style={{ overflow: "visible" }}>
+      <svg width="132" height="38" viewBox="0 0 132 38" style={{ overflow: "visible" }}>
         <path
-          d="M3 12 Q 12 2, 21 12 T 39 12 T 57 12 T 69 12"
+          d="M5 20 Q 20 4, 35 20 T 65 20 T 95 20 T 127 20"
           fill="none"
           stroke="#1E63E9"
-          strokeWidth="3"
+          strokeWidth="5"
           strokeLinecap="round"
           className="mc-rabisco-path"
         />
@@ -42,14 +44,14 @@ export default function CarregandoMinhaConta() {
           50% { transform: scale(0.88); opacity: 0.7; }
         }
         .mc-rabisco-path {
-          stroke-dasharray: 100;
-          stroke-dashoffset: 100;
+          stroke-dasharray: 180;
+          stroke-dashoffset: 180;
           animation: mc-rabisco 1.3s ease-in-out infinite;
         }
         @keyframes mc-rabisco {
-          0% { stroke-dashoffset: 100; }
+          0% { stroke-dashoffset: 180; }
           45%, 55% { stroke-dashoffset: 0; }
-          100% { stroke-dashoffset: -100; }
+          100% { stroke-dashoffset: -180; }
         }
       `}</style>
     </div>
