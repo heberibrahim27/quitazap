@@ -232,7 +232,7 @@ export default async function LandingPage() {
             <img src="/logo-q-icon.png" alt="" style={{ height: 34, width: "auto", display: "block" }} />
             <span style={{ color: "#fff", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>QuitaZap</span>
           </div>
-          <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85 }}>
+          <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85, display: "inline-block", padding: "12px 4px" }}>
             Já sou cliente
           </a>
         </header>
@@ -461,13 +461,13 @@ export default async function LandingPage() {
               background: "#fff", border: "2px solid #22c55e", borderRadius: 16,
               padding: "40px 36px", boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>PREÇO FUNDADOR</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4, whiteSpace: "nowrap" }}>PREÇO FUNDADOR</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 14,90</div>
+                  <div style={{ fontSize: "clamp(28px, 8vw, 40px)", fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1, whiteSpace: "nowrap" }}>R$ 14,90</div>
                   <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
                 </div>
               </div>
@@ -596,13 +596,13 @@ export default async function LandingPage() {
               <span style={{ color: "#fff", fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>QuitaZap</span>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               {["Como funciona", "Preço", "FAQ"].map((link) => (
-                <a key={link} href={`#${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>{link}</a>
+                <a key={link} href={`#${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>{link}</a>
               ))}
-              <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Já sou cliente</a>
-              <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Privacidade e Termos</a>
-              <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Suporte</a>
+              <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Já sou cliente</a>
+              <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Privacidade e Termos</a>
+              <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Suporte</a>
 
               {REDES_SOCIAIS.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
