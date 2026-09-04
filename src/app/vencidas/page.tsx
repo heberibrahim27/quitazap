@@ -23,6 +23,15 @@ export default async function ParcelasVencidasPage() {
     where: {
       status: "PENDENTE",
       vencimento: { lt: hoje },
+      // Divida/Parcela é tabela compartilhada com o Controle (app do
+      // cliente final) — uma Divida criada por lá via "Novo empréstimo"
+      // (src/app/minha-conta/(protegido)/emprestimos/novo/) sempre define
+      // totalParcelas e gera N parcelas de valor idêntico; uma dívida
+      // negociada aqui no admin nunca preenche esse campo. Sem esse
+      // filtro, empréstimo pessoal que o cliente cadastrou pra
+      // acompanhar sozinho aparecia como se fosse dívida em cobrança do
+      // negócio — inclusive com botão de cobrança por WhatsApp.
+      divida: { totalParcelas: null },
     },
     orderBy: { vencimento: "asc" },
     include: {
