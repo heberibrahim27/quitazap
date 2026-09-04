@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
 import { CountdownTimer } from "./CountdownTimer";
+import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
 
 // Inter nunca foi de fato carregada nesta página (o fontFamily só citava
 // o nome, sem @font-face nem next/font) — sempre caiu pro fallback
@@ -59,6 +60,8 @@ const LANDING_CSS = `
   .qz-dor-num-1 { font-size: 44px; }
   .qz-dor-num-2 { font-size: 32px; }
   .qz-dor-num-3 { font-size: 56px; }
+  .qz-cf-desktop { display: none; }
+  .qz-cf-mobile { display: flex; flex-direction: column; gap: 40px; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -77,6 +80,14 @@ const LANDING_CSS = `
     .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
     .qz-feat-img { aspect-ratio: 4 / 3; }
     .qz-price-card { padding: 40px 36px; }
+    .qz-cf-mobile { display: none; }
+    .qz-cf-desktop {
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px;
+    }
+    .qz-cf-sticky-col { position: relative; }
+    .qz-cf-sticky-inner { position: sticky; top: 12vh; height: 76vh; display: flex; align-items: center; justify-content: flex-end; }
+    .qz-cf-steps-col { display: flex; flex-direction: column; }
+    .qz-cf-step { min-height: 88vh; display: flex; align-items: center; }
     .qz-dor-num-1 { font-size: 88px; }
     .qz-dor-num-2 { font-size: 56px; }
     .qz-dor-num-3 { font-size: 120px; }
@@ -130,12 +141,6 @@ const doresMinicards = [
   { titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo." },
   { titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro." },
   { titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
-];
-
-const comoFunciona = [
-  { numero: 1, titulo: "Informe sua renda pelo WhatsApp — ou envie seu contracheque, se tiver." },
-  { numero: 2, titulo: "Registre seus gastos conversando com o QuitaZap." },
-  { numero: 3, titulo: "Veja quanto do seu dinheiro está realmente livre — e pergunte “posso gastar R$300 hoje?” antes de gastar." },
 ];
 
 const funcionalidades = [
@@ -221,7 +226,16 @@ export default async function LandingPage() {
   const vagasRestantes = Math.max(VAGAS_FUNDADOR - assinantesFundador, 0);
 
   return (
-    <div className={`${inter.variable} ${fraunces.variable} ${mono.variable}`} style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden", position: "relative" }}>
+    <div className={`${inter.variable} ${fraunces.variable} ${mono.variable}`} style={{
+      background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif",
+      color: "#0a0a0a", overflowX: "clip", position: "relative",
+      // Paleta formalizada (direção "editorial com ritmo claro/escuro" —
+      // substitui os hex ad-hoc usados até aqui). Verde continua só como
+      // sinal de ação (CTA, número positivo, progresso) — nunca fundo.
+      "--ink": "#080908", "--carbon": "#111211", "--graphite": "#242624",
+      "--paper": "#F0F0EA", "--stone": "#D8D9D3", "--muted": "#989C96",
+      "--accent": "#22e07a",
+    } as React.CSSProperties}>
       <style dangerouslySetInnerHTML={{ __html: LANDING_CSS }} />
       <ScrollReveal />
 
@@ -394,35 +408,27 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* COMO FUNCIONA */}
+      {/* COMO FUNCIONA — um dos 3 "momentos uau" da página (os outros são
+          Hero e WhatsApp+Painel). Fundo STONE, não preto — a virada de
+          humor depois de Hero+Dor escuros. Celular sticky no desktop,
+          conteúdo trocando por estado via IntersectionObserver (não
+          scroll contínuo recalculado a cada pixel — decisão de engenharia
+          pra não arriscar performance/prazo). Mobile simplifica pra 3
+          blocos empilhados, sem sticky de 250vh. */}
       {/* ══════════════════════════════════════ */}
-      <section id="como-funciona" className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+      <section id="como-funciona" className="qz-section" style={{ background: "var(--stone)" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-          <div className="qz-grid12" style={{ marginBottom: 48 }}>
-            <div className="qz-col-6 qz-reveal">
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
-              <h2 className="qz-h2-md" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
-                Simples assim, direto no WhatsApp.
-              </h2>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24 }}>
-            {comoFunciona.map((passo, i) => (
-              <div key={passo.numero} className="qz-reveal" style={{
-                background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "28px 24px",
-                "--qz-delay": `${i * 90}ms`,
-              } as React.CSSProperties}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8, background: "#22e07a",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 800, fontSize: 16, color: "#000", marginBottom: 16,
-                }}>
-                  {passo.numero}
-                </div>
-                <p style={{ margin: 0, fontSize: 15, color: "#374151", lineHeight: 1.55, fontWeight: 500 }}>{passo.titulo}</p>
-              </div>
-            ))}
-          </div>
+          <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 20 }}>
+            [ 03 / COMO FUNCIONA ]
+          </p>
+          <h2 className="qz-reveal" style={{
+            margin: "0 0 64px", fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "var(--ink)",
+            fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15, maxWidth: 640, "--qz-delay": "60ms",
+          } as React.CSSProperties}>
+            Sua vida acontece. Você só conta pra gente.
+          </h2>
+
+          <ComoFuncionaScroll />
         </div>
       </section>
 
