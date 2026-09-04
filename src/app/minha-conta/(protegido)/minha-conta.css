@@ -792,6 +792,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   box-shadow: 0 -12px 30px -10px rgba(7,27,61,0.3);
   transform: translateY(100%);
   transition: transform 0.25s ease;
+  /* Trava lateral: mesmo com a causa raiz do zoom do Safari corrigida
+     (ver .mc-input), isso impede que qualquer conteúdo interno futuro
+     alargue esse sheet fixo pra fora da tela. */
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 .fab-sheet.open { transform: translateY(0); }
 .fab-sheet-handle { display: block; width: 36px; height: 4px; border-radius: 999px; background: var(--line); margin: 0 auto 14px; border: none; padding: 0; cursor: pointer; }
@@ -1190,7 +1195,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   border: 1px solid var(--mc-line);
   border-radius: 12px;
   padding: 12px 14px;
-  font-size: 14.5px;
+  /* 16px não é só estética: abaixo disso o Safari/iOS dá zoom automático
+     ao focar o campo (mais visível no <input type="date">, que abre um
+     picker nativo por cima) e pan pra centralizar o campo focado — como
+     o sheet é position:fixed, ele fica pra trás desse zoom da página e
+     parece "arrastado" pra lateral. 16px desativa esse zoom na raiz. */
+  font-size: 16px;
   outline: none;
   background: var(--card-tint);
   color: var(--mc-ink);
