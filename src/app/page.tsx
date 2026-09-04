@@ -10,6 +10,7 @@ import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
 import { CountdownTimer } from "./CountdownTimer";
 import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
+import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
 
 // Inter nunca foi de fato carregada nesta página (o fontFamily só citava
 // o nome, sem @font-face nem next/font) — sempre caiu pro fallback
@@ -62,6 +63,47 @@ const LANDING_CSS = `
   .qz-dor-num-3 { font-size: 56px; }
   .qz-cf-desktop { display: none; }
   .qz-cf-mobile { display: flex; flex-direction: column; gap: 40px; }
+  .qz-wp-stage { display: flex; flex-direction: column; gap: 20px; margin-top: 40px; }
+  .qz-wp-dashboard {
+    position: relative; background: linear-gradient(160deg, var(--graphite), #0a0b0a);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 18px 18px 22px;
+    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.6);
+  }
+  .qz-wp-dash-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.45); margin-bottom: 14px;
+  }
+  .qz-wp-dash-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); }
+  .qz-wp-dash-row {
+    display: flex; justify-content: space-between; font-size: 14px; color: rgba(255,255,255,0.85);
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .qz-wp-dash-bars { display: flex; align-items: flex-end; gap: 6px; height: 48px; margin-top: 14px; }
+  .qz-wp-dash-bars span { flex: 1; background: rgba(255,255,255,0.14); border-radius: 3px 3px 0 0; }
+  .qz-wp-phone { width: 176px; margin: 0 auto; }
+  .qz-wp-phone-screen {
+    position: absolute; inset: 0; background: linear-gradient(180deg,#0d1610,#070a08);
+    display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: 0 14px 24px;
+  }
+  .qz-wp-phone-bubble {
+    align-self: flex-end; max-width: 85%; background: #dcf8c6; border-radius: 12px 12px 2px 12px;
+    padding: 8px 12px; font-size: 12px; color: #1f2937;
+  }
+  .qz-wp-phone-check {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; color: var(--accent);
+    align-self: flex-end; font-weight: 600;
+  }
+  .qz-wp-chip {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .qz-wp-chip-msg { font-size: 13.5px; color: rgba(255,255,255,0.85); }
+  .qz-wp-chip-status { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em; color: var(--accent); font-weight: 600; }
+  .qz-wp-chip-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; color: rgba(255,255,255,0.4); }
+  .qz-wp-chip-insight { font-size: 13.5px; color: rgba(255,255,255,0.85); line-height: 1.5; margin: 0; }
+  .qz-wp-chip-insight strong { color: var(--accent); font-weight: 700; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -88,6 +130,28 @@ const LANDING_CSS = `
     .qz-cf-sticky-inner { position: sticky; top: 12vh; height: 76vh; display: flex; align-items: center; justify-content: flex-end; }
     .qz-cf-steps-col { display: flex; flex-direction: column; }
     .qz-cf-step { min-height: 88vh; display: flex; align-items: center; }
+    .qz-wp-stage { position: relative; height: 560px; display: block; margin-top: 64px; }
+    .qz-wp-dashboard {
+      position: absolute; top: 4%; right: 0; width: 56%; max-width: 400px;
+      transform: translate3d(calc(var(--wp-px, 0) * 6px), calc(var(--wp-py, 0) * 6px), 0) rotate(1.5deg);
+      transition: transform .2s ease-out;
+    }
+    .qz-wp-phone {
+      position: absolute; left: 2%; bottom: 0; z-index: 3;
+      transform: translate3d(calc(var(--wp-px, 0) * 12px), calc(var(--wp-py, 0) * 12px), 0) rotate(var(--wp-phone-rot, -3deg));
+      transition: transform .25s ease-out;
+    }
+    .qz-wp-phone:hover { --wp-phone-rot: 0deg; }
+    .qz-wp-chip-1 {
+      position: absolute; top: 0; left: 4%; width: 200px; z-index: 4;
+      transform: translate3d(calc(var(--wp-px, 0) * 18px), calc(var(--wp-py, 0) * 18px), 0);
+      transition: transform .2s ease-out;
+    }
+    .qz-wp-chip-2 {
+      position: absolute; bottom: 6%; right: 4%; width: 260px; z-index: 4;
+      transform: translate3d(calc(var(--wp-px, 0) * 20px), calc(var(--wp-py, 0) * -18px), 0);
+      transition: transform .2s ease-out;
+    }
     .qz-dor-num-1 { font-size: 88px; }
     .qz-dor-num-2 { font-size: 56px; }
     .qz-dor-num-3 { font-size: 120px; }
@@ -433,58 +497,36 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* WHATSAPP + PAINEL — prova de que existe um produto de verdade
-          por trás da conversa no WhatsApp. Celular sempre visível (não
-          só desktop, diferente do mockup decorativo da seção seguinte),
-          já que a maioria do público chega pelo celular. */}
+      {/* WHATSAPP + PAINEL — segundo dos 3 "momentos uau" (Hero e Como
+          Funciona são os outros). Fundo CARBON: o produto como objeto,
+          não texto+celular de template. Celular + fatia de painel +
+          mensagens flutuando fora do aparelho, com leve parallax de
+          MOUSE (não de scroll — decisão já tomada de cortar parallax
+          contínuo ligado a scroll por custo/risco de performance; mouse
+          é interação local, não compete com essa decisão). */}
       {/* ══════════════════════════════════════ */}
-      <section className="qz-section" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "center" }}>
-          <div className="qz-col-7 qz-reveal">
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>WHATSAPP + PAINEL</p>
-            <h2 className="qz-h2-md" style={{ margin: "0 0 16px", color: "#0f172a", textAlign: "left" }}>
-              Por trás da conversa, um painel de verdade.
-            </h2>
-            <p style={{ margin: "0 0 28px", fontSize: 15, color: "#64748b", lineHeight: 1.6, maxWidth: 440 }}>
-              Você conversa normalmente pelo WhatsApp — e cada gasto, dívida e resposta vira informação organizada no seu painel, sempre atualizado.
-            </p>
+      <section id="whatsapp-painel" className="qz-section" style={{ background: "var(--carbon)", position: "relative", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
+          backgroundImage: `url("${GRAIN_SVG}")`,
+        }} />
+        <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }}>
+          <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 20 }}>
+            [ 04 / WHATSAPP + PAINEL ]
+          </p>
+          <h2 className="qz-reveal" style={{
+            margin: "0 0 16px", fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "var(--paper)",
+            fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15, maxWidth: 620, "--qz-delay": "40ms",
+          } as React.CSSProperties}>
+            Converse de um lado. Enxergue tudo do outro.
+          </h2>
+          <p className="qz-reveal" style={{
+            margin: 0, fontSize: 15, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, maxWidth: 460, "--qz-delay": "80ms",
+          } as React.CSSProperties}>
+            Você conversa normalmente pelo WhatsApp — e cada gasto, dívida e resposta vira informação organizada no seu painel, sempre atualizado.
+          </p>
 
-            {/* Mockup de conversa — texto de exemplo, não é print real de conversa de nenhum cliente. */}
-            <div style={{ background: "#e9edf1", border: "1px solid #dbe2e8", borderRadius: 16, padding: 20, maxWidth: 420 }}>
-              <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
-                <div style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#dcf8c6", borderRadius: "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937" }}>
-                  gastei 45 no mercado
-                </div>
-                <div style={{ alignSelf: "flex-start", maxWidth: "85%", background: "#fff", borderRadius: "12px 12px 12px 2px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
-                  Anotado ✅ Esse mês você já gastou R$680 em mercado.
-                </div>
-                <div style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#dcf8c6", borderRadius: "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937" }}>
-                  posso gastar 300 hoje?
-                </div>
-                <div style={{ alignSelf: "flex-start", maxWidth: "85%", background: "#fff", borderRadius: "12px 12px 12px 2px", padding: "9px 13px", fontSize: 13.5, color: "#1f2937", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
-                  Pode! Depois disso ainda sobra R$1.330 até o fim do mês.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="qz-col-5 qz-reveal" style={{ marginTop: 40, "--qz-delay": "120ms" } as React.CSSProperties}>
-            <div className="qz-panel-phone" aria-hidden="true">
-              <div className="qz-phone-mock-inner">
-                <div className="qz-phone-notch-band">
-                  <div className="qz-phone-notch" />
-                </div>
-                <div style={{
-                  position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
-                }}>
-                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em", textAlign: "center", padding: "0 24px" }}>
-                    PRINT DO PAINEL EM BREVE
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <WhatsAppPainelStage />
         </div>
       </section>
 
