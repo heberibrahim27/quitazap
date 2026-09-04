@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import { AlertaBanner } from "@/components/AlertaBanner";
 import { IconAlertTriangle, IconCheckCircle, IconClock } from "@/components/icons";
+import { PRECO_MENSAL } from "@/lib/financeiro-admin/motor";
 
 function fmt(valor: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
@@ -78,8 +79,7 @@ export default async function ClienteDetalhePage({
   const planos      = cliente._count.planosEnviados;
   const ultimoPlano = cliente.planosEnviados[0] ?? null;
 
-  // Total pago em assinaturas: meses desde cadastro × R$29,90 (só para clientes pagantes)
-  const PRECO_MENSAL = 29.90;
+  // Total pago em assinaturas: meses desde cadastro × preço vigente (só para clientes pagantes)
   const mesesAtivo   = Math.max(1, Math.floor(
     (Date.now() - new Date(cliente.criadoEm).getTime()) / (1000 * 60 * 60 * 24 * 30)
   ));

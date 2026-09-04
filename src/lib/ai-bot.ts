@@ -551,7 +551,7 @@ ADAPTAÇÕES POR PERFIL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DÚVIDAS SOBRE PREÇO / ASSINATURA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-O QuitaZAP custa *R$ 29,90/mês* e você pode cancelar quando quiser, sem multa e sem burocracia.
+O QuitaZAP custa *R$ 14,90/mês* e você pode cancelar quando quiser, sem multa e sem burocracia.
 
 Por esse valor você tem:
 • IA de organização financeira 24h pelo WhatsApp
