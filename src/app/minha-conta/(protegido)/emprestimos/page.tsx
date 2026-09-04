@@ -64,12 +64,17 @@ export default async function EmprestimosPage() {
                     <div className="mc-list-desc">{e.credor}</div>
                     <div className="mc-list-meta">
                       {parcelasPagas}/{e.totalParcelas ?? e.parcelas.length} parcelas
-                      {proximaParcela ? ` · próxima ${proximaParcela.vencimento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : " · quitado"}
+                      {proximaParcela ? ` · vence ${proximaParcela.vencimento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : " · quitado"}
                     </div>
                   </div>
                   <div className="mc-list-side">
-                    <ValorLista valor={e.valorTotal - e.valorPago} />
-                    <div className="mc-list-sub">de {fmtValor(e.valorTotal)}</div>
+                    {/* Parcela mensal é o valor principal aqui — é o que
+                        pesa no orçamento do mês, diferente do saldo devedor
+                        (total ainda faltando pagar do empréstimo inteiro). */}
+                    <ValorLista valor={proximaParcela ? proximaParcela.valor : e.valorTotal - e.valorPago} />
+                    <div className="mc-list-sub">
+                      {proximaParcela ? `faltam ${fmtValor(e.valorTotal - e.valorPago)}` : "quitado"}
+                    </div>
                   </div>
                 </Link>
               );

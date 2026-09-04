@@ -1181,6 +1181,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 .cartao-parcelas-mes.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
+/* ── Filtro de mês visível (Receitas/Despesas) ────── */
+.mc-mes-filtro {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  margin-bottom: 12px;
+}
+.mc-mes-seta {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--card-tint); color: var(--mc-ink); text-decoration: none;
+}
+.mc-mes-seta svg { width: 16px; height: 16px; }
+.mc-mes-label { font-size: 13.5px; font-weight: 700; color: var(--mc-ink); min-width: 110px; text-align: center; }
+
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {
   position: relative;

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
+import { MesFiltro } from "../MesFiltro";
 import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
@@ -115,6 +116,12 @@ export default async function DespesasPage({
           {fmtValor(total)}
         </p>
       </div>
+
+      <MesFiltro
+        hrefAnterior={`/minha-conta/despesas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}&aba=${aba}`}
+        hrefSeguinte={`/minha-conta/despesas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}&aba=${aba}`}
+        label={`${nomeMes}/${ano}`}
+      />
 
       <div className="mc-card">
         {despesas.length === 0 ? (
