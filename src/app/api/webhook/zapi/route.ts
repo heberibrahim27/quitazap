@@ -43,6 +43,7 @@ import { extrairDadosServidorPublicoManual } from "@/lib/diagnostico-normalizer"
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { parseMoneyBR } from "@/lib/money";
 import { normalizarRespostaCompraImagem } from "@/lib/gasto-flow";
+import { transcreverAudio, analisarImagem } from "@/lib/ai/openai-client";
 import {
   deveAguardarDespesasFixasControle,
   ETAPA_AGUARDANDO_DESPESAS_FIXAS,
@@ -83,58 +84,9 @@ function normalizarTipoDividaIA(tipo: string | null | undefined): DividaIA["tipo
     : "OUTRO";
 }
 
-// ── Transcrição de áudio via Whisper ─────
-async function transcreverAudio(audioUrl: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY!;
-
-  const audioRes = await fetch(audioUrl);
-  if (!audioRes.ok) throw new Error(`Falha ao baixar áudio: ${audioRes.status}`);
-
-  const audioBuffer = await audioRes.arrayBuffer();
-  const contentType = audioRes.headers.get("content-type") || "audio/ogg";
-  const ext = contentType.includes("mp4") ? "mp4" : contentType.includes("mpeg") ? "mp3" : "ogg";
-
-  const audioBlob = new Blob([audioBuffer], { type: contentType });
-
-  const formData = new FormData();
-  formData.append("file", audioBlob, `audio.${ext}`);
-  formData.append("model", "whisper-1");
-  formData.append("language", "pt");
-
-  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Whisper erro ${res.status}: ${err}`);
-  }
-
-  const data = await res.json();
-  return data.text?.trim() ?? "";
-}
-
-// ── Análise de imagem via GPT-4o Vision ──
-async function analisarImagem(imageUrl: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY!;
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analise esta imagem financeira. Pode ser:
+// ── Prompt de análise de imagem via GPT-4o Vision ──
+// (a chamada em si — fetch, custo, log — vive em @/lib/ai/openai-client)
+const PROMPT_ANALISE_IMAGEM = `Analise esta imagem financeira. Pode ser:
 - Boleto, fatura de cartão, extrato bancário, comprovante de empréstimo, carnê
 - Contracheque, holerite, comprovante de salário ou folha de pagamento
 - Recibo, nota fiscal ou cupom de uma COMPRA do dia a dia (mercado, farmácia, restaurante, loja, posto de gasolina, etc.)
@@ -239,27 +191,8 @@ Se for BOLETO, FATURA ou DÍVIDA, extraia:
 Responda assim:
 Fatura Nubank de R$ 1.500 vencendo dia 15. Mínimo R$ 150.
 
-Se a imagem NÃO for financeira, responda apenas: [NAO_FINANCEIRA]`,
-            },
-            {
-              type: "image_url",
-              image_url: { url: imageUrl, detail: "low" },
-            },
-          ],
-        },
-      ],
-      max_tokens: 600,
-    }),
-  });
+Se a imagem NÃO for financeira, responda apenas: [NAO_FINANCEIRA]`;
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`GPT-4o Vision erro ${res.status}: ${err}`);
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? "";
-}
 // ── Tipos para extração de PDF ──────────────────────────────────────────
 
 type EmprestimoConsig = {
@@ -856,13 +789,17 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Verifica assinatura vencida (só para clientes pagantes) ──
+    // isGratuito hoisted (não só const do bloco) porque telemetria de IA
+    // do áudio/imagem abaixo (transcreverAudio/analisarImagem) também
+    // precisa dele.
+    let isGratuito = false;
     if (sessao.clienteId) {
       const clienteAtual = await prisma.cliente.findUnique({
         where: { id: sessao.clienteId },
         select: { assinaturaVenceEm: true, gratuito: true },
       });
       const venceEm = clienteAtual?.assinaturaVenceEm;
-      const isGratuito = clienteAtual?.gratuito ?? false;
+      isGratuito = clienteAtual?.gratuito ?? false;
 
       if (!isGratuito && venceEm && venceEm < new Date()) {
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "nosso site";
@@ -878,7 +815,7 @@ export async function POST(req: NextRequest) {
     if (tipoEntrada === "audio") {
       try {
         await sendWhatsApp(sessao.telefone, "🎤 Recebi seu áudio! Transcrevendo...");
-        mensagem = await transcreverAudio(body.audio.audioUrl);
+        mensagem = await transcreverAudio(body.audio.audioUrl, { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "whisper-webhook" });
         console.log(`[Z-API] Áudio transcrito: "${mensagem}"`);
         if (!mensagem) {
           await sendWhatsApp(sessao.telefone, "Não consegui entender o áudio. Pode digitar a informação?");
@@ -895,7 +832,7 @@ export async function POST(req: NextRequest) {
     if (tipoEntrada === "imagem") {
       try {
         await sendWhatsApp(sessao.telefone, "📷 Recebi sua imagem! Analisando...");
-        const analise = await analisarImagem(body.image.imageUrl);
+        const analise = await analisarImagem(body.image.imageUrl, PROMPT_ANALISE_IMAGEM, { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "vision-webhook" });
         console.log(`[Z-API] Imagem analisada: "${analise}"`);
 
         if (!analise || analise.includes("[NAO_FINANCEIRA]")) {
