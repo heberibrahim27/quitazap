@@ -33,16 +33,49 @@ model Cliente {
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
-  dividas            Divida[]
-  pagamentos         Pagamento[]
-  planosEnviados     PlanoEnviado[]
-  botSessoes         BotSessao[]
-  cobrancas          Cobranca[]
-  tarefas            Tarefa[]
-  lancamentos        Lancamento[]
-  cartoes            Cartao[]
-  pushSubscriptions  PushSubscription[]
-  orcamentos         OrcamentoCategoria[]
+  dividas           Divida[]
+  pagamentos        Pagamento[]
+  planosEnviados    PlanoEnviado[]
+  botSessoes        BotSessao[]
+  cobrancas         Cobranca[]
+  tarefas           Tarefa[]
+  lancamentos       Lancamento[]
+  cartoes           Cartao[]
+  pushSubscriptions PushSubscription[]
+  orcamentos        OrcamentoCategoria[]
+  metas             Meta[]
+}
+
+// ─────────────────────────────────────────
+// METAS (cofrinhos)
+// ─────────────────────────────────────────
+// Meta com valor-alvo (ex: "Trocar de carro", R$15.000) e um histórico de
+// depósitos — o "guardado" é sempre a soma dos depósitos, nunca um campo
+// solto, pra nunca dessincronizar do extrato de depósitos mostrado na tela.
+model Meta {
+  id           String   @id @default(cuid())
+  clienteId    String
+  nome         String
+  valorAlvo    Float
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  cliente   Cliente        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  depositos DepositoMeta[]
+
+  @@index([clienteId])
+}
+
+model DepositoMeta {
+  id       String   @id @default(cuid())
+  metaId   String
+  valor    Float
+  data     DateTime @default(now())
+  criadoEm DateTime @default(now())
+
+  meta Meta @relation(fields: [metaId], references: [id], onDelete: Cascade)
+
+  @@index([metaId])
 }
 
 // ─────────────────────────────────────────
@@ -100,7 +133,7 @@ model Divida {
   tipo           String    @default("OUTRO")
   status         String    @default("ATIVA")
   prioridade     Int       @default(0)
-  totalParcelas  Int?      // quantidade total de parcelas, quando aplicável (empréstimo, financiamento)
+  totalParcelas  Int? // quantidade total de parcelas, quando aplicável (empréstimo, financiamento)
   diaVencimento  Int?
   emAtraso       Boolean   @default(false)
   diasAtraso     Int?
@@ -311,19 +344,19 @@ model Cartao {
 //            Transporte, Moradia, Contas da casa, ...), quando aplicável
 // origem:    TEXTO | AUDIO | FOTO
 model Lancamento {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   clienteId      String
   tipo           String
   descricao      String
   categoria      String?
   valor          Float
   data           DateTime
-  recorrente     Boolean   @default(false)
+  recorrente     Boolean  @default(false)
   cartaoId       String?
-  origem         String    @default("TEXTO")
+  origem         String   @default("TEXTO")
   comprovanteUrl String?
-  criadoEm       DateTime  @default(now())
-  atualizadoEm   DateTime  @updatedAt
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
 
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   cartao  Cartao? @relation(fields: [cartaoId], references: [id], onDelete: SetNull)

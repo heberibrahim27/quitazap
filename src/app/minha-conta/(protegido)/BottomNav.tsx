@@ -5,8 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { NOMES_CATEGORIAS_GASTO, definirCategoriaGasto } from "@/lib/gasto-flow";
 import { criarDespesaRapida, criarReceitaRapida } from "./lancamento-actions";
+import { criarMeta } from "./metas/metas-actions";
 
-type VisaoFab = "menu" | "despesa" | "receita";
+type VisaoFab = "menu" | "despesa" | "receita" | "meta";
 
 function hojeStr(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -91,6 +92,21 @@ export function BottomNav({
     });
   }
 
+  function aoEnviarMeta(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setErroForm(null);
+    startTransition(async () => {
+      const resultado = await criarMeta(formData);
+      if (resultado.erro) {
+        setErroForm(resultado.erro);
+        return;
+      }
+      fecharTudo();
+      router.refresh();
+    });
+  }
+
   return (
     <>
       <nav className="bottom-nav" aria-label="Navegação">
@@ -142,7 +158,13 @@ export function BottomNav({
             </button>
           )}
           <p className="fab-sheet-title">
-            {fabVisao === "menu" ? "Novo lançamento" : fabVisao === "despesa" ? "Nova despesa" : "Nova receita"}
+            {fabVisao === "menu"
+              ? "Novo lançamento"
+              : fabVisao === "despesa"
+                ? "Nova despesa"
+                : fabVisao === "receita"
+                  ? "Nova receita"
+                  : "Nova meta"}
           </p>
           <button type="button" className="fab-sheet-close" onClick={fecharTudo} aria-label="Fechar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -162,6 +184,12 @@ export function BottomNav({
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
               </span>
               Nova receita
+            </button>
+            <button type="button" className="fab-sheet-option" onClick={() => setFabVisao("meta")}>
+              <span className="fab-sheet-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
+              </span>
+              Nova meta
             </button>
             <p style={{ margin: "10px 4px 0", fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.5 }}>
               Também dá pra lançar tudo isso por texto ou áudio direto no WhatsApp.
@@ -282,6 +310,25 @@ export function BottomNav({
             </label>
             <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }} disabled={enviando}>
               {enviando ? "Salvando..." : "Adicionar receita"}
+            </button>
+          </form>
+        )}
+
+        {fabVisao === "meta" && (
+          <form onSubmit={aoEnviarMeta} className="mc-form-card" style={{ padding: "4px 0 0", background: "none", backdropFilter: "none", WebkitBackdropFilter: "none", boxShadow: "none" }}>
+            {erroForm && (
+              <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--red)" }}>{erroForm}</p>
+            )}
+            <label className="mc-label">
+              Nome da meta *
+              <input name="nome" required placeholder="Ex: Trocar de carro" className="mc-input" />
+            </label>
+            <label className="mc-label">
+              Valor que quer guardar *
+              <input name="valorAlvo" required type="text" inputMode="decimal" placeholder="Ex: 15.000,00" className="mc-input" />
+            </label>
+            <button type="submit" className="mc-btn-primary" style={{ border: "none", width: "100%" }} disabled={enviando}>
+              {enviando ? "Salvando..." : "Criar meta"}
             </button>
           </form>
         )}

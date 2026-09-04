@@ -97,7 +97,7 @@ export default async function MinhaContaPage({
   const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 
-  const [dividas, tarefasPendentes, lancamentosDoMes, cartoes, ultimosLancamentos] = await Promise.all([
+  const [dividas, tarefasPendentes, lancamentosDoMes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos] = await Promise.all([
     prisma.divida.findMany({
       where: { clienteId: cliente.id, status: "ATIVA" },
       orderBy: [{ prioridade: "desc" }, { criadoEm: "asc" }],
@@ -120,6 +120,10 @@ export default async function MinhaContaPage({
       take: 3,
       include: { cartao: { select: { nome: true } } },
     }),
+    // Metas (cofrinhos): soma dos alvos e do já guardado, pra hero mostrar
+    // o progresso geral de todos os cofrinhos juntos numa barra só.
+    prisma.meta.aggregate({ where: { clienteId: cliente.id }, _sum: { valorAlvo: true } }),
+    prisma.depositoMeta.aggregate({ where: { meta: { clienteId: cliente.id } }, _sum: { valor: true } }),
   ]);
 
   const gastoCartaoMes = new Map<string, number>();
@@ -173,6 +177,10 @@ export default async function MinhaContaPage({
   // cadastrada, cai pro simples entradas−saídas (sem o anel de %).
   const heroDisponivel = resumoPlano.calculavel ? resumoPlano.saldoProjetado : resultadoMes;
   const heroComprometido = resumoPlano.calculavel ? resumoPlano.totalComprometido : totalSaidasMes;
+
+  const totalAlvoMetas = agregadoMetas._sum.valorAlvo ?? 0;
+  const totalGuardadoMetas = agregadoDepositos._sum.valor ?? 0;
+  const percentualMetas = totalAlvoMetas > 0 ? Math.min(totalGuardadoMetas / totalAlvoMetas, 1) : null;
   const percentualComprometido =
     resumoPlano.calculavel && resumoPlano.rendaDisponivel > 0
       ? Math.min(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 1.5)
@@ -277,6 +285,17 @@ export default async function MinhaContaPage({
               </div>
               <div className="hero-glass-bar-track">
                 <div className="hero-glass-bar-fill" style={{ width: `${Math.min(percentualComprometido * 100, 100)}%` }} />
+              </div>
+            </div>
+          )}
+          {percentualMetas != null && (
+            <div className="hero-glass-bar">
+              <div className="hero-glass-bar-top">
+                <span>Guardado nas metas</span>
+                <span className="hero-glass-bar-value" style={{ color: "var(--green)" }}>{Math.round(percentualMetas * 100)}%</span>
+              </div>
+              <div className="hero-glass-bar-track">
+                <div className="hero-glass-bar-fill" style={{ width: `${percentualMetas * 100}%`, background: "var(--green)" }} />
               </div>
             </div>
           )}
