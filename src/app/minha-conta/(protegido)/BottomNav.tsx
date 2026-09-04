@@ -39,17 +39,20 @@ export function BottomNav({
   const [maisAberto, setMaisAberto] = useState(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
+  const [cartaoSelecionado, setCartaoSelecionado] = useState(false);
 
   const fecharTudo = () => {
     setFabAberto(false);
     setMaisAberto(false);
     setFabVisao("menu");
     setErroForm(null);
+    setCartaoSelecionado(false);
   };
 
   const voltarAoMenu = () => {
     setFabVisao("menu");
     setErroForm(null);
+    setCartaoSelecionado(false);
   };
 
   function aoEnviarDespesa(e: React.FormEvent<HTMLFormElement>) {
@@ -195,10 +198,25 @@ export function BottomNav({
             {cartoes.length > 0 && (
               <label className="mc-label">
                 Cartão (só se for compra no cartão)
-                <select name="cartaoId" defaultValue="" className="mc-input">
+                <select
+                  name="cartaoId"
+                  defaultValue=""
+                  className="mc-input"
+                  onChange={(e) => setCartaoSelecionado(e.target.value !== "")}
+                >
                   <option value="">Nenhum — despesa direto</option>
                   {cartoes.map((c) => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {cartaoSelecionado && (
+              <label className="mc-label">
+                Parcelas
+                <select name="parcelas" defaultValue="1" className="mc-input">
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x`}</option>
                   ))}
                 </select>
               </label>
