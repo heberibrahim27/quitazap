@@ -272,6 +272,7 @@ export async function GET(req: NextRequest) {
     for (const divida of dividas) {
       const sessao = divida.cliente.botSessoes?.[0];
       if (!sessao?.telefone) continue;
+      if (!divida.cliente.aceitaProativas) continue;
 
       const diasRestantes = divida.diaVencimento! - diaHoje;
       const nomeCliente   = divida.cliente.nome;

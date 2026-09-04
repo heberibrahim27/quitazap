@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
         status: "PENDENTE",
         vencimento: { gte: doisDiasAntes, lt: doisDiasDepois },
       },
-      include: { cliente: { select: { telefone: true } } },
+      include: { cliente: { select: { telefone: true, aceitaProativas: true } } },
     });
 
     for (const t of candidatasHoje) {
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
       let enviouAlgo = false;
 
       const telefone = t.cliente?.telefone;
-      if (telefone) {
+      if (telefone && t.cliente?.aceitaProativas) {
         try {
           await sendWhatsApp(telefone, mensagemWhatsApp);
           enviouAlgo = true;

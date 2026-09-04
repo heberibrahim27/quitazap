@@ -6,6 +6,7 @@ import { hashSenhaCliente, verificarSenhaCliente } from "@/lib/cliente-auth";
 import { subirFotoPerfil } from "@/lib/supabase-storage";
 import { FotoPerfilForm } from "./FotoPerfilForm";
 import { NotificacoesPush } from "../NotificacoesPush";
+import { MensagensProativas } from "../MensagensProativas";
 import { ResetTotalForm } from "./ResetTotalForm";
 import { resetarDadosFinanceiros } from "./reset-actions";
 import { HORAS_TRABALHO_MENSAL_PADRAO } from "@/lib/financeiro/horas-trabalho";
@@ -146,6 +147,7 @@ export default async function PerfilPage({
       </div>
 
       <NotificacoesPush />
+      <MensagensProativas aceitaProativasInicial={cliente.aceitaProativas} />
 
       <div className="card-head">
         <p className="card-title" style={{ fontSize: 14 }}>

@@ -34,6 +34,10 @@ model Cliente {
   jornadaMensalHoras    Float?
   gratuito              Boolean   @default(false)
   assinaturaVenceEm     DateTime?
+  // Consentimento pra mensagens proativas do sistema (lembrete de tarefa/
+  // vencimento, avisos de novidade) — não afeta respostas do bot a algo que
+  // o próprio cliente mandou, isso nunca é bloqueado por este campo.
+  aceitaProativas       Boolean   @default(true)
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
