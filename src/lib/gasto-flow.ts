@@ -52,6 +52,21 @@ export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }
 // catálogo acima, com "Outros" (o fallback do bot) no fim.
 export const NOMES_CATEGORIAS_GASTO: CategoriaGasto[] = [...CATEGORIAS.map((c) => c.categoria), "Outros"];
 
+// Categorias de entrada (Receita) — lista própria, sem nada a ver com as
+// de gasto acima: "Salário" ou "Prêmio" não fazem sentido junto de
+// "Mercado"/"Apostas" no mesmo select.
+export type CategoriaReceita = "Salário" | "Bico/Freelance" | "Dividendos/Investimentos" | "Prêmio" | "Gorjeta" | "Reembolso" | "Outros";
+
+export const NOMES_CATEGORIAS_RECEITA: CategoriaReceita[] = [
+  "Salário",
+  "Bico/Freelance",
+  "Dividendos/Investimentos",
+  "Prêmio",
+  "Gorjeta",
+  "Reembolso",
+  "Outros",
+];
+
 const PALAVRAS_GASTO = [
   "gastei",
   "gasto",

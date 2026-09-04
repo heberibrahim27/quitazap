@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
-import { CATEGORIAS } from "@/lib/gasto-flow";
+import { NOMES_CATEGORIAS_GASTO, NOMES_CATEGORIAS_RECEITA } from "@/lib/gasto-flow";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import type { Lancamento } from "@prisma/client";
 
@@ -114,6 +114,9 @@ export default async function EditarLancamentoPage({
   }
 
   const dataInput = new Date(lancamento.data).toISOString().split("T")[0];
+  // Receita e despesa têm listas de categoria totalmente diferentes —
+  // "Salário"/"Prêmio" não fazem sentido ao lado de "Mercado"/"Apostas".
+  const nomesCategorias = lancamento.tipo === "RECEITA" ? NOMES_CATEGORIAS_RECEITA : NOMES_CATEGORIAS_GASTO;
 
   return (
     <div>
@@ -149,7 +152,7 @@ export default async function EditarLancamentoPage({
           Categoria
           <select name="categoria" defaultValue={lancamento.categoria ?? ""} className="mc-input">
             <option value="">Sem categoria</option>
-            {CATEGORIAS.map(({ categoria }) => (
+            {nomesCategorias.map((categoria) => (
               <option key={categoria} value={categoria}>{categoria}</option>
             ))}
           </select>
