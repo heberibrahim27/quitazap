@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
-import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
+import { calcularResumoFinanceiro } from "@/lib/financeiro/motor";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
 import { MesSwipe } from "./MesSwipe";
@@ -98,7 +98,7 @@ export default async function MinhaContaPage({
   const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 
-  const [dividas, tarefasPendentes, lancamentosDoMes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos] = await Promise.all([
+  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro] = await Promise.all([
     prisma.divida.findMany({
       where: { clienteId: cliente.id, status: "ATIVA" },
       orderBy: [{ prioridade: "desc" }, { criadoEm: "asc" }],
@@ -106,10 +106,6 @@ export default async function MinhaContaPage({
     prisma.tarefa.findMany({
       where: { clienteId: cliente.id, status: "PENDENTE" },
       orderBy: [{ vencimento: "asc" }, { criadoEm: "asc" }],
-    }),
-    prisma.lancamento.findMany({
-      where: { clienteId: cliente.id, data: { gte: inicioMes, lt: fimMes } },
-      include: { cartao: { select: { nome: true } } },
     }),
     prisma.cartao.findMany({ where: { clienteId: cliente.id }, orderBy: { nome: "asc" } }),
     // Só o que já aconteceu (até o fim do mês atual) — sem esse corte, uma
@@ -125,60 +121,27 @@ export default async function MinhaContaPage({
     // o progresso geral de todos os cofrinhos juntos numa barra só.
     prisma.meta.aggregate({ where: { clienteId: cliente.id }, _sum: { valorAlvo: true } }),
     prisma.depositoMeta.aggregate({ where: { meta: { clienteId: cliente.id } }, _sum: { valor: true } }),
+    // Motor financeiro central (src/lib/financeiro/motor.ts) — único lugar
+    // autorizado a somar Lancamento/Parcela. Ver motor-contrato.ts.
+    calcularResumoFinanceiro({ clienteId: cliente.id, periodo: { inicio: inicioMes, fim: fimMes }, rendaMensalDeclarada: cliente.rendaMensal }),
   ]);
 
-  const gastoCartaoMes = new Map<string, number>();
-  let totalReceitasMes = 0;
-  let totalFixasMes = 0;
-  let totalVariaveisMes = 0;
-  let totalCartaoMes = 0;
-  // Depósito/saque em meta (categoria "Metas", ver metas-actions.ts) não é
-  // receita nem despesa "de verdade" — é dinheiro só mudando de lugar entre
-  // a conta e o cofrinho. Fica de fora de Receitas/Despesas e vira sua
-  // própria linha ("Investimentos"), líquido do mês (depósitos - saques).
-  let totalMetasMes = 0;
-  for (const l of lancamentosDoMes) {
-    if (l.categoria === "Metas") {
-      totalMetasMes += l.tipo === "RECEITA" ? -l.valor : l.valor;
-    } else if (l.tipo === "RECEITA") totalReceitasMes += l.valor;
-    else if (l.tipo === "DESPESA_FIXA") totalFixasMes += l.valor;
-    else if (l.tipo === "DESPESA_VARIAVEL") totalVariaveisMes += l.valor;
-    else if (l.tipo === "COMPRA_CARTAO") {
-      totalCartaoMes += l.valor;
-      if (l.cartao) gastoCartaoMes.set(l.cartao.nome, (gastoCartaoMes.get(l.cartao.nome) ?? 0) + l.valor);
-    }
-  }
-  const totalSaidasMes = totalFixasMes + totalVariaveisMes + totalCartaoMes + totalMetasMes;
-  const resultadoMes = totalReceitasMes - totalSaidasMes;
-
-  // Renda = o que foi lançado como receita este mês (salário + outras
-  // fontes). Só cai pra "Renda mensal" declarada no Perfil enquanto o
-  // cliente ainda não lançou nenhuma receita no mês — não existem mais
-  // dois números de renda diferentes andando em paralelo.
-  const rendaEfetiva = totalReceitasMes > 0 ? totalReceitasMes : (cliente.rendaMensal ?? null);
-
-  const resumoPlano = await resumoPlanoSimplificado({
-    clienteId: cliente.id,
-    rendaMensal: rendaEfetiva,
-    totalDespesasMes: totalSaidasMes,
-    inicioMes,
-    fimMes,
-  });
-  // Separa empréstimos do resto das dívidas pra ter uma linha própria no
-  // Resumo — mesma parcela que já entra no "comprometido" do plano acima,
-  // só reclassificada aqui pra exibição (não soma de novo em lugar nenhum).
-  const parcelasDoMesComTipo = resumoPlano.calculavel
-    ? await prisma.parcela.findMany({
-        where: { status: "PENDENTE", vencimento: { gte: inicioMes, lt: fimMes }, divida: { clienteId: cliente.id, status: "ATIVA" } },
-        select: { valor: true, divida: { select: { tipo: true } } },
-      })
-    : [];
-  let totalEmprestimosMes = 0;
-  let totalOutrasDividasMes = 0;
-  for (const p of parcelasDoMesComTipo) {
-    if (p.divida.tipo === "EMPRESTIMO") totalEmprestimosMes += p.valor;
-    else totalOutrasDividasMes += p.valor;
-  }
+  // Aliases 1:1 com os nomes que o JSX abaixo já usava antes da extração
+  // pro motor — mantidos de propósito pra essa primeira extração não
+  // exigir tocar em nenhuma linha depois daqui.
+  const { totais, comprometimento: resumoPlano, porCartao, quantidadeLancamentos } = resumoFinanceiro;
+  const totalReceitasMes = totais.receitas;
+  const totalFixasMes = totais.despesasFixas;
+  const totalVariaveisMes = totais.despesasVariaveis;
+  const totalCartaoMes = totais.cartoes;
+  const totalMetasMes = totais.investimentos;
+  const totalEmprestimosMes = totais.emprestimos;
+  const totalOutrasDividasMes = totais.outrasDividas;
+  const totalSaidasMes = totais.totalSaidasSemDividas;
+  const resultadoMes = totais.resultadoSemPlano;
+  const rendaEfetiva = resumoPlano.rendaEfetiva;
+  const percentualComprometido = resumoPlano.percentualComprometido;
+  const gastoCartaoMes = new Map(porCartao.map((c) => [c.nomeCartao, c.total]));
 
   // Hero: quando dá pra calcular o plano (renda cadastrada), mostra o
   // resultado já projetado com parcelas de dívida do mês; sem renda
@@ -189,10 +152,6 @@ export default async function MinhaContaPage({
   const totalAlvoMetas = agregadoMetas._sum.valorAlvo ?? 0;
   const totalGuardadoMetas = agregadoDepositos._sum.valor ?? 0;
   const percentualMetas = totalAlvoMetas > 0 ? Math.min(totalGuardadoMetas / totalAlvoMetas, 1) : null;
-  const percentualComprometido =
-    resumoPlano.calculavel && resumoPlano.rendaDisponivel > 0
-      ? Math.min(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 1.5)
-      : null;
 
   const nomeMes = NOMES_MES[mes - 1];
   // Investimentos (Metas) fica de fora da lista principal — não é uma
@@ -209,10 +168,10 @@ export default async function MinhaContaPage({
     { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
   ].filter((linha) => linha.valor > 0);
   const maiorValorResumo = Math.max(totalReceitasMes, 1);
-  // Passo 1 da DRE: só despesas e dívidas "de verdade" (sem o aporte em
-  // Metas) — mesma soma que já compõe o resultado final do plano.
-  const totalSaidasOperacionais = resumoDoMes.filter((linha) => linha.rotulo !== "Receitas").reduce((soma, linha) => soma + linha.valor, 0);
-  const resultadoAntesInvestimentos = totalReceitasMes - totalSaidasOperacionais;
+  // totalSaidasOperacionais/resultadoAntesInvestimentos já vêm prontos do
+  // motor (mesma fórmula de antes) — sem resomar `resumoDoMes` aqui.
+  const totalSaidasOperacionais = totais.totalSaidasOperacionais;
+  const resultadoAntesInvestimentos = totais.resultadoAntesInvestimentos;
   // totalMetasMes pode ser negativo (mês em que se sacou mais do que se
   // guardou) — nesse caso o aporte "negativo" devolve dinheiro pra sobra,
   // e ainda faz sentido mostrar a linha.
@@ -348,7 +307,7 @@ export default async function MinhaContaPage({
       </div>
       <AnimarAoAparecer>
       <section className="card" id="resumo" style={{ paddingBottom: 0 }}>
-        {lancamentosDoMes.length === 0 ? (
+        {quantidadeLancamentos === 0 ? (
           <p className="mc-empty">Nenhum gasto ou receita registrado em {nomeMes}/{ano}.</p>
         ) : (
           <>

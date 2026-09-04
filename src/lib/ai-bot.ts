@@ -3,6 +3,8 @@
 // Modelo: gpt-4o-mini (OpenAI)
 // ─────────────────────────────────────────
 
+import { chatCompletion, type MensagemChat } from "@/lib/ai/openai-client";
+
 export type Mensagem = {
   role: "user" | "assistant" | "system";
   content: string;
@@ -687,35 +689,6 @@ REGRAS DE FLUXO E MEMÓRIA
 - Se o cliente informar que já forneceu uma informação, aceite imediatamente sem pedir de novo.
 - Ao receber uma correção do cliente ("não, eu já tinha mandado", "isso eu já disse"), responda: reconheça, corrija internamente e avance para o próximo passo.`;
 
-// Preços gpt-4o-mini por 1M tokens (USD)
-const PRECO_INPUT  = 0.15 / 1_000_000;
-const PRECO_OUTPUT = 0.60 / 1_000_000;
-
-async function registrarLogIA(opts: {
-  clienteId?: string | null;
-  gratuito?: boolean;
-  tipo: string;
-  tokensInput: number;
-  tokensOutput: number;
-}) {
-  try {
-    const { prisma } = await import("@/lib/prisma");
-    const custo = opts.tokensInput * PRECO_INPUT + opts.tokensOutput * PRECO_OUTPUT;
-    await prisma.logIA.create({
-      data: {
-        clienteId:    opts.clienteId   ?? null,
-        gratuito:     opts.gratuito    ?? false,
-        tipo:         opts.tipo,
-        tokensInput:  opts.tokensInput,
-        tokensOutput: opts.tokensOutput,
-        custoUSD:     custo,
-      },
-    });
-  } catch (e) {
-    console.error("[LogIA] Erro ao registrar:", e);
-  }
-}
-
 function usuarioPediuDiagnostico(mensagem: string): boolean {
   return /diagnostico|meu diagnostico|gerar diagnostico|diagnostico financeiro|relatorio|meu relatorio|relatorio financeiro|plano financeiro|enviar diagnostico|manda meu diagnostico/i.test(
     mensagem
@@ -731,9 +704,7 @@ export async function processarMensagemIA(
   clienteId?: string | null,
   gratuito?: boolean
 ): Promise<{ resposta: string; diagnostico?: DiagnosticoIA }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey || apiKey.startsWith("sk-proj-SUA")) {
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith("sk-proj-SUA")) {
     console.warn("[IA] OPENAI_API_KEY não configurada.");
     return { resposta: "Sistema de IA em configuração. Tente novamente em breve." };
   }
@@ -909,40 +880,22 @@ export async function processarMensagemIA(
     max_tokens: 2000,
   };
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI API erro ${res.status}: ${err}`);
-  }
-
-  const data = await res.json();
-  const choice = data.choices?.[0];
-
-  // Registra consumo de tokens
-  const usage = data.usage ?? {};
-  await registrarLogIA({
-    clienteId,
-    gratuito,
-    tipo: "chat",
-    tokensInput:  usage.prompt_tokens     ?? 0,
-    tokensOutput: usage.completion_tokens ?? 0,
+  const { conteudo, toolCalls, finishReason } = await chatCompletion({
+    model: body.model,
+    mensagens: body.messages as MensagemChat[],
+    tools: body.tools,
+    toolChoice: body.tool_choice as "auto" | "none",
+    temperature: body.temperature,
+    maxTokens: body.max_tokens,
+    telemetria: { clienteId: clienteId ?? null, gratuito: gratuito ?? false, skill: "chat" },
   });
 
   // IA decidiu gerar o diagnóstico
-  if (choice?.finish_reason === "tool_calls" && choice?.message?.tool_calls?.length > 0) {
-    const toolCall = choice.message.tool_calls[0];
-    const diagnostico = JSON.parse(toolCall.function.arguments) as DiagnosticoIA;
+  if (finishReason === "tool_calls" && toolCalls && toolCalls.length > 0) {
+    const diagnostico = JSON.parse(toolCalls[0].function.arguments) as DiagnosticoIA;
     return { resposta: "", diagnostico };
   }
 
-  const resposta = choice?.message?.content ?? "Pode continuar me enviando suas informações.";
+  const resposta = conteudo || "Pode continuar me enviando suas informações.";
   return { resposta };
 }
