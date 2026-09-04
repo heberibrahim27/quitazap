@@ -7,9 +7,29 @@ function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+const FUSO = "America/Sao_Paulo";
+
+// Mesma âncora em Brasília usada no resto do Controle (ver cartoes/page.tsx,
+// movimentacoes/page.tsx, page.tsx da home) — sem isso, um lançamento feito
+// entre 21h-23h59 de Brasília (já virado de dia em UTC) contava pro mês
+// errado aqui, podendo disparar o push de "orçamento estourado" no mês
+// seguinte antes da hora.
+function anoMesBrasil(data: Date): { ano: number; mes: number } {
+  const [ano, mes] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO,
+    year: "numeric",
+    month: "2-digit",
+  })
+    .format(data)
+    .split("-")
+    .map(Number);
+  return { ano, mes };
+}
+
 function limitesDoMes(data: Date) {
-  const inicio = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), 1));
-  const fim = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth() + 1, 1));
+  const { ano, mes } = anoMesBrasil(data);
+  const inicio = new Date(Date.UTC(ano, mes - 1, 1, 3, 0, 0, 0));
+  const fim = new Date(Date.UTC(mes === 12 ? ano + 1 : ano, mes === 12 ? 0 : mes, 1, 3, 0, 0, 0));
   return { inicio, fim };
 }
 
