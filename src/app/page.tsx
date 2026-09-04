@@ -154,10 +154,6 @@ const faq = [
     r: "Não. Enquanto sua assinatura estiver ativa, o valor de R$14,90/mês não muda. O reajuste vale só pra quem assinar depois que as primeiras 1.000 vagas do Preço Fundador se esgotarem.",
   },
   {
-    p: "Isso é seguro? Vocês têm acesso à minha conta bancária?",
-    r: "Não. Hoje o QuitaZap não acessa sua conta bancária nem movimenta seu dinheiro. Você informa os dados que quiser registrar, pelo WhatsApp ou pelo painel, e o QuitaZap usa essas informações para organizar e analisar suas finanças.",
-  },
-  {
     p: "Por que confiar em mais um app financeiro?",
     r: "Porque o QuitaZap mostra de onde vêm os números. As análises são baseadas nos dados que você registra e servem para te ajudar a entender melhor sua situação — sem promessa milagrosa e sem esconder informação atrás de um score misterioso.",
   },
