@@ -230,7 +230,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   /* Sem cabeçalho separado por cima, a hero é quem precisa abrir espaço
      pro notch/status bar (mesma fórmula do cabeçalho clássico). */
   padding: max(14px, env(safe-area-inset-top)) 22px 52px;
-  background: var(--navy-deep);
+  background: linear-gradient(150deg, #0A2A57 0%, #0F4A8C 55%, #1470B8 100%);
   border: 1px solid rgba(255,255,255,0.1);
   border-top: none;
   box-shadow: var(--shadow-hero), inset 0 0 60px rgba(255,255,255,0.03);
