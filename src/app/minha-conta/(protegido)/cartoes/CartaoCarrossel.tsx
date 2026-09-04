@@ -28,6 +28,8 @@ export type CartaoCarrosselItem = {
   faturaFechada: boolean;
   faturaSelLabel: string;
   faturaSelValorFmt: string;
+  comprasLabel: string;
+  comprasVazioLabel: string;
   compras: CompraCartaoView[];
   proximasParcelas: ParcelaFuturaView[];
   proximasParcelasTotalFmt: string;
@@ -238,12 +240,12 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
 
           <div className="card-head">
             <p className="card-title" style={{ fontSize: 14 }}>
-              <span className="title-label">Últimas compras</span>
+              <span className="title-label">{cartaoAtivo.comprasLabel}</span>
             </p>
           </div>
           <div className="mc-card">
             {cartaoAtivo.compras.length === 0 ? (
-              <p className="mc-empty">Nenhuma compra registrada nesse cartão ainda.</p>
+              <p className="mc-empty">{cartaoAtivo.comprasVazioLabel}</p>
             ) : (
               <div className="mc-list">
                 {cartaoAtivo.compras.map((compra) => (
