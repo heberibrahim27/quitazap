@@ -171,26 +171,24 @@ export default async function MinhaContaPage({
   // deduzido só depois num segundo passo (ver JSX): Receitas menos
   // despesas e dívidas primeiro dá o "Resultado antes de investimentos";
   // só depois de tirar o aporte é que chega na sobra livre de verdade.
+  // Soma só das despesas/dívidas do mês (sem Receita nem Investimentos) —
+  // base de comparação ENTRE as barras de saída: cada uma reflete sua
+  // participação dentro do total gasto, não uma fração da receita (que é
+  // uma grandeza diferente e não diz nada sobre o peso relativo entre
+  // categorias de despesa entre si).
+  const somaDespesasMes = totalFixasMes + totalVariaveisMes + totalCartaoMes + totalEmprestimosMes + totalOutrasDividasMes;
+  const baseDespesas = Math.max(somaDespesasMes, 1);
   const resumoDoMes = [
-    { rotulo: "Receitas", valor: totalReceitasMes, icone: "receita", classe: "green" },
-    { rotulo: "Despesas fixas", valor: totalFixasMes, icone: "fixa", classe: "blue" },
-    { rotulo: "Desp. variáveis", valor: totalVariaveisMes, icone: "variavel", classe: "cyan" },
-    { rotulo: "Cartões", valor: totalCartaoMes, icone: "cartao", classe: "blue" },
-    { rotulo: "Empréstimos", valor: totalEmprestimosMes, icone: "divida", classe: "blue" },
-    { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue" },
+    { rotulo: "Receitas", valor: totalReceitasMes, icone: "receita", classe: "green", base: Math.max(totalReceitasMes, 1) },
+    { rotulo: "Despesas fixas", valor: totalFixasMes, icone: "fixa", classe: "blue", base: baseDespesas },
+    { rotulo: "Desp. variáveis", valor: totalVariaveisMes, icone: "variavel", classe: "cyan", base: baseDespesas },
+    { rotulo: "Cartões", valor: totalCartaoMes, icone: "cartao", classe: "blue", base: baseDespesas },
+    { rotulo: "Empréstimos", valor: totalEmprestimosMes, icone: "divida", classe: "blue", base: baseDespesas },
+    { rotulo: "Outras dívidas", valor: totalOutrasDividasMes, icone: "divida", classe: "blue", base: baseDespesas },
   ].filter((linha) => linha.valor > 0);
-  // Base de cálculo ÚNICA pra todas as barrinhas do Resumo (incluindo a de
-  // Investimentos, renderizada à parte logo abaixo): o maior valor entre
-  // TODAS as linhas mostradas, não só a Receita. Usar só a Receita como
-  // referência (bug anterior) fazia a barra de qualquer categoria de
-  // despesa/investimento menor que a receita do mês parecer artificialmente
-  // vazia mesmo quando ela já era a maior categoria de saída — e, no caso
-  // oposto (mês com dívida/despesa maior que a receita), forçava mais de
-  // uma barra a bater 100% ao mesmo tempo, sem diferenciação nenhuma.
-  const maiorValorResumo = Math.max(
-    totalReceitasMes, totalFixasMes, totalVariaveisMes, totalCartaoMes,
-    totalEmprestimosMes, totalOutrasDividasMes, Math.abs(totalMetasMes), 1,
-  );
+  // Investimentos não é despesa (é aporte, ver comentário acima) — mantém
+  // referência própria, relativa à Receita.
+  const baseInvestimentos = Math.max(totalReceitasMes, 1);
   // totalSaidasOperacionais/resultadoAntesInvestimentos já vêm prontos do
   // motor (mesma fórmula de antes) — sem resomar `resumoDoMes` aqui.
   const totalSaidasOperacionais = totais.totalSaidasOperacionais;
@@ -404,7 +402,7 @@ export default async function MinhaContaPage({
                   <span className="resumo-bar-track">
                     <span
                       className="resumo-bar-fill"
-                      style={{ "--to": Math.min(linha.valor / maiorValorResumo, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
+                      style={{ "--to": Math.min(linha.valor / linha.base, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
                     />
                   </span>
                   <span className="resumo-value">
@@ -435,7 +433,7 @@ export default async function MinhaContaPage({
                   <span className="resumo-bar-track">
                     <span
                       className="resumo-bar-fill"
-                      style={{ "--to": Math.min(Math.abs(totalMetasMes) / maiorValorResumo, 1), "--i": resumoDoMes.length, background: "var(--green)" } as React.CSSProperties}
+                      style={{ "--to": Math.min(Math.abs(totalMetasMes) / baseInvestimentos, 1), "--i": resumoDoMes.length, background: "var(--green)" } as React.CSSProperties}
                     />
                   </span>
                   <span className="resumo-value">
