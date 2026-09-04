@@ -44,6 +44,7 @@ model Cliente {
   pushSubscriptions PushSubscription[]
   orcamentos        OrcamentoCategoria[]
   metas             Meta[]
+  eventosCakto      EventoCakto[]
 }
 
 // ─────────────────────────────────────────
@@ -555,4 +556,42 @@ model MetaFinanceira {
   dataAlvo     DateTime?
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
+}
+
+// ─────────────────────────────────────────
+// EVENTO CAKTO — histórico bruto de webhook (base da receita real)
+// ─────────────────────────────────────────
+// Antes desta tabela, o webhook (api/webhook/cakto/route.ts) só reagia a
+// "purchase_approved" e nunca gravava o valor pago em lugar nenhum — a
+// receita no /financeiro e /painel era só contagem de Cliente pagante ×
+// preço fixo hardcoded, sem refletir desconto, upgrade, reembolso ou
+// chargeback nenhum. Esta tabela grava TODO evento recebido (não só
+// aprovação), com o payload bruto sempre preservado — mesmo que o nome
+// exato de um campo (valor, motivo) mude ou a extração abaixo erre, o
+// dado original nunca se perde e dá pra reprocessar depois.
+// status:      APROVADA | REEMBOLSADA | CANCELADA | CHARGEBACK | DESCONHECIDO
+//              (classificado por padrão de texto em cima de `evento`, ver
+//              classificarStatusCakto() no webhook — Cakto não tem schema
+//              público confirmado nesta auditoria, então a classificação é
+//              tolerante a variação de nome em vez de um enum fechado)
+// valorPago:   best-effort a partir dos campos mais prováveis do payload
+//              (amount/baseAmount/paidAmount/value) — null quando nenhum
+//              bateu; NUNCA inventado. Unidade (reais vs. centavos) ainda
+//              precisa ser confirmada com um payload real da Cakto.
+model EventoCakto {
+  id           String   @id @default(cuid())
+  clienteId    String?
+  evento       String
+  status       String   @default("DESCONHECIDO")
+  valorPago    Float?
+  moeda        String   @default("BRL")
+  transacaoId  String?  @unique
+  payloadBruto Json
+  criadoEm     DateTime @default(now())
+
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId])
+  @@index([evento])
+  @@index([criadoEm])
 }

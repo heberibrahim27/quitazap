@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { IconUsers, IconWallet, IconTrendUp, IconAlertTriangle, IconCheckCircle, IconArrowUpRight, IconPlus } from "@/components/icons";
 import { QaReveal } from "@/components/QaReveal";
 import { QaTrendChart } from "@/components/QaTrendChart";
+import { calcularDreAdmin, PRECO_MENSAL } from "@/lib/financeiro-admin/motor";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,50 +15,28 @@ function fmtData(data: Date) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(data));
 }
 
-// Mês/ano atual em horário de Brasília — mesmo padrão do Financeiro, evita
-// que um cliente cadastrado nas primeiras ~3h UTC do mês seguinte conte
-// como se já fosse do mês novo no gráfico de crescimento do MRR.
-function mesAtualBrasil(): { ano: number; mes: number } {
+// Mês/ano atual em horário de Brasília — usado só pro gráfico de
+// crescimento (histórico de 6 meses), que é específico desta tela e não
+// faz parte do DRE de um mês só (ver src/lib/financeiro-admin/motor.ts,
+// que já tem seu próprio mesAtualBrasil() no formato YYYY-MM).
+function anoMesAtualBrasil(): { ano: number; mes: number } {
   const [anoTxt, mesTxt] = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit",
   }).format(new Date()).split("-");
   return { ano: Number(anoTxt), mes: Number(mesTxt) - 1 };
 }
 
-const PRECO_MENSAL = 29.90; // R$ por assinante/mês
 const NOMES_MES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-async function buscarCustoIA(): Promise<{ gastoMes: number; gastoPagantes: number; gastoGratuitos: number }> {
-  try {
-    const { prisma } = await import("@/lib/prisma");
-    const { ano, mes } = mesAtualBrasil();
-    const inicio = new Date(Date.UTC(ano, mes, 1, 3, 0, 0, 0));
-
-    const [pagantes, gratuitos] = await Promise.all([
-      prisma.logIA.aggregate({
-        _sum: { custoUSD: true },
-        where: { gratuito: false, criadoEm: { gte: inicio } },
-      }),
-      prisma.logIA.aggregate({
-        _sum: { custoUSD: true },
-        where: { gratuito: true, criadoEm: { gte: inicio } },
-      }),
-    ]);
-
-    const gastoPagantes  = pagantes._sum.custoUSD  ?? 0;
-    const gastoGratuitos = gratuitos._sum.custoUSD ?? 0;
-    return { gastoMes: gastoPagantes + gastoGratuitos, gastoPagantes, gastoGratuitos };
-  } catch {
-    return { gastoMes: 0, gastoPagantes: 0, gastoGratuitos: 0 };
-  }
-}
 
 export default async function Home() {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const em7Dias = new Date(hoje); em7Dias.setDate(em7Dias.getDate() + 7);
 
-  const [clientes, totalPlanos, custoIA] = await Promise.all([
+  // Motor DRE Admin (src/lib/financeiro-admin/motor.ts) — mesma fonte que
+  // /financeiro usa; antes desta unificação, esta tela calculava "lucro"
+  // do seu próprio jeito (ignorando comissão Cakto e custo manual).
+  const [clientes, totalPlanos, dre] = await Promise.all([
     prisma.cliente.findMany({
       select: {
         id: true,
@@ -72,20 +51,20 @@ export default async function Home() {
       orderBy: { criadoEm: "desc" },
     }),
     prisma.planoEnviado.count(),
-    buscarCustoIA(),
+    calcularDreAdmin(),
   ]);
 
   // ── Métricas de negócio ──────────────────
   const pagantes   = clientes.filter((c) => !c.gratuito);
   const gratuitos  = clientes.filter((c) => c.gratuito);
 
-  // MRR = assinantes pagantes × R$29,90
-  const mrr = pagantes.length * PRECO_MENSAL;
-
-  // Crescimento do MRR nos últimos 6 meses (cliente pagante contado a
-  // partir do mês em que se cadastrou — sem dado de cancelamento hoje,
-  // então é um crescimento acumulado, não "MRR líquido de churn").
-  const { ano: anoAtualBR, mes: mesAtualBR } = mesAtualBrasil();
+  // Crescimento nos últimos 6 meses (cliente pagante contado a partir do
+  // mês em que se cadastrou — sem dado de cancelamento hoje, então é um
+  // crescimento acumulado por contagem, não "receita líquida de churn").
+  // Deliberadamente por contagem × preço fixo mesmo quando o mês corrente
+  // já tem receita observada da Cakto — é uma série histórica, não dá pra
+  // "observar" meses passados sem reprocessar evento por evento.
+  const { ano: anoAtualBR, mes: mesAtualBR } = anoMesAtualBrasil();
   const mrrTrend = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(anoAtualBR, mesAtualBR - (5 - i), 1);
     const inicioProximoMesBrasil = new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 1, 3, 0, 0, 0));
@@ -93,7 +72,8 @@ export default async function Home() {
     return { label: NOMES_MES_CURTO[d.getMonth()], mrr: qtd * PRECO_MENSAL };
   });
 
-  // Receita total estimada (meses ativos × R$29,90)
+  // Receita total estimada (meses ativos × R$29,90) — acumulado histórico,
+  // não é o DRE do mês, fica de fora da unificação.
   const receitaTotal = pagantes.reduce((acc, c) => {
     const meses = Math.max(1, Math.floor(
       (Date.now() - new Date(c.criadoEm).getTime()) / (1000 * 60 * 60 * 24 * 30)
@@ -114,12 +94,11 @@ export default async function Home() {
     return new Date(c.assinaturaVenceEm) < hoje;
   });
 
-  // Custo IA em BRL (USD × 5.7)
-  const USD_BRL = 5.7;
-  const custoIABRL         = custoIA.gastoMes      * USD_BRL;
-  const custoIAPagantesBRL = custoIA.gastoPagantes * USD_BRL;
-  const custoIAGratuitosBRL= custoIA.gastoGratuitos* USD_BRL;
-  const lucroEstimado      = mrr - custoIABRL;
+  const mrr = dre.receitaBruta;
+  const custoIABRL = dre.custoIA;
+  const custoIAPagantesBRL = dre.custoIAPagantes;
+  const custoIAGratuitosBRL = dre.custoIAGratuitos;
+  const resultadoOperacional = dre.resultadoOperacional;
 
   return (
     <div>
@@ -165,7 +144,8 @@ export default async function Home() {
           <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconWallet size={14} /> Receita mensal recorrente (MRR)</p>
           <strong className="qa-hero-value">{fmt(mrr)}</strong>
           <p className="qa-hero-caption">
-            {pagantes.length} cliente{pagantes.length !== 1 ? "s" : ""} pagante{pagantes.length !== 1 ? "s" : ""} · lucro estimado {fmt(lucroEstimado)}/mês
+            {pagantes.length} cliente{pagantes.length !== 1 ? "s" : ""} pagante{pagantes.length !== 1 ? "s" : ""} · resultado operacional {fmt(resultadoOperacional)}/mês
+            {dre.receitaFonte === "ESTIMADA" && " (estimado)"}
           </p>
         </div>
         <div className="qa-hero-chart">
@@ -218,11 +198,11 @@ export default async function Home() {
           <p className="qa-stat-caption">pagantes {fmt(custoIAPagantesBRL)} · gratuitos {fmt(custoIAGratuitosBRL)}</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.05}>
-          <p className="qa-stat-label"><IconTrendUp size={14} /> Lucro estimado/mês</p>
-          <strong className="qa-stat-value" style={{ color: lucroEstimado >= 0 ? "#6ee7b7" : "#fca5a5" }}>
-            {fmt(lucroEstimado)}
+          <p className="qa-stat-label"><IconTrendUp size={14} /> Resultado operacional/mês</p>
+          <strong className="qa-stat-value" style={{ color: resultadoOperacional >= 0 ? "#6ee7b7" : "#fca5a5" }}>
+            {fmt(resultadoOperacional)}
           </strong>
-          <p className="qa-stat-caption">MRR − custo IA real</p>
+          <p className="qa-stat-caption">Receita líquida − custo IA − custos manuais</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.1}>
           <p className="qa-stat-label">Assinaturas em risco</p>
