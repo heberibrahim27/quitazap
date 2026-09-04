@@ -29,6 +29,16 @@ const LANDING_CSS = `
   .qz-h2-sm { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25; }
   .qz-h2-md { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
   .qz-h2-lg { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+  .qz-phone-mock { display: none; }
+  .qz-phone-mock-inner {
+    position: relative; width: 100%; height: 100%; border-radius: 38px;
+    background: #0a0a0a; overflow: hidden; border: 1px solid #000;
+  }
+  .qz-phone-notch-band {
+    position: absolute; top: 0; left: 0; right: 0; height: 24px; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qz-phone-notch { width: 80px; height: 6px; border-radius: 999px; background: #000; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -43,6 +53,14 @@ const LANDING_CSS = `
     .qz-h2-sm { font-size: 30px; }
     .qz-h2-md { font-size: 36px; }
     .qz-h2-lg { font-size: 48px; }
+  }
+  @media (min-width: 1280px) {
+    .qz-phone-mock {
+      display: block; position: absolute; top: 40px; right: 48px;
+      width: 280px; height: 580px; border-radius: 40px; padding: 2px;
+      background: linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.05));
+      box-shadow: 0 60px 100px -30px rgba(15,23,42,0.35), 0 20px 40px -15px rgba(15,23,42,0.2);
+    }
   }
 `;
 
@@ -365,7 +383,28 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* FUNCIONALIDADES */}
       {/* ══════════════════════════════════════ */}
-      <section className="qz-section" style={{ background: "#ffffff" }}>
+      <section className="qz-section" style={{ background: "#ffffff", position: "relative" }}>
+        {/* Mockup de celular flutuante (referência de estilo "Cogni" que o
+            Ibrahim mandou) — só aparece em telas bem largas (>=1280px) pra
+            não disputar espaço com o grid de cards em tablet/laptop menor.
+            Sem print real do painel ainda, então usa o mesmo placeholder
+            "em breve" das outras telas dos cards abaixo. */}
+        <div className="qz-phone-mock qz-reveal" aria-hidden="true">
+          <div className="qz-phone-mock-inner">
+            <div className="qz-phone-notch-band">
+              <div className="qz-phone-notch" />
+            </div>
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
+            }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em", textAlign: "center", padding: "0 24px" }}>
+                PRINT DO PAINEL EM BREVE
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
