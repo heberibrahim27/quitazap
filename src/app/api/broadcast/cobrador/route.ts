@@ -78,15 +78,18 @@ export async function POST(req: NextRequest) {
         select: {
           assinaturaVenceEm: true,
           gratuito: true,
+          aceitaProativas: true,
         },
       },
     },
   });
 
-  // Filtra só os que têm assinatura ativa ou são gratuitos
+  // Filtra só os que têm assinatura ativa ou são gratuitos, e que não
+  // desativaram mensagens proativas nas Configurações.
   const hoje = new Date();
   const ativos = sessoes.filter((s) => {
     if (!s.cliente) return false;
+    if (!s.cliente.aceitaProativas) return false;
     if (s.cliente.gratuito) return true;
     if (!s.cliente.assinaturaVenceEm) return true; // sem data = ativo
     return s.cliente.assinaturaVenceEm >= hoje;
