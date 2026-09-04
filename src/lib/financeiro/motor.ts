@@ -12,9 +12,11 @@ import { prisma } from "@/lib/prisma";
 import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
 import type {
   EntradaMotorFinanceiro,
+  MediaMensal,
   OpcoesMotorFinanceiro,
   PeriodoFinanceiro,
   PorCartao,
+  PorCategoria,
   ResumoFinanceiro,
   TotaisFinanceiros,
 } from "./motor-contrato";
@@ -52,6 +54,7 @@ async function calcularTotaisBase(
 ): Promise<{
   totais: Pick<TotaisFinanceiros, "receitas" | "despesasFixas" | "despesasVariaveis" | "cartoes" | "investimentos">;
   porCartao: PorCartao[];
+  porCategoria: PorCategoria[];
   quantidadeLancamentos: number;
 }> {
   const lancamentos = await prisma.lancamento.findMany({
@@ -60,6 +63,7 @@ async function calcularTotaisBase(
   });
 
   const porCartaoMap = new Map<string, PorCartao>();
+  const porCategoriaMap = new Map<string, number>();
   let receitas = 0;
   let despesasFixas = 0;
   let despesasVariaveis = 0;
@@ -90,11 +94,21 @@ async function calcularTotaisBase(
     // RECEITA/DESPESA_FIXA/DESPESA_VARIAVEL/COMPRA_CARTAO com categoria
     // "Metas" já foram tratados acima; FATURA_FECHADA nunca entra em
     // nenhum total (marcador visual — ver comentário em schema.prisma).
+    // porCategoria só soma despesa de verdade (mesma allowlist acima),
+    // nunca RECEITA/Metas/FATURA_FECHADA.
+    if (
+      l.categoria &&
+      l.categoria !== "Metas" &&
+      (l.tipo === "DESPESA_FIXA" || l.tipo === "DESPESA_VARIAVEL" || l.tipo === "COMPRA_CARTAO")
+    ) {
+      porCategoriaMap.set(l.categoria, (porCategoriaMap.get(l.categoria) ?? 0) + l.valor);
+    }
   }
 
   return {
     totais: { receitas, despesasFixas, despesasVariaveis, cartoes, investimentos },
     porCartao: Array.from(porCartaoMap.values()),
+    porCategoria: Array.from(porCategoriaMap.entries()).map(([categoria, total]) => ({ categoria, total })),
     quantidadeLancamentos: lancamentos.length,
   };
 }
@@ -105,7 +119,7 @@ export async function calcularResumoFinanceiro(
 ): Promise<ResumoFinanceiro> {
   const { clienteId, periodo, rendaMensalDeclarada } = entrada;
 
-  const { totais: base, porCartao, quantidadeLancamentos } = await calcularTotaisBase(clienteId, periodo);
+  const { totais: base, porCartao, porCategoria, quantidadeLancamentos } = await calcularTotaisBase(clienteId, periodo);
 
   const totalSaidasSemDividas = base.despesasFixas + base.despesasVariaveis + base.cartoes + base.investimentos;
 
@@ -167,6 +181,7 @@ export async function calcularResumoFinanceiro(
       resultadoSemPlano,
     },
     porCartao,
+    porCategoria,
     comprometimento: { ...resumoPlano, rendaEfetiva, percentualComprometido },
   };
 
@@ -205,4 +220,47 @@ export async function calcularResumoFinanceiro(
   }
 
   return resumo;
+}
+
+/** Média mensal dos N meses ANTERIORES ao período de referência (o mês de
+ * `periodoReferencia` nunca entra na média) — reaproveita `calcularTotaisBase`
+ * uma vez por mês e faz a média, em vez de qualquer tela recalcular isso
+ * por conta própria. Usada pela Saúde Financeira (ritmo de despesas
+ * variáveis) e pela detecção de anomalia por categoria. */
+export async function calcularMediaMensal(
+  clienteId: string,
+  periodoReferencia: PeriodoFinanceiro,
+  quantidadeMeses: number,
+): Promise<MediaMensal> {
+  const { ano, mes } = anoMesAtualBrasil(periodoReferencia.inicio);
+  let anoIter = ano;
+  let mesIter = mes;
+
+  let somaFixas = 0;
+  let somaVariaveis = 0;
+  let somaCartoes = 0;
+  const somaPorCategoria = new Map<string, number>();
+
+  for (let i = 0; i < quantidadeMeses; i++) {
+    const anterior = mesAnteriorDe(anoIter, mesIter);
+    anoIter = anterior.ano;
+    mesIter = anterior.mes;
+    const periodo = limitesDoMes(anoIter, mesIter);
+    const { totais, porCategoria } = await calcularTotaisBase(clienteId, periodo);
+    somaFixas += totais.despesasFixas;
+    somaVariaveis += totais.despesasVariaveis;
+    somaCartoes += totais.cartoes;
+    for (const { categoria, total } of porCategoria) {
+      somaPorCategoria.set(categoria, (somaPorCategoria.get(categoria) ?? 0) + total);
+    }
+  }
+
+  const n = Math.max(quantidadeMeses, 1);
+  return {
+    quantidadeMeses,
+    despesasFixas: somaFixas / n,
+    despesasVariaveis: somaVariaveis / n,
+    cartoes: somaCartoes / n,
+    porCategoria: Array.from(somaPorCategoria.entries()).map(([categoria, total]) => ({ categoria, total: total / n })),
+  };
 }

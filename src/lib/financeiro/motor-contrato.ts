@@ -60,6 +60,11 @@ export interface PorCartao {
   total: number;
 }
 
+export interface PorCategoria {
+  categoria: string;
+  total: number;
+}
+
 /** Reaproveita o contrato que já existe (`plano-pagamento-contrato.ts`) em
  * vez de duplicar a forma — o motor só acrescenta o que falta ali. */
 export interface ComprometimentoFinanceiro extends ResumoPlanoParaDashboard {
@@ -89,6 +94,11 @@ export interface ResumoFinanceiro {
   quantidadeLancamentos: number;
   totais: TotaisFinanceiros;
   porCartao: PorCartao[];
+  /** Só despesas (FIXA/VARIAVEL/COMPRA_CARTAO) com categoria preenchida —
+   * mesma allowlist de tipos do resto do motor, então RECEITA/Metas/
+   * FATURA_FECHADA nunca entram aqui. Base de "onde estou gastando mais"
+   * (Skill/WhatsApp) e de detecção de anomalia por categoria. */
+  porCategoria: PorCategoria[];
   comprometimento: ComprometimentoFinanceiro;
   /** Só preenchido quando chamado com `{ comHistorico: true }`. */
   historico?: HistoricoFinanceiro;
@@ -98,4 +108,17 @@ export interface ResumoFinanceiro {
 
 export interface OpcoesMotorFinanceiro {
   comHistorico?: boolean;
+}
+
+/** Média mensal de um período de N meses ANTERIORES a um período de
+ * referência (o mês de referência nunca entra na média) — usado pelo
+ * "ritmo" da Saúde Financeira e pela detecção de anomalia por categoria.
+ * Mesmas fórmulas/allowlist do resto do motor, só que com N chamadas
+ * internas em vez de uma. */
+export interface MediaMensal {
+  quantidadeMeses: number;
+  despesasFixas: number;
+  despesasVariaveis: number;
+  cartoes: number;
+  porCategoria: PorCategoria[];
 }
