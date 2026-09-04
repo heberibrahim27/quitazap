@@ -1260,6 +1260,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .mc-input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
+/* Em pt-BR o iOS escreve a data por extenso ("3 de set. de 2026" em vez
+   de "03/09/2026") — mais larga que o espaço reservado, e sem isso esse
+   conteúdo interno (dentro do shadow DOM do próprio input, que não
+   respeita o padding/box-sizing normal) vazava pra fora do campo e
+   quebrava o respiro na borda direita do card. overflow:hidden recorta
+   no limite da caixa em vez de deixar vazar. */
+.mc-input[type="date"] {
+  overflow: hidden;
+}
 
 .mc-btn-primary,
 .mc-btn-secondary {
