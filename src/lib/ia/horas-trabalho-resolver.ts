@@ -66,5 +66,6 @@ export async function responderHorasTrabalho(clienteId: string, mensagemOriginal
   if (valor == null) return "Me diga o valor — ex: \"quantas horas de trabalho custa uma TV de R$1.500?\"";
 
   const fatos = await calcularHorasTrabalho(clienteId, valor);
-  return frasearComIA(mensagemOriginal, fatos, clienteId, gratuito, () => fallbackHorasTrabalho(fatos));
+  const resposta = await frasearComIA(mensagemOriginal, fatos, clienteId, gratuito, () => fallbackHorasTrabalho(fatos));
+  return `${resposta}\n\n_Análise baseada nas informações registradas no QuitaZap._`;
 }

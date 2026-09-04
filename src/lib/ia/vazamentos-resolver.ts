@@ -64,5 +64,6 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
 
 export async function responderConsultaVazamentos(clienteId: string, gratuito: boolean): Promise<string> {
   const fatos = await fatosVazamentos(clienteId);
-  return frasearComIA(fatos, clienteId, gratuito, () => fallbackVazamentos(fatos));
+  const resposta = await frasearComIA(fatos, clienteId, gratuito, () => fallbackVazamentos(fatos));
+  return `${resposta}\n\n_Análise baseada nas informações registradas no QuitaZap._`;
 }

@@ -82,6 +82,10 @@ export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
             </p>
           ))}
         </div>
+
+        <p style={{ margin: "10px 18px 0", fontSize: 10.5, color: "var(--mc-ink-faint, var(--mc-ink-dim))" }}>
+          Análise baseada nas informações registradas no QuitaZap.
+        </p>
       </div>
     </>
   );
