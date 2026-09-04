@@ -142,16 +142,20 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   padding: max(8px, env(safe-area-inset-top)) 18px 8px;
   border-bottom-color: var(--line);
 }
-/* Dashboard: cabeçalho fixo e totalmente transparente por cima da hero
-   e do resto da página — sem cor própria pra bater com o degradê, e
-   sempre visível (nunca aparece/desaparece ao rolar). Só logo + avatar
-   (sem saudação, que perderia contraste num fundo que muda por baixo). */
+/* Dashboard: cabeçalho fixo por cima da hero e do resto da página,
+   sempre visível (nunca aparece/desaparece ao rolar). Sem cor sólida
+   própria (não bate com o degradê), mas uma tira escurecida com leve
+   desfoque — sem isso, o texto/conteúdo rolando por baixo ficava colado
+   direto no logo/avatar, sem nenhuma separação. Tendendo pro escuro (em
+   vez de claro) pra saudação em branco ter contraste em qualquer fundo
+   por trás, hero (azul) ou resto da página (claro). */
 .header-transparent {
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: rgba(8, 20, 40, 0.24);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   border-bottom: none;
 }
+.header-transparent .header-greeting { color: #fff; }
 .brand-logo {
   display: block; height: 48px; width: auto;
   transition: height 0.25s ease;

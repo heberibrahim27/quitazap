@@ -8,11 +8,10 @@ import { useEffect, useState } from "react";
 // encolhe (logo menor, saudação recolhida) depois de ~24px de scroll —
 // nunca some por completo, ao contrário do header do resto do app.
 //
-// No Dashboard (Início), a hero já mostra "Resumo do mês" etc, então o
-// cabeçalho fixo ali é só logo + avatar (sem saudação, que dependeria
-// de uma cor de texto certa pro fundo por trás — variável, já que o
-// cabeçalho é transparente por cima de qualquer conteúdo) — sempre
-// visível, nunca aparece/desaparece ao rolar.
+// No Dashboard (Início), o cabeçalho é uma tira fixa com leve desfoque
+// por cima de tudo (hero ou resto da página) — nunca aparece/desaparece
+// ao rolar. A tira sempre tende pro escuro (ver .header-transparent),
+// então a saudação em branco funciona em qualquer fundo por trás.
 export function Header({ nome, fotoUrl }: { nome: string; fotoUrl?: string | null }) {
   const [compacto, setCompacto] = useState(false);
   const naHome = usePathname() === "/minha-conta";
@@ -46,17 +45,6 @@ export function Header({ nome, fotoUrl }: { nome: string; fotoUrl?: string | nul
     </Link>
   );
 
-  if (naHome) {
-    return (
-      <div className="header header-transparent">
-        <Link href="/minha-conta">
-          <img className="brand-logo" src="/minha-conta/logo-simbolo.webp" alt="QuitaZap" />
-        </Link>
-        {avatar}
-      </div>
-    );
-  }
-
   const conteudo = (
     <>
       <Link href="/minha-conta">
@@ -68,6 +56,10 @@ export function Header({ nome, fotoUrl }: { nome: string; fotoUrl?: string | nul
       </div>
     </>
   );
+
+  if (naHome) {
+    return <div className="header header-transparent">{conteudo}</div>;
+  }
 
   return (
     <>
