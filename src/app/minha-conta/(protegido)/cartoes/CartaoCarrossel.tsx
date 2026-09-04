@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ValorLista } from "../ValorLista";
 import { ParcelasAccordion } from "../emprestimos/[id]/ParcelasAccordion";
 
@@ -13,6 +13,11 @@ export type CompraCartaoView = {
   dataFmt: string;
 };
 
+export type ParcelaFuturaView = CompraCartaoView & {
+  mesChave: string;
+  mesLabel: string;
+};
+
 export type CartaoCarrosselItem = {
   id: string;
   nome: string;
@@ -22,9 +27,74 @@ export type CartaoCarrosselItem = {
   disponivelFmt: string | null;
   faturaFechada: boolean;
   compras: CompraCartaoView[];
-  proximasParcelas: CompraCartaoView[];
+  proximasParcelas: ParcelaFuturaView[];
   proximasParcelasTotalFmt: string;
 };
+
+// Parcelas futuras agrupadas por mês com um filtro em pills — em vez de uma
+// lista longa só empilhada, o cliente escolhe o mês que quer conferir (ex:
+// "só quero ver o que cai em dezembro"). Já vem ordenado por data (asc) do
+// servidor, então os meses únicos saem na ordem certa sem precisar reordenar.
+function ProximasParcelas({ parcelas, totalFmt }: { parcelas: ParcelaFuturaView[]; totalFmt: string }) {
+  const meses = useMemo(() => {
+    const vistos = new Set<string>();
+    const lista: { chave: string; label: string }[] = [];
+    for (const p of parcelas) {
+      if (!vistos.has(p.mesChave)) {
+        vistos.add(p.mesChave);
+        lista.push({ chave: p.mesChave, label: p.mesLabel });
+      }
+    }
+    return lista;
+  }, [parcelas]);
+
+  const [mesSelecionado, setMesSelecionado] = useState(meses[0]?.chave ?? "");
+  // Se a lista de parcelas mudar (ex: trocou de cartão no carrossel) e o mês
+  // selecionado não existir mais nela, volta pro primeiro mês disponível.
+  useEffect(() => {
+    if (!meses.some((m) => m.chave === mesSelecionado)) {
+      setMesSelecionado(meses[0]?.chave ?? "");
+    }
+  }, [meses, mesSelecionado]);
+
+  const parcelasDoMes = parcelas.filter((p) => p.mesChave === mesSelecionado);
+
+  return (
+    <ParcelasAccordion resumo={`${parcelas.length} parcela(s) agendada(s) — ${totalFmt}`}>
+      {meses.length > 1 && (
+        <div className="cartao-parcelas-meses">
+          {meses.map((m) => (
+            <button
+              key={m.chave}
+              type="button"
+              className={`cartao-parcelas-mes ${m.chave === mesSelecionado ? "active" : ""}`}
+              onClick={() => setMesSelecionado(m.chave)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="mc-list">
+        {parcelasDoMes.map((parcela) => (
+          <div key={parcela.id} className="mc-list-row">
+            <div className="mc-list-icon" style={{ background: "rgba(30,99,233,0.1)", color: "var(--blue)" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 2" /></svg>
+            </div>
+            <div className="mc-list-body">
+              <div className="mc-list-desc">{parcela.descricao}</div>
+              <div className="mc-list-meta">{parcela.categoria ?? "Sem categoria"}</div>
+            </div>
+            <div className="mc-list-side">
+              <ValorLista valor={parcela.valor} sinal="-" />
+              <div className="mc-list-sub">{parcela.dataFmt}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ParcelasAccordion>
+  );
+}
 
 function CartaoHero({ c }: { c: CartaoCarrosselItem }) {
   return (
@@ -193,27 +263,11 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
                   <span className="title-label">Próximas parcelas</span>
                 </p>
               </div>
-              <ParcelasAccordion
-                resumo={`${cartaoAtivo.proximasParcelas.length} parcela(s) agendada(s) — ${cartaoAtivo.proximasParcelasTotalFmt}`}
-              >
-                <div className="mc-list">
-                  {cartaoAtivo.proximasParcelas.map((parcela) => (
-                    <div key={parcela.id} className="mc-list-row">
-                      <div className="mc-list-icon" style={{ background: "rgba(30,99,233,0.1)", color: "var(--blue)" }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 2" /></svg>
-                      </div>
-                      <div className="mc-list-body">
-                        <div className="mc-list-desc">{parcela.descricao}</div>
-                        <div className="mc-list-meta">{parcela.categoria ?? "Sem categoria"}</div>
-                      </div>
-                      <div className="mc-list-side">
-                        <ValorLista valor={parcela.valor} sinal="-" />
-                        <div className="mc-list-sub">{parcela.dataFmt}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ParcelasAccordion>
+              <ProximasParcelas
+                key={cartaoAtivo.id}
+                parcelas={cartaoAtivo.proximasParcelas}
+                totalFmt={cartaoAtivo.proximasParcelasTotalFmt}
+              />
             </>
           )}
         </>

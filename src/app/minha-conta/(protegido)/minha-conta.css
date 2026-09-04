@@ -1168,6 +1168,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .parcelas-toggle svg { width: 16px; height: 16px; color: var(--ink-faint); flex-shrink: 0; }
 .parcelas-conteudo { padding: 0 16px 16px; }
 
+/* ── Cartões: filtro de mês nas parcelas futuras ──── */
+.cartao-parcelas-meses {
+  display: flex; gap: 6px; overflow-x: auto; padding: 0 0 12px;
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.cartao-parcelas-meses::-webkit-scrollbar { display: none; }
+.cartao-parcelas-mes {
+  flex-shrink: 0; border: 1px solid var(--mc-line); border-radius: 999px;
+  padding: 6px 14px; font-size: 12px; font-weight: 700; font-family: inherit;
+  background: var(--card-tint); color: var(--mc-ink-dim); cursor: pointer;
+}
+.cartao-parcelas-mes.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {
   position: relative;

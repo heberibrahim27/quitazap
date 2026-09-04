@@ -18,6 +18,18 @@ function fmtDataComAno(d: Date) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
+const NOMES_MES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+// Chave ordenável (ano-mês) pra agrupar/filtrar parcelas futuras por mês
+// no client, e um rótulo pra exibir ("Out/2026").
+function mesChave(d: Date): string {
+  const data = new Date(d);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+}
+function mesLabel(d: Date): string {
+  const data = new Date(d);
+  return `${NOMES_MES_ABREV[data.getMonth()]}/${data.getFullYear()}`;
+}
+
 // Mesma âncora em Brasília usada no resto do Controle — ver page.tsx da home.
 function anoMesAtualBrasil(agora: Date): { ano: number; mes: number; dia: number } {
   const [ano, mes, dia] = new Intl.DateTimeFormat("en-CA", {
@@ -134,6 +146,8 @@ export default async function CartoesPage() {
         categoria: l.categoria,
         valor: l.valor,
         dataFmt: fmtDataComAno(l.data),
+        mesChave: mesChave(l.data),
+        mesLabel: mesLabel(l.data),
       })),
       proximasParcelasTotalFmt: fmtValor(
         proximasParcelasPorCartao[i].reduce((soma, l) => soma + l.valor, 0)
