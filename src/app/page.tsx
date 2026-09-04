@@ -422,65 +422,69 @@ export default async function LandingPage() {
       {/* PREÇO */}
       {/* ══════════════════════════════════════ */}
       <section id="preco" style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-        <div style={{ maxWidth: 480, margin: "0 auto", textAlign: "center" }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
-          <h2 style={{ margin: "0 0 12px", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a" }}>
-            Preço Fundador
-          </h2>
-          <p style={{ margin: "0 0 40px", fontSize: 15, color: "#64748b", lineHeight: 1.6 }}>
-            Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} — enquanto durar.
-          </p>
-
-          <div style={{
-            background: "#fff", border: "2px solid #22c55e", borderRadius: 24,
-            padding: "40px 36px", boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>PREÇO FUNDADOR</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 14,90</div>
-                <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
-              </div>
-            </div>
-
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px", marginBottom: 24 }}>
-              <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#166534", fontWeight: 700 }}>
-                Enquanto sua assinatura estiver ativa, esse valor não muda.
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-                Depois dos primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")}, o valor sobe pra novos assinantes.
-              </p>
-            </div>
-
-            <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 20, marginBottom: 28 }}>
-              {[
-                "Registro de gastos e dívidas pelo WhatsApp",
-                "Raio-X do Salário e leitura de contracheque",
-                "Análises e alertas de saúde financeira",
-                "Analista financeiro por IA, 24h",
-                "Cancelamento a qualquer momento",
-              ].map((item) => (
-                <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#374151", marginBottom: 10 }}>
-                  <span style={{ color: "#22c55e", fontWeight: 700, flexShrink: 0 }}>✓</span>
-                  {item}
-                </div>
-              ))}
-            </div>
-
-            <a href={CAKTO_URL} style={{
-              display: "block", background: "#22c55e", color: "#000",
-              fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 12,
-              textDecoration: "none", textAlign: "center",
-            }}>
-              Garantir minha vaga
-            </a>
-
-            <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
-              7 dias de garantia. Cancele quando quiser.
+        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "start" }}>
+          <div className="qz-col-5 qz-reveal">
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
+            <h2 style={{ margin: "0 0 12px", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+              Preço Fundador
+            </h2>
+            <p style={{ margin: 0, fontSize: 15, color: "#64748b", lineHeight: 1.6, textAlign: "left" }}>
+              Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} — enquanto durar. Um plano só, sem tier, sem surpresa.
             </p>
+          </div>
+
+          <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
+            <div style={{
+              background: "#fff", border: "2px solid #22c55e", borderRadius: 16,
+              padding: "40px 36px", boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>PREÇO FUNDADOR</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 14,90</div>
+                  <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
+                </div>
+              </div>
+
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 14px", marginBottom: 24 }}>
+                <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#166534", fontWeight: 700 }}>
+                  Enquanto sua assinatura estiver ativa, esse valor não muda.
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
+                  Depois dos primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")}, o valor sobe pra novos assinantes.
+                </p>
+              </div>
+
+              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 20, marginBottom: 28 }}>
+                {[
+                  "Registro de gastos e dívidas pelo WhatsApp",
+                  "Raio-X do Salário e leitura de contracheque",
+                  "Análises e alertas de saúde financeira",
+                  "Analista financeiro por IA, 24h",
+                  "Cancelamento a qualquer momento",
+                ].map((item) => (
+                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#374151", marginBottom: 10 }}>
+                    <span style={{ color: "#22c55e", fontWeight: 700, flexShrink: 0 }}>✓</span>
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              <a href={CAKTO_URL} style={{
+                display: "block", background: "#22c55e", color: "#000",
+                fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 8,
+                textDecoration: "none", textAlign: "center",
+              }}>
+                Garantir minha vaga
+              </a>
+
+              <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+                7 dias de garantia. Cancele quando quiser.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -489,18 +493,19 @@ export default async function LandingPage() {
       {/* FAQ */}
       {/* ══════════════════════════════════════ */}
       <section id="faq" style={{ padding: "96px 24px", background: "#ffffff" }}>
-        <div style={{ maxWidth: 700, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto" }}>
+          <div className="qz-col-4 qz-reveal">
             <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
-            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a" }}>
+            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
               Perguntas frequentes
             </h2>
           </div>
-          <div style={{ display: "flex", flexDirection: "column" as const, gap: 2 }}>
+          <div className="qz-col-8" style={{ display: "flex", flexDirection: "column" as const, gap: 2 }}>
             {faq.map((item, i) => (
-              <details key={i} style={{
+              <details key={i} className="qz-reveal" style={{
                 background: i % 2 === 0 ? "#fff" : "#fafafa", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden",
-              }}>
+                "--qz-delay": `${i * 50}ms`,
+              } as React.CSSProperties}>
                 <summary style={{
                   padding: "18px 20px", fontSize: 15, fontWeight: 600, color: "#0f172a", cursor: "pointer",
                   listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -531,7 +536,7 @@ export default async function LandingPage() {
           width: "600px", height: "400px", maxWidth: "150vw",
           background: "radial-gradient(ellipse, rgba(34,197,94,0.1) 0%, transparent 70%)",
         }} />
-        <div style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
+        <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: "-1px" }}>
             Descubra hoje quanto do seu dinheiro é realmente seu.
           </h2>
@@ -540,7 +545,7 @@ export default async function LandingPage() {
           </p>
           <a href={CAKTO_URL} style={{
             display: "inline-block", background: "#22c55e", color: "#000", fontWeight: 800, fontSize: 18,
-            padding: "18px 48px", borderRadius: 12, textDecoration: "none",
+            padding: "18px 48px", borderRadius: 8, textDecoration: "none",
           }}>
             Garantir Preço Fundador — R$14,90/mês
           </a>
