@@ -33,7 +33,7 @@ const GRUPOS = [
     rotulo: "Clientes",
     itens: [
       { href: "/clientes", label: "Clientes", Icone: IconUsers },
-      { href: "/vencidas", label: "Vencidas", Icone: IconClock },
+      { href: "/assinaturas", label: "Assinaturas", Icone: IconClock },
     ],
   },
   {

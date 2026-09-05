@@ -16,15 +16,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
+  // Select explícito (não include/findMany sem select) — decisão de
+  // escopo do admin (Ibrahim, 2026-09-05): o backup é só pra gestão de
+  // conta/assinatura, nunca dado financeiro pessoal do cliente (renda,
+  // despesas, dívidas negociadas) nem o hash de senha de acesso ao
+  // /minha-conta (esse por segurança, não por privacidade financeira).
   const clientes = await prisma.cliente.findMany({
-    include: {
-      dividas: {
-        include: {
-          parcelas: true,
-          pagamentos: true,
-        },
-      },
-      planosEnviados: true,
+    select: {
+      id: true,
+      nome: true,
+      telefone: true,
+      cpf: true,
+      email: true,
+      obs: true,
+      statusAtendimento: true,
+      gratuito: true,
+      assinaturaVenceEm: true,
+      aceitaProativas: true,
+      criadoEm: true,
+      atualizadoEm: true,
     },
     orderBy: { criadoEm: "asc" },
   });

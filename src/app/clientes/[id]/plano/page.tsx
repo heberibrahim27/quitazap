@@ -101,12 +101,9 @@ export default async function PlanoWhatsAppPage({
         {/* ── 3 Cenários ── */}
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ margin: "0 0 12px", fontSize: 18, color: "#0f172a" }}>📊 Cenários de quitação</h2>
-          {!cliente.rendaMensal && !cliente.valorDisponivelMensal && (
-            <div style={{ background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 12, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#854d0e" }}>
-              💡 <strong>Dica:</strong> Cadastre a renda mensal e o valor disponível do cliente para cenários mais precisos.{" "}
-              <Link href={`/clientes/${id}/editar`} style={{ color: "#92400e", fontWeight: 700 }}>Editar cliente →</Link>
-            </div>
-          )}
+          {/* Sem aviso pra cadastrar renda/valor disponível aqui — /editar
+              não tem mais esses campos (decisão de privacidade: admin não
+              edita dado financeiro pessoal do cliente). */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
             {cenarios.map((c) => (
               <div key={c.nome} style={{

@@ -5,6 +5,7 @@ import { ExcluirForm } from "@/components/ExcluirForm";
 import { AlertaBanner } from "@/components/AlertaBanner";
 import { IconAlertTriangle, IconCheckCircle, IconClock } from "@/components/icons";
 import { PRECO_MENSAL } from "@/lib/financeiro-admin/motor";
+import { calcularStatusAssinatura, LABEL_STATUS_ASSINATURA, COR_STATUS_ASSINATURA } from "@/lib/status-assinatura";
 
 function fmt(valor: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
@@ -13,14 +14,6 @@ function fmtData(data: Date | null) {
   if (!data) return "-";
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(data));
 }
-
-const STATUS_ATEND: Record<string, { label: string; bg: string; color: string; border: string }> = {
-  NOVO:                    { label: "Novo",                   bg: "rgba(0,123,255,0.12)",   color: "#7dc4ff", border: "rgba(0,123,255,0.3)" },
-  AGUARDANDO_INFORMACOES:  { label: "Aguardando informações", bg: "rgba(245,158,11,0.12)",  color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
-  PLANO_GERADO:            { label: "Plano gerado",           bg: "rgba(167,139,250,0.12)", color: "#c4b5fd", border: "rgba(167,139,250,0.3)" },
-  ACOMPANHAMENTO:          { label: "Acompanhamento",         bg: "rgba(16,185,129,0.12)",  color: "#6ee7b7", border: "rgba(16,185,129,0.25)" },
-  ENCERRADO:               { label: "Encerrado",              bg: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "rgba(255,255,255,0.12)" },
-};
 
 const estiloExcluir: React.CSSProperties = {
   background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5",
@@ -41,13 +34,7 @@ export default async function ClienteDetalhePage({
   const { id } = await params;
   const { ok } = await searchParams;
 
-  const cliente = await prisma.cliente.findUnique({
-    where: { id },
-    include: {
-      _count:         { select: { planosEnviados: true } },
-      planosEnviados: { orderBy: { criadoEm: "desc" }, take: 1 },
-    },
-  });
+  const cliente = await prisma.cliente.findUnique({ where: { id } });
 
   if (!cliente) notFound();
 
@@ -75,9 +62,8 @@ export default async function ClienteDetalhePage({
 
   // ───────────────────────────────────────────────────────
 
-  const statusInfo  = STATUS_ATEND[cliente.statusAtendimento] ?? STATUS_ATEND["NOVO"];
-  const planos      = cliente._count.planosEnviados;
-  const ultimoPlano = cliente.planosEnviados[0] ?? null;
+  const statusAssinatura = calcularStatusAssinatura(cliente);
+  const corStatus = COR_STATUS_ASSINATURA[statusAssinatura];
 
   // Total pago em assinaturas: meses desde cadastro × preço vigente (só para clientes pagantes)
   const mesesAtivo   = Math.max(1, Math.floor(
@@ -101,8 +87,8 @@ export default async function ClienteDetalhePage({
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
             <h1 className="qa-page-title" style={{ margin: 0 }}>{cliente.nome}</h1>
-            <span className="qa-badge" style={{ background: statusInfo.bg, color: statusInfo.color, border: `1px solid ${statusInfo.border}` }}>
-              {statusInfo.label}
+            <span className="qa-badge" style={{ background: corStatus.bg, color: corStatus.color, border: `1px solid ${corStatus.border}` }}>
+              {LABEL_STATUS_ASSINATURA[statusAssinatura]}
             </span>
           </div>
           <p className="qa-page-subtitle" style={{ marginBottom: 2 }}>{cliente.telefone}</p>
@@ -110,10 +96,7 @@ export default async function ClienteDetalhePage({
             <p className="qa-page-subtitle" style={{ marginBottom: 2 }}>{cliente.email}</p>
           )}
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--qa-gray-500)" }}>
-            {planos > 0
-              ? `${planos} plano${planos !== 1 ? "s" : ""} enviado${planos !== 1 ? "s" : ""}`
-              : "Nenhum plano enviado ainda"}
-            {" · "}desde {fmtData(cliente.criadoEm)}
+            desde {fmtData(cliente.criadoEm)}
           </p>
         </div>
 
@@ -215,31 +198,6 @@ export default async function ClienteDetalhePage({
         </div>
       </div>
 
-      {/* ── Último plano enviado ── */}
-      {ultimoPlano && (
-        <div className="qa-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Último plano enviado</h2>
-            <span style={{ fontSize: 12, color: "var(--qa-gray-500)" }}>{fmtData(ultimoPlano.criadoEm)}</span>
-          </div>
-          <pre style={{
-            margin: 0,
-            whiteSpace: "pre-wrap",
-            fontFamily: "inherit",
-            fontSize: 13,
-            color: "var(--qa-gray-400)",
-            lineHeight: 1.6,
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid var(--qa-line-soft)",
-            borderRadius: 12,
-            padding: "14px 16px",
-            maxHeight: 320,
-            overflowY: "auto",
-          }}>
-            {ultimoPlano.texto}
-          </pre>
-        </div>
-      )}
     </div>
   );
 }
