@@ -11,6 +11,7 @@ import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
 import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
 import { HeroFade } from "./HeroFade";
 import { FuncionalidadesStack } from "./FuncionalidadesStack";
+import { listarContatosAtivos } from "@/lib/contatos-sociais";
 
 // Inter nunca foi de fato carregada nesta página (o fontFamily só citava
 // o nome, sem @font-face nem next/font) — sempre caiu pro fallback
@@ -276,18 +277,11 @@ const LANDING_CSS = `
 
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
 
-// Redes sociais: só aparece no rodapé quando a env var correspondente
-// estiver configurada — dá o mesmo efeito de "ativar/desativar" sem
-// precisar de painel de admin ainda (fica pro backlog). Sem fallback pra
-// número pessoal: enquanto não existir um canal de suporte de verdade,
-// o ícone/link correspondente fica oculto em vez de expor o WhatsApp
-// pessoal de alguém como se fosse o contato oficial do produto.
-const REDES_SOCIAIS = [
-  { nome: "Instagram", url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM },
-  { nome: "WhatsApp", url: process.env.NEXT_PUBLIC_SOCIAL_WHATSAPP },
-  { nome: "Facebook", url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK },
-  { nome: "TikTok", url: process.env.NEXT_PUBLIC_SOCIAL_TIKTOK },
-].filter((r): r is { nome: string; url: string } => Boolean(r.url));
+// Redes sociais cadastradas em /painel/contatos — sem nenhum canal ativo,
+// o bloco inteiro do rodapé fica oculto (ver listarContatosAtivos).
+// Revalida a cada 5min + on-demand (revalidatePath) quando o admin
+// mexe em /painel/contatos, então a página continua estática na prática.
+export const revalidate = 300;
 
 export const metadata = {
   title: "QuitaZAP — Descubra quanto do seu dinheiro ainda é seu",
@@ -458,19 +452,30 @@ const WHATSAPP_ICON = (
 );
 
 const ICONES_REDE: Record<string, React.ReactNode> = {
-  Instagram: (
+  INSTAGRAM: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
   ),
-  WhatsApp: <span style={{ display: "inline-flex" }}>{WHATSAPP_ICON}</span>,
-  Facebook: (
+  WHATSAPP: <span style={{ display: "inline-flex" }}>{WHATSAPP_ICON}</span>,
+  FACEBOOK: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.88v-6.99H7.9V12h2.5V9.8c0-2.48 1.48-3.85 3.74-3.85 1.08 0 2.21.2 2.21.2v2.43h-1.25c-1.23 0-1.61.76-1.61 1.55V12h2.75l-.44 2.89h-2.31v6.99A10 10 0 0 0 22 12z" /></svg>
   ),
-  TikTok: (
+  TIKTOK: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.9-.98-1.4-2.26-1.4-3.62h-3.15v13.44a2.7 2.7 0 1 1-1.9-2.58V9.9a5.85 5.85 0 1 0 5.05 5.79V9.5a7.9 7.9 0 0 0 4.6 1.47V7.83a4.83 4.83 0 0 1-3.2-2.01z" /></svg>
+  ),
+  YOUTUBE: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12s0-3.2-.4-4.7a2.8 2.8 0 0 0-2-2C17.9 5 12 5 12 5s-5.9 0-7.6.3a2.8 2.8 0 0 0-2 2C2 8.8 2 12 2 12s0 3.2.4 4.7a2.8 2.8 0 0 0 2 2C6.1 19 12 19 12 19s5.9 0 7.6-.3a2.8 2.8 0 0 0 2-2c.4-1.5.4-4.7.4-4.7zM10 15.2V8.8l5.5 3.2z" /></svg>
+  ),
+  EMAIL: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 6-10 7L2 6" /></svg>
+  ),
+  OUTRO: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 14.5l5-5" /><path d="M7.2 16.8a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 0" /><path d="M16.8 7.2a4 4 0 0 1 0 5.6l-2 2a4 4 0 0 1-5.6 0" /></svg>
   ),
 };
 
 export default async function LandingPage() {
+  const contatosSociais = await listarContatosAtivos();
+
   return (
     <div className={`${inter.variable} ${fraunces.variable} ${oswald.variable} ${mono.variable}`} style={{
       background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif",
@@ -973,14 +978,14 @@ export default async function LandingPage() {
               <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Já sou cliente</a>
               <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Privacidade e Termos</a>
 
-              {REDES_SOCIAIS.length > 0 && (
+              {contatosSociais.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {REDES_SOCIAIS.map((r) => (
-                    <a key={r.nome} href={r.url} target="_blank" rel="noreferrer" aria-label={r.nome} style={{
+                  {contatosSociais.map((c) => (
+                    <a key={c.id} href={c.link} target="_blank" rel="noreferrer" aria-label={c.nome} style={{
                       width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.06)",
                       display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
                     }}>
-                      {ICONES_REDE[r.nome]}
+                      {ICONES_REDE[c.tipo]}
                     </a>
                   ))}
                 </div>
