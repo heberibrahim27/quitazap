@@ -20,6 +20,11 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/oferta") ||
     pathname.startsWith("/minha-conta") ||
+    // Política de Privacidade/Termos: linkada direto na landing (FAQ,
+    // rodapé) pra qualquer visitante sem login nenhum — sem essa linha,
+    // clicar nesse link redirecionava pro /login (bug real, pré-existente,
+    // achado na validação final antes do merge pra main).
+    pathname.startsWith("/privacidade") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname === "/favicon.ico" ||
