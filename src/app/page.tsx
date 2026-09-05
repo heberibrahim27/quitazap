@@ -36,6 +36,60 @@ const GRAIN_SVG =
 const LANDING_CSS = `
   .qz-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); transition-delay: var(--qz-delay, 0ms); }
   .qz-reveal.qz-visible { opacity: 1; transform: none; }
+  /* Border-beam: aro fino de luz que dá uma volta única quando o elemento
+     entra na tela (reaproveita o mesmo IntersectionObserver do reveal, via
+     .qz-visible), depois some e deixa só a borda estática já existente do
+     elemento. Usado com critério em pouquíssimos lugares (card de preço) —
+     nunca em todo card, conforme decidido no diagnóstico de direção de arte. */
+  .qz-beam { position: relative; }
+  .qz-beam::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    border: 1px solid rgba(255,255,255,0);
+    box-shadow: 0 0 0 0 rgba(255,255,255,0);
+    opacity: 0; pointer-events: none;
+  }
+  .qz-price-wrap.qz-visible .qz-beam::before { animation: qz-beam-sweep 1.6s cubic-bezier(.16,1,.3,1) .3s 1 both; }
+  @keyframes qz-beam-sweep {
+    0% { opacity: 0; border-color: rgba(255,255,255,0); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+    35% { opacity: 1; border-color: rgba(255,255,255,0.55); box-shadow: 0 0 20px 1px rgba(255,255,255,0.25); }
+    100% { opacity: 0; border-color: rgba(255,255,255,0); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  }
+  /* CTA com profundidade: gradiente sutil + sombra em camadas (glow verde +
+     sombra escura + highlight interno) em vez de retângulo verde chapado,
+     mais um brilho que atravessa a superfície uma única vez ao entrar na
+     tela — a versão do border-beam que faz sentido pra um botão sólido
+     (não vidro/transparente). */
+  .qz-cta {
+    position: relative; overflow: hidden;
+    background: linear-gradient(180deg, #29e883, #1bc767) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 4px rgba(0,0,0,0.16),
+      0 10px 24px -10px rgba(34,224,122,0.55), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .qz-cta:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.16),
+      0 14px 30px -10px rgba(34,224,122,0.65), 0 4px 12px rgba(0,0,0,0.35);
+  }
+  .qz-cta::after {
+    content: ""; position: absolute; top: -60%; left: -60%; width: 35%; height: 220%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.55), transparent);
+    transform: rotate(20deg) translateX(-120%); opacity: 0; pointer-events: none;
+  }
+  .qz-cta.qz-visible::after,
+  .qz-price-wrap.qz-visible .qz-cta::after,
+  .qz-final-wrap.qz-visible .qz-cta::after { animation: qz-cta-sheen 1.3s ease .6s 1 both; }
+  @keyframes qz-cta-sheen {
+    0% { transform: rotate(20deg) translateX(-120%); opacity: 0; }
+    15% { opacity: 1; }
+    55% { opacity: 1; }
+    100% { transform: rotate(20deg) translateX(260%); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .qz-beam::before, .qz-cta::after { animation: none !important; opacity: 0 !important; }
+  }
   .qz-grid12 { display: grid; grid-template-columns: 1fr; gap: 28px; }
   .qz-hero-pad { padding-left: 24px; padding-right: 24px; }
   .qz-hero-light { font-size: 48px; }
@@ -331,7 +385,14 @@ export default async function LandingPage() {
             decodificar o primeiro frame (e o fallback se autoplay falhar). */}
         <div style={{
           position: "absolute", inset: 0, zIndex: 0,
-          background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)",
+          background: "linear-gradient(160deg, #030f08 0%, #0a2413 45%, #114a28 80%, #0e3a20 100%)",
+        }} />
+        {/* Glow radial suave — dá profundidade ao primeiro paint mesmo antes
+            do vídeo decodificar (o "poster" real da seção, já que não temos
+            como extrair um frame estático confiável do arquivo de vídeo). */}
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 0,
+          background: "radial-gradient(ellipse 60% 55% at 30% 35%, rgba(34,224,122,0.16), transparent 70%)",
         }} />
         <div style={{
           position: "absolute", inset: 0, zIndex: 0, opacity: 0.05,
@@ -393,10 +454,10 @@ export default async function LandingPage() {
             <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
               Controle seus gastos, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar — sem conectar conta bancária.
             </p>
-            <a href={CAKTO_URL} className="qz-reveal" style={{
+            <a href={CAKTO_URL} className="qz-reveal qz-cta" style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               borderRadius: 999, padding: "13px 26px", fontSize: 14, fontWeight: 600,
-              background: "#22e07a", color: "#000", textDecoration: "none",
+              color: "#000", textDecoration: "none",
             }}>
               Quero garantir R$14,90/mês
             </a>
@@ -619,11 +680,13 @@ export default async function LandingPage() {
             </p>
           </div>
 
-          <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
+          <div className="qz-col-7 qz-reveal qz-price-wrap" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
             {/* Card "vidro" — brilho neutro (branco), não verde: o verde fica
                 reservado só pro CTA e pra barra de progresso das vagas,
-                não pra moldura inteira do card. */}
-            <div className="qz-price-card" style={{
+                não pra moldura inteira do card. qz-beam dá uma volta de luz
+                única quando o card entra na tela (border-beam pontual, só
+                aqui — não em todo card da página). */}
+            <div className="qz-price-card qz-beam" style={{
               background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20,
               boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px -12px rgba(255,255,255,0.06)",
               backdropFilter: "blur(16px)", textAlign: "left",
@@ -673,8 +736,8 @@ export default async function LandingPage() {
                 ))}
               </div>
 
-              <a href={CAKTO_URL} style={{
-                display: "block", background: "#22e07a", color: "#000",
+              <a href={CAKTO_URL} className="qz-cta" style={{
+                display: "block", color: "#000",
                 fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 10,
                 textDecoration: "none", textAlign: "center",
               }}>
@@ -736,15 +799,15 @@ export default async function LandingPage() {
           width: "600px", height: "400px", maxWidth: "150vw",
           background: "radial-gradient(ellipse, rgba(34,224,122,0.1) 0%, transparent 70%)",
         }} />
-        <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
+        <div className="qz-reveal qz-final-wrap" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff" }}>
             Descubra hoje quanto do seu dinheiro é realmente seu.
           </h2>
           <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
             {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis nesta condição · Cancele quando quiser
           </p>
-          <a href={CAKTO_URL} style={{
-            display: "inline-block", background: "#22e07a", color: "#000", fontWeight: 800, fontSize: 18,
+          <a href={CAKTO_URL} className="qz-cta" style={{
+            display: "inline-block", color: "#000", fontWeight: 800, fontSize: 18,
             padding: "18px 48px", borderRadius: 8, textDecoration: "none",
           }}>
             Quero garantir R$14,90/mês
