@@ -4,16 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { WhatsAppScreen, WhatsAppBubble } from "./WhatsAppScreen";
 
 const ESTADOS = [
-  { numero: "01", label: "REGISTRE" },
-  { numero: "02", label: "ORGANIZAMOS" },
-  { numero: "03", label: "ENTENDA" },
+  { numero: "01", label: "CONTE" },
+  { numero: "02", label: "A GENTE ORGANIZA" },
+  { numero: "03", label: "VOCÊ ENTENDE" },
 ] as const;
 
-// Narrativa guiada por scroll: celular fica fixo (sticky no desktop) e o
-// conteúdo da tela muda conforme cada "estado" entra na viewport. O que
-// controla a troca é o IntersectionObserver observando 3 blocos-gatilho —
-// não um listener de scroll recalculando a cada pixel (isso seria caro e
-// arriscado pra performance mobile antes do lançamento).
+// Narrativa guiada por scroll: celular fica fixo (sticky no desktop) e as
+// mensagens da MESMA conversa vão se acumulando conforme cada "estado"
+// entra na viewport — a sequência exata de 3 prints reais de WhatsApp que
+// o Ibrahim mandou como referência (usuário manda o gasto → bot confirma
+// o registro → bot responde quanto ainda sobra), não um mockup de app
+// inventado. O que controla a troca é o IntersectionObserver observando 3
+// blocos-gatilho — não um listener de scroll recalculando a cada pixel
+// (isso seria caro e arriscado pra performance mobile antes do lançamento).
 export function ComoFuncionaScroll() {
   const [ativo, setAtivo] = useState(0);
   const refs = useRef<Array<HTMLDivElement | null>>([]);
@@ -88,8 +91,8 @@ export function ComoFuncionaScroll() {
 function TextoEstado({ estado, i, ativo }: { estado: { numero: string; label: string }; i: number; ativo: boolean }) {
   const textos = [
     "Você manda uma mensagem contando o que gastou — do jeito que já fala com qualquer pessoa.",
-    "O QuitaZap organiza tudo sozinho: o lançamento aparece certinho no seu extrato.",
-    "Você pergunta antes de gastar de novo, e já sabe exatamente quanto ainda tem livre.",
+    "A gente confirma na hora e guarda certinho no seu extrato, sem você precisar fazer nada.",
+    "Você já sabe quanto ainda tem livre pra gastar — direto ali, na mesma conversa.",
   ];
   return (
     <div style={{ opacity: ativo ? 1 : 0.4, transition: "opacity .4s ease" }}>
@@ -103,34 +106,18 @@ function TextoEstado({ estado, i, ativo }: { estado: { numero: string; label: st
   );
 }
 
+// Mesma conversa real do início ao fim (prints enviados pelo Ibrahim) — as
+// mensagens vão se acumulando conforme o estado avança, não trocam de tela.
 function TelaCelular({ estado, compacta }: { estado: number; compacta?: boolean }) {
-  const padX = compacta ? 8 : 20;
-  const padY = compacta ? 10 : 0;
-  const fontBase = compacta ? 7 : 13.5;
-  if (estado === 0) {
-    return (
-      <WhatsAppScreen compacta={compacta}>
-        <WhatsAppBubble text="Gastei R$ 87,50 no mercado." time="09:14" out compacta={compacta} />
-      </WhatsAppScreen>
-    );
-  }
-  if (estado === 1) {
-    return (
-      <div style={{ position: "absolute", inset: 0, background: "#0a0f0b", paddingTop: compacta ? 18 : 40, paddingLeft: padX, paddingRight: padX, paddingBottom: padY, display: "flex", flexDirection: "column" as const, gap: compacta ? 4 : 10 }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: compacta ? 6 : 10, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>EXTRATO</span>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.06)", borderRadius: compacta ? 6 : 10, padding: compacta ? "6px 8px" : "12px 14px" }}>
-          <span style={{ fontSize: fontBase, color: "#fff", fontWeight: 600 }}>Mercado</span>
-          <span style={{ fontSize: fontBase, color: "var(--accent)", fontWeight: 700 }}>R$ 87,50</span>
-        </div>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: compacta ? 6 : 9.5, color: "var(--accent)", letterSpacing: "0.05em" }}>REGISTRADO ✓</span>
-      </div>
-    );
-  }
   return (
-    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg,#0a2e18,#041a0c)", display: "flex", alignItems: "center", justifyContent: "center", paddingTop: padY, paddingBottom: padY, paddingLeft: padX, paddingRight: padX }}>
-      <p style={{ margin: 0, textAlign: "center", fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500, fontSize: compacta ? 11 : 22, color: "#fff", lineHeight: 1.3 }}>
-        Você ainda tem <span style={{ color: "var(--accent)" }}>R$ 1.630</span> disponíveis.
-      </p>
-    </div>
+    <WhatsAppScreen compacta={compacta}>
+      <WhatsAppBubble text="Gastei R$ 87,50 no mercado." time="09:41" out compacta={compacta} />
+      {estado >= 1 && (
+        <WhatsAppBubble text="✅ OK! Registrado! 🛒 Mercado R$ 87,50" time="09:41" compacta={compacta} />
+      )}
+      {estado >= 2 && (
+        <WhatsAppBubble text="💰 Você ainda tem R$ 1.630 disponíveis." time="09:41" compacta={compacta} />
+      )}
+    </WhatsAppScreen>
   );
 }
