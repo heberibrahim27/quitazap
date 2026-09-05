@@ -679,3 +679,28 @@ model SaudeFinanceiraLog {
   @@unique([clienteId, dia])
   @@index([clienteId])
 }
+
+// ─────────────────────────────────────────
+// CONTATO SOCIAL (redes sociais / canais de suporte)
+// ─────────────────────────────────────────
+// Cadastro do fundador (via /painel/contatos) pros pontos públicos que
+// antes tinham o WhatsApp pessoal dele hardcoded (rodapé da landing,
+// política de privacidade, plano do Cobrador). `link` já vem normalizado
+// (mailto:, https://wa.me/..., https://...) no momento da gravação — quem
+// lê (landing, privacidade, cobrador) nunca reprocessa `valorBruto`, só
+// usa `link` direto. Só itens com `ativo:true` aparecem em qualquer lugar
+// público; sem nenhum ativo, o bloco correspondente some inteiro (sem
+// ícone vazio, sem "#", sem link morto).
+model ContatoSocial {
+  id           String   @id @default(cuid())
+  tipo         String // "WHATSAPP" | "INSTAGRAM" | "EMAIL" | "YOUTUBE" | "TIKTOK" | "OUTRO"
+  nome         String // nome exibido (ex: "Suporte QuitaZap", "@quitazap")
+  valorBruto   String // o que o fundador digitou (telefone, e-mail ou URL), sem normalizar
+  link         String // link final já normalizado, pronto pra usar em href
+  ativo        Boolean  @default(true)
+  ordem        Int      @default(0)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([ativo, ordem])
+}

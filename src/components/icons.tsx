@@ -190,3 +190,13 @@ export function IconTarget(props: IconProps) {
     </svg>
   );
 }
+
+export function IconLink(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9.5 14.5l5-5" />
+      <path d="M7.2 16.8a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 0" />
+      <path d="M16.8 7.2a4 4 0 0 1 0 5.6l-2 2a4 4 0 0 1-5.6 0" />
+    </svg>
+  );
+}
