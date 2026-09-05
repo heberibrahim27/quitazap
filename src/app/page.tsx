@@ -454,24 +454,29 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       <section style={{ position: "relative", overflow: "hidden", minHeight: 640 }} className="qz-hero">
         {/* Gradiente de marca como poster — cobre o instante antes do vídeo
-            decodificar o primeiro frame (e o fallback se autoplay falhar). */}
+            decodificar o primeiro frame (e o fallback se autoplay falhar).
+            Fica FORA do fade (backdrop permanente por trás do vídeo), então
+            os tons precisam terminar bem escuros/neutros (perto do preto da
+            dobra de Dor) — antes terminava num verde médio (#114a28/#0e3a20)
+            que, sem o vídeo/overlays por cima durante o fade, aparecia como
+            um "flash" verde na transição. */}
         <div style={{
           position: "absolute", inset: 0, zIndex: 0,
-          background: "linear-gradient(160deg, #030f08 0%, #0a2413 45%, #114a28 80%, #0e3a20 100%)",
-        }} />
-        {/* Glow radial suave — dá profundidade ao primeiro paint mesmo antes
-            do vídeo decodificar (o "poster" real da seção, já que não temos
-            como extrair um frame estático confiável do arquivo de vídeo). */}
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 0,
-          background: "radial-gradient(ellipse 60% 55% at 30% 35%, rgba(34,224,122,0.16), transparent 70%)",
-        }} />
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 0, opacity: 0.05,
-          backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
+          background: "linear-gradient(160deg, #030f08 0%, #0a1a10 45%, #060f09 80%, #030906 100%)",
         }} />
         <HeroFade>
+          {/* Glow radial e grid ficam dentro do fade (junto com o vídeo) —
+              não podem sobrar sozinhos por trás como backdrop permanente,
+              senão o glow verde vira o tint visível durante a transição. */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0,
+            background: "radial-gradient(ellipse 60% 55% at 30% 35%, rgba(34,224,122,0.16), transparent 70%)",
+          }} />
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0, opacity: 0.05,
+            backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }} />
           <video
             autoPlay
             muted
