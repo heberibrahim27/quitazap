@@ -474,8 +474,7 @@ export default async function LandingPage() {
         <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-q-icon.png" alt="" style={{ height: 34, width: "auto", display: "block" }} />
-            <span style={{ color: "#fff", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>QuitaZap</span>
+            <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ height: 34, width: "auto", display: "block" }} />
           </div>
           <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85, display: "inline-block", padding: "12px 4px" }}>
             Já sou cliente
@@ -879,8 +878,7 @@ export default async function LandingPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-q-icon.png" alt="" style={{ height: 28, width: "auto", display: "block" }} />
-              <span style={{ color: "#fff", fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>QuitaZap</span>
+              <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ height: 28, width: "auto", display: "block" }} />
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
