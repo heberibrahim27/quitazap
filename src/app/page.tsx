@@ -112,6 +112,11 @@ const LANDING_CSS = `
   }
   .qz-phone-notch { width: 33%; height: 100%; border-radius: 0 0 12px 12px; background: #000; }
   .qz-panel-phone { width: 200px; height: 412px; margin: 0 auto; border-radius: 30px; padding: 2px; background: linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.05)); box-shadow: 0 30px 60px -20px rgba(15,23,42,.35); }
+  /* Fotos reais (Como Funciona) já vêm com a moldura de celular completa
+     (bezel, notch, status bar) dentro da própria imagem — usar
+     .qz-panel-phone aqui criaria um "celular dentro de celular". Só um
+     recorte com cantos levemente arredondados, sem frame extra por fora. */
+  .qz-cf-photo { width: 200px; height: 412px; margin: 0 auto; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(15,23,42,.35); }
   .qz-hero-side { margin-top: 8px; }
   .qz-feat-img { aspect-ratio: 16 / 9; }
   .qz-price-card { padding: 28px 22px; }
@@ -210,6 +215,7 @@ const LANDING_CSS = `
     .qz-h2-lg { font-size: 48px; }
     .qz-hero-side { margin-top: 32px; }
     .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
+    .qz-cf-photo { width: 240px; height: 494px; margin: 0; }
     .qz-feat-img { aspect-ratio: 4 / 3; }
     .qz-price-card { padding: 40px 36px; }
     .qz-cf-mobile { display: none; }

@@ -52,7 +52,7 @@ export function ComoFuncionaScroll() {
       <div className="qz-cf-desktop">
         <div className="qz-cf-sticky-col">
           <div className="qz-cf-sticky-inner">
-            <div className="qz-panel-phone" aria-hidden="true">
+            <div className="qz-cf-photo" aria-hidden="true">
               <FotoCelular ativo={ativo} />
             </div>
           </div>
@@ -66,14 +66,18 @@ export function ComoFuncionaScroll() {
         </div>
       </div>
 
-      {/* Mobile — sem sticky de 250vh: celular pequeno embutido em cada
-          estado, empilhado, conectado por uma linha fina (<768px). */}
+      {/* Mobile — sem sticky de 250vh: cada estado empilhado com a foto
+          bem grande (quase a largura útil da tela, pra dar pra ler as
+          mensagens dentro dela) em cima do texto (<768px). */}
       <div className="qz-cf-mobile">
         {ESTADOS.map((estado, i) => (
-          <div key={estado.numero} className="qz-reveal" style={{ "--qz-delay": `${i * 90}ms`, display: "flex", gap: 20 } as React.CSSProperties}>
-            <div style={{ flexShrink: 0, width: 84, height: 173 }}>
+          <div key={estado.numero} className="qz-reveal" style={{ "--qz-delay": `${i * 90}ms` } as React.CSSProperties}>
+            <div style={{
+              width: "100%", maxWidth: 300, margin: "0 auto 24px", aspectRatio: "310 / 641",
+              borderRadius: 28, overflow: "hidden", boxShadow: "0 24px 48px -20px rgba(15,23,42,.3)",
+            }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={FOTOS[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <img src={FOTOS[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <TextoEstado estado={estado} i={i} ativo />
           </div>
@@ -95,7 +99,7 @@ function FotoCelular({ ativo }: { ativo: number }) {
           src={src}
           alt={i === 0 ? "Conversa real do QuitaZap no WhatsApp" : ""}
           style={{
-            position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain",
+            position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
             opacity: ativo === i ? 1 : 0, transition: "opacity 0.6s ease",
           }}
         />
