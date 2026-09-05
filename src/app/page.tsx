@@ -5,10 +5,8 @@
 // ─────────────────────────────────────────
 
 import { Inter, Fraunces, Oswald, JetBrains_Mono } from "next/font/google";
-import { prisma } from "@/lib/prisma";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
-import { CountdownTimer } from "./CountdownTimer";
 import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
 import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
 import { HeroFade } from "./HeroFade";
@@ -107,16 +105,6 @@ const LANDING_CSS = `
      em vez do bloco de texto centralizado genérico de antes. */
   .qz-close-light { display: block; font-size: clamp(20px, 5vw, 30px); font-weight: 300; opacity: 0.75; margin-bottom: 4px; }
   .qz-close-heavy { display: block; font-family: var(--font-fraunces); font-style: italic; font-weight: 500; font-size: clamp(34px, 9vw, 76px); line-height: 1.05; letter-spacing: -0.02em; }
-  .qz-phone-mock { display: none; }
-  .qz-phone-mock-inner {
-    position: relative; width: 100%; height: 100%; border-radius: 38px;
-    background: #0a0a0a; overflow: hidden; border: 1px solid #000;
-  }
-  .qz-phone-notch-band {
-    position: absolute; top: 0; left: 0; right: 0; height: 24px; z-index: 2;
-    display: flex; justify-content: center;
-  }
-  .qz-phone-notch { width: 33%; height: 100%; border-radius: 0 0 12px 12px; background: #000; }
   .qz-panel-phone { width: 200px; height: 412px; margin: 0 auto; border-radius: 30px; padding: 2px; background: linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.05)); box-shadow: 0 30px 60px -20px rgba(15,23,42,.35); }
   /* Fotos reais (Como Funciona) já vêm com a moldura de celular completa
      (bezel, notch, status bar) dentro da própria imagem — usar
@@ -276,24 +264,9 @@ const LANDING_CSS = `
     .qz-dor-num-2 { font-size: 56px; }
     .qz-dor-num-3 { font-size: 120px; }
   }
-  @media (min-width: 1280px) {
-    .qz-phone-mock {
-      display: block; position: absolute; top: 40px; right: 48px;
-      width: 280px; height: 580px; border-radius: 40px; padding: 2px;
-      background: linear-gradient(160deg, rgba(255,255,255,0.6), rgba(255,255,255,0.05));
-      box-shadow: 0 60px 100px -30px rgba(15,23,42,0.35), 0 20px 40px -15px rgba(15,23,42,0.2);
-    }
-  }
 `;
 
-// Contador de vagas do Preço Fundador é lido do banco a cada request —
-// nunca pode ser congelado no build (teria que ser "force-dynamic" mesmo
-// se essa fosse a única razão nesta página).
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
-const VAGAS_FUNDADOR = 1000;
 
 // Mesmo contato/link de suporte usado em /privacidade — WhatsApp oficial
 // do QuitaZap já usado em outras telas do produto (dashboard/plano).
@@ -485,19 +458,6 @@ const ICONES_REDE: Record<string, React.ReactNode> = {
 };
 
 export default async function LandingPage() {
-  let assinantesFundador = 0;
-  try {
-    assinantesFundador = await prisma.cliente.count({ where: { gratuito: false } });
-  } catch {
-    // Landing nunca pode cair por causa de uma falha de contagem — segue
-    // com 0 (mostra "1.000 vagas ainda disponíveis") em vez de derrubar a
-    // página inteira.
-  }
-  // Contador regressivo (vagas ainda disponíveis, não "vaga número X") —
-  // pedido explícito: a mecânica de urgência é sobre quantas restam, não
-  // sobre implicar que já existem 1.000+ assinantes reais.
-  const vagasRestantes = Math.max(VAGAS_FUNDADOR - assinantesFundador, 0);
-
   return (
     <div className={`${inter.variable} ${fraunces.variable} ${oswald.variable} ${mono.variable}`} style={{
       background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif",
@@ -762,27 +722,6 @@ export default async function LandingPage() {
       {/* FUNCIONALIDADES */}
       {/* ══════════════════════════════════════ */}
       <section className="qz-section" style={{ background: "#ffffff", position: "relative" }}>
-        {/* Mockup de celular flutuante (referência de estilo "Cogni" que o
-            Ibrahim mandou) — só aparece em telas bem largas (>=1280px) pra
-            não disputar espaço com o grid de cards em tablet/laptop menor.
-            Sem print real do painel ainda, então usa o mesmo placeholder
-            "em breve" das outras telas dos cards abaixo. */}
-        <div className="qz-phone-mock qz-reveal" aria-hidden="true">
-          <div className="qz-phone-mock-inner">
-            <div className="qz-phone-notch-band">
-              <div className="qz-phone-notch" />
-            </div>
-            <div style={{
-              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
-            }}>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em", textAlign: "center", padding: "0 24px" }}>
-                PRINT DO PAINEL EM BREVE
-              </span>
-            </div>
-          </div>
-        </div>
-
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
@@ -867,48 +806,27 @@ export default async function LandingPage() {
               <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano só.</span> Sem letra miúda, sem surpresa.
             </h2>
             <p style={{ margin: 0, fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "left" }}>
-              1.000 vagas disponibilizadas nesta condição. Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
+              Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
             </p>
           </div>
 
           <div className="qz-col-7 qz-reveal qz-price-wrap" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
             {/* Card "vidro" — brilho neutro (branco), não verde: o verde fica
-                reservado só pro CTA e pra barra de progresso das vagas,
-                não pra moldura inteira do card. qz-beam dá uma volta de luz
-                única quando o card entra na tela (border-beam pontual, só
-                aqui — não em todo card da página). */}
+                reservado só pro CTA, não pra moldura inteira do card.
+                qz-beam dá uma volta de luz única quando o card entra na
+                tela (border-beam pontual, só aqui — não em todo card da
+                página). */}
             <div className="qz-price-card qz-beam" style={{
               background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20,
               boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px -12px rgba(255,255,255,0.06)",
               backdropFilter: "blur(16px)", textAlign: "left",
             }}>
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 24 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 28 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>QuitaZAP</div>
                 <div style={{ textAlign: "right", lineHeight: 1 }}>
                   <span style={{ fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.5)", verticalAlign: "top" }}>R$ </span>
                   <span style={{ fontFamily: "var(--font-fraunces)", fontSize: "clamp(40px, 9vw, 56px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>14,90</span>
                   <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>/mês</span>
-                </div>
-              </div>
-
-              {/* Instrumentos de urgência — vagas restantes com barra de
-                  progresso e countdown evergreen, tratados como dado da
-                  própria interface, não banner de promoção. */}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", borderBottom: "1px solid rgba(255,255,255,0.1)", padding: "18px 0", marginBottom: 24, display: "flex", flexDirection: "column" as const, gap: 16 }}>
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>VAGAS DISPONÍVEIS</span>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: "0.05em" }}>
-                      {vagasRestantes.toLocaleString("pt-BR")} / {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
-                    </span>
-                  </div>
-                  <div style={{ height: 3, borderRadius: 999, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min((assinantesFundador / VAGAS_FUNDADOR) * 100, 100)}%`, background: "#22e07a", borderRadius: 999 }} />
-                  </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.05em" }}>TEMPO RESTANTE</span>
-                  <CountdownTimer />
                 </div>
               </div>
 
@@ -1003,7 +921,7 @@ export default async function LandingPage() {
             </span>
           </h2>
           <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80", "--qz-delay": "180ms" } as React.CSSProperties}>
-            {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis nesta condição · Cancele quando quiser
+            Cancele quando quiser
           </p>
           <div className="qz-reveal" style={{ display: "inline-block", "--qz-delay": "260ms" } as React.CSSProperties}>
             <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
