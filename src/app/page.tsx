@@ -621,6 +621,9 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       <section id="como-funciona" className="qz-section" style={{ background: "var(--stone)" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+          <div className="qz-reveal" style={{ marginBottom: 20 }}>
+            <LogoQuitaZap height={28} />
+          </div>
           <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 20 }}>
             [ 03 / COMO FUNCIONA ]
           </p>
