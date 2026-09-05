@@ -928,16 +928,19 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 640, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <h2 style={{ margin: "0 0 20px", color: "#fff" }}>
             <span className="qz-reveal qz-close-light" style={{ "--qz-delay": "0ms" } as React.CSSProperties}>
-              Descubra hoje quanto do seu dinheiro
+              Você cuida da sua vida.
             </span>
             <span className="qz-reveal qz-close-heavy" style={{ "--qz-delay": "90ms" } as React.CSSProperties}>
-              é realmente <span style={{ color: "#22e07a" }}>seu.</span>
+              O QuitaZap cuida dos números.
             </span>
           </h2>
-          <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80", "--qz-delay": "180ms" } as React.CSSProperties}>
+          <p className="qz-reveal" style={{ margin: "0 0 20px", fontSize: 16, color: "rgba(255,255,255,0.65)", lineHeight: 1.55, maxWidth: 460, marginLeft: "auto", marginRight: "auto", "--qz-delay": "150ms" } as React.CSSProperties}>
+            Registre pelo WhatsApp, acompanhe tudo no painel e decida melhor antes de gastar.
+          </p>
+          <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80", "--qz-delay": "200ms" } as React.CSSProperties}>
             Cancele quando quiser
           </p>
-          <div className="qz-reveal" style={{ display: "inline-block", "--qz-delay": "260ms" } as React.CSSProperties}>
+          <div className="qz-reveal" style={{ display: "inline-block", "--qz-delay": "280ms" } as React.CSSProperties}>
             <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
               Quero garantir R$14,90/mês
             </CtaButton>
