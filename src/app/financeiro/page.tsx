@@ -2,14 +2,20 @@
 // QuitaZAP — Página Financeiro
 // /financeiro
 // ─────────────────────────────────────────
+// Painel executivo do SaaS: MRR, base ativa, churn, crescimento, custos e
+// resultado operacional do negócio — nunca dado financeiro pessoal do
+// cliente final (isso é escopo do admin de Clientes/Assinaturas, ver
+// decisão do Ibrahim documentada em src/lib/status-assinatura.ts).
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
-import { IconWallet, IconTrendUp, IconTarget, IconCheckCircle, IconAlertTriangle } from "@/components/icons";
+import { IconWallet, IconTrendUp, IconTrendDown, IconTarget, IconCheckCircle, IconAlertTriangle, IconUsers } from "@/components/icons";
 import { QaReveal } from "@/components/QaReveal";
-import { QaRing } from "@/components/QaRing";
+import { QaTrendChart } from "@/components/QaTrendChart";
+import { QaFlowChart } from "@/components/QaFlowChart";
 import { calcularDreAdmin, mesAtualBrasil, PRECO_MENSAL, COMISSAO_CAKTO } from "@/lib/financeiro-admin/motor";
+import { calcularMetricasNegocio } from "@/lib/financeiro-admin/metricas-negocio";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +25,10 @@ function fmt(v: number) {
 
 function pct(v: number) {
   return (v * 100).toFixed(1) + "%";
+}
+
+function pctDireto(v: number) {
+  return v.toFixed(1) + "%";
 }
 
 const NOMES_MES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -38,16 +48,33 @@ const excluirEstiloDark: React.CSSProperties = {
   fontSize: 12,
 };
 
+/** Badge de variação vs. mês anterior. `invertido` = métrica em que
+ * "menor é melhor" (cancelamentos, reembolsos) — inverte a cor do sinal. */
+function DeltaBadge({ atual, anterior, invertido = false }: { atual: number; anterior: number; invertido?: boolean }) {
+  const diff = atual - anterior;
+  if (diff === 0) {
+    return <span style={{ fontSize: 11.5, color: "var(--qa-gray-500)" }}>= vs. mês anterior</span>;
+  }
+  const positivo = invertido ? diff < 0 : diff > 0;
+  const Icone = diff > 0 ? IconTrendUp : IconTrendDown;
+  return (
+    <span style={{ fontSize: 11.5, display: "inline-flex", alignItems: "center", gap: 3, color: positivo ? "#6ee7b7" : "#fca5a5" }}>
+      <Icone size={11} /> {diff > 0 ? "+" : ""}{diff} vs. mês anterior
+    </span>
+  );
+}
+
 export default async function FinanceiroPage() {
   const mesAtual = mesAtualBrasil();
   const [ano, mesNum] = mesAtual.split("-").map(Number);
 
-  // Motor DRE Admin (src/lib/financeiro-admin/motor.ts) — única fonte dos
-  // números de receita/custo/resultado do negócio. /painel consome o
-  // mesmo motor; antes desta unificação, cada tela calculava "lucro" do
-  // seu próprio jeito (uma ignorava comissão Cakto e custo manual).
-  const [dre, custosDoMes, metas] = await Promise.all([
+  // Motor DRE Admin (receita/custo/resultado do mês) + métricas de negócio
+  // (MRR, churn, movimento da base) — duas fontes complementares, cada uma
+  // com seu próprio contrato documentado (motor-contrato.ts e o topo de
+  // metricas-negocio.ts). /painel consome o mesmo motor DRE.
+  const [dre, metricas, custosDoMes, metas] = await Promise.all([
     calcularDreAdmin(mesAtual),
+    calcularMetricasNegocio(mesAtual),
     prisma.custoMensal.findMany({ where: { mes: mesAtual }, orderBy: { criadoEm: "asc" } }),
     prisma.metaFinanceira.findMany(),
   ]);
@@ -67,6 +94,8 @@ export default async function FinanceiroPage() {
   const totalClientesAtivos = totalAssinantes + totalGratuitos;
   const custoTotal = comissaoCakto + custoIA + custoManualMes;
   const custoVariavelPorCliente = totalClientesAtivos > 0 ? custoIA / totalClientesAtivos : 0;
+  const custoMedioPorAssinante = totalAssinantes > 0 ? custoTotal / totalAssinantes : 0;
+  const margemOperacionalPorAssinante = totalAssinantes > 0 ? resultadoOperacional / totalAssinantes : 0;
 
   // Break-even: quantos assinantes cobrem o custo fixo do mês (custo manual)
   // + a fatia variável de IA por cliente, considerando a comissão da CAKTO
@@ -133,7 +162,7 @@ export default async function FinanceiroPage() {
       <div className="qa-page-header">
         <div>
           <h1 className="qa-page-title">Financeiro</h1>
-          <p className="qa-page-subtitle">Receita, custos e lucro do QuitaZAP — {NOMES_MES[mesNum - 1]}/{ano}</p>
+          <p className="qa-page-subtitle">Saúde financeira do QuitaZAP — {NOMES_MES[mesNum - 1]}/{ano}</p>
         </div>
       </div>
 
@@ -150,39 +179,127 @@ export default async function FinanceiroPage() {
         </div>
       )}
 
+      {metricas.alertas.map((alerta) => (
+        <div key={alerta} className="qa-alert qa-alert-amber" style={{ marginBottom: 14 }}>
+          <IconAlertTriangle size={18} />
+          <span>{alerta}</span>
+        </div>
+      ))}
+
       <QaReveal className="qa-hero">
         <div>
-          <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconTrendUp size={14} /> Resultado operacional do mês</p>
-          <strong className="qa-hero-value" style={{ color: resultadoPositivo ? undefined : "#fca5a5" }}>{fmt(resultadoOperacional)}</strong>
-          <p className="qa-hero-caption">Receita líquida {fmt(receitaLiquida)} · Custos {fmt(custoIA + custoManualMes)}</p>
+          <p className="qa-hero-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><IconWallet size={14} /> MRR — receita mensal recorrente</p>
+          <strong className="qa-hero-value">{fmt(metricas.mrrAtual)}</strong>
+          <p className="qa-hero-caption">
+            {metricas.ativos} assinante{metricas.ativos !== 1 ? "s" : ""} ativo{metricas.ativos !== 1 ? "s" : ""}
+            {metricas.crescimentoMrrPct != null && (
+              <> · {metricas.crescimentoMrrPct >= 0 ? "+" : ""}{pctDireto(metricas.crescimentoMrrPct)} vs. mês anterior</>
+            )}
+          </p>
         </div>
-        <QaRing
-          value={margem ?? 0}
-          color={resultadoPositivo ? "#10b981" : "#ef4444"}
-          label={`${Math.round((margem ?? 0) * 100)}%`}
-        />
+        <div className="qa-hero-chart">
+          <QaTrendChart data={metricas.serieMensal} dataKey="mrr" labelKey="rotulo" color="#00bfff" />
+        </div>
       </QaReveal>
 
+      <p style={{ margin: "20px 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        Visão do mês
+      </p>
       <div className="qa-stat-grid">
         <QaReveal className="qa-stat-card" delay={0}>
-          <p className="qa-stat-label">Assinantes pagos</p>
-          <strong className="qa-stat-value" style={{ color: "#6ee7b7" }}>{totalAssinantes}</strong>
-          <p className="qa-stat-caption">+ {totalGratuitos} gratuito{totalGratuitos !== 1 ? "s" : ""} (não contabilizados)</p>
+          <p className="qa-stat-label"><IconWallet size={13} /> Receita recebida no mês</p>
+          <strong className="qa-stat-value">{fmt(receitaBruta)}</strong>
+          <p className="qa-stat-caption">{receitaFonte === "OBSERVADA" ? "valor real recebido (Cakto)" : "estimado (sem pagamento observado)"}</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.05}>
-          <p className="qa-stat-label"><IconWallet size={13} /> Receita bruta/mês</p>
-          <strong className="qa-stat-value">{fmt(receitaBruta)}</strong>
-          <p className="qa-stat-caption">{receitaFonte === "OBSERVADA" ? "valor real recebido (Cakto)" : `${totalAssinantes} × ${fmt(PRECO_MENSAL)} (estimado)`}</p>
+          <p className="qa-stat-label"><IconUsers size={13} /> Assinantes ativos</p>
+          <strong className="qa-stat-value" style={{ color: "#6ee7b7" }}>{metricas.ativos}</strong>
+          <p className="qa-stat-caption">+ {totalGratuitos} lead{totalGratuitos !== 1 ? "s" : ""} gratuito{totalGratuitos !== 1 ? "s" : ""} (não pagante)</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.1}>
-          <p className="qa-stat-label">Comissão CAKTO (5,3%)</p>
-          <strong className="qa-stat-value" style={{ color: "#fcd34d" }}>- {fmt(comissaoCakto)}</strong>
-          <p className="qa-stat-caption">Descontado automaticamente</p>
+          <p className="qa-stat-label">Churn do mês</p>
+          <strong className="qa-stat-value" style={{ color: metricas.churnVariacaoPP > 0 ? "#fca5a5" : "#6ee7b7" }}>{pctDireto(metricas.churnPct)}</strong>
+          <p className="qa-stat-caption">{metricas.cancelamentos} cancelamento{metricas.cancelamentos !== 1 ? "s" : ""} este mês</p>
         </QaReveal>
         <QaReveal className="qa-stat-card" delay={0.15}>
           <p className="qa-stat-label"><IconTrendUp size={13} /> Resultado operacional/mês</p>
           <strong className="qa-stat-value" style={{ color: resultadoPositivo ? "#6ee7b7" : "#fca5a5" }}>{fmt(resultadoOperacional)}</strong>
           <p className="qa-stat-caption">Margem: {pct(margem ?? 0)}</p>
+        </QaReveal>
+      </div>
+
+      <p style={{ margin: "20px 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        Movimento da base — vs. mês anterior
+      </p>
+      <div className="qa-stat-grid">
+        <QaReveal className="qa-stat-card" delay={0}>
+          <p className="qa-stat-label">Novos assinantes</p>
+          <strong className="qa-stat-value" style={{ color: "#6ee7b7" }}>{metricas.novosAssinantes}</strong>
+          <DeltaBadge atual={metricas.novosAssinantes} anterior={metricas.novosAssinantesMesAnterior} />
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.05}>
+          <p className="qa-stat-label">Cancelamentos</p>
+          <strong className="qa-stat-value" style={{ color: "#fca5a5" }}>{metricas.cancelamentos}</strong>
+          <DeltaBadge atual={metricas.cancelamentos} anterior={metricas.cancelamentosMesAnterior} invertido />
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.1}>
+          <p className="qa-stat-label">Reativações</p>
+          <strong className="qa-stat-value" style={{ color: "#7dc4ff" }}>{metricas.reativacoes}</strong>
+          <DeltaBadge atual={metricas.reativacoes} anterior={metricas.reativacoesMesAnterior} />
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.15}>
+          <p className="qa-stat-label">Reembolsos / chargebacks</p>
+          <strong className="qa-stat-value" style={{ color: "#fcd34d" }}>{metricas.eventosProblema}</strong>
+          <DeltaBadge atual={metricas.eventosProblema} anterior={metricas.eventosProblemaMesAnterior} invertido />
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.2}>
+          <p className="qa-stat-label">Leads gratuitos (total)</p>
+          <strong className="qa-stat-value">{metricas.inativosTotal}</strong>
+          <DeltaBadge atual={metricas.inativosTotal} anterior={metricas.inativosTotalMesAnterior} />
+        </QaReveal>
+      </div>
+      <p style={{ margin: "-8px 0 20px", fontSize: 11.5, color: "var(--qa-gray-500)" }}>
+        &quot;Pagamento pendente/falho&quot; ainda não entra aqui — falta confirmar com a Cakto o nome exato do evento de recusa/pendência de pagamento; hoje o webhook só distingue aprovação, reembolso, cancelamento e chargeback.
+      </p>
+
+      <div className="qa-grid-2col">
+        <div className="qa-card">
+          <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 600 }}>MRR — últimos 12 meses</h2>
+          <div style={{ width: "100%", height: 220 }}>
+            <QaTrendChart data={metricas.serieMensal} dataKey="mrr" labelKey="rotulo" color="#00bfff" />
+          </div>
+        </div>
+        <div className="qa-card">
+          <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 600 }}>Novos vs. cancelados por mês</h2>
+          <div style={{ width: "100%", height: 220 }}>
+            <QaFlowChart data={metricas.serieMensal} labelKey="rotulo" />
+          </div>
+        </div>
+      </div>
+
+      <p style={{ margin: "20px 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        Indicadores
+      </p>
+      <div className="qa-stat-grid">
+        <QaReveal className="qa-stat-card" delay={0}>
+          <p className="qa-stat-label">ARPU</p>
+          <strong className="qa-stat-value">{fmt(metricas.arpu)}</strong>
+          <p className="qa-stat-caption">Receita recorrente / assinante ativo</p>
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.05}>
+          <p className="qa-stat-label">Custo médio / assinante</p>
+          <strong className="qa-stat-value">{fmt(custoMedioPorAssinante)}</strong>
+          <p className="qa-stat-caption">Comissão + IA + custos manuais do mês</p>
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.1}>
+          <p className="qa-stat-label">Margem operacional / assinante</p>
+          <strong className="qa-stat-value" style={{ color: margemOperacionalPorAssinante >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmt(margemOperacionalPorAssinante)}</strong>
+          <p className="qa-stat-caption">Resultado operacional / assinante ativo</p>
+        </QaReveal>
+        <QaReveal className="qa-stat-card" delay={0.15}>
+          <p className="qa-stat-label">Receita perdida em cancelamentos</p>
+          <strong className="qa-stat-value" style={{ color: "#fca5a5" }}>{fmt(metricas.receitaPerdidaCancelamentos)}</strong>
+          <p className="qa-stat-caption">MRR perdido este mês</p>
         </QaReveal>
       </div>
 
@@ -233,8 +350,12 @@ export default async function FinanceiroPage() {
       <div className="qa-grid-2col">
         {/* Custos do mês */}
         <div className="qa-card">
-          <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 600 }}>Custos — {NOMES_MES[mesNum - 1]}/{ano}</h2>
+          <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 600 }}>DRE — {NOMES_MES[mesNum - 1]}/{ano}</h2>
 
+          <div className="qa-list-row">
+            <span style={{ fontSize: 13.5, color: "var(--qa-gray-400)" }}>Receita líquida (após comissão CAKTO)</span>
+            <strong style={{ fontSize: 13.5 }}>{fmt(receitaLiquida)}</strong>
+          </div>
           <div className="qa-list-row">
             <span style={{ fontSize: 13.5, color: "var(--qa-gray-400)" }}>IA (uso real, automático)</span>
             <strong style={{ fontSize: 13.5 }}>{fmt(custoIA)}</strong>
