@@ -55,6 +55,12 @@ export default async function EmprestimosPage() {
               const proximaParcela = e.parcelas
                 .filter((p) => p.status === "PENDENTE")
                 .sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())[0];
+              // Data final = vencimento da última parcela cadastrada (não
+              // necessariamente a de maior "numero" — pega pelo vencimento
+              // em si, pra não depender de numeração sempre sequencial).
+              const ultimaParcela = e.parcelas.length > 0
+                ? e.parcelas.reduce((mt, p) => (p.vencimento > mt.vencimento ? p : mt))
+                : null;
               return (
                 <Link key={e.id} href={`/minha-conta/emprestimos/${e.id}`} className="mc-list-row" style={{ textDecoration: "none" }}>
                   <div className="mc-list-icon" style={{ background: "rgba(30,99,233,0.1)", color: "var(--blue)" }}>
@@ -65,6 +71,7 @@ export default async function EmprestimosPage() {
                     <div className="mc-list-meta">
                       {parcelasPagas}/{e.totalParcelas ?? e.parcelas.length} parcelas
                       {proximaParcela ? ` · vence ${proximaParcela.vencimento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : " · quitado"}
+                      {ultimaParcela ? ` · termina ${ultimaParcela.vencimento.toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" })}` : ""}
                     </div>
                   </div>
                   <div className="mc-list-side">
