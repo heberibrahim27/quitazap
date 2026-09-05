@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WhatsAppScreen, WhatsAppBubble } from "./WhatsAppScreen";
 
 const ESTADOS = [
   { numero: "01", label: "REGISTRE" },
@@ -108,11 +109,9 @@ function TelaCelular({ estado, compacta }: { estado: number; compacta?: boolean 
   const fontBase = compacta ? 7 : 13.5;
   if (estado === 0) {
     return (
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg,#0d1610,#070a08)", display: "flex", alignItems: "flex-end", paddingTop: padY, paddingLeft: padX, paddingRight: padX, paddingBottom: compacta ? 14 : 32 }}>
-        <div style={{ background: "#dcf8c6", borderRadius: compacta ? "6px 6px 2px 6px" : "12px 12px 2px 12px", padding: compacta ? "5px 7px" : "10px 14px", fontSize: fontBase, color: "#1f2937", maxWidth: "85%" }}>
-          Gastei R$ 87,50 no mercado.
-        </div>
-      </div>
+      <WhatsAppScreen compacta={compacta}>
+        <WhatsAppBubble text="Gastei R$ 87,50 no mercado." time="09:14" out compacta={compacta} />
+      </WhatsAppScreen>
     );
   }
   if (estado === 1) {

@@ -82,18 +82,6 @@ const LANDING_CSS = `
   .qz-wp-dash-bars { display: flex; align-items: flex-end; gap: 6px; height: 48px; margin-top: 14px; }
   .qz-wp-dash-bars span { flex: 1; background: rgba(255,255,255,0.14); border-radius: 3px 3px 0 0; }
   .qz-wp-phone { width: 176px; margin: 0 auto; }
-  .qz-wp-phone-screen {
-    position: absolute; inset: 0; background: linear-gradient(180deg,#0d1610,#070a08);
-    display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: 0 14px 24px;
-  }
-  .qz-wp-phone-bubble {
-    align-self: flex-end; max-width: 85%; background: #dcf8c6; border-radius: 12px 12px 2px 12px;
-    padding: 8px 12px; font-size: 12px; color: #1f2937;
-  }
-  .qz-wp-phone-check {
-    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; color: var(--accent);
-    align-self: flex-end; font-weight: 600;
-  }
   .qz-wp-chip {
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -104,6 +92,27 @@ const LANDING_CSS = `
   .qz-wp-chip-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; color: rgba(255,255,255,0.4); }
   .qz-wp-chip-insight { font-size: 13.5px; color: rgba(255,255,255,0.85); line-height: 1.5; margin: 0; }
   .qz-wp-chip-insight strong { color: var(--accent); font-weight: 700; }
+  .qz-wa-screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #E5DDD5; }
+  .qz-wa-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #075E54; flex-shrink: 0; }
+  .qz-wa-avatar {
+    width: 26px; height: 26px; border-radius: 50%; background: #128C7E; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700;
+  }
+  .qz-wa-header-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .qz-wa-header-name { color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1.1; }
+  .qz-wa-header-status { color: rgba(255,255,255,0.75); font-size: 9.5px; line-height: 1; }
+  .qz-wa-body { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .qz-wa-row { display: flex; }
+  .qz-wa-row.qz-wa-out { justify-content: flex-end; }
+  .qz-wa-row.qz-wa-in { justify-content: flex-start; }
+  .qz-wa-bubble {
+    max-width: 80%; padding: 6px 7px 4px; border-radius: 7.5px; font-size: 12px;
+    line-height: 1.35; color: #111b21; position: relative;
+  }
+  .qz-wa-bubble.qz-wa-out { background: #D9FDD3; border-top-right-radius: 0; }
+  .qz-wa-bubble.qz-wa-in { background: #fff; border-top-left-radius: 0; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
+  .qz-wa-meta { display: flex; align-items: center; gap: 3px; justify-content: flex-end; margin-top: 2px; font-size: 9px; color: rgba(0,0,0,0.45); }
+  .qz-wa-check { color: #53BDEB; font-size: 11px; line-height: 1; }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }

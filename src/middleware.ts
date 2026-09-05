@@ -22,7 +22,13 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/minha-conta") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    // Qualquer arquivo estático servido direto de /public (vídeos, imagens,
+    // ícones, manifest, sw.js etc.) precisa ser público — sem essa checagem,
+    // um visitante sem cookie de admin pedindo /videos/hero-loop.mp4 (ou
+    // qualquer novo asset futuro) era redirecionado pro /login em vez de
+    // receber o arquivo (bug real: o vídeo do Hero nunca carregava).
+    /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {
     return NextResponse.next();
   }

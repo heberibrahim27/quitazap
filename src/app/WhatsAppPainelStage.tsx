@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { WhatsAppScreen, WhatsAppBubble } from "./WhatsAppScreen";
 
 // Composição decorativa do fold WhatsApp+Painel: um "objeto de produto"
 // (celular + fatia de painel + mensagens flutuando fora do celular) com
@@ -70,10 +71,10 @@ export function WhatsAppPainelStage() {
         <div className="qz-panel-phone" style={{ width: 176, height: 364, margin: 0 }}>
           <div className="qz-phone-mock-inner">
             <div className="qz-phone-notch-band"><div className="qz-phone-notch" /></div>
-            <div className="qz-wp-phone-screen">
-              <div className="qz-wp-phone-bubble">Gastei R$ 42 na farmácia.</div>
-              <span className="qz-wp-phone-check">REGISTRADO ✓</span>
-            </div>
+            <WhatsAppScreen>
+              <WhatsAppBubble text="Gastei R$ 42 na farmácia." time="14:02" out />
+              <WhatsAppBubble text="Registrado! ✅ Já está no seu extrato." time="14:02" />
+            </WhatsAppScreen>
           </div>
         </div>
       </div>
