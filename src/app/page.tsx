@@ -102,6 +102,11 @@ const LANDING_CSS = `
   .qz-h2-sm { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25; }
   .qz-h2-md { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
   .qz-h2-lg { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+  /* Fechamento — headline bem maior que as outras seções (bookend do
+     Hero), em duas linhas com stagger separado, pra terminar "grande"
+     em vez do bloco de texto centralizado genérico de antes. */
+  .qz-close-light { display: block; font-size: clamp(20px, 5vw, 30px); font-weight: 300; opacity: 0.75; margin-bottom: 4px; }
+  .qz-close-heavy { display: block; font-family: var(--font-fraunces); font-style: italic; font-weight: 500; font-size: clamp(34px, 9vw, 76px); line-height: 1.05; letter-spacing: -0.02em; }
   .qz-phone-mock { display: none; }
   .qz-phone-mock-inner {
     position: relative; width: 100%; height: 100%; border-radius: 38px;
@@ -947,24 +952,38 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* CTA FINAL */}
+      {/* CTA FINAL — bookend do Hero: volta pro dark e termina "grande"
+          (auditoria de direção de arte apontou essa dobra como a mais
+          fraca — bloco de texto centralizado genérico, sem escala nem
+          entrada diferenciada). Gradiente final escurecido (era
+          #0a2e18, um verde bem saturado — mesmo problema já corrigido
+          no Hero: sem nada por cima suavizando, virava a dobra mais
+          "verde" da página, contradizendo a própria regra de verde só
+          em ponto de ação). */}
       {/* ══════════════════════════════════════ */}
-      <section className="qz-section" style={{ background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)", position: "relative", overflow: "hidden", textAlign: "center" }}>
+      <section className="qz-section" style={{ background: "linear-gradient(160deg, #020d06 0%, #041209 55%, #030a05 100%)", position: "relative", overflow: "hidden", textAlign: "center" }}>
         <div style={{
           position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
           width: "600px", height: "400px", maxWidth: "150vw",
-          background: "radial-gradient(ellipse, rgba(34,224,122,0.1) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, rgba(34,224,122,0.12) 0%, transparent 70%)",
         }} />
-        <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff" }}>
-            Descubra hoje quanto do seu dinheiro é realmente seu.
+        <div style={{ maxWidth: 640, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <h2 style={{ margin: "0 0 20px", color: "#fff" }}>
+            <span className="qz-reveal qz-close-light" style={{ "--qz-delay": "0ms" } as React.CSSProperties}>
+              Descubra hoje quanto do seu dinheiro
+            </span>
+            <span className="qz-reveal qz-close-heavy" style={{ "--qz-delay": "90ms" } as React.CSSProperties}>
+              é realmente <span style={{ color: "#22e07a" }}>seu.</span>
+            </span>
           </h2>
-          <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
+          <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80", "--qz-delay": "180ms" } as React.CSSProperties}>
             {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis nesta condição · Cancele quando quiser
           </p>
-          <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
-            Quero garantir R$14,90/mês
-          </CtaButton>
+          <div className="qz-reveal" style={{ display: "inline-block", "--qz-delay": "260ms" } as React.CSSProperties}>
+            <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
+              Quero garantir R$14,90/mês
+            </CtaButton>
+          </div>
         </div>
 
         {/* Transição em degradê pro preto do rodapé — mesmo tratamento do
