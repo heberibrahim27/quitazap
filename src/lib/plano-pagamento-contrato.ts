@@ -57,6 +57,19 @@ export interface EntradaPlanoPagamento {
   compromissos: CompromissoFinanceiro[];
 }
 
+/** Motivo determinístico de uma posição no plano — nunca "a IA achou que
+ * devia ser assim": todo item carrega um código auditável, e a
+ * `justificativa` em texto é só a tradução desse código (por template no
+ * v1; LLM formatando o mesmo código pode entrar depois sem mudar a
+ * ordenação). */
+export type ReasonCode =
+  | "RISK_SERVICE_CUTOFF" // moradia/serviço essencial com risco de corte, já vencido ou vencendo muito perto
+  | "OVERDUE" // já em atraso, sem risco crítico específico identificado
+  | "DUE_SOON" // vence nos próximos dias, ainda não atrasou
+  | "MINIMUM_REQUIRED" // compromisso do mês, sem urgência acima das anteriores
+  | "HIGH_COST_DEBT" // maior custo/juros embutido entre as que podem receber amortização extra
+  | "LOWER_PRIORITY"; // resto — pode esperar
+
 /** Um item já ordenado dentro do plano recomendado, com a explicação de
  * por que ficou nessa posição — texto pronto pra mostrar ao cliente, não
  * só um código de motivo. */
@@ -64,6 +77,7 @@ export interface ItemPlanoRecomendado {
   compromissoId: string;
   posicao: number;
   valorRecomendado: number;
+  reasonCode: ReasonCode;
   /** "Prioridade alta porque atrasa há 12 dias e tem risco de corte de energia." */
   justificativa: string;
   /** false quando o item não coube no plano por falta de saldo. */
