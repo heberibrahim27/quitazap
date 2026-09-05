@@ -322,8 +322,14 @@ const funcionalidadesGrid = [
 ];
 const funcionalidadesStack = [
   { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando.", imagem: "/painel-modo-apertou.webp" },
-  { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos pagamentos." },
+  // Renomeado de "Simulador de Parcelas": o print real disponível
+  // (tela de Empréstimos > detalhe) mostra o controle de uma parcela já
+  // existente — marcar como paga, ver quanto falta — não uma simulação de
+  // parcela nova. Texto ajustado pra descrever o que a tela mostra de
+  // verdade, em vez de prometer algo que ela não faz.
+  { titulo: "Controle de Parcelas", texto: "Acompanhe cada parcela do seu empréstimo e marque como paga sem esforço.", imagem: "/painel-emprestimo.webp" },
   { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas.", imagem: "/painel-dividas.webp" },
+  { titulo: "Cartões sob controle", texto: "Limite, fatura e compras parceladas — tudo num só lugar, sem susto.", imagem: "/painel-cartoes.webp" },
 ];
 
 const faq = [
