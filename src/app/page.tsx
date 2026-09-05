@@ -826,6 +826,33 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
+      {/* PROVA SOCIAL — etapa 4/4 do plano da auditoria de direção de arte.
+          Sem depoimento, sem foto/vídeo e sem número — não existe ainda
+          nenhum dado real (avaliação, contagem de usuários, foto de
+          cliente) pra sustentar uma prova social de verdade, e inventar
+          qualquer um desses violaria a própria regra do brief ("não criar
+          falsas provas sociais"). Fica só uma frase editorial curta,
+          quieta, sem moldura de "card de depoimento" — um respiro entre o
+          grid denso de Funcionalidades e o pedido de Preço, não uma
+          seção fingindo ter prova que não tem. Assim que existir material
+          real (foto/vídeo de gente usando o QuitaZap, depoimento de
+          verdade), essa dobra ganha corpo. */}
+      {/* ══════════════════════════════════════ */}
+      <section className="qz-section" style={{ background: "var(--paper)" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "center" }}>
+          <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>
+            [ VIDA REAL ]
+          </p>
+          <p className="qz-reveal" style={{
+            margin: 0, fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500, color: "var(--ink)",
+            fontSize: "clamp(26px, 4.5vw, 42px)", lineHeight: 1.3, "--qz-delay": "60ms",
+          } as React.CSSProperties}>
+            No meio da correria, você continua no controle.
+          </p>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
       {/* PREÇO */}
       {/* ══════════════════════════════════════ */}
       <section id="preco" className="qz-section" style={{ background: "linear-gradient(160deg, #050b07 0%, #0d1a10 100%)", position: "relative", overflow: "hidden" }}>
