@@ -90,8 +90,13 @@ function ConteudoCard({ item, index }: { item: Item; index: number }) {
       </div>
       <div className="qz-feat-stack-imgwrap">
         {item.imagem ? (
+          // Esse container é mais alto que largo (retrato), mas os prints
+          // reais do painel são paisagem — com object-fit:cover eles
+          // ficavam cortados/ampliados a ponto de virar texto ilegível
+          // (achado de QA). "contain" mostra o print inteiro, sem
+          // distorcer nem cortar, com a cor do card preenchendo a sobra.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.imagem} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={item.imagem} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#f8fafc" }} />
         ) : (
           /* Placeholder — sem screenshot real batendo com essa
              funcionalidade ainda. */

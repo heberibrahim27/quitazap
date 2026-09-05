@@ -317,11 +317,11 @@ const doresMinicards = [
 // inventar prova social).
 const funcionalidadesGrid = [
   { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque." },
-  { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento." },
+  { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento.", imagem: "/painel-salario-livre.webp" },
   { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora.", imagem: "/whatsapp-3.webp", imagemVertical: true },
 ];
 const funcionalidadesStack = [
-  { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando." },
+  { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando.", imagem: "/painel-modo-apertou.webp" },
   { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos pagamentos." },
   { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas.", imagem: "/painel-dividas.webp" },
 ];
