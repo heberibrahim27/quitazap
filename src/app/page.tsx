@@ -142,7 +142,7 @@ const LANDING_CSS = `
   .qz-dor-num-1 { font-size: 44px; }
   .qz-dor-num-2 { font-size: 32px; }
   .qz-dor-num-3 { font-size: 56px; }
-  .qz-cf-desktop { display: none; }
+  .qz-cf-stack-desktop { display: none; }
   .qz-cf-mobile { display: flex; flex-direction: column; gap: 40px; }
   .qz-wp-stage { display: flex; flex-direction: column; gap: 20px; margin-top: 40px; }
   /* Screenshot real do painel (substituiu as barras/linhas fake em CSS) —
@@ -151,6 +151,16 @@ const LANDING_CSS = `
   .qz-wp-dashboard {
     position: relative; border-radius: 16px; overflow: hidden;
     box-shadow: 0 20px 40px -20px rgba(0,0,0,0.6);
+  }
+  /* Spotlight seguindo o cursor (depth rig) — só acende quando o JS de
+     WhatsAppPainelStage seta --wp-spot-o (ponteiro fino, sem
+     prefers-reduced-motion); sem JS/no celular fica sempre em opacity 0. */
+  .qz-wp-dashboard::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(220px circle at var(--wp-spot-x, 50%) var(--wp-spot-y, 50%), rgba(34,224,122,0.22), transparent 70%);
+    opacity: var(--wp-spot-o, 0);
+    transition: opacity .3s ease;
+    mix-blend-mode: screen;
   }
   .qz-wp-phone { width: 176px; margin: 0 auto; }
   .qz-wp-phone-photo { width: 100%; height: 364px; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(0,0,0,.6); }
@@ -240,22 +250,35 @@ const LANDING_CSS = `
     .qz-feat-stack-imgwrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
     .qz-price-card { padding: 40px 36px; }
     .qz-cf-mobile { display: none; }
-    .qz-cf-desktop {
-      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px;
+    /* Cards empilhando com scroll (mesmo mecanismo de
+       .qz-feat-stack-item/.qz-feat-stack-card — ver ComoFuncionaScroll.tsx). */
+    .qz-cf-stack-desktop { display: block; position: relative; margin-top: 32px; padding-bottom: 8vh; }
+    .qz-cf-stack-item {
+      position: sticky; top: 10vh; height: 76vh; margin-bottom: 6vh;
+      display: flex; align-items: center; justify-content: center;
     }
-    .qz-cf-sticky-col { position: relative; }
-    .qz-cf-sticky-inner { position: sticky; top: 12vh; height: 76vh; display: flex; align-items: center; justify-content: flex-end; }
-    .qz-cf-steps-col { display: flex; flex-direction: column; }
-    .qz-cf-step { min-height: 88vh; display: flex; align-items: center; }
-    .qz-wp-stage { position: relative; height: 560px; display: block; margin-top: 64px; }
+    .qz-cf-stack-card {
+      width: 100%; height: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 24px;
+      display: flex; align-items: center; justify-content: center; gap: 56px; padding: 48px;
+      box-shadow: 0 30px 60px -20px rgba(15,23,42,.3);
+    }
+    .qz-wp-stage { position: relative; height: 560px; display: block; margin-top: 64px; perspective: 900px; }
     .qz-wp-dashboard {
       position: absolute; top: 4%; right: 0; width: 56%; max-width: 400px;
       transform: translate3d(calc(var(--wp-px, 0) * 6px), calc(var(--wp-py, 0) * 6px), 0) rotate(1.5deg);
       transition: transform .2s ease-out;
     }
+    /* Camada do meio do depth rig: além do translate proporcional ao
+       mouse (já existia), ganha uma leve rotação 3D (perspective no pai
+       .qz-wp-stage) — máx. ~±5°, "limitar bastante" por decisão de
+       produto (nada de tilt exagerado tipo cardz.js). */
     .qz-wp-phone {
       position: absolute; left: 2%; bottom: 0; z-index: 3;
-      transform: translate3d(calc(var(--wp-px, 0) * 12px), calc(var(--wp-py, 0) * 12px), 0) rotate(var(--wp-phone-rot, -3deg));
+      transform:
+        translate3d(calc(var(--wp-px, 0) * 12px), calc(var(--wp-py, 0) * 12px), 0)
+        rotateX(calc(var(--wp-py, 0) * -10deg))
+        rotateY(calc(var(--wp-px, 0) * 10deg))
+        rotate(var(--wp-phone-rot, -3deg));
       transition: transform .25s ease-out;
     }
     .qz-wp-phone:hover { --wp-phone-rot: 0deg; }
@@ -273,6 +296,42 @@ const LANDING_CSS = `
     .qz-dor-num-2 { font-size: 56px; }
     .qz-dor-num-3 { font-size: 120px; }
   }
+
+  /* ── "premium-glass" — vidro com borda dupla mascarada ──
+     Componente único reutilizável (via className, não CSS repetido por
+     card): duas bordas de 1px sobrepostas via ::before/::after, cada uma
+     visível só numa diagonal (mask-image), uma branca/prateada e outra
+     no verde da marca — essa última desligada por padrão e ligada só com
+     .premium-glass--accent, porque o reflexo verde nem sempre faz sentido
+     (reservado pra onde tem ação/estado, ex: um insight; um card neutro
+     como o de preço fica só com o brilho branco). Troca a sombra única
+     de cada card por uma sombra em múltiplas camadas — por isso um
+     elemento que já define box-shadow/border própria deve tirá-los ao
+     adotar esta classe, pra não competir com ela. */
+  .premium-glass {
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 8px 20px -12px rgba(15,23,42,0.35),
+      0 30px 60px -24px rgba(15,23,42,0.45);
+  }
+  .premium-glass::before,
+  .premium-glass::after {
+    content: ""; position: absolute; inset: 0;
+    border-radius: inherit; border: 1px solid transparent; pointer-events: none;
+  }
+  .premium-glass::before {
+    border-color: rgba(255,255,255,0.5);
+    -webkit-mask-image: linear-gradient(135deg, #000 0%, transparent 48%);
+    mask-image: linear-gradient(135deg, #000 0%, transparent 48%);
+  }
+  .premium-glass::after {
+    border-color: rgba(34,224,122,0.45);
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(315deg, #000 0%, transparent 48%);
+    mask-image: linear-gradient(315deg, #000 0%, transparent 48%);
+  }
+  .premium-glass--accent::after { opacity: 1; }
 `;
 
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
@@ -834,9 +893,8 @@ export default async function LandingPage() {
                 qz-beam dá uma volta de luz única quando o card entra na
                 tela (border-beam pontual, só aqui — não em todo card da
                 página). */}
-            <div className="qz-price-card qz-beam" style={{
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20,
-              boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px -12px rgba(255,255,255,0.06)",
+            <div className="qz-price-card qz-beam premium-glass" style={{
+              background: "rgba(255,255,255,0.05)", borderRadius: 20,
               backdropFilter: "blur(16px)", textAlign: "left",
             }}>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 28 }}>
