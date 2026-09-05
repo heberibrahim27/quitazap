@@ -276,16 +276,15 @@ const LANDING_CSS = `
 
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
 
-// Mesmo contato/link de suporte usado em /privacidade — WhatsApp oficial
-// do QuitaZap já usado em outras telas do produto (dashboard/plano).
-const CONTATO_SUPORTE_LINK = process.env.NEXT_PUBLIC_SUPORTE_LINK || "https://wa.me/5571993085436";
-
 // Redes sociais: só aparece no rodapé quando a env var correspondente
 // estiver configurada — dá o mesmo efeito de "ativar/desativar" sem
-// precisar de painel de admin ainda (fica pro backlog).
+// precisar de painel de admin ainda (fica pro backlog). Sem fallback pra
+// número pessoal: enquanto não existir um canal de suporte de verdade,
+// o ícone/link correspondente fica oculto em vez de expor o WhatsApp
+// pessoal de alguém como se fosse o contato oficial do produto.
 const REDES_SOCIAIS = [
   { nome: "Instagram", url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM },
-  { nome: "WhatsApp", url: process.env.NEXT_PUBLIC_SOCIAL_WHATSAPP || CONTATO_SUPORTE_LINK },
+  { nome: "WhatsApp", url: process.env.NEXT_PUBLIC_SOCIAL_WHATSAPP },
   { nome: "Facebook", url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK },
   { nome: "TikTok", url: process.env.NEXT_PUBLIC_SOCIAL_TIKTOK },
 ].filter((r): r is { nome: string; url: string } => Boolean(r.url));
@@ -973,7 +972,6 @@ export default async function LandingPage() {
               ))}
               <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Já sou cliente</a>
               <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Privacidade e Termos</a>
-              <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Suporte</a>
 
               {REDES_SOCIAIS.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
