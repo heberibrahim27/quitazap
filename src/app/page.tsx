@@ -12,6 +12,7 @@ import { CountdownTimer } from "./CountdownTimer";
 import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
 import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
 import { HeroFade } from "./HeroFade";
+import { FuncionalidadesStack } from "./FuncionalidadesStack";
 
 // Inter nunca foi de fato carregada nesta página (o fontFamily só citava
 // o nome, sem @font-face nem next/font) — sempre caiu pro fallback
@@ -119,6 +120,20 @@ const LANDING_CSS = `
   .qz-cf-photo { width: 200px; height: 412px; margin: 0 auto; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(15,23,42,.35); }
   .qz-hero-side { margin-top: 8px; }
   .qz-feat-img { aspect-ratio: 16 / 9; }
+  /* Cards empilhando com scroll (referência "Parallax Clean" que o
+     Ibrahim mandou) — só no desktop; no mobile é uma lista sequencial
+     simples, sem sticky, sem scale/opacity scrubado (decisão de
+     engenharia pra não pesar no celular). */
+  .qz-feat-stack-desktop { display: none; }
+  .qz-feat-stack-mobile { display: flex; flex-direction: column; gap: 20px; margin-top: 24px; }
+  .qz-feat-stack-mobile .qz-feat-stack-card {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .qz-feat-stack-mobile .qz-feat-stack-imgwrap { order: 1; }
+  .qz-feat-stack-mobile .qz-feat-stack-content { order: 2; }
+  .qz-feat-stack-content { padding: 20px; display: flex; flex-direction: column; justify-content: center; }
+  .qz-feat-stack-imgwrap { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
   .qz-price-card { padding: 28px 22px; }
   .qz-dor-num-1 { font-size: 44px; }
   .qz-dor-num-2 { font-size: 32px; }
@@ -217,6 +232,19 @@ const LANDING_CSS = `
     .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
     .qz-cf-photo { width: 240px; height: 494px; margin: 0; }
     .qz-feat-img { aspect-ratio: 4 / 3; }
+    .qz-feat-stack-desktop { display: block; position: relative; margin-top: 32px; padding-bottom: 8vh; }
+    .qz-feat-stack-mobile { display: none; }
+    .qz-feat-stack-item {
+      position: sticky; top: 10vh; height: 62vh; margin-bottom: 6vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .qz-feat-stack-card {
+      width: 100%; height: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 24px;
+      overflow: hidden; display: grid; grid-template-columns: 1fr 1.2fr;
+      box-shadow: 0 30px 60px -20px rgba(15,23,42,.3);
+    }
+    .qz-feat-stack-content { padding: 48px; display: flex; flex-direction: column; justify-content: center; }
+    .qz-feat-stack-imgwrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
     .qz-price-card { padding: 40px 36px; }
     .qz-cf-mobile { display: none; }
     .qz-cf-desktop {
@@ -303,10 +331,15 @@ const doresMinicards = [
   { titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
 ];
 
-const funcionalidades = [
+// Os 3 primeiros ficam no grid estático de sempre; os 3 últimos (Modo
+// Apertou / Simulador de Parcelas / Dívidas e Consignados) ganham o
+// efeito de empilhamento com scroll (ver FuncionalidadesStack.tsx).
+const funcionalidadesGrid = [
   { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque." },
   { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento." },
   { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora." },
+];
+const funcionalidadesStack = [
   { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando." },
   { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos pagamentos." },
   { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas." },
@@ -627,9 +660,6 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       <section id="como-funciona" className="qz-section" style={{ background: "var(--stone)" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-          <div className="qz-reveal" style={{ marginBottom: 20 }}>
-            <LogoQuitaZap height={28} />
-          </div>
           <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 20 }}>
             [ 03 / COMO FUNCIONA ]
           </p>
@@ -713,7 +743,7 @@ export default async function LandingPage() {
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-            {funcionalidades.map((f, i) => (
+            {funcionalidadesGrid.map((f, i) => (
               <div key={f.titulo} className="qz-reveal" style={{
                 background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden",
                 "--qz-delay": `${i * 60}ms`,
@@ -736,6 +766,8 @@ export default async function LandingPage() {
               </div>
             ))}
           </div>
+
+          <FuncionalidadesStack itens={funcionalidadesStack} />
         </div>
       </section>
 
