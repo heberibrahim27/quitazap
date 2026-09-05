@@ -372,6 +372,23 @@ function CtaButton({
   );
 }
 
+// Logo com glow suave atrás — a wordmark tem "Quita" em tom bem escuro
+// (parte oficial do arquivo enviado), que quase some nos fundos escuros
+// do Hero/rodapé sem esse respiro claro por trás.
+function LogoQuitaZap({ height }: { height: number }) {
+  return (
+    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <div style={{
+        position: "absolute", inset: `${-height * 0.35}px ${-height * 0.18}px`,
+        background: "radial-gradient(ellipse, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.22) 45%, transparent 75%)",
+        filter: `blur(${height * 0.22}px)`,
+      }} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ position: "relative", height, width: "auto", display: "block" }} />
+    </div>
+  );
+}
+
 const WHATSAPP_ICON = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
     <path d="M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652C8.051 23.08 9.993 23.56 12 23.56h.008c6.572 0 11.92-5.334 11.928-11.894 0-3.174-1.25-6.16-3.42-8.217M12.045 21.58h-.007c-1.784 0-3.532-.48-5.057-1.38l-.363-.215-3.76.985 1.006-3.654-.237-.374a9.814 9.814 0 0 1-1.51-5.26c.001-5.45 4.452-9.878 9.92-9.878 2.648 0 5.135 1.03 7.007 2.9a9.836 9.836 0 0 1 2.907 6.988c-.002 5.45-4.455 9.888-9.906 9.888" fill="white"/>
@@ -434,7 +451,12 @@ export default async function LandingPage() {
           QuitaZap. Valores em px/rem abaixo são a tradução literal das
           classes Tailwind do arquivo de referência — não são invenção. */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ position: "relative", overflow: "hidden", minHeight: 640 }} className="qz-hero">
+      {/* position:sticky (não scroll-linked JS) faz o Hero ficar grudado no
+          topo enquanto a dobra de Dor desliza por cima dele — some ao
+          rolar pra baixo, volta a aparecer ao rolar pra cima. Zero custo
+          de performance (é só CSS), consistente com a decisão de cortar
+          qualquer efeito recalculado a cada pixel de scroll. */}
+      <section style={{ position: "sticky", top: 0, zIndex: 0, overflow: "hidden", minHeight: 640 }} className="qz-hero">
         {/* Gradiente de marca como poster — cobre o instante antes do vídeo
             decodificar o primeiro frame (e o fallback se autoplay falhar). */}
         <div style={{
@@ -473,8 +495,7 @@ export default async function LandingPage() {
         {/* header — px-6 md:px-12 py-8 */}
         <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ height: 34, width: "auto", display: "block" }} />
+            <LogoQuitaZap height={34} />
           </div>
           <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85, display: "inline-block", padding: "12px 4px" }}>
             Já sou cliente
@@ -517,13 +538,6 @@ export default async function LandingPage() {
           </div>
         </div>
 
-        {/* Transição em degradê pro branco da seção seguinte — evita o corte
-            seco entre o hero escuro e o fundo claro logo abaixo. */}
-        <div style={{
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 120,
-          background: "linear-gradient(to bottom, transparent, #ffffff)",
-          pointerEvents: "none",
-        }} />
       </section>
 
       {/* ══════════════════════════════════════ */}
@@ -533,7 +547,7 @@ export default async function LandingPage() {
           entrando por último. Sem "wow moment" pesado aqui (isso fica pra
           Hero/Como Funciona/WhatsApp+Painel) — só reveal e contador. */}
       {/* ══════════════════════════════════════ */}
-      <section className="qz-section" style={{ background: "linear-gradient(180deg, #050b07 0%, #0a140d 100%)", position: "relative", overflow: "hidden" }}>
+      <section className="qz-section" style={{ background: "linear-gradient(180deg, #050b07 0%, #0a140d 100%)", position: "relative", zIndex: 1, overflow: "hidden" }}>
         <div style={{
           position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
           backgroundImage: `url("${GRAIN_SVG}")`,
@@ -877,8 +891,7 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ height: 28, width: "auto", display: "block" }} />
+              <LogoQuitaZap height={28} />
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
