@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { calcularPlanoPagamento, type ItemPlano } from "@/lib/plano-pagamento-motor";
+import { marcarDividaComoPaga } from "@/lib/pagamento-divida-service";
 import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
@@ -11,10 +13,36 @@ function fmtValor(v: number) {
 // recomendada de pagamento (motor determinístico — ver
 // plano-pagamento-motor.ts, consenso de arquitetura fechado em
 // 2026-09-05). Substitui o antigo texto fixo "a recomendação completa
-// ainda está sendo construída" pela recomendação de verdade.
-export default async function PlanoPage() {
+// ainda está sendo construída" pela recomendação de verdade. Cada item
+// tem um botão "Marcar pago" (marcarDividaComoPaga, reaproveitado do
+// mesmo padrão de Empréstimos, agora pra qualquer tipo de dívida) — dar
+// baixa aqui já recalcula o plano na hora (revalidatePath).
+export default async function PlanoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ erro?: string }>;
+}) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
+
+  const { erro } = await searchParams;
+
+  async function marcarComoPago(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const dividaId = String(formData.get("dividaId") || "");
+    const valor = Number(formData.get("valor"));
+
+    const resultado = await marcarDividaComoPaga(clienteAtual.id, dividaId, valor);
+    if (!resultado.ok) {
+      redirect(`/minha-conta/plano?erro=${encodeURIComponent(resultado.erro ?? "Não foi possível marcar como pago.")}`);
+    }
+
+    revalidatePath("/minha-conta", "layout");
+    redirect("/minha-conta/plano");
+  }
 
   const plano = await calcularPlanoPagamento(cliente.id);
   const totalPagarAgora = plano.pagarAgora.reduce((soma, i) => soma + i.valor, 0);
@@ -46,6 +74,12 @@ export default async function PlanoPage() {
         </div>
       </div>
 
+      {erro && (
+        <div className="mc-card" style={{ margin: "16px 0", background: "var(--red-soft)", border: "1px solid rgba(226,59,92,0.25)" }}>
+          <p style={{ margin: 0, color: "var(--red)", fontSize: 13.5, fontWeight: 600 }}>{erro}</p>
+        </div>
+      )}
+
       {!plano.calculavel ? (
         <section className="mc-section">
           <div className="mc-card">
@@ -72,7 +106,7 @@ export default async function PlanoPage() {
               ) : (
                 <div className="mc-list">
                   {plano.pagarAgora.map((item, i) => (
-                    <ItemLista key={item.dividaId} item={item} posicao={i + 1} />
+                    <ItemLista key={item.dividaId} item={item} posicao={i + 1} marcarComoPago={marcarComoPago} />
                   ))}
                 </div>
               )}
@@ -100,7 +134,7 @@ export default async function PlanoPage() {
                 </p>
                 <div className="mc-list">
                   {plano.negociarRever.map((item) => (
-                    <ItemLista key={item.dividaId} item={item} />
+                    <ItemLista key={item.dividaId} item={item} marcarComoPago={marcarComoPago} />
                   ))}
                 </div>
               </div>
@@ -118,7 +152,7 @@ export default async function PlanoPage() {
                 <div className="mc-card" style={{ opacity: 0.75 }}>
                   <div className="mc-list">
                     {plano.podeEsperar.map((item) => (
-                      <ItemLista key={item.dividaId} item={item} />
+                      <ItemLista key={item.dividaId} item={item} marcarComoPago={marcarComoPago} />
                     ))}
                   </div>
                 </div>
@@ -135,7 +169,15 @@ export default async function PlanoPage() {
   );
 }
 
-function ItemLista({ item, posicao }: { item: ItemPlano; posicao?: number }) {
+function ItemLista({
+  item,
+  posicao,
+  marcarComoPago,
+}: {
+  item: ItemPlano;
+  posicao?: number;
+  marcarComoPago: (fd: FormData) => Promise<void>;
+}) {
   return (
     <div className="mc-list-row">
       {posicao != null && (
@@ -147,8 +189,13 @@ function ItemLista({ item, posicao }: { item: ItemPlano; posicao?: number }) {
         <div className="mc-list-desc">{item.credor}</div>
         <div className="mc-list-meta">{item.justificativa}</div>
       </div>
-      <div className="mc-list-side">
+      <div className="mc-list-side" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
         <ValorLista valor={item.valor} />
+        <form action={marcarComoPago}>
+          <input type="hidden" name="dividaId" value={item.dividaId} />
+          <input type="hidden" name="valor" value={item.valor} />
+          <button type="submit" className="parcela-marcar">Marcar pago</button>
+        </form>
       </div>
     </div>
   );
