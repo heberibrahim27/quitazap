@@ -65,7 +65,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     } else {
-      console.warn("[CRON INSIGHTS-SOMBRA] CRON_SECRET não configurado — rota acessível sem autenticação.");
+      // Falha fechado: sem CRON_SECRET configurado, negar chamada externa em
+      // vez de deixar passar sem autenticação nenhuma.
+      console.error("[CRON INSIGHTS-SOMBRA] CRON_SECRET não configurado — recusando chamada externa.");
+      return NextResponse.json({ error: "CRON_SECRET não configurado" }, { status: 500 });
     }
   }
 

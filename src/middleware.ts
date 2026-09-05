@@ -20,9 +20,20 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/oferta") ||
     pathname.startsWith("/minha-conta") ||
+    // Política de Privacidade/Termos: linkada direto na landing (FAQ,
+    // rodapé) pra qualquer visitante sem login nenhum — sem essa linha,
+    // clicar nesse link redirecionava pro /login (bug real, pré-existente,
+    // achado na validação final antes do merge pra main).
+    pathname.startsWith("/privacidade") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    // Qualquer arquivo estático servido direto de /public (vídeos, imagens,
+    // ícones, manifest, sw.js etc.) precisa ser público — sem essa checagem,
+    // um visitante sem cookie de admin pedindo /videos/hero-loop.mp4 (ou
+    // qualquer novo asset futuro) era redirecionado pro /login em vez de
+    // receber o arquivo (bug real: o vídeo do Hero nunca carregava).
+    /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {
     return NextResponse.next();
   }

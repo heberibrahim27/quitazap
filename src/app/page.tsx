@@ -4,9 +4,29 @@
 // pro redirecionamento mantido por compatibilidade)
 // ─────────────────────────────────────────
 
-import { prisma } from "@/lib/prisma";
+import { Inter, Fraunces, Oswald, JetBrains_Mono } from "next/font/google";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
+import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
+import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
+import { HeroFade } from "./HeroFade";
+import { FuncionalidadesStack } from "./FuncionalidadesStack";
+
+// Inter nunca foi de fato carregada nesta página (o fontFamily só citava
+// o nome, sem @font-face nem next/font) — sempre caiu pro fallback
+// (Segoe UI/Arial) em qualquer sistema sem Inter instalada. Corrigido
+// aqui via next/font (auto-hospedado, sem request externo) e aproveitado
+// pra trazer as duas fontes da identidade "Hero Ousado" (serifada
+// itálica pros acentos, mono pros rótulos) — escopado só a esta página,
+// não mexe na tipografia do resto do produto logado.
+const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-inter" });
+const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], weight: ["300", "500", "600"], variable: "--font-fraunces" });
+// Fonte extra usada só no Hero (pedido explícito) — condensada/geométrica
+// como no headline da referência Finex que o Ibrahim mandou, aplicada em
+// cima da nossa paleta (verde), não as cores azuis do original. O resto
+// do site continua com Fraunces (serifada itálica), sem mudança.
+const oswald = Oswald({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-oswald" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-mono" });
 
 // Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
 // nas referências de design (Aura Build) pra tirar a sensação de fundo
@@ -21,36 +41,250 @@ const GRAIN_SVG =
 const LANDING_CSS = `
   .qz-reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); transition-delay: var(--qz-delay, 0ms); }
   .qz-reveal.qz-visible { opacity: 1; transform: none; }
+  /* Border-beam: aro fino de luz que dá uma volta única quando o elemento
+     entra na tela (reaproveita o mesmo IntersectionObserver do reveal, via
+     .qz-visible), depois some e deixa só a borda estática já existente do
+     elemento. Usado com critério em pouquíssimos lugares (card de preço) —
+     nunca em todo card, conforme decidido no diagnóstico de direção de arte. */
+  .qz-beam { position: relative; }
+  .qz-beam::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    border: 1px solid rgba(255,255,255,0);
+    box-shadow: 0 0 0 0 rgba(255,255,255,0);
+    opacity: 0; pointer-events: none;
+  }
+  .qz-price-wrap.qz-visible .qz-beam::before { animation: qz-beam-sweep 1.6s cubic-bezier(.16,1,.3,1) .3s 1 both; }
+  @keyframes qz-beam-sweep {
+    0% { opacity: 0; border-color: rgba(255,255,255,0); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+    35% { opacity: 1; border-color: rgba(255,255,255,0.55); box-shadow: 0 0 20px 1px rgba(255,255,255,0.25); }
+    100% { opacity: 0; border-color: rgba(255,255,255,0); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  }
+  /* CTA estilo Finex (referência mandada pelo Ibrahim) adaptado pra nossa
+     paleta: anel fino girando continuamente ao redor da pílula, sem usar
+     mask/conic-gradient mascarado (técnica que já vazou fora do card uma
+     vez nesta sessão) — aqui é só empilhamento de 3 camadas com
+     overflow:hidden: (1) o wrap com border-radius+overflow:hidden, (2) um
+     conic-gradient bem maior que o próprio botão girando por baixo, (3) a
+     pílula de verdade (gradiente verde + sombra) cobrindo tudo menos um
+     anel fino de ~1.5px nas bordas, onde o brilho giratório aparece. */
+  .qz-cta-wrap {
+    position: relative; display: inline-flex; border-radius: 999px; overflow: hidden;
+    padding: 1.5px; text-decoration: none; flex-shrink: 0;
+  }
+  .qz-cta-wrap::before {
+    content: ""; position: absolute; inset: -150%;
+    background: conic-gradient(from 0deg, transparent 0deg, transparent 270deg, rgba(255,255,255,0.95) 320deg, #22e07a 345deg, transparent 360deg);
+    animation: qz-cta-spin 3s linear infinite;
+  }
+  @keyframes qz-cta-spin { to { transform: rotate(360deg); } }
+  .qz-cta-inner {
+    position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; border-radius: 999px; color: #000; text-decoration: none;
+    background: linear-gradient(180deg, #29e883, #1bc767);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 4px rgba(0,0,0,0.16);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .qz-cta-wrap:hover .qz-cta-inner {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.16), 0 6px 16px -6px rgba(34,224,122,0.6);
+  }
+  .qz-cta-arrow { transition: transform .25s ease; flex-shrink: 0; }
+  .qz-cta-wrap:hover .qz-cta-arrow { transform: translateX(3px); }
+  @media (prefers-reduced-motion: reduce) {
+    .qz-cta-wrap::before { animation: none; }
+  }
   .qz-grid12 { display: grid; grid-template-columns: 1fr; gap: 28px; }
-  @media (min-width: 900px) {
+  .qz-hero-pad { padding-left: 24px; padding-right: 24px; }
+  /* Tamanho fluido (clamp) em vez de salto fixo por breakpoint — o salto
+     duro pra 128px/72px/48px exatamente em 768px, junto com o grid virando
+     multi-coluna nesse mesmo ponto (coluna de texto ainda estreita),
+     quebrava "ainda é seu."/"Um plano só..." em linhas curtas e
+     desalinhadas por volta de 768-900px. Fluido cresce com a largura da
+     coluna em vez de saltar de uma vez. */
+  .qz-hero-light { font-size: clamp(40px, 6.5vw, 72px); }
+  .qz-hero-heavy { font-size: clamp(56px, 10vw, 128px); line-height: 0.95; }
+  .qz-section { padding: 64px 24px; }
+  .qz-h2-sm { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25; }
+  .qz-h2-md { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
+  .qz-h2-lg { font-size: clamp(28px, 4.5vw, 48px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+  /* Fechamento — headline bem maior que as outras seções (bookend do
+     Hero), em duas linhas com stagger separado, pra terminar "grande"
+     em vez do bloco de texto centralizado genérico de antes. */
+  .qz-close-light { display: block; font-size: clamp(20px, 5vw, 30px); font-weight: 300; opacity: 0.75; margin-bottom: 4px; }
+  .qz-close-heavy { display: block; font-family: var(--font-fraunces); font-style: italic; font-weight: 500; font-size: clamp(34px, 9vw, 76px); line-height: 1.05; letter-spacing: -0.02em; }
+  .qz-panel-phone { width: 200px; height: 412px; margin: 0 auto; border-radius: 30px; padding: 2px; background: linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.05)); box-shadow: 0 30px 60px -20px rgba(15,23,42,.35); }
+  /* Fotos reais (Como Funciona) já vêm com a moldura de celular completa
+     (bezel, notch, status bar) dentro da própria imagem — usar
+     .qz-panel-phone aqui criaria um "celular dentro de celular". Só um
+     recorte com cantos levemente arredondados, sem frame extra por fora. */
+  .qz-cf-photo { width: 200px; height: 412px; margin: 0 auto; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(15,23,42,.35); }
+  .qz-hero-side { margin-top: 8px; }
+  .qz-feat-img { aspect-ratio: 16 / 9; }
+  /* Foto real de celular (retrato) — não force a mesma proporção paisagem
+     dos placeholders, senão o crop corta o topo da tela e mostra só um
+     pedaço irreconhecível da conversa. */
+  .qz-feat-img-portrait { aspect-ratio: 9 / 19.5; }
+  /* Cards empilhando com scroll (referência "Parallax Clean" que o
+     Ibrahim mandou) — só no desktop; no mobile é uma lista sequencial
+     simples, sem sticky, sem scale/opacity scrubado (decisão de
+     engenharia pra não pesar no celular). */
+  .qz-feat-stack-desktop { display: none; }
+  .qz-feat-stack-mobile { display: flex; flex-direction: column; gap: 20px; margin-top: 24px; }
+  .qz-feat-stack-mobile .qz-feat-stack-card {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .qz-feat-stack-mobile .qz-feat-stack-imgwrap { order: 1; }
+  .qz-feat-stack-mobile .qz-feat-stack-content { order: 2; }
+  .qz-feat-stack-content { padding: 20px; display: flex; flex-direction: column; justify-content: center; }
+  .qz-feat-stack-imgwrap { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
+  .qz-price-card { padding: 28px 22px; }
+  .qz-dor-num-1 { font-size: 44px; }
+  .qz-dor-num-2 { font-size: 32px; }
+  .qz-dor-num-3 { font-size: 56px; }
+  .qz-cf-desktop { display: none; }
+  .qz-cf-mobile { display: flex; flex-direction: column; gap: 40px; }
+  .qz-wp-stage { display: flex; flex-direction: column; gap: 20px; margin-top: 40px; }
+  /* Screenshot real do painel (substituiu as barras/linhas fake em CSS) —
+     só recorte com cantos arredondados + sombra, sem frame extra por
+     fora, mesmo critério já usado nas fotos reais de Como Funciona. */
+  .qz-wp-dashboard {
+    position: relative; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.6);
+  }
+  .qz-wp-phone { width: 176px; margin: 0 auto; }
+  .qz-wp-phone-photo { width: 100%; height: 364px; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(0,0,0,.6); }
+  .qz-wp-chip {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .qz-wp-chip-msg { font-size: 13.5px; color: rgba(255,255,255,0.85); }
+  .qz-wp-chip-status { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em; color: var(--accent); font-weight: 600; }
+  .qz-wp-chip-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; color: rgba(255,255,255,0.4); }
+  .qz-wp-chip-insight { font-size: 13.5px; color: rgba(255,255,255,0.85); line-height: 1.5; margin: 0; }
+  .qz-wp-chip-insight strong { color: var(--accent); font-weight: 700; }
+  .qz-wa-screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: #E5DDD5; }
+  .qz-wa-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #075E54; flex-shrink: 0; }
+  .qz-wa-avatar {
+    width: 26px; height: 26px; border-radius: 50%; background: #128C7E; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700;
+  }
+  .qz-wa-header-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .qz-wa-header-name { color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1.1; }
+  .qz-wa-header-status { color: rgba(255,255,255,0.75); font-size: 9.5px; line-height: 1; }
+  .qz-wa-body { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; overflow: visible; }
+  .qz-wa-row { display: flex; }
+  .qz-wa-row.qz-wa-out { justify-content: flex-end; }
+  .qz-wa-row.qz-wa-in { justify-content: flex-start; }
+  .qz-wa-bubble {
+    max-width: 80%; padding: 6px 7px 4px; border-radius: 7.5px; font-size: 12px;
+    line-height: 1.35; color: #111b21; position: relative;
+  }
+  .qz-wa-bubble.qz-wa-out { background: #D9FDD3; border-top-right-radius: 0; }
+  .qz-wa-bubble.qz-wa-in { background: #fff; border-top-left-radius: 0; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
+  /* Rabicho da bolha (tail) — sem isso não parece WhatsApp de verdade,
+     só um card com canto reto. Triângulo via border trick, encostado no
+     canto onde o border-radius foi zerado acima. */
+  .qz-wa-bubble.qz-wa-out::after {
+    content: ""; position: absolute; top: 0; right: -8px; width: 0; height: 0;
+    border-style: solid; border-width: 0 0 13px 8px;
+    border-color: transparent transparent transparent #D9FDD3;
+  }
+  .qz-wa-bubble.qz-wa-in::after {
+    content: ""; position: absolute; top: 0; left: -8px; width: 0; height: 0;
+    border-style: solid; border-width: 0 8px 13px 0;
+    border-color: transparent transparent transparent transparent;
+    border-right-color: #fff;
+  }
+  .qz-wa-meta { display: flex; align-items: center; gap: 3px; justify-content: flex-end; margin-top: 2px; font-size: 9px; color: rgba(0,0,0,0.45); }
+  .qz-wa-check { color: #53BDEB; font-size: 11px; line-height: 1; }
+  .qz-wa-inputbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px 10px; background: #E5DDD5; flex-shrink: 0; }
+  .qz-wa-input-pill {
+    flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0;
+    background: #fff; border-radius: 999px; padding: 5px 10px;
+  }
+  .qz-wa-input-placeholder { flex: 1; font-size: 11.5px; color: #8696a0; }
+  .qz-wa-mic-btn {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: #00A884;
+    display: flex; align-items: center; justify-content: center;
+  }
+  @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
     .qz-col-5 { grid-column: span 5; }
     .qz-col-6 { grid-column: span 6; }
     .qz-col-7 { grid-column: span 7; }
     .qz-col-8 { grid-column: span 8; }
+    .qz-hero-pad { padding-left: 48px; padding-right: 48px; }
+    .qz-hero-heavy { margin-top: -16px; }
+    .qz-section { padding: 96px 48px; }
+    .qz-h2-sm { font-size: 30px; }
+    .qz-h2-md { font-size: 36px; }
+    .qz-hero-side { margin-top: 32px; }
+    .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
+    .qz-cf-photo { width: 240px; height: 494px; margin: 0; }
+    .qz-feat-img { aspect-ratio: 4 / 3; }
+    .qz-feat-stack-desktop { display: block; position: relative; margin-top: 32px; padding-bottom: 8vh; }
+    .qz-feat-stack-mobile { display: none; }
+    .qz-feat-stack-item {
+      position: sticky; top: 10vh; height: 62vh; margin-bottom: 6vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .qz-feat-stack-card {
+      width: 100%; height: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 24px;
+      overflow: hidden; display: grid; grid-template-columns: 1fr 1.2fr;
+      box-shadow: 0 30px 60px -20px rgba(15,23,42,.3);
+    }
+    .qz-feat-stack-content { padding: 48px; display: flex; flex-direction: column; justify-content: center; }
+    .qz-feat-stack-imgwrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    .qz-price-card { padding: 40px 36px; }
+    .qz-cf-mobile { display: none; }
+    .qz-cf-desktop {
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px;
+    }
+    .qz-cf-sticky-col { position: relative; }
+    .qz-cf-sticky-inner { position: sticky; top: 12vh; height: 76vh; display: flex; align-items: center; justify-content: flex-end; }
+    .qz-cf-steps-col { display: flex; flex-direction: column; }
+    .qz-cf-step { min-height: 88vh; display: flex; align-items: center; }
+    .qz-wp-stage { position: relative; height: 560px; display: block; margin-top: 64px; }
+    .qz-wp-dashboard {
+      position: absolute; top: 4%; right: 0; width: 56%; max-width: 400px;
+      transform: translate3d(calc(var(--wp-px, 0) * 6px), calc(var(--wp-py, 0) * 6px), 0) rotate(1.5deg);
+      transition: transform .2s ease-out;
+    }
+    .qz-wp-phone {
+      position: absolute; left: 2%; bottom: 0; z-index: 3;
+      transform: translate3d(calc(var(--wp-px, 0) * 12px), calc(var(--wp-py, 0) * 12px), 0) rotate(var(--wp-phone-rot, -3deg));
+      transition: transform .25s ease-out;
+    }
+    .qz-wp-phone:hover { --wp-phone-rot: 0deg; }
+    .qz-wp-chip-1 {
+      position: absolute; top: 0; left: 4%; width: 200px; z-index: 4;
+      transform: translate3d(calc(var(--wp-px, 0) * 18px), calc(var(--wp-py, 0) * 18px), 0);
+      transition: transform .2s ease-out;
+    }
+    .qz-wp-chip-2 {
+      position: absolute; bottom: 6%; right: 4%; width: 260px; z-index: 4;
+      transform: translate3d(calc(var(--wp-px, 0) * 20px), calc(var(--wp-py, 0) * -18px), 0);
+      transition: transform .2s ease-out;
+    }
+    .qz-dor-num-1 { font-size: 88px; }
+    .qz-dor-num-2 { font-size: 56px; }
+    .qz-dor-num-3 { font-size: 120px; }
   }
 `;
 
-// Contador de vagas do Preço Fundador é lido do banco a cada request —
-// nunca pode ser congelado no build (teria que ser "force-dynamic" mesmo
-// se essa fosse a única razão nesta página).
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
-const VAGAS_FUNDADOR = 1000;
-
-// Mesmo contato/link de suporte usado em /privacidade — WhatsApp oficial
-// do QuitaZap já usado em outras telas do produto (dashboard/plano).
-const CONTATO_SUPORTE_LINK = process.env.NEXT_PUBLIC_SUPORTE_LINK || "https://wa.me/5571993085436";
 
 // Redes sociais: só aparece no rodapé quando a env var correspondente
 // estiver configurada — dá o mesmo efeito de "ativar/desativar" sem
-// precisar de painel de admin ainda (fica pro backlog).
+// precisar de painel de admin ainda (fica pro backlog). Sem fallback pra
+// número pessoal: enquanto não existir um canal de suporte de verdade,
+// o ícone/link correspondente fica oculto em vez de expor o WhatsApp
+// pessoal de alguém como se fosse o contato oficial do produto.
 const REDES_SOCIAIS = [
   { nome: "Instagram", url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM },
-  { nome: "WhatsApp", url: process.env.NEXT_PUBLIC_SOCIAL_WHATSAPP || CONTATO_SUPORTE_LINK },
+  { nome: "WhatsApp", url: process.env.NEXT_PUBLIC_SOCIAL_WHATSAPP },
   { nome: "Facebook", url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK },
   { nome: "TikTok", url: process.env.NEXT_PUBLIC_SOCIAL_TIKTOK },
 ].filter((r): r is { nome: string; url: string } => Boolean(r.url));
@@ -67,53 +301,154 @@ export const metadata = {
 };
 
 const doresMinicards = [
-  { icone: "💳", titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi." },
-  { icone: "📄", titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo." },
-  { icone: "🏦", titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro." },
-  { icone: "🧾", titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
+  { badge: "CARTÃO", titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi.", icone: "cartao" as const },
+  { badge: "FIXAS", titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo.", icone: "contas" as const },
+  { badge: "CONSIGNADO", titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro.", icone: "emprestimo" as const },
+  { badge: "DIA A DIA", titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece.", icone: "gastos" as const },
 ];
 
-const comoFunciona = [
-  { numero: 1, titulo: "Informe sua renda pelo WhatsApp — ou envie seu contracheque, se tiver." },
-  { numero: 2, titulo: "Registre seus gastos conversando com o QuitaZap." },
-  { numero: 3, titulo: "Veja quanto do seu dinheiro está realmente livre — e pergunte “posso gastar R$300 hoje?” antes de gastar." },
+// Os 3 primeiros ficam no grid estático de sempre; os 3 últimos (Modo
+// Apertou / Simulador de Parcelas / Dívidas e Consignados) ganham o
+// efeito de empilhamento com scroll (ver FuncionalidadesStack.tsx).
+// `imagem` só quando existe screenshot real batendo de fato com a
+// funcionalidade — sem isso, fica o placeholder "EM BREVE" (mostrar um
+// print de outra tela fingindo ser a certa seria tão desonesto quanto
+// inventar prova social).
+const funcionalidadesGrid = [
+  { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque.", imagem: "/painel-raiox.webp", imagemVertical: true },
+  { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento.", imagem: "/painel-salario-livre.webp" },
+  { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora.", imagem: "/whatsapp-3.webp", imagemVertical: true },
 ];
-
-const funcionalidades = [
-  { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque." },
-  { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento." },
-  { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora." },
-  { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando." },
-  { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos pagamentos." },
-  { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas." },
+const funcionalidadesStack = [
+  { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando.", imagem: "/painel-modo-apertou.webp" },
+  // Renomeado de "Simulador de Parcelas": o print real disponível
+  // (tela de Empréstimos > detalhe) mostra o controle de uma parcela já
+  // existente — marcar como paga, ver quanto falta — não uma simulação de
+  // parcela nova. Texto ajustado pra descrever o que a tela mostra de
+  // verdade, em vez de prometer algo que ela não faz.
+  { titulo: "Controle de Parcelas", texto: "Acompanhe cada parcela do seu empréstimo e marque como paga sem esforço.", imagem: "/painel-emprestimo.webp" },
+  { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas.", imagem: "/painel-dividas.webp" },
+  { titulo: "Cartões sob controle", texto: "Limite, fatura e compras parceladas — tudo num só lugar, sem susto.", imagem: "/painel-cartoes.webp" },
 ];
 
 const faq = [
   {
-    p: "Preciso conectar minha conta bancária?",
-    r: "Não. Você começa direto pelo WhatsApp e pelo seu contracheque — sem conectar conta bancária, sem Open Finance. As informações vêm do que você mesmo registra ou envia.",
+    p: "O QuitaZap tem acesso à minha conta bancária?",
+    r: "Não. Hoje você não precisa conectar sua conta bancária. O QuitaZap trabalha com as informações que você decide registrar pelo WhatsApp ou pelo painel.",
   },
   {
-    p: "Como funciona o Raio-X do contracheque?",
-    r: "Você envia uma foto ou PDF do seu contracheque (ou informa sua renda) pelo WhatsApp, e o QuitaZap identifica salário, descontos e consignados pra te mostrar quanto realmente sobra.",
+    p: "Preciso trocar de banco ou cartão para usar?",
+    r: "Não. O QuitaZap independe do banco ou cartão que você usa. Você pode organizar receitas, gastos, cartões, dívidas e compromissos no mesmo lugar.",
   },
   {
-    p: "O QuitaZap paga ou movimenta meu dinheiro?",
-    r: "Não. O QuitaZap não acessa sua conta bancária nem movimenta ou paga nada por você — ele só organiza as informações que você registra e ajuda você a entender sua situação financeira. Os pagamentos continuam sendo feitos por você, do seu jeito de sempre.",
+    p: "Como registro meus gastos?",
+    r: "É só falar normalmente pelo WhatsApp. Você pode escrever, mandar áudio, foto ou documento, e o QuitaZap ajuda a transformar isso em informação organizada.",
   },
   {
-    p: "Meus dados ficam seguros?",
-    r: "Sim. Seus dados são usados só pra calcular suas informações financeiras e gerar suas análises — não vendemos seus dados pessoais ou financeiros pra ninguém. Você pode pedir a exclusão da sua conta e dos seus dados quando quiser. Veja todos os detalhes na nossa Política de Privacidade.",
+    p: "O que eu posso perguntar ao QuitaZap?",
+    r: "Coisas do dia a dia, como \"quanto ainda posso gastar?\", \"onde estou gastando mais?\", \"essa parcela cabe no meu mês?\" ou \"como posso economizar este mês?\".",
   },
   {
-    p: "Posso cancelar quando quiser?",
-    r: "Sim, a qualquer momento, sem multa e sem burocracia. Seu acesso continua até o fim do período já pago.",
+    p: "Preciso entender de finanças para usar?",
+    r: "Não. O objetivo é justamente tirar a complexidade. O QuitaZap organiza os números e apresenta o que importa em linguagem simples.",
   },
   {
-    p: "O preço vai aumentar pra quem já assinou?",
-    r: "Não. Enquanto sua assinatura estiver ativa, o valor de R$14,90/mês não muda. O reajuste vale só pra quem assinar depois que as primeiras 1.000 vagas do Preço Fundador se esgotarem.",
+    p: "As respostas da inteligência artificial podem errar?",
+    r: "Podem. Por isso, as análises dependem das informações registradas no QuitaZap. A IA ajuda a interpretar e explicar os dados, mas não substitui uma decisão financeira profissional quando ela for necessária.",
+  },
+  {
+    p: "Meus dados são vendidos para outras empresas?",
+    r: "Não. O QuitaZap não vende seus dados. As informações são usadas para prestar o serviço e gerar as funcionalidades que você utiliza.",
+  },
+  {
+    p: "Posso cancelar quando quiser? E o valor de R$14,90?",
+    r: "Sim. Você pode cancelar sua assinatura. Quem aderir à condição de R$14,90 mantém esse valor enquanto a assinatura permanecer ativa; se cancelar e voltar depois, vale a condição disponível naquele momento.",
   },
 ];
+
+// Botão de CTA — anel giratório + pílula verde (estilo Finex adaptado à
+// nossa paleta). Componente compartilhado pelos 3 CTAs (Hero, Preço,
+// Fechamento) pra não triplicar a mesma estrutura de 3 camadas.
+function CtaButton({
+  href,
+  children,
+  className,
+  innerStyle,
+  block,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+  innerStyle?: React.CSSProperties;
+  block?: boolean;
+}) {
+  return (
+    <a href={href} className={`qz-cta-wrap ${className ?? ""}`} style={block ? { display: "flex", width: "100%" } : undefined}>
+      <span className="qz-cta-inner" style={innerStyle}>
+        {children}
+        <svg className="qz-cta-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </span>
+    </a>
+  );
+}
+
+// Logo com glow suave atrás — a wordmark tem "Quita" em tom bem escuro
+// (parte oficial do arquivo enviado), que quase some nos fundos escuros
+// do Hero/rodapé sem esse respiro claro por trás.
+function LogoQuitaZap({ height }: { height: number }) {
+  return (
+    <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <div style={{
+        position: "absolute", inset: `${-height * 0.35}px ${-height * 0.18}px`,
+        background: "radial-gradient(ellipse, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.22) 45%, transparent 75%)",
+        filter: `blur(${height * 0.22}px)`,
+      }} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ position: "relative", height, width: "auto", display: "block" }} />
+    </div>
+  );
+}
+
+// Ícones dos 4 mini-cards de Dor — estilo linha fina, verde só no traço
+// (referência: print que o Ibrahim mandou, cards escuros com badge+ícone
+// verde centralizados, não o card inteiro pintado).
+function IconeDor({ tipo }: { tipo: "cartao" | "contas" | "emprestimo" | "gastos" }) {
+  const props = { width: 26, height: 26, viewBox: "0 0 24 24", fill: "none" as const, stroke: "#22e07a", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (tipo === "cartao") {
+    return (
+      <svg {...props}>
+        <rect x="2.5" y="5.5" width="19" height="13" rx="2" />
+        <path d="M2.5 9.5h19" />
+        <path d="M6 14.5h4" />
+      </svg>
+    );
+  }
+  if (tipo === "contas") {
+    return (
+      <svg {...props}>
+        <path d="M6 3h12v16.5l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3Z" />
+        <path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" />
+      </svg>
+    );
+  }
+  if (tipo === "emprestimo") {
+    return (
+      <svg {...props}>
+        <circle cx="8" cy="8" r="2.5" />
+        <circle cx="16" cy="16" r="2.5" />
+        <path d="M17 7 7 17" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...props}>
+      <path d="M6 8h12l-1 12H7Z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </svg>
+  );
+}
 
 const WHATSAPP_ICON = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -136,17 +471,17 @@ const ICONES_REDE: Record<string, React.ReactNode> = {
 };
 
 export default async function LandingPage() {
-  let assinantesFundador = 0;
-  try {
-    assinantesFundador = await prisma.cliente.count({ where: { gratuito: false } });
-  } catch {
-    // Landing nunca pode cair por causa de uma falha de contagem — segue
-    // com 0 (mostra "vaga 1 de 1.000") em vez de derrubar a página inteira.
-  }
-  const vagaAtual = Math.min(assinantesFundador + 1, VAGAS_FUNDADOR);
-
   return (
-    <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: "#0a0a0a", overflowX: "hidden", position: "relative" }}>
+    <div className={`${inter.variable} ${fraunces.variable} ${oswald.variable} ${mono.variable}`} style={{
+      background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif",
+      color: "#0a0a0a", overflowX: "clip", position: "relative",
+      // Paleta formalizada (direção "editorial com ritmo claro/escuro" —
+      // substitui os hex ad-hoc usados até aqui). Verde continua só como
+      // sinal de ação (CTA, número positivo, progresso) — nunca fundo.
+      "--ink": "#080908", "--carbon": "#111211", "--graphite": "#242624",
+      "--paper": "#F0F0EA", "--stone": "#D8D9D3", "--muted": "#989C96",
+      "--accent": "#22e07a",
+    } as React.CSSProperties}>
       <style dangerouslySetInnerHTML={{ __html: LANDING_CSS }} />
       <ScrollReveal />
 
@@ -157,188 +492,180 @@ export default async function LandingPage() {
       }} />
 
       {/* ══════════════════════════════════════ */}
-      {/* HERO */}
+      {/* HERO — porte fiel do export Aura Build (Bloomava) que o Ibrahim
+          mandou como referência. Mesma estrutura/escala exata (grid-cols-12,
+          col-span-8/4, text-5xl→9xl, font-extralight→semibold, tracking-
+          tighter, leading-none, breakpoint md=768px), conteúdo adaptado pro
+          QuitaZap. Valores em px/rem abaixo são a tradução literal das
+          classes Tailwind do arquivo de referência — não são invenção. */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ position: "relative", overflow: "hidden" }}>
-        {/*
-          Vídeo de fundo (gerado no Veo3) ainda não foi enviado — usando o
-          gradiente de marca como poster/frame estático por enquanto, com
-          overlay escuro de ~35% por cima (mesmo efeito visual que o vídeo
-          vai ter). Quando o arquivo chegar, trocar a div "posterPlaceholder"
-          abaixo por:
-          <video autoPlay muted loop playsInline poster="/hero-poster.jpg" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}>
-            <source src="/hero.mp4" type="video/mp4" />
+      <section style={{ position: "relative", overflow: "hidden", minHeight: 640 }} className="qz-hero">
+        {/* Gradiente de marca como poster — cobre o instante antes do vídeo
+            decodificar o primeiro frame (e o fallback se autoplay falhar).
+            Fica FORA do fade (backdrop permanente por trás do vídeo), então
+            os tons precisam terminar bem escuros/neutros (perto do preto da
+            dobra de Dor) — antes terminava num verde médio (#114a28/#0e3a20)
+            que, sem o vídeo/overlays por cima durante o fade, aparecia como
+            um "flash" verde na transição. */}
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 0,
+          background: "linear-gradient(160deg, #030f08 0%, #0a1a10 45%, #060f09 80%, #030906 100%)",
+        }} />
+        <HeroFade>
+          {/* Glow radial e grid ficam dentro do fade (junto com o vídeo) —
+              não podem sobrar sozinhos por trás como backdrop permanente,
+              senão o glow verde vira o tint visível durante a transição. */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0,
+            background: "radial-gradient(ellipse 60% 55% at 30% 35%, rgba(34,224,122,0.16), transparent 70%)",
+          }} />
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0, opacity: 0.05,
+            backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }} />
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{ position: "absolute", inset: 0, zIndex: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          >
+            <source src="/videos/hero-loop.mp4" type="video/mp4" />
           </video>
-        */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)",
-        }} />
-        <div style={{
-          position: "absolute", inset: 0, opacity: 0.06,
-          backgroundImage: "linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }} />
-        <div style={{
-          position: "absolute", top: "-200px", left: "50%", transform: "translateX(-50%)",
-          width: "800px", height: "600px", maxWidth: "150vw",
-          background: "radial-gradient(ellipse, rgba(34,197,94,0.14) 0%, transparent 70%)",
-        }} />
-        {/* Overlay escuro (papel do vídeo quando ele entrar) */}
-        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
+          {/* Overlay 1 — bg-neutral-900/50 mix-blend-multiply na referência */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "rgba(0,0,0,0.5)", mixBlendMode: "multiply" }} />
+          {/* Overlay 2 — bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/90 */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0,
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent, rgba(0,0,0,0.9))",
+          }} />
 
-        <div style={{ position: "relative", zIndex: 1, padding: "0 24px 96px" }}>
-          {/* Nav */}
-          <nav style={{
-            maxWidth: 1080, margin: "0 auto", padding: "28px 0",
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 9, background: "#22c55e",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {WHATSAPP_ICON}
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 18, color: "#ffffff", letterSpacing: "-0.3px" }}>QuitaZAP</span>
+          {/* header — px-6 md:px-12 py-8 */}
+          <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <LogoQuitaZap height={34} />
             </div>
-            <a href="/minha-conta/entrar" style={{ color: "#d1fae5", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
+            <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85, display: "inline-block", padding: "12px 4px" }}>
               Já sou cliente
             </a>
-          </nav>
+          </header>
 
-          {/* Hero content — tipografia editorial (duas linhas de peso bem
-              diferente) + grid assimétrico 12 colunas, headline à esquerda
-              ocupando 8 colunas, CTA/subheadline num bloco menor ao lado. */}
-          <div className="qz-grid12" style={{ maxWidth: 1120, margin: "48px auto 0", alignItems: "end" }}>
-            <div className="qz-col-8">
-              <h1 style={{ margin: "0 0 8px", textAlign: "left" }}>
-                <span className="qz-reveal" style={{
-                  display: "block", fontSize: "clamp(20px, 3.2vw, 34px)", fontWeight: 200,
-                  color: "rgba(255,255,255,0.78)", letterSpacing: "-0.5px", marginBottom: 6,
-                }}>
+          {/* grid grid-cols-1 md:grid-cols-12 gap-8 items-end — px-6 md:px-12 pb-12 md:pb-24 */}
+          <div className="qz-grid12 qz-hero-pad" style={{ position: "relative", zIndex: 10, padding: "0 24px 48px", alignItems: "end" }}>
+            <div className="qz-col-7">
+              <p className="qz-reveal" style={{
+                margin: "0 0 20px", fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600,
+                color: "rgba(255,255,255,0.6)", letterSpacing: "0.14em", textTransform: "uppercase",
+              }}>
+                Controle financeiro pelo WhatsApp
+              </p>
+              <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em", fontFamily: "var(--font-oswald)" }}>
+                <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 300, opacity: 0.8, marginBottom: 8, "--qz-delay": "60ms" } as React.CSSProperties}>
                   Descubra quanto do seu dinheiro
                 </span>
-                <span className="qz-reveal" style={{
-                  display: "block", fontSize: "clamp(52px, 10.5vw, 128px)", fontWeight: 600,
-                  letterSpacing: "-4px", lineHeight: 0.92, marginLeft: "-2px", color: "#ffffff",
-                  "--qz-delay": "80ms",
-                } as React.CSSProperties}>
-                  ainda é <span style={{ color: "#22c55e" }}>seu.</span>
+                <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "120ms" } as React.CSSProperties}>
+                  ainda é <span style={{ color: "#22e07a" }}>seu.</span>
                 </span>
               </h1>
             </div>
 
-            <div className="qz-col-4" style={{ textAlign: "left" }}>
-              <p className="qz-reveal" style={{
-                margin: "0 0 14px", fontSize: 16, color: "#cbd5e1", lineHeight: 1.6,
-                "--qz-delay": "160ms",
-              } as React.CSSProperties}>
-                Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar.
+            <div className="qz-col-5 qz-hero-side" style={{ color: "#fff" }}>
+              <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.01em", fontFamily: "var(--font-oswald)" }} className="qz-reveal">
+                Direto no WhatsApp.
+              </h2>
+              <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
+                Controle seus gastos, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar — sem conectar conta bancária.
               </p>
-
-              <p className="qz-reveal" style={{
-                margin: "0 0 24px", fontSize: 13, color: "#94a3b8", lineHeight: 1.6,
-                "--qz-delay": "220ms",
-              } as React.CSSProperties}>
-                Feito pra quem quer parar de descobrir só no fim do mês que o dinheiro acabou — jovem, aposentado, CLT ou autônomo.
-              </p>
-
-              <a href={CAKTO_URL} className="qz-reveal" style={{
-                background: "#22c55e", color: "#000",
-                fontWeight: 700, fontSize: 15,
-                padding: "15px 22px", borderRadius: 6,
-                textDecoration: "none", display: "block", textAlign: "center",
-                "--qz-delay": "280ms",
-              } as React.CSSProperties}>
-                Garantir Preço Fundador — R$14,90/mês
-              </a>
-
-              <div style={{ marginTop: 14, display: "flex", flexDirection: "column" as const, gap: 4 }}>
-                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
-                  Sem precisar conectar sua conta bancária. Comece pelo WhatsApp, contando sua renda e seus gastos.
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
-                  Seus dados financeiros não são vendidos. Tudo que você registra é usado só pra gerar suas análises.
-                </p>
-              </div>
-
-              <div style={{ marginTop: 18 }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 7,
-                  background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)",
-                  borderRadius: 6, padding: "7px 14px",
-                  fontSize: 12.5, color: "#86efac", fontWeight: 600,
-                }}>
-                  🔥 Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")}
-                </span>
-                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "#64748b" }}>
-                  R$14,90/mês enquanto sua assinatura permanecer ativa. Válido pros primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")} assinantes.
-                </p>
-              </div>
+              <CtaButton
+                href={CAKTO_URL}
+                className="qz-reveal"
+                innerStyle={{ padding: "13px 26px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em" }}
+              >
+                Quero garantir R$14,90/mês
+              </CtaButton>
             </div>
           </div>
-        </div>
+        </HeroFade>
+      </section>
 
-        {/* Transição em degradê pro branco da seção seguinte — evita o corte
-            seco entre o hero escuro e o fundo claro logo abaixo. */}
+      {/* ══════════════════════════════════════ */}
+      {/* SEÇÃO DOR + PROVA — agita o problema em palavras, depois narrativa
+          de subtração editorial (não 3 cards iguais): renda cheia → o que
+          já está comprometido → o que sobra de verdade, em verde e maior,
+          entrando por último. Sem "wow moment" pesado aqui (isso fica pra
+          Hero/Como Funciona/WhatsApp+Painel) — só reveal e contador. */}
+      {/* ══════════════════════════════════════ */}
+      <section className="qz-section" style={{ background: "linear-gradient(180deg, #050b07 0%, #0a140d 100%)", position: "relative", overflow: "hidden" }}>
         <div style={{
-          position: "absolute", left: 0, right: 0, bottom: 0, height: 120,
-          background: "linear-gradient(to bottom, transparent, #ffffff)",
-          pointerEvents: "none",
+          position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
+          backgroundImage: `url("${GRAIN_SVG}")`,
         }} />
-      </section>
-
-      {/* ══════════════════════════════════════ */}
-      {/* PROVA NUMÉRICA (exemplo ilustrativo) */}
-      {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "56px 24px 0", background: "#ffffff" }}>
-        <div className="qz-reveal" style={{ maxWidth: 780, margin: "0 auto" }}>
-          <div style={{
-            background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16,
-            padding: "28px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20,
-          }}>
-            {[
-              { label: "Renda líquida", valor: 5820, cor: "#0f172a" },
-              { label: "Contas e dívidas", valor: 4190, cor: "#ef4444" },
-              { label: "Realmente livre", valor: 1630, cor: "#16a34a" },
-            ].map((item) => (
-              <div key={item.label} style={{ textAlign: "center" }}>
-                <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>{item.label}</p>
-                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: item.cor, letterSpacing: "-0.5px" }}>
-                  <CountUp valor={item.valor} />
-                </p>
-              </div>
-            ))}
-          </div>
-          <p style={{ margin: "12px 0 0", fontSize: 11.5, color: "#94a3b8", textAlign: "center" }}>
-            Exemplo ilustrativo — os números do seu caso vêm do que você registrar no QuitaZap.
-          </p>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════ */}
-      {/* SEÇÃO DOR */}
-      {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "80px 24px", background: "#ffffff" }}>
-        <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-          <div className="qz-grid12" style={{ marginBottom: 40 }}>
-            <div className="qz-col-7 qz-reveal">
-              <h2 style={{ margin: 0, fontSize: "clamp(24px, 3.2vw, 32px)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.35, color: "#0f172a", textAlign: "left" }}>
+        <div style={{ maxWidth: 1080, margin: "0 auto", position: "relative" }}>
+          <div className="qz-grid12" style={{ marginBottom: 56 }}>
+            <div className="qz-col-8 qz-reveal">
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>TODO MÊS A MESMA HISTÓRIA</p>
+              <h2 className="qz-h2-sm" style={{ margin: 0, color: "#fff", textAlign: "left" }}>
                 Muita gente recebe o dinheiro do mês e, quando vê, quase tudo já foi em cartão, contas e dívidas — e no fim do mês nem sabe direito onde o dinheiro foi.
               </h2>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
+
+          {/* Narrativa de subtração — renda cheia, o que já está
+              comprometido, o que sobra de verdade. Posições assimétricas,
+              não cards iguais; cada linha entra em cascata no scroll. */}
+          <div style={{ marginBottom: 56 }}>
+            <div className="qz-reveal">
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>RENDA LÍQUIDA</p>
+              <p className="qz-dor-num-1" style={{ margin: 0, fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <CountUp valor={5820} />
+              </p>
+            </div>
+
+            <div className="qz-reveal" style={{ marginTop: 20, marginLeft: "8%", "--qz-delay": "120ms" } as React.CSSProperties}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>− COMPROMETIDO COM CONTAS E DÍVIDAS</p>
+              <p className="qz-dor-num-2" style={{ margin: 0, fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "rgba(255,255,255,0.4)", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <CountUp valor={4190} />
+              </p>
+            </div>
+
+            <div className="qz-reveal" style={{
+              marginTop: 32, paddingTop: 32, borderTop: "1px solid rgba(255,255,255,0.15)", "--qz-delay": "260ms",
+            } as React.CSSProperties}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>REALMENTE LIVRE</p>
+              <p className="qz-dor-num-3" style={{ margin: 0, fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500, color: "#22e07a", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                <CountUp valor={1630} />
+              </p>
+              <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.4)" }}>
+                Exemplo ilustrativo — os números do seu caso vêm do que você registrar no QuitaZap.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+            {/* Textura de grid sutil só atrás desses 4 cards — referência
+                do print (fundo quase preto com grafite/grid de fundo). */}
+            <div style={{
+              position: "absolute", inset: -16, zIndex: 0, opacity: 0.05, pointerEvents: "none",
+              backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }} />
             {doresMinicards.map((d, i) => (
               <div key={d.titulo} className="qz-reveal" style={{
-                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14,
-                padding: "22px 16px", display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 8,
+                position: "relative", zIndex: 1, background: "#0a140d", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 16, padding: "28px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
                 "--qz-delay": `${i * 70}ms`,
               } as React.CSSProperties}>
-                <span style={{ fontSize: 28 }}>{d.icone}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{d.titulo}</span>
-                <span style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.4 }}>{d.texto}</span>
+                <span style={{
+                  display: "inline-block", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#22e07a",
+                  letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 10px", borderRadius: 999,
+                  border: "1px solid rgba(34,224,122,0.35)", background: "rgba(34,224,122,0.08)", marginBottom: 18,
+                }}>
+                  {d.badge}
+                </span>
+                <IconeDor tipo={d.icone} />
+                <p style={{ margin: "16px 0 6px", fontSize: 15, fontWeight: 700, color: "#fff" }}>{d.titulo}</p>
+                <p style={{ margin: 0, fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{d.texto}</p>
               </div>
             ))}
           </div>
@@ -346,68 +673,98 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* COMO FUNCIONA */}
+      {/* COMO FUNCIONA — um dos 3 "momentos uau" da página (os outros são
+          Hero e WhatsApp+Painel). Fundo STONE, não preto — a virada de
+          humor depois de Hero+Dor escuros. Celular sticky no desktop,
+          conteúdo trocando por estado via IntersectionObserver (não
+          scroll contínuo recalculado a cada pixel — decisão de engenharia
+          pra não arriscar performance/prazo). Mobile simplifica pra 3
+          blocos empilhados, sem sticky de 250vh. */}
       {/* ══════════════════════════════════════ */}
-      <section id="como-funciona" style={{ padding: "80px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+      <section id="como-funciona" className="qz-section" style={{ background: "var(--stone)" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-          <div className="qz-grid12" style={{ marginBottom: 48 }}>
-            <div className="qz-col-6 qz-reveal">
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>COMO FUNCIONA</p>
-              <h2 style={{ margin: 0, fontSize: "clamp(26px, 3.6vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
-                Simples assim, direto no WhatsApp.
-              </h2>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24 }}>
-            {comoFunciona.map((passo, i) => (
-              <div key={passo.numero} className="qz-reveal" style={{
-                background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "28px 24px",
-                "--qz-delay": `${i * 90}ms`,
-              } as React.CSSProperties}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8, background: "#22c55e",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 800, fontSize: 16, color: "#000", marginBottom: 16,
-                }}>
-                  {passo.numero}
-                </div>
-                <p style={{ margin: 0, fontSize: 15, color: "#374151", lineHeight: 1.55, fontWeight: 500 }}>{passo.titulo}</p>
-              </div>
-            ))}
-          </div>
+          <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 20 }}>
+            [ 03 / COMO FUNCIONA ]
+          </p>
+          <h2 className="qz-reveal" style={{
+            margin: "0 0 64px", fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "var(--ink)",
+            fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15, maxWidth: 640, "--qz-delay": "60ms",
+          } as React.CSSProperties}>
+            Sua vida acontece. Você só conta pra gente.
+          </h2>
+
+          <ComoFuncionaScroll />
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* WHATSAPP + PAINEL — segundo dos 3 "momentos uau" (Hero e Como
+          Funciona são os outros). Fundo CARBON: o produto como objeto,
+          não texto+celular de template. Celular + fatia de painel +
+          mensagens flutuando fora do aparelho, com leve parallax de
+          MOUSE (não de scroll — decisão já tomada de cortar parallax
+          contínuo ligado a scroll por custo/risco de performance; mouse
+          é interação local, não compete com essa decisão). */}
+      {/* ══════════════════════════════════════ */}
+      <section id="whatsapp-painel" className="qz-section" style={{ background: "var(--carbon)", position: "relative", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
+          backgroundImage: `url("${GRAIN_SVG}")`,
+        }} />
+        <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }}>
+          <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 20 }}>
+            [ 04 / WHATSAPP + PAINEL ]
+          </p>
+          <h2 className="qz-reveal" style={{
+            margin: "0 0 16px", fontFamily: "var(--font-fraunces)", fontWeight: 500, color: "var(--paper)",
+            fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15, maxWidth: 620, "--qz-delay": "40ms",
+          } as React.CSSProperties}>
+            Converse de um lado. Enxergue tudo do outro.
+          </h2>
+          <p className="qz-reveal" style={{
+            margin: 0, fontSize: 15, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, maxWidth: 460, "--qz-delay": "80ms",
+          } as React.CSSProperties}>
+            Você conversa normalmente pelo WhatsApp — e cada gasto, dívida e resposta vira informação organizada no seu painel, sempre atualizado.
+          </p>
+
+          <WhatsAppPainelStage />
         </div>
       </section>
 
       {/* ══════════════════════════════════════ */}
       {/* FUNCIONALIDADES */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "80px 24px", background: "#ffffff" }}>
+      <section className="qz-section" style={{ background: "#ffffff", position: "relative" }}>
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-grid12" style={{ marginBottom: 48 }}>
             <div className="qz-col-6 qz-reveal">
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
-              <h2 style={{ margin: 0, fontSize: "clamp(26px, 3.6vw, 38px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>FUNCIONALIDADES</p>
+              <h2 className="qz-h2-md" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
                 Tudo isso, direto no seu WhatsApp.
               </h2>
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-            {funcionalidades.map((f, i) => (
+            {funcionalidadesGrid.map((f, i) => (
               <div key={f.titulo} className="qz-reveal" style={{
                 background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden",
                 "--qz-delay": `${i * 60}ms`,
               } as React.CSSProperties}>
-                {/* Placeholder de screenshot real do app — trocar por print
-                    de tela verdadeira desta funcionalidade assim que
-                    disponível. */}
-                <div style={{
-                  aspectRatio: "4 / 3", background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
-                    PRINT DO APP EM BREVE
-                  </span>
-                </div>
+                {f.imagem ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={f.imagem} alt="" className={f.imagemVertical ? "qz-feat-img-portrait" : "qz-feat-img"} style={{ objectFit: "cover", width: "100%" }} />
+                ) : (
+                  /* Placeholder — sem screenshot real batendo com essa
+                     funcionalidade ainda. */
+                  <div className="qz-feat-img" style={{
+                    background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
+                      PRINT DO APP EM BREVE
+                    </span>
+                  </div>
+                )}
                 <div style={{ padding: "18px 20px" }}>
                   <p style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{f.titulo}</p>
                   <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>{f.texto}</p>
@@ -415,50 +772,78 @@ export default async function LandingPage() {
               </div>
             ))}
           </div>
+
+          <FuncionalidadesStack itens={funcionalidadesStack} />
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════ */}
+      {/* PROVA SOCIAL — etapa 4/4 do plano da auditoria de direção de arte.
+          Sem depoimento, sem foto/vídeo e sem número — não existe ainda
+          nenhum dado real (avaliação, contagem de usuários, foto de
+          cliente) pra sustentar uma prova social de verdade, e inventar
+          qualquer um desses violaria a própria regra do brief ("não criar
+          falsas provas sociais"). Fica só uma frase editorial curta,
+          quieta, sem moldura de "card de depoimento" — um respiro entre o
+          grid denso de Funcionalidades e o pedido de Preço, não uma
+          seção fingindo ter prova que não tem. Assim que existir material
+          real (foto/vídeo de gente usando o QuitaZap, depoimento de
+          verdade), essa dobra ganha corpo. */}
+      {/* ══════════════════════════════════════ */}
+      <section className="qz-section" style={{ background: "var(--paper)" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "center" }}>
+          <p className="qz-reveal" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>
+            [ VIDA REAL ]
+          </p>
+          <p className="qz-reveal" style={{
+            margin: 0, fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500, color: "var(--ink)",
+            fontSize: "clamp(26px, 4.5vw, 42px)", lineHeight: 1.3, "--qz-delay": "60ms",
+          } as React.CSSProperties}>
+            No meio da correria, você continua no controle.
+          </p>
         </div>
       </section>
 
       {/* ══════════════════════════════════════ */}
       {/* PREÇO */}
       {/* ══════════════════════════════════════ */}
-      <section id="preco" style={{ padding: "96px 24px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
-        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "start" }}>
+      <section id="preco" className="qz-section" style={{ background: "linear-gradient(160deg, #050b07 0%, #0d1a10 100%)", position: "relative", overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
+          backgroundImage: `url("${GRAIN_SVG}")`,
+        }} />
+        <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto", alignItems: "center", position: "relative" }}>
           <div className="qz-col-5 qz-reveal">
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>PREÇO</p>
-            <h2 style={{ margin: "0 0 12px", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
-              Preço Fundador
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>CONDIÇÃO ESPECIAL</p>
+            <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff", textAlign: "left" }}>
+              <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano só.</span> Sem letra miúda, sem surpresa.
             </h2>
-            <p style={{ margin: 0, fontSize: 15, color: "#64748b", lineHeight: 1.6, textAlign: "left" }}>
-              Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} — enquanto durar. Um plano só, sem tier, sem surpresa.
+            <p style={{ margin: 0, fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "left" }}>
+              Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
             </p>
           </div>
 
-          <div className="qz-col-7 qz-reveal" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
-            <div style={{
-              background: "#fff", border: "2px solid #22c55e", borderRadius: 16,
-              padding: "40px 36px", boxShadow: "0 0 0 8px rgba(34,197,94,0.07)", textAlign: "left",
+          <div className="qz-col-7 qz-reveal qz-price-wrap" style={{ "--qz-delay": "100ms" } as React.CSSProperties}>
+            {/* Card "vidro" — brilho neutro (branco), não verde: o verde fica
+                reservado só pro CTA, não pra moldura inteira do card.
+                qz-beam dá uma volta de luz única quando o card entra na
+                tela (border-beam pontual, só aqui — não em todo card da
+                página). */}
+            <div className="qz-price-card qz-beam" style={{
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20,
+              boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px -12px rgba(255,255,255,0.06)",
+              backdropFilter: "blur(16px)", textAlign: "left",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>PREÇO FUNDADOR</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>QuitaZAP</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 40, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", lineHeight: 1 }}>R$ 14,90</div>
-                  <div style={{ fontSize: 14, color: "#94a3b8" }}>/mês</div>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 28 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>QuitaZAP</div>
+                <div style={{ textAlign: "right", lineHeight: 1 }}>
+                  <span style={{ fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.5)", verticalAlign: "top" }}>R$ </span>
+                  <span style={{ fontFamily: "var(--font-fraunces)", fontSize: "clamp(40px, 9vw, 56px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>14,90</span>
+                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>/mês</span>
                 </div>
               </div>
 
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 14px", marginBottom: 24 }}>
-                <p style={{ margin: "0 0 4px", fontSize: 12.5, color: "#166534", fontWeight: 700 }}>
-                  Enquanto sua assinatura estiver ativa, esse valor não muda.
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-                  Depois dos primeiros {VAGAS_FUNDADOR.toLocaleString("pt-BR")}, o valor sobe pra novos assinantes.
-                </p>
-              </div>
-
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 20, marginBottom: 28 }}>
+              <div style={{ marginBottom: 28 }}>
                 {[
                   "Registro de gastos e dívidas pelo WhatsApp",
                   "Raio-X do Salário e leitura de contracheque",
@@ -466,22 +851,18 @@ export default async function LandingPage() {
                   "Analista financeiro por IA, 24h",
                   "Cancelamento a qualquer momento",
                 ].map((item) => (
-                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#374151", marginBottom: 10 }}>
-                    <span style={{ color: "#22c55e", fontWeight: 700, flexShrink: 0 }}>✓</span>
+                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 10 }}>
+                    <span style={{ color: "rgba(255,255,255,0.55)", fontWeight: 700, flexShrink: 0 }}>✓</span>
                     {item}
                   </div>
                 ))}
               </div>
 
-              <a href={CAKTO_URL} style={{
-                display: "block", background: "#22c55e", color: "#000",
-                fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 8,
-                textDecoration: "none", textAlign: "center",
-              }}>
-                Garantir minha vaga
-              </a>
+              <CtaButton href={CAKTO_URL} block innerStyle={{ padding: "16px 24px", fontSize: 16, fontWeight: 700 }}>
+                Quero garantir R$14,90/mês
+              </CtaButton>
 
-              <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+              <p style={{ margin: "12px 0 0", fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
                 7 dias de garantia. Cancele quando quiser.
               </p>
             </div>
@@ -492,11 +873,11 @@ export default async function LandingPage() {
       {/* ══════════════════════════════════════ */}
       {/* FAQ */}
       {/* ══════════════════════════════════════ */}
-      <section id="faq" style={{ padding: "96px 24px", background: "#ffffff" }}>
+      <section id="faq" className="qz-section" style={{ background: "#ffffff" }}>
         <div className="qz-grid12" style={{ maxWidth: 1080, margin: "0 auto" }}>
           <div className="qz-col-4 qz-reveal">
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
-            <h2 style={{ margin: 0, fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1px", color: "#0f172a", textAlign: "left" }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: "#22e07a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>DÚVIDAS</p>
+            <h2 className="qz-h2-lg" style={{ margin: 0, color: "#0f172a", textAlign: "left" }}>
               Perguntas frequentes
             </h2>
           </div>
@@ -514,9 +895,9 @@ export default async function LandingPage() {
                   <span style={{ fontSize: 18, color: "#94a3b8", flexShrink: 0, marginLeft: 12 }}>+</span>
                 </summary>
                 <div style={{ padding: "0 20px 18px", fontSize: 14, color: "#64748b", lineHeight: 1.65 }}>
-                  {item.p === "Meus dados ficam seguros?" ? (
+                  {item.p === "Meus dados são vendidos para outras empresas?" ? (
                     <>
-                      Sim. Seus dados são usados só pra calcular suas informações financeiras e gerar suas análises — não vendemos seus dados pessoais ou financeiros pra ninguém. Você pode pedir a exclusão da sua conta e dos seus dados quando quiser. Veja todos os detalhes na nossa{" "}
+                      {item.r} Veja todos os detalhes na nossa{" "}
                       <a href="/privacidade" style={{ color: "#16a34a", fontWeight: 600 }}>Política de Privacidade</a>.
                     </>
                   ) : item.r}
@@ -528,27 +909,41 @@ export default async function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════ */}
-      {/* CTA FINAL */}
+      {/* CTA FINAL — bookend do Hero: volta pro dark e termina "grande"
+          (auditoria de direção de arte apontou essa dobra como a mais
+          fraca — bloco de texto centralizado genérico, sem escala nem
+          entrada diferenciada). Gradiente final escurecido (era
+          #0a2e18, um verde bem saturado — mesmo problema já corrigido
+          no Hero: sem nada por cima suavizando, virava a dobra mais
+          "verde" da página, contradizendo a própria regra de verde só
+          em ponto de ação). */}
       {/* ══════════════════════════════════════ */}
-      <section style={{ padding: "88px 24px", background: "linear-gradient(160deg, #020d06 0%, #041a0c 50%, #0a2e18 100%)", position: "relative", overflow: "hidden", textAlign: "center" }}>
+      <section className="qz-section" style={{ background: "linear-gradient(160deg, #020d06 0%, #041209 55%, #030a05 100%)", position: "relative", overflow: "hidden", textAlign: "center" }}>
         <div style={{
           position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
           width: "600px", height: "400px", maxWidth: "150vw",
-          background: "radial-gradient(ellipse, rgba(34,197,94,0.1) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, rgba(34,224,122,0.12) 0%, transparent 70%)",
         }} />
-        <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <h2 style={{ margin: "0 0 16px", fontSize: "clamp(28px, 5vw, 44px)", fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: "-1px" }}>
-            Descubra hoje quanto do seu dinheiro é realmente seu.
+        <div style={{ maxWidth: 640, margin: "0 auto", position: "relative", zIndex: 1 }}>
+          <h2 style={{ margin: "0 0 20px", color: "#fff" }}>
+            <span className="qz-reveal qz-close-light" style={{ "--qz-delay": "0ms" } as React.CSSProperties}>
+              Você cuida da sua vida.
+            </span>
+            <span className="qz-reveal qz-close-heavy" style={{ "--qz-delay": "90ms" } as React.CSSProperties}>
+              O QuitaZap cuida dos números.
+            </span>
           </h2>
-          <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
-            Vaga {vagaAtual.toLocaleString("pt-BR")} de {VAGAS_FUNDADOR.toLocaleString("pt-BR")} no Preço Fundador · Cancele quando quiser
+          <p className="qz-reveal" style={{ margin: "0 0 20px", fontSize: 16, color: "rgba(255,255,255,0.65)", lineHeight: 1.55, maxWidth: 460, marginLeft: "auto", marginRight: "auto", "--qz-delay": "150ms" } as React.CSSProperties}>
+            Registre pelo WhatsApp, acompanhe tudo no painel e decida melhor antes de gastar.
           </p>
-          <a href={CAKTO_URL} style={{
-            display: "inline-block", background: "#22c55e", color: "#000", fontWeight: 800, fontSize: 18,
-            padding: "18px 48px", borderRadius: 8, textDecoration: "none",
-          }}>
-            Garantir Preço Fundador — R$14,90/mês
-          </a>
+          <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80", "--qz-delay": "200ms" } as React.CSSProperties}>
+            Cancele quando quiser
+          </p>
+          <div className="qz-reveal" style={{ display: "inline-block", "--qz-delay": "280ms" } as React.CSSProperties}>
+            <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
+              Quero garantir R$14,90/mês
+            </CtaButton>
+          </div>
         </div>
 
         {/* Transição em degradê pro preto do rodapé — mesmo tratamento do
@@ -568,22 +963,15 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 7, background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                  <path d="M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652C8.051 23.08 9.993 23.56 12 23.56h.008c6.572 0 11.92-5.334 11.928-11.894 0-3.174-1.25-6.16-3.42-8.217M12.045 21.58h-.007c-1.784 0-3.532-.48-5.057-1.38l-.363-.215-3.76.985 1.006-3.654-.237-.374a9.814 9.814 0 0 1-1.51-5.26c.001-5.45 4.452-9.878 9.92-9.878 2.648 0 5.135 1.03 7.007 2.9a9.836 9.836 0 0 1 2.907 6.988c-.002 5.45-4.455 9.888-9.906 9.888"/>
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.031-.967-.272-.099-.47-.148-.67.15-.197.297-.767.966-.94 1.164-.174.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.151-.172.2-.296.3-.495.099-.198.05-.371-.025-.52-.075-.149-.668-1.612-.916-2.207-.241-.579-.486-.5-.668-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
-                </svg>
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 16, color: "#fff" }}>QuitaZAP</span>
+              <LogoQuitaZap height={28} />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               {["Como funciona", "Preço", "FAQ"].map((link) => (
-                <a key={link} href={`#${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>{link}</a>
+                <a key={link} href={`#${link.toLowerCase().replace(" ", "-")}`} style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>{link}</a>
               ))}
-              <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Já sou cliente</a>
-              <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Privacidade e Termos</a>
-              <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#475569", textDecoration: "none" }}>Suporte</a>
+              <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Já sou cliente</a>
+              <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Privacidade e Termos</a>
 
               {REDES_SOCIAIS.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

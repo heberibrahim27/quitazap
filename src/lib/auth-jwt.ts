@@ -6,14 +6,23 @@
 
 import { createHmac, timingSafeEqual } from "crypto";
 
-const SECRET =
-  process.env.NEXTAUTH_SECRET ??
-  process.env.CRON_SECRET ??
-  "quitazap-receber-secret-2024";
+// Sem fallback pra segredo público: um segredo previsível permitiria forjar
+// sessão de qualquer usuário admin. Falha alto e cedo (só nas rotas que
+// realmente criam/verificam token) em vez de assinar tokens com um valor
+// hardcoded e conhecido — mesmo princípio de src/lib/cliente-auth.ts.
+function getSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET ?? process.env.CRON_SECRET;
+  if (!secret) {
+    throw new Error(
+      "NEXTAUTH_SECRET (ou CRON_SECRET) precisa estar configurado pra autenticação funcionar com segurança."
+    );
+  }
+  return secret;
+}
 
 export function criarToken(usuarioId: string): string {
   const payload = `${usuarioId}:${Date.now()}`;
-  const sig = createHmac("sha256", SECRET).update(payload).digest("hex");
+  const sig = createHmac("sha256", getSecret()).update(payload).digest("hex");
   return Buffer.from(`${payload}:${sig}`).toString("base64url");
 }
 
@@ -33,7 +42,7 @@ export function verificarToken(token: string): string | null {
     if (isNaN(timestamp)) return null;
 
     // Verifica assinatura
-    const expectedSig = createHmac("sha256", SECRET).update(payload).digest("hex");
+    const expectedSig = createHmac("sha256", getSecret()).update(payload).digest("hex");
     if (
       sig.length !== expectedSig.length ||
       !timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))

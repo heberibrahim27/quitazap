@@ -2,11 +2,12 @@ import Link from "next/link";
 
 export const metadata = { title: "Privacidade e Termos de Uso — QuitaZAP" };
 
-// Contato de suporte oficial — configurável via env var; enquanto
-// NEXT_PUBLIC_SUPORTE_CONTATO não for definido, cai no WhatsApp oficial do
-// QuitaZap já usado em outras telas do produto (dashboard/plano).
-const CONTATO_SUPORTE = process.env.NEXT_PUBLIC_SUPORTE_CONTATO || "WhatsApp (71) 9 9308-5436";
-const CONTATO_SUPORTE_LINK = process.env.NEXT_PUBLIC_SUPORTE_LINK || "https://wa.me/5571993085436";
+// Contato de suporte oficial — configurável via env var. Sem fallback pra
+// número pessoal: enquanto não estiver definido, o texto abaixo não linka
+// pra lugar nenhum (só menciona "o suporte do QuitaZap" em prosa) em vez de
+// expor o WhatsApp pessoal de alguém como se fosse o canal oficial.
+const CONTATO_SUPORTE = process.env.NEXT_PUBLIC_SUPORTE_CONTATO;
+const CONTATO_SUPORTE_LINK = process.env.NEXT_PUBLIC_SUPORTE_LINK;
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
@@ -73,10 +74,16 @@ export default function PrivacidadePage() {
             precisarmos manter alguma informação por obrigação legal, prevenção a fraude ou comprovação de operações.
           </p>
           <p>
-            Contato:{" "}
-            <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
-              {CONTATO_SUPORTE}
-            </a>
+            {CONTATO_SUPORTE_LINK ? (
+              <>
+                Contato:{" "}
+                <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
+                  {CONTATO_SUPORTE}
+                </a>
+              </>
+            ) : (
+              "Entre em contato com o suporte do QuitaZap pelos canais disponíveis no aplicativo."
+            )}
           </p>
         </Secao>
 
@@ -124,10 +131,16 @@ export default function PrivacidadePage() {
 
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0a0a0a", margin: "20px 0 8px" }}>6. Exclusão da conta</h3>
           <p>
-            O usuário pode solicitar a exclusão da conta e dos dados pelo suporte:{" "}
-            <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
-              {CONTATO_SUPORTE}
-            </a>
+            {CONTATO_SUPORTE_LINK ? (
+              <>
+                O usuário pode solicitar a exclusão da conta e dos dados pelo suporte:{" "}
+                <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
+                  {CONTATO_SUPORTE}
+                </a>
+              </>
+            ) : (
+              "O usuário pode solicitar a exclusão da conta e dos dados pelo suporte do QuitaZap."
+            )}
           </p>
 
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0a0a0a", margin: "20px 0 8px" }}>7. Alterações</h3>

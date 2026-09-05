@@ -81,12 +81,14 @@ export default function PlanoPage() {
         ))}
       </div>
 
-      <div style={{ marginTop: 32, background: "white", border: "1px solid #e2e8f0", borderRadius: 16, padding: "16px 20px", fontSize: 13, color: "#64748b", textAlign: "center" }}>
-        Dúvidas? Fale com a gente no WhatsApp:{" "}
-        <a href="https://wa.me/5571993085436" target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
-          71 9 9308-5436
-        </a>
-      </div>
+      {process.env.NEXT_PUBLIC_SUPORTE_LINK && (
+        <div style={{ marginTop: 32, background: "white", border: "1px solid #e2e8f0", borderRadius: 16, padding: "16px 20px", fontSize: 13, color: "#64748b", textAlign: "center" }}>
+          Dúvidas? Fale com a gente no WhatsApp:{" "}
+          <a href={process.env.NEXT_PUBLIC_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
+            {process.env.NEXT_PUBLIC_SUPORTE_CONTATO ?? "clique aqui"}
+          </a>
+        </div>
+      )}
     </div>
   );
 }
