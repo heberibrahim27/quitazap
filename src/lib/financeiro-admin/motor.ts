@@ -4,6 +4,7 @@
 // Ver motor-contrato.ts pro contrato e o porquê de cada campo.
 
 import { prisma } from "@/lib/prisma";
+import { whereStatusAssinatura } from "@/lib/status-assinatura";
 import type { DreAdminResumo, FonteReceita, LinhaCusto } from "./motor-contrato";
 
 // Preço Fundador vigente (R$14,90) — não o preço futuro do "QuitaZap
@@ -26,7 +27,7 @@ export function mesAtualBrasil(): string {
     .slice(0, 7);
 }
 
-function limitesDoMes(mes: string): { inicio: Date; fim: Date } {
+export function limitesDoMes(mes: string): { inicio: Date; fim: Date } {
   const [ano, mesNum] = mes.split("-").map(Number);
   const inicio = new Date(Date.UTC(ano, mesNum - 1, 1, 3, 0, 0, 0));
   const fim = new Date(Date.UTC(mesNum === 12 ? ano + 1 : ano, mesNum === 12 ? 0 : mesNum, 1, 3, 0, 0, 0));
@@ -38,7 +39,11 @@ export async function calcularDreAdmin(mesRef?: string): Promise<DreAdminResumo>
   const { inicio, fim } = limitesDoMes(mes);
 
   const [totalAssinantes, totalGratuitos, custosManuais, custoIAPagantesRaw, custoIAGratuitosRaw, eventosCakto] = await Promise.all([
-    prisma.cliente.count({ where: { gratuito: false } }),
+    // PAGO de verdade (status-assinatura.ts) — antes contava qualquer
+    // cliente com gratuito=false, inclusive quem já tinha a assinatura
+    // vencida (status CANCELADO); inflava tanto essa contagem quanto o
+    // fallback de receita estimada (contagem × preço) por causa disso.
+    prisma.cliente.count({ where: whereStatusAssinatura("PAGO") }),
     prisma.cliente.count({ where: { gratuito: true } }),
     prisma.custoMensal.findMany({ where: { mes } }),
     prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { gratuito: false, criadoEm: { gte: inicio, lt: fim } } }),
