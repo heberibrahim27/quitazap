@@ -681,6 +681,27 @@ model SaudeFinanceiraLog {
 }
 
 // ─────────────────────────────────────────
+// PLANILHA ANALYTICS — importação manual de dados do Analytics
+// ─────────────────────────────────────────
+// Uma linha por planilha nomeada (lista fixa em
+// src/lib/analytics-planilhas.ts, tela /atualizacao-dados). Reenviar o
+// arquivo faz upsert por `chave`: substitui a importação anterior inteira,
+// nunca acumula histórico. `linhas` guarda as linhas cruas extraídas do
+// arquivo (CSV/XLSX) pra permitir montar novos cards sem reprocessar o
+// arquivo original; `metricas` é o resumo já calculado (contagem de linhas,
+// soma/média das colunas numéricas) que os cards de /painel consomem
+// direto, sem reprocessar `linhas` a cada carregamento da página.
+model PlanilhaAnalytics {
+  id           String   @id @default(cuid())
+  chave        String   @unique
+  nomeArquivo  String
+  linhas       Json
+  metricas     Json
+  importadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
 // CONTATO SOCIAL (redes sociais / canais de suporte)
 // ─────────────────────────────────────────
 // Cadastro do fundador (via /painel/contatos) pros pontos públicos que

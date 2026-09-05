@@ -4,6 +4,8 @@ import { IconUsers, IconWallet, IconTrendUp, IconAlertTriangle, IconCheckCircle,
 import { QaReveal } from "@/components/QaReveal";
 import { QaTrendChart } from "@/components/QaTrendChart";
 import { calcularDreAdmin, PRECO_MENSAL } from "@/lib/financeiro-admin/motor";
+import { PLANILHAS_ANALYTICS } from "@/lib/analytics-planilhas";
+import type { MetricasPlanilha } from "@/lib/planilha-parser";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,7 +38,7 @@ export default async function Home() {
   // Motor DRE Admin (src/lib/financeiro-admin/motor.ts) — mesma fonte que
   // /financeiro usa; antes desta unificação, esta tela calculava "lucro"
   // do seu próprio jeito (ignorando comissão Cakto e custo manual).
-  const [clientes, totalPlanos, dre] = await Promise.all([
+  const [clientes, totalPlanos, dre, planilhasImportadas] = await Promise.all([
     prisma.cliente.findMany({
       select: {
         id: true,
@@ -52,7 +54,9 @@ export default async function Home() {
     }),
     prisma.planoEnviado.count(),
     calcularDreAdmin(),
+    prisma.planilhaAnalytics.findMany(),
   ]);
+  const planilhasPorChave = new Map(planilhasImportadas.map((p) => [p.chave, p]));
 
   // ── Métricas de negócio ──────────────────
   const pagantes   = clientes.filter((c) => !c.gratuito);
@@ -211,6 +215,40 @@ export default async function Home() {
           </strong>
           <p className="qa-stat-caption">{vencidas.length} vencida{vencidas.length !== 1 ? "s" : ""} · {vencendoEm7.length} vencendo</p>
         </QaReveal>
+      </div>
+
+      <p style={{ margin: "0 0 10px", fontSize: 11.5, fontWeight: 700, color: "var(--qa-gray-500)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        Analytics
+      </p>
+      <div className="qa-stat-grid">
+        {PLANILHAS_ANALYTICS.map((p, i) => {
+          const reg = planilhasPorChave.get(p.chave);
+          const metricas = reg?.metricas as MetricasPlanilha | undefined;
+          const primeiraMetrica = metricas ? Object.entries(metricas.resumoNumerico)[0] : undefined;
+
+          return (
+            <QaReveal className="qa-stat-card" delay={i * 0.05} key={p.chave}>
+              <p className="qa-stat-label">{p.nome}</p>
+              {metricas ? (
+                <>
+                  <strong className="qa-stat-value">
+                    {primeiraMetrica ? Math.round(primeiraMetrica[1].soma).toLocaleString("pt-BR") : metricas.totalLinhas}
+                  </strong>
+                  <p className="qa-stat-caption">
+                    {primeiraMetrica ? primeiraMetrica[0] : `${metricas.totalLinhas} linha${metricas.totalLinhas !== 1 ? "s" : ""}`} · atualizado {fmtData(reg!.atualizadoEm)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <strong className="qa-stat-value" style={{ color: "var(--qa-gray-500)" }}>—</strong>
+                  <p className="qa-stat-caption">
+                    <Link href="/atualizacao-dados" style={{ color: "#7dc4ff" }}>Importar planilha</Link>
+                  </p>
+                </>
+              )}
+            </QaReveal>
+          );
+        })}
       </div>
 
       <div className="qa-card" style={{ marginTop: 8 }}>

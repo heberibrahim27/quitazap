@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Inter } from "next/font/google";
 import {
-  IconHome, IconWallet, IconUsers, IconClock, IconDownload,
+  IconHome, IconWallet, IconUsers, IconClock, IconDownload, IconUpload,
   IconFlask, IconSettings, IconLogout, IconPlus, IconMenu, IconX, IconTrendUp,
 } from "./icons";
 import "./admin-shell.css";
@@ -38,6 +38,7 @@ const GRUPOS = [
   {
     rotulo: "Sistema",
     itens: [
+      { href: "/atualizacao-dados", label: "Atualização de dados", Icone: IconUpload },
       { href: "/insights-sombra", label: "Insights (sombra)", Icone: IconTrendUp },
       { href: "/exportar", label: "Exportar dados", Icone: IconDownload },
       { href: "/testar-funil", label: "Testar bot", Icone: IconFlask },
