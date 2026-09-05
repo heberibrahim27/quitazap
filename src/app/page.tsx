@@ -11,6 +11,7 @@ import { CountUp } from "./CountUp";
 import { CountdownTimer } from "./CountdownTimer";
 import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
 import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
+import { HeroFade } from "./HeroFade";
 
 // Inter nunca foi de fato carregada nesta página (o fontFamily só citava
 // o nome, sem @font-face nem next/font) — sempre caiu pro fallback
@@ -451,12 +452,7 @@ export default async function LandingPage() {
           QuitaZap. Valores em px/rem abaixo são a tradução literal das
           classes Tailwind do arquivo de referência — não são invenção. */}
       {/* ══════════════════════════════════════ */}
-      {/* position:sticky (não scroll-linked JS) faz o Hero ficar grudado no
-          topo enquanto a dobra de Dor desliza por cima dele — some ao
-          rolar pra baixo, volta a aparecer ao rolar pra cima. Zero custo
-          de performance (é só CSS), consistente com a decisão de cortar
-          qualquer efeito recalculado a cada pixel de scroll. */}
-      <section style={{ position: "sticky", top: 0, zIndex: 0, overflow: "hidden", minHeight: 640 }} className="qz-hero">
+      <section style={{ position: "relative", overflow: "hidden", minHeight: 640 }} className="qz-hero">
         {/* Gradiente de marca como poster — cobre o instante antes do vídeo
             decodificar o primeiro frame (e o fallback se autoplay falhar). */}
         <div style={{
@@ -475,69 +471,70 @@ export default async function LandingPage() {
           backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }} />
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          style={{ position: "absolute", inset: 0, zIndex: 0, width: "100%", height: "100%", objectFit: "cover" }}
-        >
-          <source src="/videos/hero-loop.mp4" type="video/mp4" />
-        </video>
-        {/* Overlay 1 — bg-neutral-900/50 mix-blend-multiply na referência */}
-        <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "rgba(0,0,0,0.5)", mixBlendMode: "multiply" }} />
-        {/* Overlay 2 — bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/90 */}
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 0,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent, rgba(0,0,0,0.9))",
-        }} />
+        <HeroFade>
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{ position: "absolute", inset: 0, zIndex: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          >
+            <source src="/videos/hero-loop.mp4" type="video/mp4" />
+          </video>
+          {/* Overlay 1 — bg-neutral-900/50 mix-blend-multiply na referência */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "rgba(0,0,0,0.5)", mixBlendMode: "multiply" }} />
+          {/* Overlay 2 — bg-gradient-to-b from-neutral-900/60 via-transparent to-neutral-900/90 */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0,
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent, rgba(0,0,0,0.9))",
+          }} />
 
-        {/* header — px-6 md:px-12 py-8 */}
-        <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <LogoQuitaZap height={34} />
+          {/* header — px-6 md:px-12 py-8 */}
+          <header style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 24px" }} className="qz-hero-pad">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <LogoQuitaZap height={34} />
+            </div>
+            <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85, display: "inline-block", padding: "12px 4px" }}>
+              Já sou cliente
+            </a>
+          </header>
+
+          {/* grid grid-cols-1 md:grid-cols-12 gap-8 items-end — px-6 md:px-12 pb-12 md:pb-24 */}
+          <div className="qz-grid12 qz-hero-pad" style={{ position: "relative", zIndex: 10, padding: "0 24px 48px", alignItems: "end" }}>
+            <div className="qz-col-7">
+              <p className="qz-reveal" style={{
+                margin: "0 0 20px", fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600,
+                color: "rgba(255,255,255,0.6)", letterSpacing: "0.14em", textTransform: "uppercase",
+              }}>
+                Controle financeiro pelo WhatsApp
+              </p>
+              <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em", fontFamily: "var(--font-oswald)" }}>
+                <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 300, opacity: 0.8, marginBottom: 8, "--qz-delay": "60ms" } as React.CSSProperties}>
+                  Descubra quanto do seu dinheiro
+                </span>
+                <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "120ms" } as React.CSSProperties}>
+                  ainda é <span style={{ color: "#22e07a" }}>seu.</span>
+                </span>
+              </h1>
+            </div>
+
+            <div className="qz-col-5 qz-hero-side" style={{ color: "#fff" }}>
+              <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.01em", fontFamily: "var(--font-oswald)" }} className="qz-reveal">
+                Direto no WhatsApp.
+              </h2>
+              <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
+                Controle seus gastos, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar — sem conectar conta bancária.
+              </p>
+              <CtaButton
+                href={CAKTO_URL}
+                className="qz-reveal"
+                innerStyle={{ padding: "13px 26px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em" }}
+              >
+                Quero garantir R$14,90/mês
+              </CtaButton>
+            </div>
           </div>
-          <a href="/minha-conta/entrar" style={{ color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none", opacity: 0.85, display: "inline-block", padding: "12px 4px" }}>
-            Já sou cliente
-          </a>
-        </header>
-
-        {/* grid grid-cols-1 md:grid-cols-12 gap-8 items-end — px-6 md:px-12 pb-12 md:pb-24 */}
-        <div className="qz-grid12 qz-hero-pad" style={{ position: "relative", zIndex: 10, padding: "0 24px 48px", alignItems: "end" }}>
-          <div className="qz-col-7">
-            <p className="qz-reveal" style={{
-              margin: "0 0 20px", fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600,
-              color: "rgba(255,255,255,0.6)", letterSpacing: "0.14em", textTransform: "uppercase",
-            }}>
-              Controle financeiro pelo WhatsApp
-            </p>
-            <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em", fontFamily: "var(--font-oswald)" }}>
-              <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 300, opacity: 0.8, marginBottom: 8, "--qz-delay": "60ms" } as React.CSSProperties}>
-                Descubra quanto do seu dinheiro
-              </span>
-              <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "120ms" } as React.CSSProperties}>
-                ainda é <span style={{ color: "#22e07a" }}>seu.</span>
-              </span>
-            </h1>
-          </div>
-
-          <div className="qz-col-5 qz-hero-side" style={{ color: "#fff" }}>
-            <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.01em", fontFamily: "var(--font-oswald)" }} className="qz-reveal">
-              Direto no WhatsApp.
-            </h2>
-            <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
-              Controle seus gastos, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar — sem conectar conta bancária.
-            </p>
-            <CtaButton
-              href={CAKTO_URL}
-              className="qz-reveal"
-              innerStyle={{ padding: "13px 26px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em" }}
-            >
-              Quero garantir R$14,90/mês
-            </CtaButton>
-          </div>
-        </div>
-
+        </HeroFade>
       </section>
 
       {/* ══════════════════════════════════════ */}
@@ -547,7 +544,7 @@ export default async function LandingPage() {
           entrando por último. Sem "wow moment" pesado aqui (isso fica pra
           Hero/Como Funciona/WhatsApp+Painel) — só reveal e contador. */}
       {/* ══════════════════════════════════════ */}
-      <section className="qz-section" style={{ background: "linear-gradient(180deg, #050b07 0%, #0a140d 100%)", position: "relative", zIndex: 1, overflow: "hidden" }}>
+      <section className="qz-section" style={{ background: "linear-gradient(180deg, #050b07 0%, #0a140d 100%)", position: "relative", overflow: "hidden" }}>
         <div style={{
           position: "absolute", inset: 0, opacity: 0.035, mixBlendMode: "overlay", pointerEvents: "none",
           backgroundImage: `url("${GRAIN_SVG}")`,
