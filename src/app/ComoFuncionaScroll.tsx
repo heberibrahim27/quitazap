@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WhatsAppScreen, WhatsAppBubble } from "./WhatsAppScreen";
 
 const ESTADOS = [
   { numero: "01", label: "CONTE" },
@@ -9,12 +8,15 @@ const ESTADOS = [
   { numero: "03", label: "VOCÊ ENTENDE" },
 ] as const;
 
-// Narrativa guiada por scroll: celular fica fixo (sticky no desktop) e as
-// mensagens da MESMA conversa vão se acumulando conforme cada "estado"
-// entra na viewport — a sequência exata de 3 prints reais de WhatsApp que
-// o Ibrahim mandou como referência (usuário manda o gasto → bot confirma
-// o registro → bot responde quanto ainda sobra), não um mockup de app
-// inventado. O que controla a troca é o IntersectionObserver observando 3
+// Os 3 prints reais de WhatsApp que o Ibrahim mandou (tela do celular
+// inteira, não uma recriação em CSS) — cada um já é a conversa completa
+// naquele ponto (usuário manda o gasto → bot confirma o registro → bot
+// responde quanto ainda sobra).
+const FOTOS = ["/whatsapp-1.webp", "/whatsapp-2.webp", "/whatsapp-3.webp"];
+
+// Narrativa guiada por scroll: celular fica fixo (sticky no desktop) e a
+// foto do print troca em crossfade conforme cada "estado" entra na
+// viewport. O que controla a troca é o IntersectionObserver observando 3
 // blocos-gatilho — não um listener de scroll recalculando a cada pixel
 // (isso seria caro e arriscado pra performance mobile antes do lançamento).
 export function ComoFuncionaScroll() {
@@ -44,8 +46,6 @@ export function ComoFuncionaScroll() {
     return () => observer.disconnect();
   }, []);
 
-  const telaAtual = <TelaCelular estado={ativo} />;
-
   return (
     <>
       {/* Desktop — celular sticky + narrativa guiada por scroll (>=768px). */}
@@ -53,10 +53,7 @@ export function ComoFuncionaScroll() {
         <div className="qz-cf-sticky-col">
           <div className="qz-cf-sticky-inner">
             <div className="qz-panel-phone" aria-hidden="true">
-              <div className="qz-phone-mock-inner">
-                <div className="qz-phone-notch-band"><div className="qz-phone-notch" /></div>
-                {telaAtual}
-              </div>
+              <FotoCelular ativo={ativo} />
             </div>
           </div>
         </div>
@@ -75,16 +72,35 @@ export function ComoFuncionaScroll() {
         {ESTADOS.map((estado, i) => (
           <div key={estado.numero} className="qz-reveal" style={{ "--qz-delay": `${i * 90}ms`, display: "flex", gap: 20 } as React.CSSProperties}>
             <div style={{ flexShrink: 0, width: 84, height: 173 }}>
-              <div className="qz-phone-mock-inner" style={{ borderRadius: 20 }}>
-                <div className="qz-phone-notch-band" style={{ height: 14 }}><div className="qz-phone-notch" /></div>
-                <TelaCelular estado={i} compacta />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={FOTOS[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
             <TextoEstado estado={estado} i={i} ativo />
           </div>
         ))}
       </div>
     </>
+  );
+}
+
+// Crossfade entre as 3 fotos reais — as 3 ficam empilhadas e só a opacidade
+// muda, sem corte seco entre os estados.
+function FotoCelular({ ativo }: { ativo: number }) {
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {FOTOS.map((src, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt={i === 0 ? "Conversa real do QuitaZap no WhatsApp" : ""}
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain",
+            opacity: ativo === i ? 1 : 0, transition: "opacity 0.6s ease",
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -103,21 +119,5 @@ function TextoEstado({ estado, i, ativo }: { estado: { numero: string; label: st
         {textos[i]}
       </p>
     </div>
-  );
-}
-
-// Mesma conversa real do início ao fim (prints enviados pelo Ibrahim) — as
-// mensagens vão se acumulando conforme o estado avança, não trocam de tela.
-function TelaCelular({ estado, compacta }: { estado: number; compacta?: boolean }) {
-  return (
-    <WhatsAppScreen compacta={compacta}>
-      <WhatsAppBubble text="Gastei R$ 87,50 no mercado." time="09:41" out compacta={compacta} />
-      {estado >= 1 && (
-        <WhatsAppBubble text="✅ OK! Registrado! 🛒 Mercado R$ 87,50" time="09:41" compacta={compacta} />
-      )}
-      {estado >= 2 && (
-        <WhatsAppBubble text="💰 Você ainda tem R$ 1.630 disponíveis." time="09:41" compacta={compacta} />
-      )}
-    </WhatsAppScreen>
   );
 }
