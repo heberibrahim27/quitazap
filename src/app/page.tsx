@@ -94,12 +94,18 @@ const LANDING_CSS = `
   }
   .qz-grid12 { display: grid; grid-template-columns: 1fr; gap: 28px; }
   .qz-hero-pad { padding-left: 24px; padding-right: 24px; }
-  .qz-hero-light { font-size: 48px; }
-  .qz-hero-heavy { font-size: 72px; line-height: 0.95; }
+  /* Tamanho fluido (clamp) em vez de salto fixo por breakpoint — o salto
+     duro pra 128px/72px/48px exatamente em 768px, junto com o grid virando
+     multi-coluna nesse mesmo ponto (coluna de texto ainda estreita),
+     quebrava "ainda é seu."/"Um plano só..." em linhas curtas e
+     desalinhadas por volta de 768-900px. Fluido cresce com a largura da
+     coluna em vez de saltar de uma vez. */
+  .qz-hero-light { font-size: clamp(40px, 6.5vw, 72px); }
+  .qz-hero-heavy { font-size: clamp(56px, 10vw, 128px); line-height: 0.95; }
   .qz-section { padding: 64px 24px; }
   .qz-h2-sm { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25; }
   .qz-h2-md { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
-  .qz-h2-lg { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
+  .qz-h2-lg { font-size: clamp(28px, 4.5vw, 48px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; }
   /* Fechamento — headline bem maior que as outras seções (bookend do
      Hero), em duas linhas com stagger separado, pra terminar "grande"
      em vez do bloco de texto centralizado genérico de antes. */
@@ -113,6 +119,10 @@ const LANDING_CSS = `
   .qz-cf-photo { width: 200px; height: 412px; margin: 0 auto; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(15,23,42,.35); }
   .qz-hero-side { margin-top: 8px; }
   .qz-feat-img { aspect-ratio: 16 / 9; }
+  /* Foto real de celular (retrato) — não force a mesma proporção paisagem
+     dos placeholders, senão o crop corta o topo da tela e mostra só um
+     pedaço irreconhecível da conversa. */
+  .qz-feat-img-portrait { aspect-ratio: 9 / 19.5; }
   /* Cards empilhando com scroll (referência "Parallax Clean" que o
      Ibrahim mandou) — só no desktop; no mobile é uma lista sequencial
      simples, sem sticky, sem scale/opacity scrubado (decisão de
@@ -206,12 +216,10 @@ const LANDING_CSS = `
     .qz-col-7 { grid-column: span 7; }
     .qz-col-8 { grid-column: span 8; }
     .qz-hero-pad { padding-left: 48px; padding-right: 48px; }
-    .qz-hero-light { font-size: 72px; }
-    .qz-hero-heavy { font-size: 128px; margin-top: -16px; }
+    .qz-hero-heavy { margin-top: -16px; }
     .qz-section { padding: 96px 48px; }
     .qz-h2-sm { font-size: 30px; }
     .qz-h2-md { font-size: 36px; }
-    .qz-h2-lg { font-size: 48px; }
     .qz-hero-side { margin-top: 32px; }
     .qz-panel-phone { width: 240px; height: 494px; border-radius: 34px; margin: 0; }
     .qz-cf-photo { width: 240px; height: 494px; margin: 0; }
@@ -310,7 +318,7 @@ const doresMinicards = [
 const funcionalidadesGrid = [
   { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque." },
   { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento." },
-  { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora.", imagem: "/whatsapp-3.webp" },
+  { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora.", imagem: "/whatsapp-3.webp", imagemVertical: true },
 ];
 const funcionalidadesStack = [
   { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando." },
@@ -739,7 +747,7 @@ export default async function LandingPage() {
               } as React.CSSProperties}>
                 {f.imagem ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.imagem} alt="" className="qz-feat-img" style={{ objectFit: "cover", width: "100%" }} />
+                  <img src={f.imagem} alt="" className={f.imagemVertical ? "qz-feat-img-portrait" : "qz-feat-img"} style={{ objectFit: "cover", width: "100%" }} />
                 ) : (
                   /* Placeholder — sem screenshot real batendo com essa
                      funcionalidade ainda. */

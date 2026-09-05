@@ -81,7 +81,7 @@ function ConteudoCard({ item, index }: { item: Item; index: number }) {
     <>
       <div className="qz-feat-stack-content">
         <div>
-          <p style={{ margin: "0 0 8px", fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: "#cbd5e1" }}>
+          <p style={{ margin: "0 0 8px", fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, color: "#94a3b8" }}>
             {String(index + 1).padStart(2, "0")}
           </p>
           <p style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{item.titulo}</p>
