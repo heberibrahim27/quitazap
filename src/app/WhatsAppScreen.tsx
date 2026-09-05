@@ -31,7 +31,59 @@ export function WhatsAppScreen({ compacta, children }: { compacta?: boolean; chi
       <div className="qz-wa-body" style={compacta ? { padding: "6px 5px", gap: 3 } : undefined}>
         {children}
       </div>
+      {/* Barra de digitar — sem ela a tela parava só na conversa e não
+          lia como WhatsApp de verdade (faltava na primeira versão). */}
+      <div className="qz-wa-inputbar" style={compacta ? { padding: "3px 5px 5px", gap: 4 } : undefined}>
+        <div className="qz-wa-input-pill" style={compacta ? { padding: "2px 5px", gap: 3 } : undefined}>
+          <IconeEmoji compacta={compacta} />
+          <span className="qz-wa-input-placeholder" style={compacta ? { fontSize: 5.5 } : undefined}>Mensagem</span>
+          <IconeClipe compacta={compacta} />
+          <IconeCamera compacta={compacta} />
+        </div>
+        <span className="qz-wa-mic-btn" style={compacta ? { width: 16, height: 16 } : undefined}>
+          <IconeMic compacta={compacta} />
+        </span>
+      </div>
     </div>
+  );
+}
+
+function IconeEmoji({ compacta }: { compacta?: boolean }) {
+  const s = compacta ? 8 : 16;
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#8696a0" strokeWidth="1.6" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="9.5" />
+      <circle cx="8.7" cy="10" r="1" fill="#8696a0" stroke="none" />
+      <circle cx="15.3" cy="10" r="1" fill="#8696a0" stroke="none" />
+      <path d="M8 14.5c1 1.3 2.4 2 4 2s3-.7 4-2" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconeClipe({ compacta }: { compacta?: boolean }) {
+  const s = compacta ? 8 : 16;
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#8696a0" strokeWidth="1.6" style={{ flexShrink: 0 }}>
+      <path d="M17 7.5 9.5 15a2.5 2.5 0 1 0 3.5 3.5l7-7a4.5 4.5 0 1 0-6.5-6.5l-7 7a6.5 6.5 0 0 0 9 9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconeCamera({ compacta }: { compacta?: boolean }) {
+  const s = compacta ? 8 : 16;
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#8696a0" strokeWidth="1.6" style={{ flexShrink: 0 }}>
+      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z" strokeLinejoin="round" />
+      <circle cx="12" cy="13" r="3.2" />
+    </svg>
+  );
+}
+function IconeMic({ compacta }: { compacta?: boolean }) {
+  const s = compacta ? 9 : 16;
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="#fff" style={{ flexShrink: 0 }}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M6 11a6 6 0 0 0 12 0" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      <rect x="11.1" y="17" width="1.8" height="4" fill="#fff" />
+    </svg>
   );
 }
 

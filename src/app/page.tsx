@@ -4,7 +4,7 @@
 // pro redirecionamento mantido por compatibilidade)
 // ─────────────────────────────────────────
 
-import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
+import { Inter, Fraunces, Oswald, JetBrains_Mono } from "next/font/google";
 import { prisma } from "@/lib/prisma";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
@@ -21,6 +21,11 @@ import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
 // não mexe na tipografia do resto do produto logado.
 const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-inter" });
 const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], weight: ["300", "500", "600"], variable: "--font-fraunces" });
+// Fonte extra usada só no Hero (pedido explícito) — condensada/geométrica
+// como no headline da referência Finex que o Ibrahim mandou, aplicada em
+// cima da nossa paleta (verde), não as cores azuis do original. O resto
+// do site continua com Fraunces (serifada itálica), sem mudança.
+const oswald = Oswald({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-oswald" });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-mono" });
 
 // Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
@@ -155,7 +160,7 @@ const LANDING_CSS = `
   .qz-wa-header-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .qz-wa-header-name { color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1.1; }
   .qz-wa-header-status { color: rgba(255,255,255,0.75); font-size: 9.5px; line-height: 1; }
-  .qz-wa-body { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .qz-wa-body { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; overflow: visible; }
   .qz-wa-row { display: flex; }
   .qz-wa-row.qz-wa-out { justify-content: flex-end; }
   .qz-wa-row.qz-wa-in { justify-content: flex-start; }
@@ -165,8 +170,32 @@ const LANDING_CSS = `
   }
   .qz-wa-bubble.qz-wa-out { background: #D9FDD3; border-top-right-radius: 0; }
   .qz-wa-bubble.qz-wa-in { background: #fff; border-top-left-radius: 0; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
+  /* Rabicho da bolha (tail) — sem isso não parece WhatsApp de verdade,
+     só um card com canto reto. Triângulo via border trick, encostado no
+     canto onde o border-radius foi zerado acima. */
+  .qz-wa-bubble.qz-wa-out::after {
+    content: ""; position: absolute; top: 0; right: -8px; width: 0; height: 0;
+    border-style: solid; border-width: 0 0 13px 8px;
+    border-color: transparent transparent transparent #D9FDD3;
+  }
+  .qz-wa-bubble.qz-wa-in::after {
+    content: ""; position: absolute; top: 0; left: -8px; width: 0; height: 0;
+    border-style: solid; border-width: 0 8px 13px 0;
+    border-color: transparent transparent transparent transparent;
+    border-right-color: #fff;
+  }
   .qz-wa-meta { display: flex; align-items: center; gap: 3px; justify-content: flex-end; margin-top: 2px; font-size: 9px; color: rgba(0,0,0,0.45); }
   .qz-wa-check { color: #53BDEB; font-size: 11px; line-height: 1; }
+  .qz-wa-inputbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px 10px; background: #E5DDD5; flex-shrink: 0; }
+  .qz-wa-input-pill {
+    flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0;
+    background: #fff; border-radius: 999px; padding: 5px 10px;
+  }
+  .qz-wa-input-placeholder { flex: 1; font-size: 11.5px; color: #8696a0; }
+  .qz-wa-mic-btn {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: #00A884;
+    display: flex; align-items: center; justify-content: center;
+  }
   @media (min-width: 768px) {
     .qz-grid12 { grid-template-columns: repeat(12, 1fr); gap: 40px; }
     .qz-col-4 { grid-column: span 4; }
@@ -353,7 +382,7 @@ export default async function LandingPage() {
   const vagasRestantes = Math.max(VAGAS_FUNDADOR - assinantesFundador, 0);
 
   return (
-    <div className={`${inter.variable} ${fraunces.variable} ${mono.variable}`} style={{
+    <div className={`${inter.variable} ${fraunces.variable} ${oswald.variable} ${mono.variable}`} style={{
       background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif",
       color: "#0a0a0a", overflowX: "clip", position: "relative",
       // Paleta formalizada (direção "editorial com ritmo claro/escuro" —
@@ -437,18 +466,18 @@ export default async function LandingPage() {
             }}>
               Controle financeiro pelo WhatsApp
             </p>
-            <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.05em" }}>
-              <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 200, opacity: 0.8, marginBottom: 8, "--qz-delay": "60ms" } as React.CSSProperties}>
+            <h1 style={{ margin: 0, color: "#fff", lineHeight: 1, letterSpacing: "-0.02em", fontFamily: "var(--font-oswald)" }}>
+              <span className="qz-reveal qz-hero-light" style={{ display: "block", fontWeight: 300, opacity: 0.8, marginBottom: 8, "--qz-delay": "60ms" } as React.CSSProperties}>
                 Descubra quanto do seu dinheiro
               </span>
               <span className="qz-reveal qz-hero-heavy" style={{ display: "block", fontWeight: 600, marginLeft: -2, "--qz-delay": "120ms" } as React.CSSProperties}>
-                ainda é <span style={{ color: "#22e07a", fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>seu.</span>
+                ainda é <span style={{ color: "#22e07a" }}>seu.</span>
               </span>
             </h1>
           </div>
 
           <div className="qz-col-5 qz-hero-side" style={{ color: "#fff" }}>
-            <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.025em" }} className="qz-reveal">
+            <h2 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 400, letterSpacing: "-0.01em", fontFamily: "var(--font-oswald)" }} className="qz-reveal">
               Direto no WhatsApp.
             </h2>
             <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
@@ -457,7 +486,7 @@ export default async function LandingPage() {
             <a href={CAKTO_URL} className="qz-reveal qz-cta" style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               borderRadius: 999, padding: "13px 26px", fontSize: 14, fontWeight: 600,
-              color: "#000", textDecoration: "none",
+              color: "#000", textDecoration: "none", fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em",
             }}>
               Quero garantir R$14,90/mês
             </a>
