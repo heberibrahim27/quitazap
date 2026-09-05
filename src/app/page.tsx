@@ -316,7 +316,7 @@ const doresMinicards = [
 // print de outra tela fingindo ser a certa seria tão desonesto quanto
 // inventar prova social).
 const funcionalidadesGrid = [
-  { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque." },
+  { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque.", imagem: "/painel-raiox.webp", imagemVertical: true },
   { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento.", imagem: "/painel-salario-livre.webp" },
   { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora.", imagem: "/whatsapp-3.webp", imagemVertical: true },
 ];
