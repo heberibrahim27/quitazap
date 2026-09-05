@@ -164,27 +164,6 @@ export default async function ClienteDetalhePage({
             </div>
           )}
 
-          {cliente.rendaMensal && (
-            <div>
-              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Renda mensal</span>
-              <strong style={{ fontSize: 14, color: "#6ee7b7" }}>{fmt(Number(cliente.rendaMensal))}</strong>
-            </div>
-          )}
-
-          {cliente.despesasFixas && (
-            <div>
-              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Despesas fixas</span>
-              <strong style={{ fontSize: 14 }}>{fmt(Number(cliente.despesasFixas))}</strong>
-            </div>
-          )}
-
-          {cliente.valorDisponivelMensal && (
-            <div>
-              <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Disponível/mês</span>
-              <strong style={{ fontSize: 14, color: "#7dc4ff" }}>{fmt(Number(cliente.valorDisponivelMensal))}</strong>
-            </div>
-          )}
-
           <div>
             <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Cliente desde</span>
             <strong style={{ fontSize: 14 }}>{fmtData(cliente.criadoEm)}</strong>
