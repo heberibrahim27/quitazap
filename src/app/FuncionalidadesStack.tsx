@@ -2,6 +2,7 @@
 
 import { createRef, useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 type Item = { titulo: string; texto: string; imagem?: string };
 
@@ -60,6 +61,7 @@ function StackCard({
   // Sem próximo card (último da pilha) não tem quem "cubra" ele, então
   // fica parado em scale/opacity cheios — o target aqui é só um
   // placeholder pro hook não quebrar, o resultado é descartado abaixo.
+  const reduzido = usePrefersReducedMotion();
   const { scrollYProgress } = useScroll({
     target: nextRef ?? itemRef,
     offset: ["start end", "start 10vh"],
@@ -69,7 +71,7 @@ function StackCard({
 
   return (
     <div className="qz-feat-stack-item" ref={itemRef}>
-      <motion.div className="qz-feat-stack-card" style={nextRef ? { scale, opacity } : undefined}>
+      <motion.div className="qz-feat-stack-card" style={nextRef && !reduzido ? { scale, opacity } : undefined}>
         <ConteudoCard item={item} index={index} />
       </motion.div>
     </div>

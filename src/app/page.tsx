@@ -11,6 +11,7 @@ import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
 import { WhatsAppPainelStage } from "./WhatsAppPainelStage";
 import { HeroFade } from "./HeroFade";
 import { FuncionalidadesStack } from "./FuncionalidadesStack";
+import { listarContatosAtivos } from "@/lib/contatos-sociais";
 
 // Inter nunca foi de fato carregada nesta página (o fontFamily só citava
 // o nome, sem @font-face nem next/font) — sempre caiu pro fallback
@@ -141,7 +142,7 @@ const LANDING_CSS = `
   .qz-dor-num-1 { font-size: 44px; }
   .qz-dor-num-2 { font-size: 32px; }
   .qz-dor-num-3 { font-size: 56px; }
-  .qz-cf-desktop { display: none; }
+  .qz-cf-stack-desktop { display: none; }
   .qz-cf-mobile { display: flex; flex-direction: column; gap: 40px; }
   .qz-wp-stage { display: flex; flex-direction: column; gap: 20px; margin-top: 40px; }
   /* Screenshot real do painel (substituiu as barras/linhas fake em CSS) —
@@ -150,6 +151,16 @@ const LANDING_CSS = `
   .qz-wp-dashboard {
     position: relative; border-radius: 16px; overflow: hidden;
     box-shadow: 0 20px 40px -20px rgba(0,0,0,0.6);
+  }
+  /* Spotlight seguindo o cursor (depth rig) — só acende quando o JS de
+     WhatsAppPainelStage seta --wp-spot-o (ponteiro fino, sem
+     prefers-reduced-motion); sem JS/no celular fica sempre em opacity 0. */
+  .qz-wp-dashboard::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(220px circle at var(--wp-spot-x, 50%) var(--wp-spot-y, 50%), rgba(34,224,122,0.22), transparent 70%);
+    opacity: var(--wp-spot-o, 0);
+    transition: opacity .3s ease;
+    mix-blend-mode: screen;
   }
   .qz-wp-phone { width: 176px; margin: 0 auto; }
   .qz-wp-phone-photo { width: 100%; height: 364px; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(0,0,0,.6); }
@@ -239,22 +250,35 @@ const LANDING_CSS = `
     .qz-feat-stack-imgwrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
     .qz-price-card { padding: 40px 36px; }
     .qz-cf-mobile { display: none; }
-    .qz-cf-desktop {
-      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px;
+    /* Cards empilhando com scroll (mesmo mecanismo de
+       .qz-feat-stack-item/.qz-feat-stack-card — ver ComoFuncionaScroll.tsx). */
+    .qz-cf-stack-desktop { display: block; position: relative; margin-top: 32px; padding-bottom: 8vh; }
+    .qz-cf-stack-item {
+      position: sticky; top: 10vh; height: 76vh; margin-bottom: 6vh;
+      display: flex; align-items: center; justify-content: center;
     }
-    .qz-cf-sticky-col { position: relative; }
-    .qz-cf-sticky-inner { position: sticky; top: 12vh; height: 76vh; display: flex; align-items: center; justify-content: flex-end; }
-    .qz-cf-steps-col { display: flex; flex-direction: column; }
-    .qz-cf-step { min-height: 88vh; display: flex; align-items: center; }
-    .qz-wp-stage { position: relative; height: 560px; display: block; margin-top: 64px; }
+    .qz-cf-stack-card {
+      width: 100%; height: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 24px;
+      display: flex; align-items: center; justify-content: center; gap: 56px; padding: 48px;
+      box-shadow: 0 30px 60px -20px rgba(15,23,42,.3);
+    }
+    .qz-wp-stage { position: relative; height: 560px; display: block; margin-top: 64px; perspective: 900px; }
     .qz-wp-dashboard {
       position: absolute; top: 4%; right: 0; width: 56%; max-width: 400px;
       transform: translate3d(calc(var(--wp-px, 0) * 6px), calc(var(--wp-py, 0) * 6px), 0) rotate(1.5deg);
       transition: transform .2s ease-out;
     }
+    /* Camada do meio do depth rig: além do translate proporcional ao
+       mouse (já existia), ganha uma leve rotação 3D (perspective no pai
+       .qz-wp-stage) — máx. ~±5°, "limitar bastante" por decisão de
+       produto (nada de tilt exagerado tipo cardz.js). */
     .qz-wp-phone {
       position: absolute; left: 2%; bottom: 0; z-index: 3;
-      transform: translate3d(calc(var(--wp-px, 0) * 12px), calc(var(--wp-py, 0) * 12px), 0) rotate(var(--wp-phone-rot, -3deg));
+      transform:
+        translate3d(calc(var(--wp-px, 0) * 12px), calc(var(--wp-py, 0) * 12px), 0)
+        rotateX(calc(var(--wp-py, 0) * -10deg))
+        rotateY(calc(var(--wp-px, 0) * 10deg))
+        rotate(var(--wp-phone-rot, -3deg));
       transition: transform .25s ease-out;
     }
     .qz-wp-phone:hover { --wp-phone-rot: 0deg; }
@@ -272,22 +296,51 @@ const LANDING_CSS = `
     .qz-dor-num-2 { font-size: 56px; }
     .qz-dor-num-3 { font-size: 120px; }
   }
+
+  /* ── "premium-glass" — vidro com borda dupla mascarada ──
+     Componente único reutilizável (via className, não CSS repetido por
+     card): duas bordas de 1px sobrepostas via ::before/::after, cada uma
+     visível só numa diagonal (mask-image), uma branca/prateada e outra
+     no verde da marca — essa última desligada por padrão e ligada só com
+     .premium-glass--accent, porque o reflexo verde nem sempre faz sentido
+     (reservado pra onde tem ação/estado, ex: um insight; um card neutro
+     como o de preço fica só com o brilho branco). Troca a sombra única
+     de cada card por uma sombra em múltiplas camadas — por isso um
+     elemento que já define box-shadow/border própria deve tirá-los ao
+     adotar esta classe, pra não competir com ela. */
+  .premium-glass {
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 8px 20px -12px rgba(15,23,42,0.35),
+      0 30px 60px -24px rgba(15,23,42,0.45);
+  }
+  .premium-glass::before,
+  .premium-glass::after {
+    content: ""; position: absolute; inset: 0;
+    border-radius: inherit; border: 1px solid transparent; pointer-events: none;
+  }
+  .premium-glass::before {
+    border-color: rgba(255,255,255,0.5);
+    -webkit-mask-image: linear-gradient(135deg, #000 0%, transparent 48%);
+    mask-image: linear-gradient(135deg, #000 0%, transparent 48%);
+  }
+  .premium-glass::after {
+    border-color: rgba(34,224,122,0.45);
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(315deg, #000 0%, transparent 48%);
+    mask-image: linear-gradient(315deg, #000 0%, transparent 48%);
+  }
+  .premium-glass--accent::after { opacity: 1; }
 `;
 
 const CAKTO_URL = process.env.NEXT_PUBLIC_CAKTO_URL ?? "#";
 
-// Redes sociais: só aparece no rodapé quando a env var correspondente
-// estiver configurada — dá o mesmo efeito de "ativar/desativar" sem
-// precisar de painel de admin ainda (fica pro backlog). Sem fallback pra
-// número pessoal: enquanto não existir um canal de suporte de verdade,
-// o ícone/link correspondente fica oculto em vez de expor o WhatsApp
-// pessoal de alguém como se fosse o contato oficial do produto.
-const REDES_SOCIAIS = [
-  { nome: "Instagram", url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM },
-  { nome: "WhatsApp", url: process.env.NEXT_PUBLIC_SOCIAL_WHATSAPP },
-  { nome: "Facebook", url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK },
-  { nome: "TikTok", url: process.env.NEXT_PUBLIC_SOCIAL_TIKTOK },
-].filter((r): r is { nome: string; url: string } => Boolean(r.url));
+// Redes sociais cadastradas em /painel/contatos — sem nenhum canal ativo,
+// o bloco inteiro do rodapé fica oculto (ver listarContatosAtivos).
+// Revalida a cada 5min + on-demand (revalidatePath) quando o admin
+// mexe em /painel/contatos, então a página continua estática na prática.
+export const revalidate = 300;
 
 export const metadata = {
   title: "QuitaZAP — Descubra quanto do seu dinheiro ainda é seu",
@@ -458,19 +511,30 @@ const WHATSAPP_ICON = (
 );
 
 const ICONES_REDE: Record<string, React.ReactNode> = {
-  Instagram: (
+  INSTAGRAM: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
   ),
-  WhatsApp: <span style={{ display: "inline-flex" }}>{WHATSAPP_ICON}</span>,
-  Facebook: (
+  WHATSAPP: <span style={{ display: "inline-flex" }}>{WHATSAPP_ICON}</span>,
+  FACEBOOK: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.88v-6.99H7.9V12h2.5V9.8c0-2.48 1.48-3.85 3.74-3.85 1.08 0 2.21.2 2.21.2v2.43h-1.25c-1.23 0-1.61.76-1.61 1.55V12h2.75l-.44 2.89h-2.31v6.99A10 10 0 0 0 22 12z" /></svg>
   ),
-  TikTok: (
+  TIKTOK: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.9-.98-1.4-2.26-1.4-3.62h-3.15v13.44a2.7 2.7 0 1 1-1.9-2.58V9.9a5.85 5.85 0 1 0 5.05 5.79V9.5a7.9 7.9 0 0 0 4.6 1.47V7.83a4.83 4.83 0 0 1-3.2-2.01z" /></svg>
+  ),
+  YOUTUBE: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12s0-3.2-.4-4.7a2.8 2.8 0 0 0-2-2C17.9 5 12 5 12 5s-5.9 0-7.6.3a2.8 2.8 0 0 0-2 2C2 8.8 2 12 2 12s0 3.2.4 4.7a2.8 2.8 0 0 0 2 2C6.1 19 12 19 12 19s5.9 0 7.6-.3a2.8 2.8 0 0 0 2-2c.4-1.5.4-4.7.4-4.7zM10 15.2V8.8l5.5 3.2z" /></svg>
+  ),
+  EMAIL: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 6-10 7L2 6" /></svg>
+  ),
+  OUTRO: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 14.5l5-5" /><path d="M7.2 16.8a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 0" /><path d="M16.8 7.2a4 4 0 0 1 0 5.6l-2 2a4 4 0 0 1-5.6 0" /></svg>
   ),
 };
 
 export default async function LandingPage() {
+  const contatosSociais = await listarContatosAtivos();
+
   return (
     <div className={`${inter.variable} ${fraunces.variable} ${oswald.variable} ${mono.variable}`} style={{
       background: "#ffffff", minHeight: "100vh", fontFamily: "var(--font-inter), 'Segoe UI', Arial, sans-serif",
@@ -829,9 +893,8 @@ export default async function LandingPage() {
                 qz-beam dá uma volta de luz única quando o card entra na
                 tela (border-beam pontual, só aqui — não em todo card da
                 página). */}
-            <div className="qz-price-card qz-beam" style={{
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 20,
-              boxShadow: "0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px -12px rgba(255,255,255,0.06)",
+            <div className="qz-price-card qz-beam premium-glass" style={{
+              background: "rgba(255,255,255,0.05)", borderRadius: 20,
               backdropFilter: "blur(16px)", textAlign: "left",
             }}>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12, marginBottom: 28 }}>
@@ -973,14 +1036,14 @@ export default async function LandingPage() {
               <a href="/minha-conta/entrar" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Já sou cliente</a>
               <a href="/privacidade" style={{ fontSize: 13, color: "#475569", textDecoration: "none", display: "inline-block", padding: "8px 4px" }}>Privacidade e Termos</a>
 
-              {REDES_SOCIAIS.length > 0 && (
+              {contatosSociais.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {REDES_SOCIAIS.map((r) => (
-                    <a key={r.nome} href={r.url} target="_blank" rel="noreferrer" aria-label={r.nome} style={{
+                  {contatosSociais.map((c) => (
+                    <a key={c.id} href={c.link} target="_blank" rel="noreferrer" aria-label={c.nome} style={{
                       width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.06)",
                       display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
                     }}>
-                      {ICONES_REDE[r.nome]}
+                      {ICONES_REDE[c.tipo]}
                     </a>
                   ))}
                 </div>

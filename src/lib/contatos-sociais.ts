@@ -9,12 +9,13 @@
 
 import { prisma } from "@/lib/prisma";
 
-export const TIPOS_CONTATO = ["WHATSAPP", "INSTAGRAM", "EMAIL", "YOUTUBE", "TIKTOK", "OUTRO"] as const;
+export const TIPOS_CONTATO = ["WHATSAPP", "INSTAGRAM", "FACEBOOK", "EMAIL", "YOUTUBE", "TIKTOK", "OUTRO"] as const;
 export type TipoContato = (typeof TIPOS_CONTATO)[number];
 
 export const LABEL_TIPO_CONTATO: Record<TipoContato, string> = {
   WHATSAPP: "WhatsApp",
   INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
   EMAIL: "E-mail",
   YOUTUBE: "YouTube",
   TIKTOK: "TikTok",
@@ -56,7 +57,7 @@ export function normalizarContato(tipo: string, valorBruto: string): { ok: true;
     return { ok: true, link: `mailto:${email}` };
   }
 
-  // INSTAGRAM / YOUTUBE / TIKTOK / OUTRO: precisa ser uma URL utilizável.
+  // INSTAGRAM / FACEBOOK / YOUTUBE / TIKTOK / OUTRO: precisa ser uma URL utilizável.
   const comProtocolo = /^https?:\/\//i.test(valor) ? valor : `https://${valor}`;
   try {
     const url = new URL(comProtocolo);

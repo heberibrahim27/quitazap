@@ -1,13 +1,11 @@
 import Link from "next/link";
+import { getContatoSuporte } from "@/lib/contatos-sociais";
 
 export const metadata = { title: "Privacidade e Termos de Uso — QuitaZAP" };
 
-// Contato de suporte oficial — configurável via env var. Sem fallback pra
-// número pessoal: enquanto não estiver definido, o texto abaixo não linka
-// pra lugar nenhum (só menciona "o suporte do QuitaZap" em prosa) em vez de
-// expor o WhatsApp pessoal de alguém como se fosse o canal oficial.
-const CONTATO_SUPORTE = process.env.NEXT_PUBLIC_SUPORTE_CONTATO;
-const CONTATO_SUPORTE_LINK = process.env.NEXT_PUBLIC_SUPORTE_LINK;
+// Revalida a cada 5min + on-demand (revalidatePath) quando o admin mexe
+// em /painel/contatos, então a página continua estática na prática.
+export const revalidate = 300;
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
@@ -18,7 +16,9 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
-export default function PrivacidadePage() {
+export default async function PrivacidadePage() {
+  const contatoSuporte = await getContatoSuporte();
+
   return (
     <div style={{ background: "#fff", minHeight: "100vh" }}>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px 80px" }}>
@@ -74,11 +74,11 @@ export default function PrivacidadePage() {
             precisarmos manter alguma informação por obrigação legal, prevenção a fraude ou comprovação de operações.
           </p>
           <p>
-            {CONTATO_SUPORTE_LINK ? (
+            {contatoSuporte ? (
               <>
                 Contato:{" "}
-                <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
-                  {CONTATO_SUPORTE}
+                <a href={contatoSuporte.link} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
+                  {contatoSuporte.nome}
                 </a>
               </>
             ) : (
@@ -131,11 +131,11 @@ export default function PrivacidadePage() {
 
           <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0a0a0a", margin: "20px 0 8px" }}>6. Exclusão da conta</h3>
           <p>
-            {CONTATO_SUPORTE_LINK ? (
+            {contatoSuporte ? (
               <>
                 O usuário pode solicitar a exclusão da conta e dos dados pelo suporte:{" "}
-                <a href={CONTATO_SUPORTE_LINK} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
-                  {CONTATO_SUPORTE}
+                <a href={contatoSuporte.link} target="_blank" rel="noreferrer" style={{ color: "#16a34a", fontWeight: 700 }}>
+                  {contatoSuporte.nome}
                 </a>
               </>
             ) : (
