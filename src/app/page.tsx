@@ -325,10 +325,10 @@ export const metadata = {
 };
 
 const doresMinicards = [
-  { titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi." },
-  { titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo." },
-  { titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro." },
-  { titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece." },
+  { badge: "CARTÃO", titulo: "Cartão de crédito", texto: "A fatura sobe e você não sabe onde foi.", icone: "cartao" as const },
+  { badge: "FIXAS", titulo: "Contas fixas", texto: "Água, luz, aluguel — tudo saindo ao mesmo tempo.", icone: "contas" as const },
+  { badge: "CONSIGNADO", titulo: "Empréstimos e consignado", texto: "Parcelas que descontam antes de você ver o dinheiro.", icone: "emprestimo" as const },
+  { badge: "DIA A DIA", titulo: "Gastos do dia a dia", texto: "Pequenos gastos que somam mais do que parece.", icone: "gastos" as const },
 ];
 
 // Os 3 primeiros ficam no grid estático de sempre; os 3 últimos (Modo
@@ -347,40 +347,36 @@ const funcionalidadesStack = [
 
 const faq = [
   {
-    p: "Preciso conectar minha conta bancária?",
-    r: "Não. Você começa direto pelo WhatsApp e pelo seu contracheque — sem conectar conta bancária, sem Open Finance. As informações vêm do que você mesmo registra ou envia.",
+    p: "O QuitaZap tem acesso à minha conta bancária?",
+    r: "Não. Hoje você não precisa conectar sua conta bancária. O QuitaZap trabalha com as informações que você decide registrar pelo WhatsApp ou pelo painel.",
   },
   {
-    p: "Como funciona o Raio-X do contracheque?",
-    r: "Você envia uma foto ou PDF do seu contracheque (ou informa sua renda) pelo WhatsApp, e o QuitaZap identifica salário, descontos e consignados pra te mostrar quanto realmente sobra.",
+    p: "Preciso trocar de banco ou cartão para usar?",
+    r: "Não. O QuitaZap independe do banco ou cartão que você usa. Você pode organizar receitas, gastos, cartões, dívidas e compromissos no mesmo lugar.",
   },
   {
-    p: "O QuitaZap paga ou movimenta meu dinheiro?",
-    r: "Não. O QuitaZap não acessa sua conta bancária nem movimenta ou paga nada por você — ele só organiza as informações que você registra e ajuda você a entender sua situação financeira. Os pagamentos continuam sendo feitos por você, do seu jeito de sempre.",
+    p: "Como registro meus gastos?",
+    r: "É só falar normalmente pelo WhatsApp. Você pode escrever, mandar áudio, foto ou documento, e o QuitaZap ajuda a transformar isso em informação organizada.",
   },
   {
-    p: "Meus dados ficam seguros?",
-    r: "Sim. Seus dados são usados só pra calcular suas informações financeiras e gerar suas análises — não vendemos seus dados pessoais ou financeiros pra ninguém. Você pode pedir a exclusão da sua conta e dos seus dados quando quiser. Veja todos os detalhes na nossa Política de Privacidade.",
+    p: "O que eu posso perguntar ao QuitaZap?",
+    r: "Coisas do dia a dia, como \"quanto ainda posso gastar?\", \"onde estou gastando mais?\", \"essa parcela cabe no meu mês?\" ou \"como posso economizar este mês?\".",
   },
   {
-    p: "Posso cancelar quando quiser?",
-    r: "Sim, a qualquer momento, sem multa e sem burocracia. Seu acesso continua até o fim do período já pago.",
+    p: "Preciso entender de finanças para usar?",
+    r: "Não. O objetivo é justamente tirar a complexidade. O QuitaZap organiza os números e apresenta o que importa em linguagem simples.",
   },
   {
-    p: "O preço vai aumentar pra quem já assinou?",
-    r: "Não. Enquanto sua assinatura estiver ativa, o valor de R$14,90/mês não muda. O reajuste vale só pra quem assinar depois que as 1.000 vagas desta condição se esgotarem.",
+    p: "As respostas da inteligência artificial podem errar?",
+    r: "Podem. Por isso, as análises dependem das informações registradas no QuitaZap. A IA ajuda a interpretar e explicar os dados, mas não substitui uma decisão financeira profissional quando ela for necessária.",
   },
   {
-    p: "Por que confiar em mais um app financeiro?",
-    r: "Porque o QuitaZap mostra de onde vêm os números. As análises são baseadas nos dados que você registra e servem para te ajudar a entender melhor sua situação — sem promessa milagrosa e sem esconder informação atrás de um score misterioso.",
+    p: "Meus dados são vendidos para outras empresas?",
+    r: "Não. O QuitaZap não vende seus dados. As informações são usadas para prestar o serviço e gerar as funcionalidades que você utiliza.",
   },
   {
-    p: "Funciona com qualquer banco?",
-    r: "Sim. Como você não precisa conectar sua conta bancária, pode usar o QuitaZap independentemente do banco que utiliza. Cartões, gastos, receitas, dívidas e outros compromissos podem ser registrados normalmente.",
-  },
-  {
-    p: "Funciona em qualquer WhatsApp?",
-    r: "Sim. Você usa o WhatsApp normalmente para registrar gastos, receitas e fazer consultas ao QuitaZap. Não precisa instalar outro aplicativo de mensagens.",
+    p: "Posso cancelar quando quiser? E o valor de R$14,90?",
+    r: "Sim. Você pode cancelar sua assinatura. Quem aderir à condição de R$14,90 mantém esse valor enquanto a assinatura permanecer ativa; se cancelar e voltar depois, vale a condição disponível naquele momento.",
   },
 ];
 
@@ -426,6 +422,45 @@ function LogoQuitaZap({ height }: { height: number }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-quitazap.webp" alt="QuitaZap" style={{ position: "relative", height, width: "auto", display: "block" }} />
     </div>
+  );
+}
+
+// Ícones dos 4 mini-cards de Dor — estilo linha fina, verde só no traço
+// (referência: print que o Ibrahim mandou, cards escuros com badge+ícone
+// verde centralizados, não o card inteiro pintado).
+function IconeDor({ tipo }: { tipo: "cartao" | "contas" | "emprestimo" | "gastos" }) {
+  const props = { width: 26, height: 26, viewBox: "0 0 24 24", fill: "none" as const, stroke: "#22e07a", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (tipo === "cartao") {
+    return (
+      <svg {...props}>
+        <rect x="2.5" y="5.5" width="19" height="13" rx="2" />
+        <path d="M2.5 9.5h19" />
+        <path d="M6 14.5h4" />
+      </svg>
+    );
+  }
+  if (tipo === "contas") {
+    return (
+      <svg {...props}>
+        <path d="M6 3h12v16.5l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3Z" />
+        <path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" />
+      </svg>
+    );
+  }
+  if (tipo === "emprestimo") {
+    return (
+      <svg {...props}>
+        <circle cx="8" cy="8" r="2.5" />
+        <circle cx="16" cy="16" r="2.5" />
+        <path d="M17 7 7 17" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...props}>
+      <path d="M6 8h12l-1 12H7Z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </svg>
   );
 }
 
@@ -634,15 +669,30 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 1, background: "rgba(255,255,255,0.08)" }}>
+          <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+            {/* Textura de grid sutil só atrás desses 4 cards — referência
+                do print (fundo quase preto com grafite/grid de fundo). */}
+            <div style={{
+              position: "absolute", inset: -16, zIndex: 0, opacity: 0.05, pointerEvents: "none",
+              backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }} />
             {doresMinicards.map((d, i) => (
               <div key={d.titulo} className="qz-reveal" style={{
-                background: "#0a140d", padding: "24px 20px",
+                position: "relative", zIndex: 1, background: "#0a140d", border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 16, padding: "28px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
                 "--qz-delay": `${i * 70}ms`,
               } as React.CSSProperties}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>{String(i + 1).padStart(2, "0")}</span>
-                <p style={{ margin: "10px 0 4px", fontSize: 14, fontWeight: 700, color: "#fff" }}>{d.titulo}</p>
-                <p style={{ margin: 0, fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{d.texto}</p>
+                <span style={{
+                  display: "inline-block", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "#22e07a",
+                  letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 10px", borderRadius: 999,
+                  border: "1px solid rgba(34,224,122,0.35)", background: "rgba(34,224,122,0.08)", marginBottom: 18,
+                }}>
+                  {d.badge}
+                </span>
+                <IconeDor tipo={d.icone} />
+                <p style={{ margin: "16px 0 6px", fontSize: 15, fontWeight: 700, color: "#fff" }}>{d.titulo}</p>
+                <p style={{ margin: 0, fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{d.texto}</p>
               </div>
             ))}
           </div>
@@ -883,9 +933,9 @@ export default async function LandingPage() {
                   <span style={{ fontSize: 18, color: "#94a3b8", flexShrink: 0, marginLeft: 12 }}>+</span>
                 </summary>
                 <div style={{ padding: "0 20px 18px", fontSize: 14, color: "#64748b", lineHeight: 1.65 }}>
-                  {item.p === "Meus dados ficam seguros?" ? (
+                  {item.p === "Meus dados são vendidos para outras empresas?" ? (
                     <>
-                      Sim. Seus dados são usados só pra calcular suas informações financeiras e gerar suas análises — não vendemos seus dados pessoais ou financeiros pra ninguém. Você pode pedir a exclusão da sua conta e dos seus dados quando quiser. Veja todos os detalhes na nossa{" "}
+                      {item.r} Veja todos os detalhes na nossa{" "}
                       <a href="/privacidade" style={{ color: "#16a34a", fontWeight: 600 }}>Política de Privacidade</a>.
                     </>
                   ) : item.r}
