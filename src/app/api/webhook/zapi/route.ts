@@ -30,6 +30,7 @@ import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/i
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
 import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
 import { detectarRotaDividas, responderRotaDividas } from "@/lib/ia/rota-dividas-resolver";
+import { detectarPlanoPagamento, detectarMetaPrazo, responderPlanoPagamento, responderMetaPrazo } from "@/lib/ia/plano-pagamento-resolver";
 import { detectarConsultaVazamentos, responderConsultaVazamentos } from "@/lib/ia/vazamentos-resolver";
 import { detectarHorasTrabalho, responderHorasTrabalho } from "@/lib/ia/horas-trabalho-resolver";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
@@ -1285,6 +1286,54 @@ Pode mandar tudo em uma mensagem só.`;
               ...servidorHistoricoSessao,
               { role: "user", content: mensagem },
               { role: "assistant", content: respostaRota },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // Meta/prazo do Plano de Pagamento ("quero quitar o Carrefour em 6
+    // meses") — mais específico que o plano geral abaixo, por isso checado
+    // primeiro. Leitura pura, mesmo padrão das consultas acima.
+    if (sessao.clienteId) {
+      const deteccaoMeta = detectarMetaPrazo(mensagem);
+      if (deteccaoMeta) {
+        const respostaMeta = await responderMetaPrazo(sessao.clienteId, isGratuito, deteccaoMeta);
+        await sendWhatsApp(telefone, respostaMeta);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaMeta },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // Plano de Pagamento do mês ("monta meu plano de pagamento", "o que eu
+    // pago primeiro esse mês") — motor determinístico por camadas de
+    // prioridade (plano-pagamento-motor.ts). Leitura pura, mesmo padrão
+    // das consultas acima.
+    if (sessao.clienteId) {
+      if (detectarPlanoPagamento(mensagem)) {
+        const respostaPlano = await responderPlanoPagamento(sessao.clienteId, isGratuito);
+        await sendWhatsApp(telefone, respostaPlano);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaPlano },
             ]),
           },
         });
