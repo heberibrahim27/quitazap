@@ -59,41 +59,38 @@ const LANDING_CSS = `
     35% { opacity: 1; border-color: rgba(255,255,255,0.55); box-shadow: 0 0 20px 1px rgba(255,255,255,0.25); }
     100% { opacity: 0; border-color: rgba(255,255,255,0); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
   }
-  /* CTA com profundidade: gradiente sutil + sombra em camadas (glow verde +
-     sombra escura + highlight interno) em vez de retângulo verde chapado,
-     mais um brilho que atravessa a superfície uma única vez ao entrar na
-     tela — a versão do border-beam que faz sentido pra um botão sólido
-     (não vidro/transparente). */
-  .qz-cta {
-    position: relative; overflow: hidden;
-    background: linear-gradient(180deg, #29e883, #1bc767) !important;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 4px rgba(0,0,0,0.16),
-      0 10px 24px -10px rgba(34,224,122,0.55), 0 2px 8px rgba(0,0,0,0.3);
+  /* CTA estilo Finex (referência mandada pelo Ibrahim) adaptado pra nossa
+     paleta: anel fino girando continuamente ao redor da pílula, sem usar
+     mask/conic-gradient mascarado (técnica que já vazou fora do card uma
+     vez nesta sessão) — aqui é só empilhamento de 3 camadas com
+     overflow:hidden: (1) o wrap com border-radius+overflow:hidden, (2) um
+     conic-gradient bem maior que o próprio botão girando por baixo, (3) a
+     pílula de verdade (gradiente verde + sombra) cobrindo tudo menos um
+     anel fino de ~1.5px nas bordas, onde o brilho giratório aparece. */
+  .qz-cta-wrap {
+    position: relative; display: inline-flex; border-radius: 999px; overflow: hidden;
+    padding: 1.5px; text-decoration: none; flex-shrink: 0;
+  }
+  .qz-cta-wrap::before {
+    content: ""; position: absolute; inset: -150%;
+    background: conic-gradient(from 0deg, transparent 0deg, transparent 270deg, rgba(255,255,255,0.95) 320deg, #22e07a 345deg, transparent 360deg);
+    animation: qz-cta-spin 3s linear infinite;
+  }
+  @keyframes qz-cta-spin { to { transform: rotate(360deg); } }
+  .qz-cta-inner {
+    position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; border-radius: 999px; color: #000; text-decoration: none;
+    background: linear-gradient(180deg, #29e883, #1bc767);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 4px rgba(0,0,0,0.16);
     transition: transform .2s ease, box-shadow .2s ease;
   }
-  .qz-cta:hover {
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.16),
-      0 14px 30px -10px rgba(34,224,122,0.65), 0 4px 12px rgba(0,0,0,0.35);
+  .qz-cta-wrap:hover .qz-cta-inner {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.16), 0 6px 16px -6px rgba(34,224,122,0.6);
   }
-  .qz-cta::after {
-    content: ""; position: absolute; top: -60%; left: -60%; width: 35%; height: 220%;
-    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.55), transparent);
-    transform: rotate(20deg) translateX(-120%); opacity: 0; pointer-events: none;
-  }
-  .qz-cta.qz-visible::after,
-  .qz-price-wrap.qz-visible .qz-cta::after,
-  .qz-final-wrap.qz-visible .qz-cta::after { animation: qz-cta-sheen 1.3s ease .6s 1 both; }
-  @keyframes qz-cta-sheen {
-    0% { transform: rotate(20deg) translateX(-120%); opacity: 0; }
-    15% { opacity: 1; }
-    55% { opacity: 1; }
-    100% { transform: rotate(20deg) translateX(260%); opacity: 0; }
-  }
+  .qz-cta-arrow { transition: transform .25s ease; flex-shrink: 0; }
+  .qz-cta-wrap:hover .qz-cta-arrow { transform: translateX(3px); }
   @media (prefers-reduced-motion: reduce) {
-    .qz-beam::before, .qz-cta::after { animation: none !important; opacity: 0 !important; }
+    .qz-cta-wrap::before { animation: none; }
   }
   .qz-grid12 { display: grid; grid-template-columns: 1fr; gap: 28px; }
   .qz-hero-pad { padding-left: 24px; padding-right: 24px; }
@@ -347,6 +344,34 @@ const faq = [
   },
 ];
 
+// Botão de CTA — anel giratório + pílula verde (estilo Finex adaptado à
+// nossa paleta). Componente compartilhado pelos 3 CTAs (Hero, Preço,
+// Fechamento) pra não triplicar a mesma estrutura de 3 camadas.
+function CtaButton({
+  href,
+  children,
+  className,
+  innerStyle,
+  block,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+  innerStyle?: React.CSSProperties;
+  block?: boolean;
+}) {
+  return (
+    <a href={href} className={`qz-cta-wrap ${className ?? ""}`} style={block ? { display: "flex", width: "100%" } : undefined}>
+      <span className="qz-cta-inner" style={innerStyle}>
+        {children}
+        <svg className="qz-cta-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </span>
+    </a>
+  );
+}
+
 const WHATSAPP_ICON = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
     <path d="M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652C8.051 23.08 9.993 23.56 12 23.56h.008c6.572 0 11.92-5.334 11.928-11.894 0-3.174-1.25-6.16-3.42-8.217M12.045 21.58h-.007c-1.784 0-3.532-.48-5.057-1.38l-.363-.215-3.76.985 1.006-3.654-.237-.374a9.814 9.814 0 0 1-1.51-5.26c.001-5.45 4.452-9.878 9.92-9.878 2.648 0 5.135 1.03 7.007 2.9a9.836 9.836 0 0 1 2.907 6.988c-.002 5.45-4.455 9.888-9.906 9.888" fill="white"/>
@@ -483,13 +508,13 @@ export default async function LandingPage() {
             <p className="qz-reveal" style={{ margin: "0 0 32px", fontSize: 14, opacity: 0.8, maxWidth: 380, fontWeight: 300, lineHeight: 1.6 }}>
               Controle seus gastos, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar — sem conectar conta bancária.
             </p>
-            <a href={CAKTO_URL} className="qz-reveal qz-cta" style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              borderRadius: 999, padding: "13px 26px", fontSize: 14, fontWeight: 600,
-              color: "#000", textDecoration: "none", fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em",
-            }}>
+            <CtaButton
+              href={CAKTO_URL}
+              className="qz-reveal"
+              innerStyle={{ padding: "13px 26px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em" }}
+            >
               Quero garantir R$14,90/mês
-            </a>
+            </CtaButton>
           </div>
         </div>
 
@@ -765,13 +790,9 @@ export default async function LandingPage() {
                 ))}
               </div>
 
-              <a href={CAKTO_URL} className="qz-cta" style={{
-                display: "block", color: "#000",
-                fontWeight: 700, fontSize: 16, padding: "16px 24px", borderRadius: 10,
-                textDecoration: "none", textAlign: "center",
-              }}>
+              <CtaButton href={CAKTO_URL} block innerStyle={{ padding: "16px 24px", fontSize: 16, fontWeight: 700 }}>
                 Quero garantir R$14,90/mês
-              </a>
+              </CtaButton>
 
               <p style={{ margin: "12px 0 0", fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
                 7 dias de garantia. Cancele quando quiser.
@@ -828,19 +849,16 @@ export default async function LandingPage() {
           width: "600px", height: "400px", maxWidth: "150vw",
           background: "radial-gradient(ellipse, rgba(34,224,122,0.1) 0%, transparent 70%)",
         }} />
-        <div className="qz-reveal qz-final-wrap" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
+        <div className="qz-reveal" style={{ maxWidth: 600, margin: "0 auto", position: "relative", zIndex: 1 }}>
           <h2 className="qz-h2-lg" style={{ margin: "0 0 16px", color: "#fff" }}>
             Descubra hoje quanto do seu dinheiro é realmente seu.
           </h2>
           <p style={{ margin: "0 0 32px", fontSize: 14, color: "#4ade80" }}>
             {vagasRestantes.toLocaleString("pt-BR")} vagas ainda disponíveis nesta condição · Cancele quando quiser
           </p>
-          <a href={CAKTO_URL} className="qz-cta" style={{
-            display: "inline-block", color: "#000", fontWeight: 800, fontSize: 18,
-            padding: "18px 48px", borderRadius: 8, textDecoration: "none",
-          }}>
+          <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
             Quero garantir R$14,90/mês
-          </a>
+          </CtaButton>
         </div>
 
         {/* Transição em degradê pro preto do rodapé — mesmo tratamento do
