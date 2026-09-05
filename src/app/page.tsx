@@ -146,24 +146,15 @@ const LANDING_CSS = `
   .qz-cf-desktop { display: none; }
   .qz-cf-mobile { display: flex; flex-direction: column; gap: 40px; }
   .qz-wp-stage { display: flex; flex-direction: column; gap: 20px; margin-top: 40px; }
+  /* Screenshot real do painel (substituiu as barras/linhas fake em CSS) —
+     só recorte com cantos arredondados + sombra, sem frame extra por
+     fora, mesmo critério já usado nas fotos reais de Como Funciona. */
   .qz-wp-dashboard {
-    position: relative; background: linear-gradient(160deg, var(--graphite), #0a0b0a);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 18px 18px 22px;
+    position: relative; border-radius: 16px; overflow: hidden;
     box-shadow: 0 20px 40px -20px rgba(0,0,0,0.6);
   }
-  .qz-wp-dash-head {
-    display: flex; justify-content: space-between; align-items: center;
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
-    color: rgba(255,255,255,0.45); margin-bottom: 14px;
-  }
-  .qz-wp-dash-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); }
-  .qz-wp-dash-row {
-    display: flex; justify-content: space-between; font-size: 14px; color: rgba(255,255,255,0.85);
-    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
-  }
-  .qz-wp-dash-bars { display: flex; align-items: flex-end; gap: 6px; height: 48px; margin-top: 14px; }
-  .qz-wp-dash-bars span { flex: 1; background: rgba(255,255,255,0.14); border-radius: 3px 3px 0 0; }
   .qz-wp-phone { width: 176px; margin: 0 auto; }
+  .qz-wp-phone-photo { width: 100%; height: 364px; border-radius: 22px; overflow: hidden; box-shadow: 0 24px 48px -20px rgba(0,0,0,.6); }
   .qz-wp-chip {
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);

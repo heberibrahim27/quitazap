@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { WhatsAppScreen, WhatsAppBubble } from "./WhatsAppScreen";
 
 // Composição decorativa do fold WhatsApp+Painel: um "objeto de produto"
 // (celular + fatia de painel + mensagens flutuando fora do celular) com
@@ -45,42 +44,23 @@ export function WhatsAppPainelStage() {
 
   return (
     <div ref={stageRef} className="qz-wp-stage qz-reveal" aria-hidden="true" style={{ "--qz-delay": "80ms" } as React.CSSProperties}>
+      {/* Screenshot real da tela de Resumo do painel (auditoria de direção
+          de arte apontou essa dobra como a que mais dependia de mockup
+          fake — 2 linhas de texto e 5 barras desenhadas em CSS). */}
       <div className="qz-wp-dashboard">
-        <div className="qz-wp-dash-head">
-          <span>EXTRATO · SETEMBRO</span>
-          <span className="qz-wp-dash-dot" />
-        </div>
-        <div className="qz-wp-dash-row">
-          <span>Mercado</span>
-          <span>R$ 87,50</span>
-        </div>
-        <div className="qz-wp-dash-row">
-          <span>Farmácia</span>
-          <span>R$ 42,00</span>
-        </div>
-        <div className="qz-wp-dash-bars">
-          <span style={{ height: "38%" }} />
-          <span style={{ height: "62%" }} />
-          <span style={{ height: "45%" }} />
-          <span style={{ height: "80%" }} />
-          <span style={{ height: "30%" }} />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/painel-resumo.webp" alt="Resumo real do painel QuitaZap" style={{ width: "100%", height: "auto", display: "block" }} />
       </div>
 
       <div className="qz-wp-phone">
-        <div className="qz-panel-phone" style={{ width: 176, height: 364, margin: 0 }}>
-          <div className="qz-phone-mock-inner">
-            <div className="qz-phone-notch-band"><div className="qz-phone-notch" /></div>
-            <WhatsAppScreen>
-              <WhatsAppBubble text="Gastei R$ 42 na farmácia." time="14:02" out />
-              <WhatsAppBubble text="Registrado! ✅ Já está no seu extrato." time="14:02" />
-            </WhatsAppScreen>
-          </div>
+        <div className="qz-wp-phone-photo">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/whatsapp-2.webp" alt="Conversa real do QuitaZap no WhatsApp" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </div>
 
       <div className="qz-wp-chip qz-wp-chip-1">
-        <span className="qz-wp-chip-msg">“Gastei R$ 42 na farmácia.”</span>
+        <span className="qz-wp-chip-msg">“Gastei R$ 87,50 no mercado.”</span>
         <span className="qz-wp-chip-status">REGISTRADO ✓</span>
       </div>
 
