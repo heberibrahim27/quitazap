@@ -3,7 +3,7 @@
 import { createRef, useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 
-type Item = { titulo: string; texto: string };
+type Item = { titulo: string; texto: string; imagem?: string };
 
 // Efeito "cards empilhando com scroll" (referência "Parallax Clean" que o
 // Ibrahim mandou, mecanismo original em GSAP + ScrollTrigger, portado pra
@@ -89,14 +89,21 @@ function ConteudoCard({ item, index }: { item: Item; index: number }) {
         </div>
       </div>
       <div className="qz-feat-stack-imgwrap">
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
-        }}>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
-            PRINT DO APP EM BREVE
-          </span>
-        </div>
+        {item.imagem ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imagem} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          /* Placeholder — sem screenshot real batendo com essa
+             funcionalidade ainda. */
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
+          }}>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
+              PRINT DO APP EM BREVE
+            </span>
+          </div>
+        )}
       </div>
     </>
   );

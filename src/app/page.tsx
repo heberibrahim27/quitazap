@@ -330,15 +330,19 @@ const doresMinicards = [
 // Os 3 primeiros ficam no grid estático de sempre; os 3 últimos (Modo
 // Apertou / Simulador de Parcelas / Dívidas e Consignados) ganham o
 // efeito de empilhamento com scroll (ver FuncionalidadesStack.tsx).
+// `imagem` só quando existe screenshot real batendo de fato com a
+// funcionalidade — sem isso, fica o placeholder "EM BREVE" (mostrar um
+// print de outra tela fingindo ser a certa seria tão desonesto quanto
+// inventar prova social).
 const funcionalidadesGrid = [
   { titulo: "Raio-X do Salário", texto: "Entenda de onde vem e pra onde vai cada real do seu contracheque." },
   { titulo: "Salário Livre", texto: "Saiba exatamente quanto sobra até o próximo pagamento." },
-  { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora." },
+  { titulo: "Analista pelo WhatsApp", texto: "Pergunte qualquer coisa sobre suas finanças, na hora.", imagem: "/whatsapp-3.webp" },
 ];
 const funcionalidadesStack = [
   { titulo: "Modo Apertou", texto: "Um aviso claro quando dias apertados estão chegando." },
   { titulo: "Simulador de Parcelas", texto: "Descubra se uma parcela nova cabe nos seus próximos pagamentos." },
-  { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas." },
+  { titulo: "Dívidas e Consignados", texto: "Organize tudo num só lugar e veja o caminho pra ficar livre delas.", imagem: "/painel-dividas.webp" },
 ];
 
 const faq = [
@@ -794,17 +798,21 @@ export default async function LandingPage() {
                 background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden",
                 "--qz-delay": `${i * 60}ms`,
               } as React.CSSProperties}>
-                {/* Placeholder de screenshot real do app — trocar por print
-                    de tela verdadeira desta funcionalidade assim que
-                    disponível. */}
-                <div className="qz-feat-img" style={{
-                  background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
-                    PRINT DO APP EM BREVE
-                  </span>
-                </div>
+                {f.imagem ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={f.imagem} alt="" className="qz-feat-img" style={{ objectFit: "cover", width: "100%" }} />
+                ) : (
+                  /* Placeholder — sem screenshot real batendo com essa
+                     funcionalidade ainda. */
+                  <div className="qz-feat-img" style={{
+                    background: "linear-gradient(160deg, #0a2e18 0%, #041a0c 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.05em" }}>
+                      PRINT DO APP EM BREVE
+                    </span>
+                  </div>
+                )}
                 <div style={{ padding: "18px 20px" }}>
                   <p style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{f.titulo}</p>
                   <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>{f.texto}</p>
