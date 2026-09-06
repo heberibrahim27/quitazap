@@ -18,7 +18,7 @@
 import { prisma } from "@/lib/prisma";
 import { calcularStatusAssinatura, whereStatusAssinatura, LABEL_STATUS_ASSINATURA, type StatusAssinatura } from "@/lib/status-assinatura";
 import { calcularMetricasNegocio } from "@/lib/financeiro-admin/metricas-negocio";
-import { calcularDreAdmin } from "@/lib/financeiro-admin/motor";
+import { calcularDreAdmin, calcularAssinantesParaLucro } from "@/lib/financeiro-admin/motor";
 import { TIPOS_CONTATO, LABEL_TIPO_CONTATO, normalizarContato, criarContatoSocial, type TipoContato } from "@/lib/contatos-sociais";
 
 export const SYSTEM_PROMPT = `Você é o assistente interno do painel administrativo do QuitaZAP — uso exclusivo da equipe (Ibrahim e afins), nunca do cliente final. Ajuda com perguntas sobre a gestão do negócio (clientes, assinaturas, métricas financeiras do SaaS) e executa ações administrativas simples quando pedido.
@@ -49,6 +49,12 @@ export type DefinicaoFerramenta = ResultadoLeitura | ResultadoEscrita;
 
 function argTexto(args: Record<string, unknown>, chave: string): string {
   return typeof args[chave] === "string" ? (args[chave] as string) : "";
+}
+
+function argNumero(args: Record<string, unknown>, chave: string): number | null {
+  const v = args[chave];
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
 }
 
 // ── Leitura ──────────────────────────────
@@ -85,6 +91,18 @@ const buscarDreMes: ResultadoLeitura = {
     const mes = argTexto(args, "mes") || undefined;
     const dre = await calcularDreAdmin(mes);
     return dre;
+  },
+};
+
+const calcularAssinantesParaMeta: ResultadoLeitura = {
+  tipo: "leitura",
+  async executar(args) {
+    const lucroDesejado = argNumero(args, "lucroDesejado");
+    if (lucroDesejado === null) return { erro: "Informe o lucro operacional desejado, em reais." };
+
+    const mes = argTexto(args, "mes") || undefined;
+    const r = await calcularAssinantesParaLucro(lucroDesejado, mes);
+    return r;
   },
 };
 
@@ -234,6 +252,7 @@ const cadastrarContatoSocial: ResultadoEscrita = {
 export const REGISTRO_FERRAMENTAS: Record<string, DefinicaoFerramenta> = {
   buscar_metricas_negocio: buscarMetricasNegocio,
   buscar_dre_mes: buscarDreMes,
+  calcular_assinantes_para_meta: calcularAssinantesParaMeta,
   buscar_cliente: buscarCliente,
   listar_clientes_por_status: listarClientesPorStatus,
   contar_clientes_por_status: contarClientesPorStatus,
@@ -262,6 +281,21 @@ export const FERRAMENTAS_OPENAI = [
       parameters: {
         type: "object",
         properties: { mes: { type: "string", description: "Mês no formato AAAA-MM. Se omitido, usa o mês atual." } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "calcular_assinantes_para_meta",
+      description: "Simula quantos assinantes ativos são necessários pra atingir um resultado operacional (lucro) desejado no mês, usando preço da assinatura, comissão da Cakto e custos reais do DRE. Use pra perguntas tipo 'quantos assinantes preciso pra ter R$X de lucro/resultado'. lucroDesejado=0 é o break-even.",
+      parameters: {
+        type: "object",
+        properties: {
+          lucroDesejado: { type: "number", description: "Resultado operacional mensal desejado, em reais. Use 0 pra break-even." },
+          mes: { type: "string", description: "Mês no formato AAAA-MM. Se omitido, usa o mês atual." },
+        },
+        required: ["lucroDesejado"],
       },
     },
   },

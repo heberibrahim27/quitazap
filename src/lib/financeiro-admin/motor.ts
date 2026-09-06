@@ -109,3 +109,54 @@ export async function calcularDreAdmin(mesRef?: string): Promise<DreAdminResumo>
     margem,
   };
 }
+
+export interface AssinantesParaLucroResumo {
+  mes: string;
+  lucroDesejado: number;
+  assinantesAtuais: number;
+  custoManualMes: number;
+  margemPorAssinante: number;
+  /** null quando o custo de IA por cliente já é maior que a margem de uma
+   * assinatura — nenhuma quantidade de assinante cobre isso nesse preço. */
+  assinantesNecessarios: number | null;
+  faltam: number | null;
+  motivoImpossivel?: string;
+}
+
+/** Quantos assinantes ativos são necessários pra bater um resultado
+ * operacional-alvo (lucroDesejado=0 é exatamente o break-even, mesma
+ * fórmula que já existia inline em /financeiro/page.tsx — extraída aqui
+ * pra virar a única definição de "margem por assinante" do sistema, em
+ * vez de reimplementada em cada lugar que precisa de uma simulação). */
+export async function calcularAssinantesParaLucro(lucroDesejado: number, mesRef?: string): Promise<AssinantesParaLucroResumo> {
+  const dre = await calcularDreAdmin(mesRef);
+  const totalClientesAtivos = dre.totalAssinantes + dre.totalGratuitos;
+  const custoVariavelPorCliente = totalClientesAtivos > 0 ? dre.custoIA / totalClientesAtivos : 0;
+  const margemPorAssinante = PRECO_MENSAL * (1 - COMISSAO_CAKTO) - custoVariavelPorCliente;
+
+  if (margemPorAssinante <= 0) {
+    return {
+      mes: dre.mes,
+      lucroDesejado,
+      assinantesAtuais: dre.totalAssinantes,
+      custoManualMes: dre.custoManual,
+      margemPorAssinante,
+      assinantesNecessarios: null,
+      faltam: null,
+      motivoImpossivel: "O custo médio de IA por cliente já é maior que o quanto sobra de cada assinatura no preço atual — nenhuma quantidade de assinante cobre isso nesse ritmo.",
+    };
+  }
+
+  const assinantesNecessarios = Math.max(0, Math.ceil((dre.custoManual + lucroDesejado) / margemPorAssinante));
+  const faltam = Math.max(0, assinantesNecessarios - dre.totalAssinantes);
+
+  return {
+    mes: dre.mes,
+    lucroDesejado,
+    assinantesAtuais: dre.totalAssinantes,
+    custoManualMes: dre.custoManual,
+    margemPorAssinante,
+    assinantesNecessarios,
+    faltam,
+  };
+}

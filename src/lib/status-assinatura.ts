@@ -26,10 +26,20 @@ export const COR_STATUS_ASSINATURA: Record<StatusAssinatura, { bg: string; color
   INATIVO: { bg: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "rgba(255,255,255,0.12)" },
 };
 
-export function calcularStatusAssinatura(cliente: { gratuito: boolean; assinaturaVenceEm: Date | null }): StatusAssinatura {
+/** Versão parametrizada por instante — usada pra reconstruir status
+ * histórico (ex: "estava pago no fim de julho?") sem duplicar a regra.
+ * calcularStatusAssinatura (abaixo) é só esta função fixada em "agora". */
+export function calcularStatusAssinaturaEm(
+  cliente: { gratuito: boolean; assinaturaVenceEm: Date | null },
+  instante: Date
+): StatusAssinatura {
   if (cliente.gratuito) return "INATIVO";
-  if (cliente.assinaturaVenceEm && cliente.assinaturaVenceEm < new Date()) return "CANCELADO";
+  if (cliente.assinaturaVenceEm && cliente.assinaturaVenceEm < instante) return "CANCELADO";
   return "PAGO";
+}
+
+export function calcularStatusAssinatura(cliente: { gratuito: boolean; assinaturaVenceEm: Date | null }): StatusAssinatura {
+  return calcularStatusAssinaturaEm(cliente, new Date());
 }
 
 /** Cláusula `where` do Prisma equivalente a `calcularStatusAssinatura`, pra

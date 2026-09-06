@@ -14,7 +14,7 @@ import { IconWallet, IconTrendUp, IconTrendDown, IconTarget, IconCheckCircle, Ic
 import { QaReveal } from "@/components/QaReveal";
 import { QaTrendChart } from "@/components/QaTrendChart";
 import { QaFlowChart } from "@/components/QaFlowChart";
-import { calcularDreAdmin, mesAtualBrasil, PRECO_MENSAL, COMISSAO_CAKTO } from "@/lib/financeiro-admin/motor";
+import { calcularDreAdmin, calcularAssinantesParaLucro, mesAtualBrasil, PRECO_MENSAL, COMISSAO_CAKTO } from "@/lib/financeiro-admin/motor";
 import { calcularMetricasNegocio } from "@/lib/financeiro-admin/metricas-negocio";
 
 export const dynamic = "force-dynamic";
@@ -72,11 +72,12 @@ export default async function FinanceiroPage() {
   // (MRR, churn, movimento da base) — duas fontes complementares, cada uma
   // com seu próprio contrato documentado (motor-contrato.ts e o topo de
   // metricas-negocio.ts). /painel consome o mesmo motor DRE.
-  const [dre, metricas, custosDoMes, metas] = await Promise.all([
+  const [dre, metricas, custosDoMes, metas, breakEven] = await Promise.all([
     calcularDreAdmin(mesAtual),
     calcularMetricasNegocio(mesAtual),
     prisma.custoMensal.findMany({ where: { mes: mesAtual }, orderBy: { criadoEm: "asc" } }),
     prisma.metaFinanceira.findMany(),
+    calcularAssinantesParaLucro(0, mesAtual),
   ]);
 
   const {
@@ -97,12 +98,11 @@ export default async function FinanceiroPage() {
   const custoMedioPorAssinante = totalAssinantes > 0 ? custoTotal / totalAssinantes : 0;
   const margemOperacionalPorAssinante = totalAssinantes > 0 ? resultadoOperacional / totalAssinantes : 0;
 
-  // Break-even: quantos assinantes cobrem o custo fixo do mês (custo manual)
-  // + a fatia variável de IA por cliente, considerando a comissão da CAKTO
-  // sobre cada nova assinatura.
-  const margemPorCliente = PRECO_MENSAL * (1 - COMISSAO_CAKTO) - custoVariavelPorCliente;
-  const breakEvenClientes = margemPorCliente > 0 ? Math.ceil(custoManualMes / margemPorCliente) : null;
-  const clientesFaltam = breakEvenClientes != null ? Math.max(0, breakEvenClientes - totalAssinantes) : null;
+  // Break-even (0 de lucro) — cálculo canônico em financeiro-admin/motor.ts
+  // (calcularAssinantesParaLucro), a mesma função que o assistente admin
+  // usa pra simular "quantos assinantes preciso pra lucro X".
+  const breakEvenClientes = breakEven.assinantesNecessarios;
+  const clientesFaltam = breakEven.faltam;
   const resultadoPositivo = resultadoOperacional >= 0;
 
   const metaClientes = metas.find((m) => m.metrica === "clientes_pagos");
