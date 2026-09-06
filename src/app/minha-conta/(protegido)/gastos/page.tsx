@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
+import { MesFiltro } from "../MesFiltro";
 import { AnimarAoAparecer } from "../AnimarAoAparecer";
 import { ValorLista } from "../ValorLista";
 import { CategoriaAccordion } from "./CategoriaAccordion";
@@ -126,7 +127,7 @@ export default async function GastosPage({
           <span className="title-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 3.5" /></svg>
           </span>
-          <span className="title-label">Onde está indo — {nomeMes}/{ano}</span>
+          <span className="title-label">Onde está indo</span>
         </p>
       </div>
 
@@ -152,6 +153,12 @@ export default async function GastosPage({
           </div>
         </div>
       )}
+
+      <MesFiltro
+        hrefAnterior={`/minha-conta/gastos?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+        hrefSeguinte={`/minha-conta/gastos?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        label={`${nomeMes}/${ano}`}
+      />
 
       {vazamentos.length > 0 && (
         <div className="mc-card" style={{ marginBottom: 16 }}>

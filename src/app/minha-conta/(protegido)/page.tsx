@@ -103,7 +103,7 @@ export default async function MinhaContaPage({
   const mesAnterior = mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
 
-  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro, mediaMensal, limiteSeguro] = await Promise.all([
+  const [dividas, tarefasPendentes, cartoes, ultimosLancamentos, agregadoMetas, agregadoDepositos, resumoFinanceiro, mediaMensal] = await Promise.all([
     prisma.divida.findMany({
       where: { clienteId: cliente.id, status: "ATIVA" },
       orderBy: [{ prioridade: "desc" }, { criadoEm: "asc" }],
@@ -132,12 +132,18 @@ export default async function MinhaContaPage({
     // Média dos últimos 3 meses (mesmo motor) — só pro componente "ritmo"
     // da Saúde Financeira, ver src/lib/financeiro/saude-financeira.ts.
     calcularMediaMensal(cliente.id, { inicio: inicioMes, fim: fimMes }, 3),
-    // "Até o próximo salário" (src/lib/financeiro/limite-seguro.ts) é
-    // sempre sobre o mês ATUAL de verdade (a função usa a data real, não o
-    // período que o MesSwipe está mostrando) — só busca quando o cliente
-    // está olhando o mês corrente, senão não faz sentido nenhum mostrar.
-    ehMesAtual ? calcularLimiteSeguro(cliente.id) : Promise.resolve(null),
   ]);
+
+  // "Até o próximo salário" (src/lib/financeiro/limite-seguro.ts) é sempre
+  // sobre o mês ATUAL de verdade — só busca quando o cliente está olhando o
+  // mês corrente, senão não faz sentido nenhum mostrar. Fora do Promise.all
+  // acima de propósito (achado de performance): quando é o mês atual, o
+  // período é o mesmo de `resumoFinanceiro`, então passa ele pronto em vez
+  // de deixar calcularLimiteSeguro recalcular a mesma cadeia de consultas
+  // (totais + plano de pagamento + parcelas) uma segunda vez no mesmo
+  // request — essa duplicação era uma das causas da demora ao trocar de
+  // mês.
+  const limiteSeguro = ehMesAtual ? await calcularLimiteSeguro(cliente.id, new Date(), resumoFinanceiro) : null;
 
   // Aliases 1:1 com os nomes que o JSX abaixo já usava antes da extração
   // pro motor — mantidos de propósito pra essa primeira extração não
