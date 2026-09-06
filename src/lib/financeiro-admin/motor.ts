@@ -88,8 +88,8 @@ export async function calcularDreAdmin(mesRef?: string): Promise<DreAdminResumo>
     { categoria: "IA (uso real)", valor: custoIA, status: "OBSERVED" },
     { categoria: "Comissão Cakto", valor: comissaoCakto, status: receitaFonte === "OBSERVADA" ? "OBSERVED" : "ESTIMATED" },
     { categoria: "Custos manuais", valor: custoManual, status: "OBSERVED" },
-    { categoria: "Vercel (hosting)", valor: 0, status: "ESTIMATED", observacao: "Credencial de billing pendente (Access Token com escopo de billing)" },
-    { categoria: "Supabase (banco)", valor: 0, status: "ESTIMATED", observacao: "Sem API de billing exposta hoje — precisa virar estimativa por uso" },
+    { categoria: "Vercel (hosting)", valor: 0, status: "INDISPONIVEL", observacao: "Credencial de billing pendente (Access Token com escopo de billing)" },
+    { categoria: "Supabase (banco)", valor: 0, status: "INDISPONIVEL", observacao: "Sem API de billing exposta hoje — precisa virar estimativa por uso" },
   ];
 
   return {
