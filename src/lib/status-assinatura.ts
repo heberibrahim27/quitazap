@@ -44,10 +44,18 @@ export function calcularStatusAssinatura(cliente: { gratuito: boolean; assinatur
 
 /** Cláusula `where` do Prisma equivalente a `calcularStatusAssinatura`, pra
  * filtrar direto no banco (ver /assinaturas) em vez de buscar tudo e
- * filtrar em memória. */
+ * filtrar em memória.
+ *
+ * PAGO nunca inclui cliente marcado `isTeste` (Ibrahim, 2026-09-06) — um
+ * cadastro de teste interno (ex: assinatura de teste com familiar/equipe,
+ * sem pagamento real na Cakto) nunca deve contar como assinante pagante em
+ * nenhum contador do admin, mesmo com `gratuito=false` e assinatura
+ * "ativa" no cadastro. Não filtra em CANCELADO/INATIVO — um cadastro de
+ * teste ainda aparece no histórico quando alguém filtra por esses status,
+ * só nunca conta como PAGO. */
 export function whereStatusAssinatura(status: StatusAssinatura) {
   const hoje = new Date();
   if (status === "INATIVO") return { gratuito: true };
   if (status === "CANCELADO") return { gratuito: false, assinaturaVenceEm: { lt: hoje } };
-  return { gratuito: false, OR: [{ assinaturaVenceEm: null }, { assinaturaVenceEm: { gte: hoje } }] };
+  return { gratuito: false, isTeste: false, OR: [{ assinaturaVenceEm: null }, { assinaturaVenceEm: { gte: hoje } }] };
 }

@@ -216,7 +216,8 @@ const listarClientesPorStatus: ResultadoLeitura = {
 const contarClientesPorStatus: ResultadoLeitura = {
   tipo: "leitura",
   async executar() {
-    const todos = await prisma.cliente.findMany({ select: { gratuito: true, assinaturaVenceEm: true } });
+    // isTeste=false: cadastro de teste interno nunca entra nessa contagem.
+    const todos = await prisma.cliente.findMany({ where: { isTeste: false }, select: { gratuito: true, assinaturaVenceEm: true } });
     const contagem: Record<StatusAssinatura, number> = { PAGO: 0, CANCELADO: 0, INATIVO: 0 };
     for (const c of todos) contagem[calcularStatusAssinatura(c)]++;
     return contagem;
