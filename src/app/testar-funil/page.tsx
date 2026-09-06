@@ -1,11 +1,29 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import {
+  PRECO_MENSAL,
+  RE_PARAR,
+  RE_PERGUNTA_PRECO,
+  detectaNegativo,
+  normalizarTexto,
+  decidirRespostaPosOferta,
+  REBATIDAS,
+  type EstadoObjecaoLead,
+} from "@/lib/sales-bot-objecao";
 
 type Etapa = "inicio" | "QUALIFICACAO" | "PROVA" | "OFERTA" | "FOLLOWUP" | "fim";
 type Aba = "funil" | "bot";
 
 const CAKTO_LINK = "https://pay.cakto.com.br/3fz3gz6_945044";
+
+// Mesmo texto de mensagemPreco()/"enviar_link" em sales-bot.ts — repetido
+// aqui só porque aquelas duas usam CAKTO_LINK (definido lá, não no módulo
+// puro sales-bot-objecao.ts). Se mudar lá, muda aqui também.
+function mensagemPrecoSimulador(): string {
+  return `O QuitaZAP custa *${PRECO_MENSAL} por mês* — sem contrato, cancela quando quiser.\n\n👉 ${CAKTO_LINK}`;
+}
+const MSG_LINK_ACEITE = `Show! 🙌 Aqui está o link pra começar agora:\n\n👉 ${CAKTO_LINK}`;
 
 // ── Mensagens do funil (espelho do sales-bot.ts) ──────────────
 // Reposicionado (2026-09) de "quitar dívida" pra "controle financeiro
@@ -33,14 +51,6 @@ Deixa eu te mostrar rapidinho como o QuitaZAP ajuda com isso 👇`,
 
 👇 Pra começar agora:
 ${CAKTO_LINK}`,
-
-  // Objeção (preço/desconfiança/concorrente/adiar) — o bot varia o ângulo a
-  // cada rodada em vez de repetir, até 3 tentativas reais (ver REBATIDAS em
-  // sales-bot-objecao.ts). Aqui no simulador mostramos só a 1ª rebatida
-  // (ângulo PREÇO) como exemplo.
-  FOLLOWUP: `Entendo. Pensa assim: são R$ 14,90 por mês — menos de R$ 0,50 por dia, bem menos que um cafezinho. Nesse valor você tem alguém de olho na sua vida financeira 24h, todo santo dia, direto no WhatsApp.`,
-
-  CUPOM: `Ah, e tem mais uma coisa: 🎁\n\nUse o cupom *[CUPOM]* na hora de assinar e garanta desconto na sua primeira mensalidade:\n\n${CAKTO_LINK}`,
 
   FIM: `Tudo bem, sem problema! Se mudar de ideia, é só me chamar aqui a qualquer hora. 😊\n\nBoa sorte com suas finanças! 🍀`,
 };
@@ -110,13 +120,22 @@ export default function TestarFunilPage() {
 }
 
 // ── Aba Funil de Vendas ───────────────────
+// Chama a MESMA lógica pura do sales-bot.ts real (decidirRespostaPosOferta,
+// em sales-bot-objecao.ts) em vez de um script fixo por etapa — assim o
+// texto exibido depende do CONTEÚDO digitado, igual no WhatsApp de verdade
+// (achado do Ibrahim: o simulador antigo respondia sempre a mesma rebatida
+// não importava a objeção, e tratava "quero sim" como recusa).
 function AbaFunil() {
   const [chat, setChat]   = useState<MensagemChat[]>([{ de: "bot", texto: MSGS.SAUDACAO as string }]);
   const [etapa, setEtapa] = useState<Etapa>("QUALIFICACAO");
+  const [estadoObjecao, setEstadoObjecao] = useState<EstadoObjecaoLead>({ tentativasObjecao: 0, angulosUsados: "" });
+  const [resultadoFinal, setResultadoFinal] = useState<"convertido" | "desistiu" | null>(null);
   const [digitando, setDigitando] = useState(false);
+  const [input, setInput] = useState("");
   const [enviandoReal, setEnviandoReal] = useState(false);
   const [telefoneReal, setTelefoneReal] = useState("");
   const [statusReal, setStatusReal]     = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const etapaAtual = FLUXO.find((f) => f.etapa === etapa);
 
@@ -124,31 +143,91 @@ function AbaFunil() {
     setTimeout(() => {
       setChat((prev) => [...prev, ...msgs]);
       setDigitando(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
     }, delay);
   }
 
-  function responder(resposta: string) {
-    if (digitando) return;
+  function responder(mensagemLivre: string) {
+    const mensagem = mensagemLivre.trim();
+    if (digitando || !mensagem) return;
     setDigitando(true);
-    setChat((prev) => [...prev, { de: "lead", texto: resposta }]);
+    setInput("");
+    setChat((prev) => [...prev, { de: "lead", texto: mensagem }]);
+
+    const norm = normalizarTexto(mensagem);
+
+    // Pergunta de preço antes da oferta é sinal forte de interesse — pula
+    // direto pra oferta, igual sales-bot.ts real.
+    if (etapa !== "OFERTA" && etapa !== "FOLLOWUP" && RE_PERGUNTA_PRECO.test(norm)) {
+      setEtapa("OFERTA");
+      addMsg([{ de: "bot", texto: MSGS.OFERTA as string }], 800);
+      return;
+    }
 
     if (etapa === "QUALIFICACAO") {
+      if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+        setResultadoFinal("desistiu");
+        setEtapa("fim");
+        addMsg([{ de: "bot", texto: MSGS.FIM as string }], 800);
+        return;
+      }
       setEtapa("PROVA");
       addMsg([
         { de: "bot", texto: MSGS.QUALIFICACAO as string },
         { de: "bot", texto: (MSGS.PROVA as string[])[0] },
         { de: "bot", texto: (MSGS.PROVA as string[])[1] },
       ], 800);
-    } else if (etapa === "PROVA") {
+      return;
+    }
+
+    if (etapa === "PROVA") {
+      if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+        setResultadoFinal("desistiu");
+        setEtapa("fim");
+        addMsg([{ de: "bot", texto: MSGS.FIM as string }], 800);
+        return;
+      }
       setEtapa("OFERTA");
       addMsg([{ de: "bot", texto: MSGS.OFERTA as string }], 800);
-    } else if (etapa === "OFERTA") {
-      setEtapa("FOLLOWUP");
-      addMsg([{ de: "bot", texto: MSGS.FOLLOWUP as string }], 800);
-    } else if (etapa === "FOLLOWUP") {
+      return;
+    }
+
+    // OFERTA/FOLLOWUP: aqui mora o loop de objeção de verdade.
+    const decisao = decidirRespostaPosOferta(estadoObjecao, mensagem);
+
+    if (decisao.acao === "parar" || decisao.acao === "desistir") {
+      setResultadoFinal("desistiu");
       setEtapa("fim");
       addMsg([{ de: "bot", texto: MSGS.FIM as string }], 800);
+      return;
     }
+
+    if (decisao.acao === "responder_preco") {
+      // Não muda de etapa nem de estado — o lead pode perguntar o preço
+      // de novo quantas vezes quiser sem "gastar" uma rodada de objeção.
+      addMsg([{ de: "bot", texto: mensagemPrecoSimulador() }], 800);
+      return;
+    }
+
+    if (decisao.acao === "enviar_link") {
+      setResultadoFinal("convertido");
+      setEtapa("fim");
+      addMsg([{ de: "bot", texto: MSG_LINK_ACEITE }], 800);
+      return;
+    }
+
+    // decisao.acao === "rebater" — sempre um ângulo diferente do anterior
+    setEtapa("FOLLOWUP");
+    setEstadoObjecao(decisao.novoEstado);
+    addMsg([{ de: "bot", texto: REBATIDAS[decisao.angulo] }], 800);
+  }
+
+  function reiniciarFunil() {
+    setChat([{ de: "bot", texto: MSGS.SAUDACAO as string }]);
+    setEtapa("QUALIFICACAO");
+    setEstadoObjecao({ tentativasObjecao: 0, angulosUsados: "" });
+    setResultadoFinal(null);
+    setInput("");
   }
 
   async function enviarParaNumeroReal() {
@@ -179,30 +258,62 @@ function AbaFunil() {
         mensagens={chat}
         digitando={digitando}
         rodape={
-          etapaAtual && etapaAtual.respostas.length > 0 && !digitando ? (
-            <div style={{ borderTop: "1px solid #d1fae5", background: "#f0fdf4", padding: "12px 16px" }}>
-              <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px", fontWeight: 600 }}>
-                SIMULAR RESPOSTA DO LEAD:
-              </p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {etapaAtual.respostas.map((r) => (
-                  <button key={r} onClick={() => responder(r)} style={{
-                    background: "#DCF8C6", border: "1px solid #86efac",
-                    borderRadius: 20, padding: "6px 14px",
-                    fontSize: 13, cursor: "pointer", color: "#166534", fontWeight: 600,
-                  }}>{r}</button>
-                ))}
-              </div>
-            </div>
-          ) : etapa === "fim" ? (
+          etapa === "fim" ? (
             <div style={{ background: "#f0fdf4", padding: "12px 16px", borderTop: "1px solid #d1fae5", textAlign: "center" }}>
-              <span style={{ fontSize: 13, color: "#16a34a", fontWeight: 700 }}>✅ Funil concluído!</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: resultadoFinal === "convertido" ? "#16a34a" : "#b45309" }}>
+                {resultadoFinal === "convertido" ? "✅ Lead converteu — mandou o link de checkout!" : "❌ Lead desistiu, funil encerrado."}
+              </span>
               <button
-                onClick={() => { setChat([{ de: "bot", texto: MSGS.SAUDACAO as string }]); setEtapa("QUALIFICACAO"); }}
+                onClick={reiniciarFunil}
                 style={{ marginLeft: 16, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontWeight: 700 }}
               >↺ Reiniciar</button>
             </div>
-          ) : null
+          ) : (
+            <div style={{ borderTop: "1px solid #d1fae5", background: "#f0fdf4" }}>
+              {etapaAtual && etapaAtual.respostas.length > 0 && (
+                <div style={{ padding: "10px 16px 0" }}>
+                  <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 8px", fontWeight: 600 }}>
+                    ATALHOS (ou digite qualquer coisa abaixo):
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {etapaAtual.respostas.map((r) => (
+                      <button key={r} onClick={() => responder(r)} disabled={digitando} style={{
+                        background: "#DCF8C6", border: "1px solid #86efac",
+                        borderRadius: 20, padding: "6px 14px",
+                        fontSize: 13, cursor: digitando ? "not-allowed" : "pointer", color: "#166534", fontWeight: 600,
+                        opacity: digitando ? 0.5 : 1,
+                      }}>{r}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ padding: "10px 12px", display: "flex", gap: 8 }}>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && responder(input)}
+                  placeholder="Digite a resposta do lead..."
+                  disabled={digitando}
+                  style={{
+                    flex: 1, border: "1px solid #d1d5db", borderRadius: 20,
+                    padding: "10px 16px", fontSize: 14, outline: "none",
+                    background: digitando ? "#f1f5f9" : "#fff",
+                  }}
+                />
+                <button
+                  onClick={() => responder(input)}
+                  disabled={digitando || !input.trim()}
+                  style={{
+                    background: digitando || !input.trim() ? "#9ca3af" : "#25D366",
+                    color: "#fff", border: "none", borderRadius: "50%",
+                    width: 42, height: 42, fontSize: 18, cursor: digitando ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}
+                >➤</button>
+              </div>
+            </div>
+          )
         }
       />
 
