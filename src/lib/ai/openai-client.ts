@@ -66,7 +66,19 @@ function apiKeyValida(): string | null {
   return apiKey;
 }
 
-export type MensagemChat = { role: "system" | "user" | "assistant"; content: unknown };
+// "tool" + tool_calls/tool_call_id: só usados pelo loop de function-calling
+// multi-turno (chamar tool, devolver resultado, chamar de novo) — ver
+// src/app/api/assistente-admin/chat/route.ts. Os outros consumidores deste
+// client (ai-bot.ts) fazem só uma tool-call por vez, sem round-trip, então
+// nunca precisaram desses campos até agora.
+export type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
+
+export type MensagemChat = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: unknown;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+};
 
 export interface ChatCompletionOpts {
   model: string;
@@ -80,7 +92,7 @@ export interface ChatCompletionOpts {
 
 export interface ChatCompletionResultado {
   conteudo: string;
-  toolCalls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+  toolCalls?: ToolCall[];
   finishReason: string | null;
 }
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { TIPOS_CONTATO, LABEL_TIPO_CONTATO, normalizarContato, type TipoContato } from "@/lib/contatos-sociais";
+import { TIPOS_CONTATO, LABEL_TIPO_CONTATO, criarContatoSocial, type TipoContato } from "@/lib/contatos-sociais";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import { IconLink, IconPlus, IconCheckCircle, IconAlertTriangle } from "@/components/icons";
 
@@ -29,18 +29,11 @@ export default async function ContatosSociaisPage({
     "use server";
 
     const tipo = String(formData.get("tipo") || "");
-    const nome = String(formData.get("nome") || "").trim();
+    const nome = String(formData.get("nome") || "");
     const valorBruto = String(formData.get("valorBruto") || "").trim();
 
-    if (!nome) redirect("/painel/contatos?erro=nome");
-
-    const normalizado = normalizarContato(tipo, valorBruto);
-    if (!normalizado.ok) redirect(`/painel/contatos?erro=${encodeURIComponent(normalizado.erro)}`);
-
-    const ultimaOrdem = await prisma.contatoSocial.count();
-    await prisma.contatoSocial.create({
-      data: { tipo, nome, valorBruto, link: normalizado.link, ordem: ultimaOrdem },
-    });
+    const resultado = await criarContatoSocial(tipo, nome, valorBruto);
+    if (!resultado.ok) redirect(`/painel/contatos?erro=${encodeURIComponent(resultado.erro)}`);
 
     revalidarConsumidoresPublicos();
     redirect("/painel/contatos?ok=criado");

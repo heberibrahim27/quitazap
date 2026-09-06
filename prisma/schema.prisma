@@ -41,19 +41,19 @@ model Cliente {
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
-  dividas           Divida[]
-  pagamentos        Pagamento[]
-  planosEnviados    PlanoEnviado[]
-  botSessoes        BotSessao[]
-  cobrancas         Cobranca[]
-  tarefas           Tarefa[]
-  lancamentos       Lancamento[]
-  cartoes           Cartao[]
-  pushSubscriptions PushSubscription[]
-  orcamentos        OrcamentoCategoria[]
-  metas             Meta[]
-  eventosCakto      EventoCakto[]
-  insightsDetectados InsightDetectado[]
+  dividas             Divida[]
+  pagamentos          Pagamento[]
+  planosEnviados      PlanoEnviado[]
+  botSessoes          BotSessao[]
+  cobrancas           Cobranca[]
+  tarefas             Tarefa[]
+  lancamentos         Lancamento[]
+  cartoes             Cartao[]
+  pushSubscriptions   PushSubscription[]
+  orcamentos          OrcamentoCategoria[]
+  metas               Meta[]
+  eventosCakto        EventoCakto[]
+  insightsDetectados  InsightDetectado[]
   saudeFinanceiraLogs SaudeFinanceiraLog[]
 }
 
@@ -142,21 +142,21 @@ model PushSubscription {
 // status:    ATIVA  | QUITADA    | NEGOCIANDO
 // prioridade: 1 = mais urgente, 0 = sem prioridade definida
 model Divida {
-  id             String    @id @default(cuid())
-  clienteId      String
-  credor         String
-  descricao      String?
-  obs            String?
-  valorTotal     Float
-  valorPago      Float     @default(0)
-  tipo           String    @default("OUTRO")
-  status         String    @default("ATIVA")
-  prioridade     Int       @default(0)
-  totalParcelas  Int? // quantidade total de parcelas, quando aplicável (empréstimo, financiamento)
-  diaVencimento  Int?
-  emAtraso       Boolean   @default(false)
-  diasAtraso     Int?
-  dataReferencia DateTime?
+  id                String    @id @default(cuid())
+  clienteId         String
+  credor            String
+  descricao         String?
+  obs               String?
+  valorTotal        Float
+  valorPago         Float     @default(0)
+  tipo              String    @default("OUTRO")
+  status            String    @default("ATIVA")
+  prioridade        Int       @default(0)
+  totalParcelas     Int? // quantidade total de parcelas, quando aplicável (empréstimo, financiamento)
+  diaVencimento     Int?
+  emAtraso          Boolean   @default(false)
+  diasAtraso        Int?
+  dataReferencia    DateTime?
   // true = consignado/desconto direto em folha (ex: contracheque de
   // servidor público). Essa parcela já está refletida no salário líquido
   // que o cliente lança/declara como renda — motor.ts e
@@ -165,9 +165,9 @@ model Divida {
   // (ver cron consignados) marca como PAGA na data sem gerar nenhum
   // evento de abatimento, já que o dinheiro nunca "saiu" de um saldo
   // controlado pelo app.
-  descontadoEmFolha Boolean @default(false)
-  criadoEm       DateTime  @default(now())
-  atualizadoEm   DateTime  @updatedAt
+  descontadoEmFolha Boolean   @default(false)
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
 
   cliente    Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   parcelas   Parcela[]
@@ -227,21 +227,21 @@ model PlanoEnviado {
 // ─────────────────────────────────────────
 // etapa: COLETANDO_DIVIDAS | AGUARDANDO_RENDA | PLANO_GERADO
 model BotSessao {
-  id           String   @id @default(cuid())
-  telefone     String   @unique
-  clienteId    String?
-  etapa        String   @default("COLETANDO_DIVIDAS")
-  nome         String?
-  dividasTemp  String   @default("[]") // JSON: [{texto, valor, parcelas}]
-  renda        Float?
+  id             String   @id @default(cuid())
+  telefone       String   @unique
+  clienteId      String?
+  etapa          String   @default("COLETANDO_DIVIDAS")
+  nome           String?
+  dividasTemp    String   @default("[]") // JSON: [{texto, valor, parcelas}]
+  renda          Float?
   // Boleto extraído de PDF aguardando confirmação (sim/não) do cliente pra
   // virar Divida — ver src/lib/boleto-flow.ts. Campo isolado de propósito,
   // não entra no dividasTemp/confirmacaoPendente do fluxo de texto (são
   // preocupações diferentes: confirmação de documento vs. continuação de
   // conversa em texto).
   boletoPendente Json?
-  criadoEm    DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
 
   cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
 }
@@ -637,17 +637,17 @@ model EventoCakto {
 // nunca duplica nem gasta IA de novo pra reavaliar a mesma anomalia no
 // mesmo mês.
 model InsightDetectado {
-  id                  String   @id @default(cuid())
-  clienteId           String
-  tipo                String   @default("ANOMALIA_CATEGORIA")
-  categoria           String
-  mes                 String // YYYY-MM
-  totalMesAtual       Float
-  mediaUltimosMeses   Float
-  multiplicador       Float
-  textoGerado         String
-  status              String   @default("SOMBRA")
-  criadoEm            DateTime @default(now())
+  id                String   @id @default(cuid())
+  clienteId         String
+  tipo              String   @default("ANOMALIA_CATEGORIA")
+  categoria         String
+  mes               String // YYYY-MM
+  totalMesAtual     Float
+  mediaUltimosMeses Float
+  multiplicador     Float
+  textoGerado       String
+  status            String   @default("SOMBRA")
+  criadoEm          DateTime @default(now())
 
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
@@ -664,15 +664,15 @@ model InsightDetectado {
 // continua marcado com a versão que realmente o calculou, em vez de ser
 // reinterpretado silenciosamente como se tivesse saído da fórmula nova.
 model SaudeFinanceiraLog {
-  id            String   @id @default(cuid())
-  clienteId     String
-  dia           String // YYYY-MM-DD, calendário de Brasília
-  versaoFormula String
-  score         Int
-  classificacao String
-  dadosInsuficientes Boolean @default(false)
-  componentes   Json
-  criadoEm      DateTime @default(now())
+  id                 String   @id @default(cuid())
+  clienteId          String
+  dia                String // YYYY-MM-DD, calendário de Brasília
+  versaoFormula      String
+  score              Int
+  classificacao      String
+  dadosInsuficientes Boolean  @default(false)
+  componentes        Json
+  criadoEm           DateTime @default(now())
 
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
@@ -703,4 +703,31 @@ model ContatoSocial {
   atualizadoEm DateTime @updatedAt
 
   @@index([ativo, ordem])
+}
+
+// ─────────────────────────────────────────
+// AUDITORIA DO ASSISTENTE ADMIN (IA interna)
+// ─────────────────────────────────────────
+// Toda ação de ESCRITA que o assistente de IA do painel admin executa de
+// fato (depois de confirmada pelo usuário — o assistente nunca executa
+// direto, ver src/lib/assistente-admin/ferramentas.ts) grava uma linha
+// aqui: qual ferramenta, com quais argumentos, o estado antes/depois, e se
+// deu certo. Sem identidade individual por enquanto — o admin usa senha
+// única compartilhada (ver ContaAdmin acima), não dá pra saber qual
+// pessoa da equipe pediu; `solicitadoPor` fica reservado pra quando (ou
+// se) existir login por pessoa.
+model AuditoriaAssistente {
+  id            String   @id @default(cuid())
+  ferramenta    String
+  argumentos    Json
+  resumo        String
+  antes         Json?
+  depois        Json?
+  sucesso       Boolean  @default(true)
+  erro          String?
+  solicitadoPor String?
+  criadoEm      DateTime @default(now())
+
+  @@index([ferramenta])
+  @@index([criadoEm])
 }
