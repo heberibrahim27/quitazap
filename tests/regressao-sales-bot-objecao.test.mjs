@@ -358,3 +358,59 @@ test("pergunta sobre cancelamento/multa/fidelidade recebe o script certo (CANCEL
   assert.match(REBATIDAS.CANCELAMENTO, /cancelar quando quiser/i);
   assert.doesNotMatch(REBATIDAS.CANCELAMENTO, /cafezinho/i);
 });
+
+// ─────────────────────────────────────────
+// Camada 1 (IA) do plano do Ibrahim, 2026-09-06: decidirRespostaPosOferta
+// aceita um 3º parâmetro opcional com ângulos que só um classificador de
+// IA detectou (sales-bot-ia-classificador.ts), como reforço do regex —
+// nunca no lugar dele. Testes aqui garantem: (1) chamar com 2 argumentos
+// continua idêntico a hoje (retrocompatibilidade — testar-funil e todos os
+// testes acima chamam assim), (2) o reforço realmente adiciona um ângulo
+// que o regex sozinho não pegaria, (3) nunca duplica ângulo já usado, (4)
+// STOP e pergunta de preço nunca são afetados pelo reforço — continuam
+// resolvidos antes de qualquer união de ângulo.
+test("decidirRespostaPosOferta sem 3º argumento continua 100% igual a antes (retrocompatibilidade)", () => {
+  const semArgumento = decidirRespostaPosOferta(estadoInicial(), "achei caro");
+  const comArrayVazio = decidirRespostaPosOferta(estadoInicial(), "achei caro", []);
+  assert.deepEqual(semArgumento, comArrayVazio);
+  assert.deepEqual(semArgumento.angulos, ["PRECO"]);
+});
+
+test("reforço de IA adiciona um ângulo que o regex sozinho não detectaria", () => {
+  // Mensagem sem nenhuma palavra do vocabulário de objeção conhecido —
+  // sozinho, o regex cairia no ângulo genérico da ordem fixa (PRECO, o
+  // primeiro ainda não usado). Com o reforço da IA dizendo CONCORRENTE,
+  // deve usar CONCORRENTE de verdade, não o genérico.
+  const mensagemAmbigua = "ah nao sei, acho que ja tenho um jeito que funciona pra mim";
+  const decisao = decidirRespostaPosOferta(estadoInicial(), mensagemAmbigua, ["CONCORRENTE"]);
+  assert.equal(decisao.acao, "rebater");
+  assert.ok(decisao.angulos.includes("CONCORRENTE"), "deveria incluir o ângulo reforçado pela IA");
+});
+
+test("reforço de IA une com o ângulo já detectado por regex (objeção composta detectada por fontes diferentes)", () => {
+  const decisao = decidirRespostaPosOferta(estadoInicial(), "achei caro", ["CANCELAMENTO"]);
+  assert.equal(decisao.acao, "rebater");
+  assert.deepEqual(decisao.angulos, ["PRECO", "CANCELAMENTO"], "mantém a ordem fixa PRECO antes de CANCELAMENTO");
+});
+
+test("reforço de IA nunca reintroduz um ângulo já usado em rodada anterior", () => {
+  const estadoComPrecoJaUsado = { tentativasObjecao: 1, angulosUsados: "PRECO" };
+  const decisao = decidirRespostaPosOferta(estadoComPrecoJaUsado, "hmm, nao sei", ["PRECO"]);
+  // PRECO já foi usado — mesmo a IA reforçando PRECO de novo, não deveria
+  // reaparecer; sem nenhum outro ângulo válido, cai no genérico seguinte.
+  assert.ok(!decisao.angulos?.includes("PRECO") || decisao.acao !== "rebater");
+});
+
+test("reforço de IA nunca sobrepõe STOP nem pergunta direta de preço", () => {
+  const comStop = decidirRespostaPosOferta(estadoInicial(), "pare de me mandar mensagem", ["PRECO", "CONFIANCA"]);
+  assert.deepEqual(comStop, { acao: "parar" });
+
+  const comPerguntaPreco = decidirRespostaPosOferta(estadoInicial(), "quanto custa", ["CONCORRENTE"]);
+  assert.deepEqual(comPerguntaPreco, { acao: "responder_preco" });
+});
+
+test("reforço de IA com array vazio (classificador indisponível ou baixa confiança) não muda nada", () => {
+  const semReforco = decidirRespostaPosOferta(estadoInicial(), "ja uso planilha");
+  const comReforcoVazio = decidirRespostaPosOferta(estadoInicial(), "ja uso planilha", []);
+  assert.deepEqual(semReforco, comReforcoVazio);
+});

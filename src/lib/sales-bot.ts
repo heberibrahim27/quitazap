@@ -34,7 +34,31 @@ import {
   normalizarTexto,
   decidirRespostaPosOferta,
   REBATIDAS,
+  type AnguloObjecao,
 } from "@/lib/sales-bot-objecao";
+import { classificarObjecaoIA } from "@/lib/sales-bot-ia-classificador";
+
+// Confiança mínima pra aceitar um ângulo que só a IA detectou (nunca
+// presente no regex) — abaixo disso, ignora o reforço e segue só com
+// regras. Escolhido conservador de propósito: um ângulo extra rebatido à
+// toa (falso positivo) é inofensivo (só mais um parágrafo de resposta),
+// mas ainda assim não vale adicionar ruído com baixa confiança.
+const CONFIANCA_MINIMA_REFORCO_IA = 0.55;
+
+// Camada 1 do plano do Ibrahim (classificador de IA) — só chamada quando
+// a mensagem não é um caso óbvio que a Camada 0 (regras duras) já resolve
+// sozinha, pra não gastar latência/custo de IA em STOP e pergunta direta
+// de preço, que continuam 100% regex antes disso em
+// decidirRespostaPosOferta. Nunca lança: em qualquer falha, devolve []
+// (segue só com o regex de detectarAngulos).
+async function resolverAngulosReforcoIA(mensagem: string): Promise<AnguloObjecao[]> {
+  const norm = normalizarTexto(mensagem);
+  if (RE_PARAR.test(norm) || RE_PERGUNTA_PRECO.test(norm)) return [];
+
+  const classificacao = await classificarObjecaoIA(mensagem);
+  if (!classificacao || classificacao.confianca < CONFIANCA_MINIMA_REFORCO_IA) return [];
+  return classificacao.angulos;
+}
 
 const CAKTO_LINK = "https://pay.cakto.com.br/3fz3gz6_945044";
 
@@ -127,7 +151,8 @@ async function talvezEnviarCupom(lead: LeadVendas, telefone: string): Promise<vo
 // OFERTA e FOLLOWUP) — efeitos colaterais (Prisma/WhatsApp) em cima da
 // decisão pura acima.
 async function processarRespostaPosOferta(lead: LeadVendas, mensagem: string, telefone: string): Promise<void> {
-  const decisao = decidirRespostaPosOferta(lead, mensagem);
+  const angulosReforcoIA = await resolverAngulosReforcoIA(mensagem);
+  const decisao = decidirRespostaPosOferta(lead, mensagem, angulosReforcoIA);
 
   if (decisao.acao === "parar" || decisao.acao === "desistir") {
     await prisma.leadVendas.update({

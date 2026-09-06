@@ -153,14 +153,31 @@ export type DecisaoPosOferta =
 // mais de uma objeção ao mesmo tempo (ex: preço + concorrente), rebate
 // AMBAS na mesma resposta em vez de responder só uma e descartar o resto.
 // Um pedido explícito pra parar interrompe na hora, em qualquer momento.
-export function decidirRespostaPosOferta(estado: EstadoObjecaoLead, mensagem: string): DecisaoPosOferta {
+//
+// angulosReforcoIA (Camada 1 do plano do Ibrahim, 2026-09-06): ângulos que
+// um classificador de IA detectou na mensagem (ver
+// sales-bot-ia-classificador.ts), unidos aos detectados por regex antes de
+// decidir a rodada — nunca no lugar deles. Default vazio ([]) mantém esta
+// função 100% determinística e idêntica ao comportamento de hoje (é assim
+// que o simulador testar-funil e os testes de regressão continuam
+// chamando). STOP e pergunta direta de preço são resolvidos ACIMA, antes
+// de qualquer união de ângulo — a IA nunca entra nessas duas decisões.
+export function decidirRespostaPosOferta(
+  estado: EstadoObjecaoLead,
+  mensagem: string,
+  angulosReforcoIA: AnguloObjecao[] = []
+): DecisaoPosOferta {
   const norm = normalizarTexto(mensagem);
 
   if (RE_PARAR.test(norm)) return { acao: "parar" };
   if (RE_PERGUNTA_PRECO.test(norm)) return { acao: "responder_preco" };
 
   const usados = estado.angulosUsados ? estado.angulosUsados.split(",").filter(Boolean) : [];
-  const angulosDetectados = detectarAngulos(norm).filter((a) => !usados.includes(a));
+  const angulosRegex = detectarAngulos(norm);
+  const angulosUnidos = ORDEM_ANGULOS.filter(
+    (a) => angulosRegex.includes(a) || angulosReforcoIA.includes(a)
+  );
+  const angulosDetectados = angulosUnidos.filter((a) => !usados.includes(a));
 
   // "Sim"/interesse claro sem nenhuma objeção junto → manda o link, não
   // insiste à toa.
