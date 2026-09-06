@@ -775,6 +775,14 @@ model AuditoriaAssistente {
 // grava um lançamento/dívida/meta adivinhado. Fila só de leitura pro admin
 // revisar quando quiser (ver /revisao-pendente); sem notificação automática
 // por design (Ibrahim, 2026-09-06: "não me notificar direto toda vez").
+// criticidade/categoria (Ibrahim, 2026-09-06): antes desta rodada, TODA
+// mensagem que o rescue parser não entendia caía aqui como se precisasse
+// de ação humana — "pensa em 10 mil clientes tendo que olhar
+// manualmente". Agora o bot sempre resolve algo pro cliente na hora (ver
+// rescue-classificador.ts) e só marca CRITICA quando é genuinamente
+// cancelamento/reclamação grave/erro de cobrança/pedido de humano; o
+// resto (MONITORAMENTO, default) é só dado pra melhorar o parser, não
+// uma tarefa pendente de ninguém.
 model MensagemPendenteRevisao {
   id          String    @id @default(cuid())
   clienteId   String?
@@ -782,6 +790,8 @@ model MensagemPendenteRevisao {
   nome        String?
   mensagem    String
   motivo      String
+  criticidade String    @default("MONITORAMENTO")
+  categoria   String?
   resolvida   Boolean   @default(false)
   criadoEm    DateTime  @default(now())
   resolvidaEm DateTime?
@@ -790,4 +800,5 @@ model MensagemPendenteRevisao {
 
   @@index([resolvida, criadoEm])
   @@index([clienteId])
+  @@index([criticidade, resolvida, criadoEm])
 }

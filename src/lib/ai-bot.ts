@@ -15,10 +15,17 @@
 // tentou e não reconheceu a mensagem (ver api/webhook/zapi/route.ts). Em
 // vez de ele mesmo tentar "adivinhar" e fechar um diagnóstico alternativo
 // (o que causava respostas fora do produto atual), ele é 100%
-// determinístico — nenhuma chamada de IA — e só faz 3 coisas: pede pra
-// reformular, pede de novo de um jeito mais simples e, na 3ª tentativa sem
-// sucesso, desiste e registra a mensagem pra revisão humana (sem alertar
-// ninguém na hora — só fica numa fila no admin).
+// determinístico — nenhuma chamada de IA.
+//
+// Reescrito (Ibrahim, 2026-09-06): "pensa em 10 mil clientes tendo que
+// olhar manualmente" — a versão anterior desistia na 3ª tentativa e
+// deixava o cliente esperando alguém olhar no admin, sem prazo nenhum.
+// Isso não escala. Agora o bot SEMPRE dá uma resposta definitiva e
+// acionável na hora (nunca "vou deixar pendente pra alguém ver") — a
+// decisão de qual resposta dar (e se a mensagem é crítica o bastante pra
+// precisar de um humano depois) é toda pura, em rescue-classificador.ts;
+// este módulo só orquestra o efeito colateral (registrar na fila quando a
+// decisão pede isso).
 //
 // Os tipos abaixo (DividaIA, DiagnosticoIA etc.) continuam exportados
 // porque ainda são usados pelo comando QUITASCORE (monta um
@@ -27,6 +34,13 @@
 // cobertos por teste de regressão mesmo sem gerar diagnóstico novo.
 
 import { registrarMensagemPendenteRevisao } from "./mensagem-pendente-revisao-service";
+import {
+  decidirRespostaRescue,
+  MENSAGEM_RESCUE_TENTATIVA_1,
+  MENSAGEM_RESCUE_FINAL_NAO_CRITICA,
+} from "./rescue-classificador";
+
+export { MENSAGEM_RESCUE_TENTATIVA_1, MENSAGEM_RESCUE_FINAL_NAO_CRITICA };
 
 export type Mensagem = {
   role: "user" | "assistant" | "system";
@@ -140,19 +154,14 @@ export type DiagnosticoIA = {
   alertas: AlertasIA;
 };
 
-// ── Rescue ladder (3 tentativas, depois fila de revisão humana) ──────────
-// Textos exatos — a detecção de "qual tentativa é essa" funciona
-// comparando a ÚLTIMA mensagem do assistente no histórico contra estes
-// textos (mesmo padrão já usado em route.ts pra detectar
-// "aguardando renda", por exemplo). Não precisa de campo novo no banco
-// pra contar tentativa: o histórico da conversa já é a fonte de verdade.
-export const MENSAGEM_RESCUE_TENTATIVA_1 =
-  "Não consegui entender exatamente o que você quer registrar. Você está falando de um gasto, uma renda, uma dívida ou outra coisa?";
-export const MENSAGEM_RESCUE_TENTATIVA_2 =
-  'Ainda não consegui interpretar com segurança. Pode me mandar de forma simples, por exemplo: "gastei R$80 no mercado" ou "recebi R$3.000 de salário".';
-export const MENSAGEM_RESCUE_TENTATIVA_3 =
-  "Não quero registrar algo errado. Vou deixar essa mensagem pendente pra revisão.";
-
+// ── Rescue ladder ──────────────────────────
+// A detecção de "qual ponto da escada é esse" funciona comparando a
+// ÚLTIMA mensagem do assistente no histórico contra os textos conhecidos
+// (mesmo padrão já usado em route.ts pra detectar "aguardando renda", por
+// exemplo) — não precisa de campo novo no banco pra contar tentativa: o
+// histórico da conversa já é a fonte de verdade. Toda a decisão de qual
+// resposta dar mora em rescue-classificador.ts (puro, testável sem
+// banco); aqui só orquestra o efeito colateral.
 function ultimaRespostaDoAssistente(historico: Mensagem[]): string | null {
   const ultima = historico.at(-1);
   return ultima && ultima.role === "assistant" ? ultima.content.trim() : null;
@@ -160,10 +169,13 @@ function ultimaRespostaDoAssistente(historico: Mensagem[]): string | null {
 
 // Chamado só depois que TODO o resto do webhook (gasto determinístico,
 // financeiro-intent-resolver, tarefas, consultas...) já tentou e não
-// reconheceu a mensagem. Não tenta mais adivinhar sozinho — apenas escala
-// o pedido de esclarecimento e, na 3ª vez seguida sem sucesso, registra
-// pra revisão humana em vez de arriscar um registro errado ou inventar um
-// diagnóstico fora do produto atual.
+// reconheceu a mensagem. Nunca deixa o cliente esperando um humano: toda
+// resposta é definitiva e acionável na hora. Só registra na fila de
+// revisão (MensagemPendenteRevisao) quando a mensagem é CRÍTICA de
+// verdade (cancelamento, reclamação grave, erro de cobrança, pedido
+// explícito de humano — aí sim alguém da equipe precisa agir depois) ou,
+// no fim da escada sem sucesso e sem nada crítico, como dado de
+// monitoramento pra melhorar o parser (nunca como tarefa pendente).
 export async function processarMensagemIA(
   historico: Mensagem[],
   novaMensagem: string,
@@ -172,22 +184,29 @@ export async function processarMensagemIA(
   _gratuito?: boolean,
   telefone?: string | null
 ): Promise<{ resposta: string; diagnostico?: DiagnosticoIA }> {
-  const ultimaResposta = ultimaRespostaDoAssistente(historico);
+  const decisao = decidirRespostaRescue(ultimaRespostaDoAssistente(historico), novaMensagem);
 
-  if (ultimaResposta === MENSAGEM_RESCUE_TENTATIVA_2) {
+  if (decisao.tipo === "critica") {
     await registrarMensagemPendenteRevisao({
       clienteId: clienteId ?? null,
       telefone: telefone ?? null,
       nome: nomeCliente,
       mensagem: novaMensagem,
-      motivo: "Não reconhecida pelo fluxo determinístico nem pelo interpretador financeiro após 3 tentativas.",
+      motivo: `Mensagem crítica detectada (${decisao.categoria}) — precisa de atenção humana.`,
+      criticidade: "CRITICA",
+      categoria: decisao.categoria,
     });
-    return { resposta: MENSAGEM_RESCUE_TENTATIVA_3 };
+  } else if (decisao.tipo === "final_nao_critica") {
+    await registrarMensagemPendenteRevisao({
+      clienteId: clienteId ?? null,
+      telefone: telefone ?? null,
+      nome: nomeCliente,
+      mensagem: novaMensagem,
+      motivo: "Não reconhecida pelo fluxo determinístico nem pelo interpretador financeiro após a escada de esclarecimento.",
+      criticidade: "MONITORAMENTO",
+      categoria: null,
+    });
   }
 
-  if (ultimaResposta === MENSAGEM_RESCUE_TENTATIVA_1) {
-    return { resposta: MENSAGEM_RESCUE_TENTATIVA_2 };
-  }
-
-  return { resposta: MENSAGEM_RESCUE_TENTATIVA_1 };
+  return { resposta: decisao.resposta };
 }
