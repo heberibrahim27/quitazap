@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Inter } from "next/font/google";
 import {
   IconHome, IconWallet, IconUsers, IconClock, IconDownload,
-  IconFlask, IconSettings, IconLogout, IconPlus, IconMenu, IconX, IconTrendUp, IconLink,
+  IconFlask, IconSettings, IconLogout, IconPlus, IconMenu, IconX, IconTrendUp, IconLink, IconBot,
 } from "./icons";
 import "./admin-shell.css";
 
@@ -39,6 +39,7 @@ const GRUPOS = [
   {
     rotulo: "Sistema",
     itens: [
+      { href: "/assistente", label: "Assistente", Icone: IconBot },
       { href: "/insights-sombra", label: "Insights (sombra)", Icone: IconTrendUp },
       { href: "/exportar", label: "Exportar dados", Icone: IconDownload },
       { href: "/testar-funil", label: "Testar bot", Icone: IconFlask },

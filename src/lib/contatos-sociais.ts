@@ -78,6 +78,28 @@ export async function listarContatosAtivos(): Promise<ContatoSocialPublico[]> {
   return linhas.filter((l): l is ContatoSocialPublico => ehTipoValido(l.tipo));
 }
 
+// Cria um canal novo — usado pelo form de /painel/contatos e também pela
+// tool de escrita do assistente admin (src/lib/assistente-admin), sempre a
+// mesma validação/normalização em vez de duplicar a lógica em dois lugares.
+export async function criarContatoSocial(
+  tipo: string,
+  nome: string,
+  valorBruto: string
+): Promise<{ ok: true; contato: { id: string; tipo: string; nome: string; link: string } } | { ok: false; erro: string }> {
+  const nomeLimpo = nome.trim();
+  if (!nomeLimpo) return { ok: false, erro: "Informe um nome pra identificar o canal." };
+
+  const normalizado = normalizarContato(tipo, valorBruto);
+  if (!normalizado.ok) return { ok: false, erro: normalizado.erro };
+
+  const ultimaOrdem = await prisma.contatoSocial.count();
+  const contato = await prisma.contatoSocial.create({
+    data: { tipo, nome: nomeLimpo, valorBruto, link: normalizado.link, ordem: ultimaOrdem },
+    select: { id: true, tipo: true, nome: true, link: true },
+  });
+  return { ok: true, contato };
+}
+
 // Um canal só, pra usar como "contato de suporte" (privacidade, plano do
 // Cobrador) — prioriza WhatsApp, depois e-mail, depois qualquer outro
 // ativo (nessa ordem), sempre respeitando a `ordem` dentro de cada tipo.
