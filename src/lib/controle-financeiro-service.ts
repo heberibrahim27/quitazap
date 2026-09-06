@@ -12,7 +12,7 @@
 
 import { prisma } from "./prisma";
 import type { ItemParaPersistirControle, CartaoParaPersistirControle } from "./controle-financeiro-flow";
-import { verificarOrcamentoEAvisar } from "./orcamento-service";
+import { verificarOrcamentoEAvisar, verificarApertoEAvisar } from "./orcamento-service";
 
 const TIPOS_GASTO = new Set(["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"]);
 
@@ -66,6 +66,11 @@ export async function persistirLancamentosControle(
           console.error("[CONTROLE-FINANCEIRO] Erro ao verificar orçamento:", err)
         );
       }
+
+      // Roda pra QUALQUER lançamento (gasto ou receita) — uma renda
+      // corrigida pra baixo também pode deixar o mês apertado. Função já
+      // se protege sozinha (consentimento, dado insuficiente, etc).
+      await verificarApertoEAvisar(clienteId);
     }
   } catch (err) {
     console.error("[CONTROLE-FINANCEIRO] Erro ao persistir lançamento(s) em Lancamento:", err);

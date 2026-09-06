@@ -6,60 +6,53 @@ type Etapa = "inicio" | "QUALIFICACAO" | "PROVA" | "OFERTA" | "FOLLOWUP" | "fim"
 type Aba = "funil" | "bot";
 
 const CAKTO_LINK = "https://pay.cakto.com.br/3fz3gz6_945044";
-const SITE_URL   = "https://quitazap.com.br";
 
 // ── Mensagens do funil (espelho do sales-bot.ts) ──────────────
+// Reposicionado (2026-09) de "quitar dívida" pra "controle financeiro
+// contínuo" — 5 momentos: Dor → Demonstração → Diferencial → Objeção → CTA.
 const MSGS: Record<string, string | string[]> = {
-  SAUDACAO: `Olá! 👋
+  SAUDACAO: `Olá! 👋 Aqui é o *QuitaZAP*.
 
-Aqui é o *QuitaZAP* — o assistente que organiza suas dívidas pelo WhatsApp usando Inteligência Artificial. 🤖💚
+Hoje, o que mais te atrapalha com seu dinheiro? Pode ser não saber pra onde ele vai, esquecer de pagar uma conta, cartão que estoura todo mês, dívida acumulando... me conta o que pesa mais pra você agora.`,
 
-Você chegou até aqui porque quer organizar suas finanças, certo?
+  QUALIFICACAO: `Entendi. Isso é super comum — a maioria das pessoas perde o controle do dinheiro sem nem perceber, porque fica tudo espalhado (extrato, papel, memória...). 😉
 
-*Você tem dívidas para organizar?* Responde sim ou não 👇`,
-
-  QUALIFICACAO: `Entendi! Você não está sozinho(a) nisso. 😊
-
-Milhares de brasileiros estão na mesma situação — e o QuitaZAP foi criado exatamente para isso.
-
-A ideia é simples: você me conta suas dívidas aqui no WhatsApp — pode ser por texto, áudio ou até *foto do boleto* — e nossa IA cria um *plano de quitação personalizado* pra você.
-
-Deixa eu te mostrar como funciona na prática 👇`,
+Deixa eu te mostrar rapidinho como o QuitaZAP ajuda com isso 👇`,
 
   PROVA: [
-    `[IMAGEM] 💬 Veja como é simples — você manda as dívidas e o bot organiza tudo automaticamente.`,
-    `[IMAGEM] 📋 Plano de quitação gerado em minutos com base na sua renda.`,
-    `Tudo isso disponível *24h por dia*, direto no seu WhatsApp. Sem precisar instalar nada. 📱\n\nVocê pode perguntar a qualquer hora:\n📊 "Qual meu saldo devedor total?"\n📅 "Quanto preciso pagar essa semana?"\n💰 "Quanto sobra do meu salário?"\n\n*Quer ter seu plano personalizado agora?* 👇`,
+    `💬 *É assim que funciona:*\n\n👤 _Você manda:_ "gastei 45 no mercado"\n🤖 _QuitaZAP:_ ✅ Gasto registrado — Mercado — R$ 45,00\n\n👤 _Você manda:_ "recebi 3000 de salário"\n🤖 _QuitaZAP:_ ✅ Receita registrada — R$ 3.000,00\n\nSem formulário, sem planilha — só manda por texto, áudio ou foto que eu organizo pra você. 📲`,
+    `E não é só registrar: se em algum momento eu perceber que o mês tá ficando apertado — gasto chegando perto ou passando da sua renda — eu te aviso na hora, com uma dica prática. 🔔\n\nTudo isso 24h por dia, direto no seu WhatsApp, sem precisar abrir nenhum app.\n\n*Quer começar a usar agora?* 👇`,
   ],
 
   OFERTA: `🚀 *QuitaZAP — R$ 14,90/mês*
 
-✅ Plano de quitação personalizado por IA
-✅ Funciona 24h no seu WhatsApp
-✅ Manda dívidas por texto, áudio ou foto de boleto
-✅ Relatórios e resumos automáticos
+✅ Registre renda, gastos, contas, cartão e dívidas direto pelo WhatsApp
+✅ Aviso automático quando o mês fica apertado
+✅ Funciona por texto, áudio ou foto
 ✅ Cancele quando quiser — sem burocracia
 
-Por apenas *R$ 14,90 por mês* você tem um consultor financeiro no bolso.
-
-👇 *Assine agora e comece hoje:*
+👇 Pra começar agora:
 ${CAKTO_LINK}`,
 
-  FOLLOWUP: `Ficou com alguma dúvida? Me conta que eu te ajudo! 😊\n\nMuita gente pensa que é complicado, mas é tudo pelo WhatsApp mesmo — igual a essa conversa aqui. 💬\n\n*O que ficou faltando saber?*`,
+  // Objeção (preço/desconfiança/concorrente/adiar) — o bot varia o ângulo a
+  // cada rodada em vez de repetir, até 3 tentativas reais (ver REBATIDAS em
+  // sales-bot-objecao.ts). Aqui no simulador mostramos só a 1ª rebatida
+  // (ângulo PREÇO) como exemplo.
+  FOLLOWUP: `Entendo. Pensa assim: são R$ 14,90 por mês — menos de R$ 0,50 por dia, bem menos que um cafezinho. Nesse valor você tem alguém de olho na sua vida financeira 24h, todo santo dia, direto no WhatsApp.`,
 
-  CUPOM: `Espera! 🎁 Tenho uma condição especial para você.\n\nPreparamos um *cupom de desconto* exclusivo:\n\n👉 Use o cupom *[CUPOM]* na hora de assinar e garanta seu desconto!\n\n${CAKTO_LINK}\n\nOferta por tempo limitado ⏰`,
+  CUPOM: `Ah, e tem mais uma coisa: 🎁\n\nUse o cupom *[CUPOM]* na hora de assinar e garanta desconto na sua primeira mensalidade:\n\n${CAKTO_LINK}`,
 
-  FIM: `Aqui está o link mais uma vez, caso mude de ideia:\n\n👉 ${CAKTO_LINK}\n\nQualquer dúvida, pode me chamar! 😊`,
+  FIM: `Tudo bem, sem problema! Se mudar de ideia, é só me chamar aqui a qualquer hora. 😊\n\nBoa sorte com suas finanças! 🍀`,
 };
 
 type MensagemChat = { de: "bot" | "lead"; texto: string; tipo?: "imagem" };
 type MensagemIA   = { role: "user" | "assistant" | "system"; content: string };
 
 const FLUXO: { etapa: Etapa; label: string; respostas: string[] }[] = [
-  { etapa: "QUALIFICACAO", label: "Lead diz 'sim, tenho dívidas'", respostas: ["Sim", "Tenho sim", "Quero", "Claro"] },
-  { etapa: "PROVA",        label: "Lead reage às imagens", respostas: ["Interessante!", "Nossa que legal", "Quero saber mais", "E o preço?"] },
-  { etapa: "OFERTA",       label: "Lead responde após receber oferta", respostas: ["Que preço é esse?", "É caro", "Vou pensar", "Tem desconto?"] },
-  { etapa: "FOLLOWUP",     label: "Lead responde ao follow-up", respostas: ["Ainda tô na dúvida", "Tô sem dinheiro agora", "Ok obrigado"] },
+  { etapa: "QUALIFICACAO", label: "Lead responde à pergunta de abertura (a dor)", respostas: ["Esqueço de pagar conta e atraso", "Cartão estoura todo mês", "Não sei pra onde meu dinheiro vai", "Tenho dívida acumulada"] },
+  { etapa: "PROVA",        label: "Lead reage à demonstração/diferencial", respostas: ["Interessante!", "Nossa que legal", "Quero saber mais", "E o preço?"] },
+  { etapa: "OFERTA",       label: "Lead responde após receber a oferta (objeção)", respostas: ["É caro", "Não sei se confio", "Já uso outro app", "Vou pensar"] },
+  { etapa: "FOLLOWUP",     label: "Lead insiste na objeção (2ª/3ª rodada)", respostas: ["Ainda acho caro", "Continuo com dúvida", "Pare de mandar mensagem", "Ok, quero sim"] },
   { etapa: "fim",          label: "Encerramento", respostas: [] },
 ];
 
@@ -71,14 +64,16 @@ function formatarMensagem(texto: string) {
     .replace(/\n/g, "<br/>");
 }
 
-const MSG_BOAS_VINDAS = `Olá, *Ibrahim*! 👋 Seja bem-vindo(a) ao *QuitaZAP!*
+// Quem faz onboarding e registro de verdade hoje é o fluxo determinístico
+// (onboarding-controle.ts, controle-financeiro-flow.ts) + o interpretador
+// de linguagem natural (financeiro-intent-resolver.ts) — nenhum dos dois
+// passa por aqui. Esse chat chama ai-bot.ts direto (ver /api/test/bot-chat),
+// que desde 2026-09 é só o rescue parser: último recurso quando nada mais
+// reconheceu a mensagem, sem fazer nenhuma pergunta de perfil/dependentes
+// (isso não é mais usado pelo produto).
+const MSG_BOAS_VINDAS = `Olá! 👋 Esse chat simula o *rescue parser* do QuitaZAP — o último recurso, chamado só quando o fluxo normal de registro não reconhece a mensagem.
 
-Sou seu consultor financeiro pessoal. Vou te ajudar a sair das dívidas com um plano claro e direto. 💪
-
-*Antes de começar, me conta rapidinho:*
-
-1️⃣ Como você trabalha? CLT, servidor público, autônomo, MEI ou empresário?
-2️⃣ Tem dependentes? Filhos ou alguém que depende de você financeiramente?`;
+Manda qualquer coisa que o fluxo normal (renda, gasto, dívida, meta) não entenderia, e veja a escalada de 3 tentativas até cair pra revisão humana.`;
 
 // ── Componente principal ──────────────────
 export default function TestarFunilPage() {
@@ -89,7 +84,7 @@ export default function TestarFunilPage() {
       <div className="qa-page-header">
         <div>
           <h1 className="qa-page-title">Simulador</h1>
-          <p className="qa-page-subtitle">Teste o funil de vendas e o bot de IA do QuitaZAP</p>
+          <p className="qa-page-subtitle">Teste o funil de vendas e o rescue parser do QuitaZAP</p>
         </div>
       </div>
 
@@ -97,7 +92,7 @@ export default function TestarFunilPage() {
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {[
           { id: "funil" as Aba, label: "Funil de vendas" },
-          { id: "bot"   as Aba, label: "Bot QuitaZAP" },
+          { id: "bot"   as Aba, label: "Rescue parser" },
         ].map(({ id, label }) => (
           <button
             key={id}
@@ -141,9 +136,8 @@ function AbaFunil() {
       setEtapa("PROVA");
       addMsg([
         { de: "bot", texto: MSGS.QUALIFICACAO as string },
-        { de: "bot", texto: `[IMAGEM 1] — ${SITE_URL}/api/vendas/conversa`, tipo: "imagem" },
-        { de: "bot", texto: `[IMAGEM 2] — ${SITE_URL}/api/vendas/plano`, tipo: "imagem" },
-        { de: "bot", texto: (MSGS.PROVA as string[])[2] },
+        { de: "bot", texto: (MSGS.PROVA as string[])[0] },
+        { de: "bot", texto: (MSGS.PROVA as string[])[1] },
       ], 800);
     } else if (etapa === "PROVA") {
       setEtapa("OFERTA");
@@ -243,63 +237,26 @@ function AbaFunil() {
   );
 }
 
-// ── Respostas predefinidas por categoria ──
+// ── Mensagens de exemplo pra testar a escalada do rescue parser ──
+// Esse chat chama ai-bot.ts direto (sem o fluxo determinístico nem o
+// interpretador financeiro na frente) — então QUALQUER mensagem aqui vira
+// a mesma escalada de 3 tentativas, independente do conteúdo. As frases
+// abaixo são só exemplos realistas do tipo de mensagem ambígua que, no
+// fluxo real, já teria passado pelo interpretador antes de cair aqui.
 const RESPOSTAS_RAPIDAS: { categoria: string; emoji: string; itens: string[] }[] = [
   {
-    categoria: "Perfil",
-    emoji: "👤",
+    categoria: "Mensagens ambíguas",
+    emoji: "🤔",
     itens: [
-      "CLT, tenho esposa e 2 filhos",
-      "Autônomo, sem dependentes",
-      "Servidor público, tenho 1 filho",
-      "MEI, minha esposa depende de mim",
-    ],
-  },
-  {
-    categoria: "Renda",
-    emoji: "💰",
-    itens: [
-      "Recebo R$ 3.500 líquido por mês",
-      "Meu salário é R$ 2.800, às vezes faço bicos",
-      "Ganho R$ 5.200 e minha esposa ganha R$ 1.800",
-      "Sou autônomo, média de R$ 4.000 por mês",
-    ],
-  },
-  {
-    categoria: "Despesas",
-    emoji: "🏠",
-    itens: [
-      "Aluguel R$ 900, internet R$ 100, energia R$ 150, escola R$ 400, plano de saúde R$ 280",
-      "Aluguel R$ 1.200, luz R$ 120, internet R$ 100, Netflix R$ 45, academia R$ 99",
-      "Financiamento da casa R$ 850, condomínio R$ 300, escola R$ 500, plano R$ 350",
-      "Mercado R$ 600 por mês, combustível R$ 300, farmácia R$ 80",
-    ],
-  },
-  {
-    categoria: "Dívidas",
-    emoji: "💳",
-    itens: [
-      "Nubank cartão R$ 4.500, parcela R$ 375, 12x restantes, vence dia 10",
-      "Empréstimo Banco do Brasil R$ 15.000, parcela R$ 850, faltam 18 meses, vence dia 5",
-      "Casas Bahia R$ 1.800, 9x de R$ 200, vence dia 20",
-      "Financiamento do carro R$ 22.000, parcela R$ 680, 32x restantes, vence dia 15",
-      "Não tenho mais dívidas",
-    ],
-  },
-  {
-    categoria: "Outros",
-    emoji: "💬",
-    itens: [
-      "Não tenho reserva de emergência",
-      "Tenho R$ 500 guardado",
-      "Consigo separar uns R$ 300 por mês para pagar dívidas",
-      "Estou negativado no Serasa",
-      "Qual meu QuitaScore?",
+      "isso não faz sentido pra mim",
+      "e aí, como funciona esse negócio?",
+      "sei lá, me explica de novo",
+      "tanto faz",
     ],
   },
 ];
 
-// ── Aba Bot QuitaZAP ─────────────────────
+// ── Aba Rescue parser ─────────────────────
 function AbaBot() {
   const [chat, setChat] = useState<MensagemChat[]>([
     { de: "bot", texto: MSG_BOAS_VINDAS },
@@ -310,7 +267,7 @@ function AbaBot() {
   const [input, setInput]           = useState("");
   const [carregando, setCarregando] = useState(false);
   const [nome, setNome]             = useState("Ibrahim");
-  const [categoriaAberta, setCategoriaAberta] = useState<string | null>("Perfil");
+  const [categoriaAberta, setCategoriaAberta] = useState<string | null>("Mensagens ambíguas");
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function enviar(textoOverride?: string) {
@@ -343,10 +300,6 @@ function AbaBot() {
       if (data.resposta) {
         setChat((prev) => [...prev, { de: "bot", texto: data.resposta }]);
         novoHistorico.push({ role: "assistant", content: data.resposta });
-      } else if (data.diagnostico) {
-        const resumo = `✅ *Diagnóstico gerado!*\n\nDados coletados com sucesso. Em produção o bot apresentaria o diagnóstico completo aqui.`;
-        setChat((prev) => [...prev, { de: "bot", texto: resumo }]);
-        novoHistorico.push({ role: "assistant", content: resumo });
       }
 
       setHistorico(novoHistorico);
@@ -362,7 +315,7 @@ function AbaBot() {
     setChat([{ de: "bot", texto: MSG_BOAS_VINDAS }]);
     setHistorico([{ role: "assistant", content: MSG_BOAS_VINDAS }]);
     setInput("");
-    setCategoriaAberta("Perfil");
+    setCategoriaAberta("Mensagens ambíguas");
   }
 
   return (
@@ -462,7 +415,7 @@ function AbaBot() {
       </div>
 
       <p style={{ fontSize: 12, color: "var(--qa-gray-500)", textAlign: "center", margin: 0 }}>
-        💡 Este chat chama a IA diretamente — sem WhatsApp. Respostas reais do bot.
+        💡 Este chat chama ai-bot.ts diretamente — sem WhatsApp, sem o fluxo determinístico na frente. Respostas reais do rescue parser.
       </p>
     </div>
   );

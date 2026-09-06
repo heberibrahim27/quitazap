@@ -41,20 +41,21 @@ model Cliente {
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
-  dividas             Divida[]
-  pagamentos          Pagamento[]
-  planosEnviados      PlanoEnviado[]
-  botSessoes          BotSessao[]
-  cobrancas           Cobranca[]
-  tarefas             Tarefa[]
-  lancamentos         Lancamento[]
-  cartoes             Cartao[]
-  pushSubscriptions   PushSubscription[]
-  orcamentos          OrcamentoCategoria[]
-  metas               Meta[]
-  eventosCakto        EventoCakto[]
-  insightsDetectados  InsightDetectado[]
-  saudeFinanceiraLogs SaudeFinanceiraLog[]
+  dividas                   Divida[]
+  pagamentos                Pagamento[]
+  planosEnviados            PlanoEnviado[]
+  botSessoes                BotSessao[]
+  cobrancas                 Cobranca[]
+  tarefas                   Tarefa[]
+  lancamentos               Lancamento[]
+  cartoes                   Cartao[]
+  pushSubscriptions         PushSubscription[]
+  orcamentos                OrcamentoCategoria[]
+  metas                     Meta[]
+  eventosCakto              EventoCakto[]
+  insightsDetectados        InsightDetectado[]
+  saudeFinanceiraLogs       SaudeFinanceiraLog[]
+  mensagensPendentesRevisao MensagemPendenteRevisao[]
 }
 
 // ─────────────────────────────────────────
@@ -267,14 +268,21 @@ model MensagemProcessada {
 // ─────────────────────────────────────────
 // etapa: QUALIFICACAO | PROVA | OFERTA | FOLLOWUP | CONVERTIDO | DESISTIU
 model LeadVendas {
-  id           String   @id @default(cuid())
-  telefone     String   @unique
-  nome         String?
-  etapa        String   @default("QUALIFICACAO")
-  cupomEnviado Boolean  @default(false)
-  msgCount     Int      @default(0)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  id                String   @id @default(cuid())
+  telefone          String   @unique
+  nome              String?
+  etapa             String   @default("QUALIFICACAO")
+  cupomEnviado      Boolean  @default(false)
+  msgCount          Int      @default(0)
+  // Loop de reversão de objeção (Ibrahim, 2026-09-06): quantas vezes já
+  // tentamos reverter uma objeção com um ângulo diferente, e quais ângulos
+  // (PRECO/CONFIANCA/CONCORRENTE/ADIAR, separados por vírgula) já foram
+  // usados — pra nunca repetir o mesmo argumento pro mesmo lead. Zerado
+  // de novo depois que o lead compra ou desiste de vez.
+  tentativasObjecao Int      @default(0)
+  angulosUsados     String   @default("")
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────
@@ -730,4 +738,30 @@ model AuditoriaAssistente {
 
   @@index([ferramenta])
   @@index([criadoEm])
+}
+
+// ─────────────────────────────────────────
+// MENSAGEM PENDENTE DE REVISÃO (fila do rescue parser)
+// ─────────────────────────────────────────
+// Quando o interpretador financeiro (src/lib/ia/financeiro-intent-resolver.ts)
+// e o ai-bot.ts (rescue ladder, 3 tentativas) não conseguem entender uma
+// mensagem com segurança suficiente, ela pára de tentar e cai aqui — nunca
+// grava um lançamento/dívida/meta adivinhado. Fila só de leitura pro admin
+// revisar quando quiser (ver /revisao-pendente); sem notificação automática
+// por design (Ibrahim, 2026-09-06: "não me notificar direto toda vez").
+model MensagemPendenteRevisao {
+  id          String    @id @default(cuid())
+  clienteId   String?
+  telefone    String?
+  nome        String?
+  mensagem    String
+  motivo      String
+  resolvida   Boolean   @default(false)
+  criadoEm    DateTime  @default(now())
+  resolvidaEm DateTime?
+
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@index([resolvida, criadoEm])
+  @@index([clienteId])
 }
