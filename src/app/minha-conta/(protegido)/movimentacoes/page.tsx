@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { listarMovimentacoes } from "@/lib/movimentacoes-service";
 import { MesSwipe } from "../MesSwipe";
+import { MesFiltro } from "../MesFiltro";
 import { ValorLista } from "../ValorLista";
 
 function fmtValor(v: number) {
@@ -101,6 +102,12 @@ export default async function MovimentacoesPage({
           </p>
         </div>
       </div>
+
+      <MesFiltro
+        hrefAnterior={`/minha-conta/movimentacoes?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+        hrefSeguinte={`/minha-conta/movimentacoes?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        label={`${nomeMes}/${ano}`}
+      />
 
       <div className="mc-card">
         {movimentacoes.length === 0 ? (
