@@ -104,8 +104,8 @@ test("mesma objeção repetida (só 'não') pula pro próximo ângulo em ordem f
     estado = r.novoEstado;
   }
 
-  // 3 ângulos usados, todos diferentes (ordem fixa PRECO→CONFIANCA→CONCORRENTE→ADIAR).
-  assert.deepEqual(angulosVistos, ["PRECO", "CONFIANCA", "CONCORRENTE"]);
+  // 3 ângulos usados, todos diferentes (ordem fixa PRECO→CONFIANCA→CANCELAMENTO→CONCORRENTE→ADIAR).
+  assert.deepEqual(angulosVistos, ["PRECO", "CONFIANCA", "CANCELAMENTO"]);
 
   const r4 = decidirRespostaPosOferta(estado, "não");
   assert.equal(r4.acao, "desistir");
@@ -337,4 +337,24 @@ test("fluxo completo: os 4 pontos de dor do botão de abertura avançam pro funi
   for (const dor of pontosDeDor) {
     assert.equal(ehRecusaClara(dor), false, `"${dor}" não deveria encerrar o funil na abertura`);
   }
+});
+
+// Achado do Ibrahim numa rodada de testes com personas variadas — não
+// urgente, mas fácil de resolver: pergunta sobre cancelamento/multa caía
+// no rebate genérico de preço em vez de responder direto sobre a política
+// real (já existente em outro lugar do texto: "cancele quando quiser").
+test("pergunta sobre cancelamento/multa/fidelidade recebe o script certo (CANCELAMENTO), não o de preço", () => {
+  const frasesDeCancelamento = [
+    "e se eu quiser cancelar depois, tem multa ou pegadinha?",
+    "isso tem fidelidade?",
+    "é difícil cancelar depois?",
+    "tem alguma letra miúda nesse contrato?",
+  ];
+  for (const frase of frasesDeCancelamento) {
+    const decisao = decidirRespostaPosOferta(estadoInicial(), frase);
+    assert.equal(decisao.acao, "rebater", `"${frase}" deveria gerar uma rebatida`);
+    assert.deepEqual(decisao.angulos, ["CANCELAMENTO"], `"${frase}" deveria usar o ângulo CANCELAMENTO`);
+  }
+  assert.match(REBATIDAS.CANCELAMENTO, /cancelar quando quiser/i);
+  assert.doesNotMatch(REBATIDAS.CANCELAMENTO, /cafezinho/i);
 });
