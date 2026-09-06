@@ -30,7 +30,7 @@ import {
   PRECO_MENSAL,
   RE_PARAR,
   RE_PERGUNTA_PRECO,
-  detectaNegativo,
+  ehRecusaClara,
   normalizarTexto,
   decidirRespostaPosOferta,
   REBATIDAS,
@@ -135,7 +135,10 @@ async function processarRespostaPosOferta(lead: LeadVendas, mensagem: string, te
       angulosUsados: decisao.novoEstado.angulosUsados,
     },
   });
-  await sendWhatsApp(telefone, REBATIDAS[decisao.angulo]);
+  // Objeção composta (ex: preço + concorrente na mesma frase) rebate as
+  // duas em uma única mensagem, em vez de responder só a primeira e
+  // descartar o resto do que o lead disse.
+  await sendWhatsApp(telefone, decisao.angulos.map((a) => REBATIDAS[a]).join("\n\n"));
 
   // Cupom real (não é urgência inventada) só entra depois da 2ª rodada de
   // objeção — não no primeiro "não", pra não parecer que o preço já
@@ -196,7 +199,7 @@ export async function processarLeadVendas(
 
   // ── Momento 1: DOR — aguardando resposta à pergunta de abertura ──
   if (lead.etapa === "QUALIFICACAO") {
-    if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+    if (RE_PARAR.test(norm) || ehRecusaClara(mensagem)) {
       await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
       await sendWhatsApp(telefone, ENCERRAMENTO);
       return;
@@ -215,7 +218,7 @@ export async function processarLeadVendas(
 
   // ── Lead reagiu à demonstração/diferencial ──
   if (lead.etapa === "PROVA") {
-    if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+    if (RE_PARAR.test(norm) || ehRecusaClara(mensagem)) {
       await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
       await sendWhatsApp(telefone, ENCERRAMENTO);
       return;

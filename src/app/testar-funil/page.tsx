@@ -5,7 +5,7 @@ import {
   PRECO_MENSAL,
   RE_PARAR,
   RE_PERGUNTA_PRECO,
-  detectaNegativo,
+  ehRecusaClara,
   normalizarTexto,
   decidirRespostaPosOferta,
   REBATIDAS,
@@ -165,7 +165,7 @@ function AbaFunil() {
     }
 
     if (etapa === "QUALIFICACAO") {
-      if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+      if (RE_PARAR.test(norm) || ehRecusaClara(mensagem)) {
         setResultadoFinal("desistiu");
         setEtapa("fim");
         addMsg([{ de: "bot", texto: MSGS.FIM as string }], 800);
@@ -181,7 +181,7 @@ function AbaFunil() {
     }
 
     if (etapa === "PROVA") {
-      if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+      if (RE_PARAR.test(norm) || ehRecusaClara(mensagem)) {
         setResultadoFinal("desistiu");
         setEtapa("fim");
         addMsg([{ de: "bot", texto: MSGS.FIM as string }], 800);
@@ -219,7 +219,7 @@ function AbaFunil() {
     // decisao.acao === "rebater" — sempre um ângulo diferente do anterior
     setEtapa("FOLLOWUP");
     setEstadoObjecao(decisao.novoEstado);
-    addMsg([{ de: "bot", texto: REBATIDAS[decisao.angulo] }], 800);
+    addMsg([{ de: "bot", texto: decisao.angulos.map((a) => REBATIDAS[a]).join("\n\n") }], 800);
   }
 
   function reiniciarFunil() {
