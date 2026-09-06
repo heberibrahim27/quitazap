@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Inter } from "next/font/google";
 import {
   IconHome, IconWallet, IconUsers, IconClock, IconDownload,
-  IconFlask, IconSettings, IconLogout, IconPlus, IconMenu, IconX, IconTrendUp, IconLink, IconBot, IconAlertTriangle, IconTarget,
+  IconFlask, IconSettings, IconLogout, IconPlus, IconMenu, IconX, IconTrendUp, IconLink, IconBot, IconAlertTriangle, IconTarget, IconMegaphone,
 } from "./icons";
 import "./admin-shell.css";
 
@@ -27,6 +27,7 @@ const GRUPOS = [
     itens: [
       { href: "/painel", label: "Dashboard", Icone: IconHome },
       { href: "/financeiro", label: "Financeiro", Icone: IconWallet },
+      { href: "/marketing", label: "Marketing", Icone: IconMegaphone },
     ],
   },
   {
