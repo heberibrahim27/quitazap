@@ -626,6 +626,36 @@ model MetaFinanceira {
 }
 
 // ─────────────────────────────────────────
+// MARKETING — investimento em aquisição paga (Ads)
+// ─────────────────────────────────────────
+// Pedido do Ibrahim (2026-09-06): tela /marketing pra projetar meses de
+// investimento em Ads (CAC, MRR, resultado) e comparar projetado x real.
+// MarketingParametros é uma linha só (mesmo padrão de ContaAdmin acima) —
+// sem linha ainda, a tela usa os defaults do briefing.
+model MarketingParametros {
+  id                        String   @id @default(cuid())
+  investimentoInicialMensal Float    @default(1000)
+  cacProjetado              Float    @default(25)
+  // Fração (0.15 = 15%), não percentual — mesmo padrão de COMISSAO_CAKTO.
+  churnMensal               Float    @default(0.15)
+  horizonteMeses            Int      @default(12)
+  atualizadoEm              DateTime @updatedAt
+}
+
+// Dado real de um mês de campanha, informado manualmente pelo Ibrahim (sem
+// integração automática com Meta/Instagram Ads por enquanto).
+// novasAssinaturasPagas tem que ser confirmado pela Cakto — nunca lead,
+// conversa ou clique.
+model MarketingMesReal {
+  id                    String   @id @default(cuid())
+  mes                   String   @unique // "AAAA-MM"
+  investimentoReal      Float
+  novasAssinaturasPagas Int
+  criadoEm              DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
 // EVENTO CAKTO — histórico bruto de webhook (base da receita real)
 // ─────────────────────────────────────────
 // Antes desta tabela, o webhook (api/webhook/cakto/route.ts) só reagia a
