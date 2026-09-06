@@ -85,11 +85,17 @@ export const RE_PARAR = /\b(pare\b|chega\b|cansei\b|desist[oa]\b|me deixa(?:m)? 
 
 export const RE_PERGUNTA_PRECO = /\b(quanto custa|qual (o )?(valor|preco)|quanto (e|eh|fica|sai)|quanto que (e|eh|fica|custa)|qual o preco)\b/;
 
-export type AnguloObjecao = "PRECO" | "CONFIANCA" | "CONCORRENTE" | "ADIAR";
-const ORDEM_ANGULOS: AnguloObjecao[] = ["PRECO", "CONFIANCA", "CONCORRENTE", "ADIAR"];
+export type AnguloObjecao = "PRECO" | "CONFIANCA" | "CANCELAMENTO" | "CONCORRENTE" | "ADIAR";
+const ORDEM_ANGULOS: AnguloObjecao[] = ["PRECO", "CONFIANCA", "CANCELAMENTO", "CONCORRENTE", "ADIAR"];
 
 const RE_OBJ_PRECO = /\b(caro|cara|nao tenho dinheiro|sem grana|ta apertado|nao posso pagar|nao da pra pagar|muito dinheiro)\b/;
 const RE_OBJ_CONFIANCA = /\b(confio|desconfio|sera que funciona|isso e golpe|e seguro|e confiavel|meus dados|vender meus dados|e verdade isso|parece scam|fraude)\b/;
+// Achado do Ibrahim (registrado pra depois, sem urgência): pergunta sobre
+// cancelamento/multa/fidelidade caía no rebate genérico de preço
+// (cafezinho) em vez de responder direto sobre a política real, que já
+// existe em outro lugar do texto ("Cancele quando quiser — sem
+// burocracia"). Categoria própria pra reafirmar isso sem inventar nada novo.
+const RE_OBJ_CANCELAMENTO = /\b(multa|fidelidade|pegadinha|letra miuda|taxa escondida|dificil (de )?cancelar|complicado (pra |para )?cancelar|preso (no|com o|na) (plano|contrato|assinatura))\b/;
 // Achado do Ibrahim: "planilha" (o concorrente mais comum de verdade —
 // Excel/Google Sheets/caderno) não estava na lista, só nomes de app
 // (Mobills, GuiaBolso...). Sem esse sinal, uma objeção de "já resolvo do
@@ -109,6 +115,7 @@ function detectarAngulos(mensagemNormalizada: string): AnguloObjecao[] {
   const angulos: AnguloObjecao[] = [];
   if (RE_OBJ_PRECO.test(mensagemNormalizada)) angulos.push("PRECO");
   if (RE_OBJ_CONFIANCA.test(mensagemNormalizada)) angulos.push("CONFIANCA");
+  if (RE_OBJ_CANCELAMENTO.test(mensagemNormalizada)) angulos.push("CANCELAMENTO");
   if (RE_OBJ_CONCORRENTE.test(mensagemNormalizada)) angulos.push("CONCORRENTE");
   if (RE_OBJ_ADIAR.test(mensagemNormalizada)) angulos.push("ADIAR");
   return angulos;
@@ -122,6 +129,7 @@ function detectarAngulos(mensagemNormalizada: string): AnguloObjecao[] {
 export const REBATIDAS: Record<AnguloObjecao, string> = {
   PRECO: `Entendo. Pensa assim: são ${PRECO_MENSAL} por mês — menos de R$ 0,50 por dia, bem menos que um cafezinho. Nesse valor você tem alguém de olho na sua vida financeira 24h, todo santo dia, direto no WhatsApp.`,
   CONFIANCA: `Faz todo sentido perguntar isso. O QuitaZAP não mexe no seu dinheiro nem faz nenhuma transação — você só me conta o que gastou ou recebeu, e eu organizo. A gente não vende dado pessoal nem financeiro de ninguém, e você pode cancelar quando quiser, sem burocracia.`,
+  CANCELAMENTO: `Não tem multa, fidelidade nem pegadinha nenhuma. Você pode cancelar quando quiser, direto por aqui mesmo, sem burocracia — simples assim.`,
   CONCORRENTE: `Que bom que você já se preocupa com isso! A diferença é que aqui não tem app pra abrir nem planilha pra lembrar de preencher — você só manda uma mensagem no WhatsApp, do jeito que fala no dia a dia, e eu registro. Costuma ser mais fácil de manter no automático.`,
   ADIAR: `Sem problema, decisão que envolve dinheiro merece calma mesmo. O link fica disponível pra quando você decidir, sem pressa nenhuma. Posso te tirar mais alguma dúvida antes?`,
 };
@@ -141,7 +149,7 @@ export type DecisaoPosOferta =
 
 // Nunca desiste na 1ª objeção: sempre escolhe ângulo(s) ainda não usado(s)
 // (nunca repete o mesmo argumento), até 3 rodadas reais — depois disso, ou
-// se todos os 4 ângulos já foram usados, desiste. Se a mensagem trouxer
+// se todos os ângulos já foram usados, desiste. Se a mensagem trouxer
 // mais de uma objeção ao mesmo tempo (ex: preço + concorrente), rebate
 // AMBAS na mesma resposta em vez de responder só uma e descartar o resto.
 // Um pedido explícito pra parar interrompe na hora, em qualquer momento.
