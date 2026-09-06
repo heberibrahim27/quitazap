@@ -276,13 +276,39 @@ model LeadVendas {
   msgCount          Int      @default(0)
   // Loop de reversão de objeção (Ibrahim, 2026-09-06): quantas vezes já
   // tentamos reverter uma objeção com um ângulo diferente, e quais ângulos
-  // (PRECO/CONFIANCA/CONCORRENTE/ADIAR, separados por vírgula) já foram
-  // usados — pra nunca repetir o mesmo argumento pro mesmo lead. Zerado
-  // de novo depois que o lead compra ou desiste de vez.
+  // (PRECO/CONFIANCA/CANCELAMENTO/CONCORRENTE/ADIAR, separados por vírgula)
+  // já foram usados — pra nunca repetir o mesmo argumento pro mesmo lead.
+  // Zerado de novo depois que o lead compra ou desiste de vez.
   tentativasObjecao Int      @default(0)
   angulosUsados     String   @default("")
+  // Por que etapa virou DESISTIU (pedido do Ibrahim: painel admin precisa
+  // distinguir "pediu pra parar" de "só sumiu"/"esgotou as objeções") —
+  // null enquanto o lead ainda está ativo ou converteu.
+  // OPTOUT = pediu explicitamente pra parar (RE_PARAR)
+  // RECUSOU = recusou logo na abertura/demonstração (ehRecusaClara)
+  // OBJECAO_ESGOTADA = não aceitou depois de esgotar as rodadas de objeção
+  motivoDesistencia String?
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
+
+  mensagens MensagemLeadVendas[]
+}
+
+// Histórico completo da conversa do funil de vendas (pedido do Ibrahim:
+// painel admin pra acompanhar atendimento por lead). Uma linha por
+// mensagem — nunca sobrescreve, só acrescenta — ao contrário do
+// BotSessao.dividasTemp (usado pelo bot de assinante), que é um blob JSON
+// mutável de working-memory, não um log de auditoria.
+model MensagemLeadVendas {
+  id       String   @id @default(cuid())
+  leadId   String
+  direcao  String // "LEAD" | "BOT"
+  texto    String
+  criadoEm DateTime @default(now())
+
+  lead LeadVendas @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, criadoEm])
 }
 
 // ─────────────────────────────────────────
