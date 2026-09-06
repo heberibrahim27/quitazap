@@ -11,6 +11,7 @@ import { LimiteSeguroCard } from "./LimiteSeguroCard";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
 import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
 import { MesSwipe } from "./MesSwipe";
+import { MesFiltro } from "./MesFiltro";
 import { AnimarAoAparecer } from "./AnimarAoAparecer";
 
 function fmtValor(v: number) {
@@ -326,6 +327,12 @@ export default async function MinhaContaPage({
         </div>
       </div>
       </MesSwipe>
+
+      <MesFiltro
+        hrefAnterior={`/minha-conta?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
+        hrefSeguinte={ehMesAtual ? null : `/minha-conta?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        label={`${nomeMes}/${ano}`}
+      />
 
       {resumoPlano.calculavel && (
         <>
