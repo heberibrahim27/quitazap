@@ -18,13 +18,24 @@
 import { prisma } from "@/lib/prisma";
 import { calcularStatusAssinatura, whereStatusAssinatura, LABEL_STATUS_ASSINATURA, type StatusAssinatura } from "@/lib/status-assinatura";
 import { calcularMetricasNegocio } from "@/lib/financeiro-admin/metricas-negocio";
-import { calcularDreAdmin, calcularAssinantesParaLucro } from "@/lib/financeiro-admin/motor";
+import { calcularDreAdmin, calcularAssinantesParaLucro, PRECO_MENSAL, COMISSAO_CAKTO } from "@/lib/financeiro-admin/motor";
 import { TIPOS_CONTATO, LABEL_TIPO_CONTATO, normalizarContato, criarContatoSocial, type TipoContato } from "@/lib/contatos-sociais";
 
 export const SYSTEM_PROMPT = `Você é o assistente interno do painel administrativo do QuitaZAP — uso exclusivo da equipe (Ibrahim e afins), nunca do cliente final. Ajuda com perguntas sobre a gestão do negócio (clientes, assinaturas, métricas financeiras do SaaS) e executa ações administrativas simples quando pedido.
 
+Fatos fixos do negócio (não precisa de ferramenta pra isso, já sabe de cor):
+- Preço da assinatura hoje: R$ ${PRECO_MENSAL.toFixed(2).replace(".", ",")}/mês (mesmo valor pra todo cliente pagante).
+- Comissão da Cakto sobre cada cobrança: ${(COMISSAO_CAKTO * 100).toFixed(1).replace(".", ",")}%.
+- Isso é o preço de tabela/catálogo — não confunda com "ARPU" (receita média por assinante ativo), que é um dado observado que pode variar/zerar conforme a base atual.
+
+Status de assinatura — só existem 3, não invente um quarto:
+- PAGO: assinatura ativa e em dia.
+- CANCELADO: já foi pagante, assinatura venceu e não renovou (ou cancelou/reembolsou).
+- INATIVO: cliente gratuito/lead, nunca pagou nada — NÃO é sinônimo de "pagamento pendente", "pagamento recusado" ou "pagamento em análise". O sistema hoje NÃO tem esse conceito de "pendente" — o webhook da Cakto ainda não distingue esse estado de nenhum outro. Se perguntarem por "clientes com pagamento pendente/falho", nunca rotule cliente INATIVO como "pendente" — explique que esse dado não existe no sistema hoje e, se fizer sentido, ofereça mostrar os INATIVOs deixando claro que são leads gratuitos (não uma cobrança pendente).
+
 Regras rígidas, sem exceção:
-- Você só sabe o que as ferramentas abaixo devolvem. Nunca invente número, nome ou ID.
+- Você só sabe o que as ferramentas abaixo devolvem (além dos fatos fixos acima). Nunca invente número, nome ou ID.
+- Todo valor em reais tem no máximo 2 casas decimais (formato R$ 0,00) — nunca escreva um valor monetário com 3+ casas decimais.
 - Você NUNCA tem acesso a dado financeiro pessoal do cliente final (renda, despesas, dívidas, contracheque) — isso é por design, não por instrução: nenhuma ferramenta sua expõe esse dado. Se perguntarem, explique que esse dado é privado do cliente e não fica disponível aqui.
 - Ferramentas de escrita (marcar_cliente_como_pago, cadastrar_contato_social) nunca executam a ação de verdade quando você as chama — elas só geram uma proposta que a pessoa confirma manualmente na tela. Ainda assim, só chame uma ferramenta de escrita quando o pedido for específico o bastante (já souber qual cliente/contato). Se o nome for ambíguo ou faltar informação, pergunte antes ou use buscar_cliente pra resolver.
 - Pra qualquer ação envolvendo um cliente específico, sempre chame buscar_cliente antes se ainda não tiver o ID exato — nunca invente ou adivinhe um clienteId.
@@ -57,6 +68,14 @@ function argNumero(args: Record<string, unknown>, chave: string): number | null 
   return Number.isFinite(n) ? n : null;
 }
 
+// Arredonda pra centavos antes de devolver ao modelo — sem isso, valor
+// derivado de custo de IA (LogIA.custoUSD × câmbio) chega com 4+ casas
+// decimais (ex: R$ 0,0284) e o modelo simplesmente ecoa o número cru na
+// resposta em vez de formatar como dinheiro de verdade.
+function arredondarMoeda(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
 // ── Leitura ──────────────────────────────
 
 const buscarMetricasNegocio: ResultadoLeitura = {
@@ -66,8 +85,9 @@ const buscarMetricasNegocio: ResultadoLeitura = {
     const m = await calcularMetricasNegocio(mes);
     return {
       mes: m.mes,
-      mrrAtual: m.mrrAtual,
-      mrrMesAnterior: m.mrrMesAnterior,
+      precoMensalCatalogo: PRECO_MENSAL,
+      mrrAtual: arredondarMoeda(m.mrrAtual),
+      mrrMesAnterior: arredondarMoeda(m.mrrMesAnterior),
       crescimentoMrrPct: m.crescimentoMrrPct,
       assinantesAtivos: m.ativos,
       churnPct: m.churnPct,
@@ -78,8 +98,12 @@ const buscarMetricasNegocio: ResultadoLeitura = {
       cancelamentosMesAnterior: m.cancelamentosMesAnterior,
       reativacoes: m.reativacoes,
       eventosProblema: m.eventosProblema,
-      arpu: m.arpu,
-      receitaPerdidaCancelamentos: m.receitaPerdidaCancelamentos,
+      // ARPU é receita média OBSERVADA por assinante — não confundir com
+      // precoMensalCatalogo (preço de tabela). Difere/zera quando a base
+      // de ativos é pequena; nunca é a resposta certa pra "qual o preço
+      // da assinatura".
+      arpu: arredondarMoeda(m.arpu),
+      receitaPerdidaCancelamentos: arredondarMoeda(m.receitaPerdidaCancelamentos),
       alertas: m.alertas,
     };
   },
@@ -90,7 +114,19 @@ const buscarDreMes: ResultadoLeitura = {
   async executar(args) {
     const mes = argTexto(args, "mes") || undefined;
     const dre = await calcularDreAdmin(mes);
-    return dre;
+    return {
+      ...dre,
+      precoMensalCatalogo: PRECO_MENSAL,
+      receitaBruta: arredondarMoeda(dre.receitaBruta),
+      comissaoCakto: arredondarMoeda(dre.comissaoCakto),
+      receitaLiquida: arredondarMoeda(dre.receitaLiquida),
+      custoIA: arredondarMoeda(dre.custoIA),
+      custoIAPagantes: arredondarMoeda(dre.custoIAPagantes),
+      custoIAGratuitos: arredondarMoeda(dre.custoIAGratuitos),
+      custoManual: arredondarMoeda(dre.custoManual),
+      resultadoOperacional: arredondarMoeda(dre.resultadoOperacional),
+      custos: dre.custos.map((c) => ({ ...c, valor: arredondarMoeda(c.valor) })),
+    };
   },
 };
 
@@ -102,7 +138,12 @@ const calcularAssinantesParaMeta: ResultadoLeitura = {
 
     const mes = argTexto(args, "mes") || undefined;
     const r = await calcularAssinantesParaLucro(lucroDesejado, mes);
-    return r;
+    return {
+      ...r,
+      precoMensalCatalogo: PRECO_MENSAL,
+      custoManualMes: arredondarMoeda(r.custoManualMes),
+      margemPorAssinante: arredondarMoeda(r.margemPorAssinante),
+    };
   },
 };
 
@@ -315,7 +356,7 @@ export const FERRAMENTAS_OPENAI = [
     type: "function",
     function: {
       name: "listar_clientes_por_status",
-      description: "Lista clientes filtrados por status de assinatura.",
+      description: "Lista clientes filtrados por status de assinatura. INATIVO = cliente gratuito/lead que nunca pagou — não existe status de 'pagamento pendente/recusado' no sistema hoje, não confunda os dois.",
       parameters: {
         type: "object",
         properties: {
@@ -330,7 +371,7 @@ export const FERRAMENTAS_OPENAI = [
     type: "function",
     function: {
       name: "contar_clientes_por_status",
-      description: "Conta quantos clientes existem em cada status de assinatura (pago, cancelado, inativo).",
+      description: "Conta quantos clientes existem em cada status de assinatura (pago, cancelado, inativo). INATIVO = gratuito/lead, não 'pagamento pendente' (esse conceito não existe no sistema hoje).",
       parameters: { type: "object", properties: {} },
     },
   },
