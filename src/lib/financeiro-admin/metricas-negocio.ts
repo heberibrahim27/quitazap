@@ -168,8 +168,11 @@ export async function calcularMetricasNegocio(mesRef?: string): Promise<Metricas
   // pública, que continua mostrando exatamente 12 meses.
   const meses13 = ultimosNMeses(mes, 13);
 
+  // isTeste=false: cadastro de teste interno (Ibrahim, 2026-09-06) nunca
+  // entra em nenhuma métrica histórica (ativos/novos/cancelados/MRR/churn)
+  // — mesmo critério de whereStatusAssinatura em status-assinatura.ts.
   const [clientes, eventos] = await Promise.all([
-    prisma.cliente.findMany({ select: { criadoEm: true, gratuito: true, assinaturaVenceEm: true } }),
+    prisma.cliente.findMany({ where: { isTeste: false }, select: { criadoEm: true, gratuito: true, assinaturaVenceEm: true } }),
     prisma.eventoCakto.findMany({ select: { clienteId: true, status: true, criadoEm: true } }),
   ]);
 

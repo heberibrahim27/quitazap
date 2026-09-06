@@ -16,6 +16,7 @@ import { QaTrendChart } from "@/components/QaTrendChart";
 import { QaFlowChart } from "@/components/QaFlowChart";
 import { calcularDreAdmin, calcularAssinantesParaLucro, mesAtualBrasil, PRECO_MENSAL, COMISSAO_CAKTO } from "@/lib/financeiro-admin/motor";
 import { calcularMetricasNegocio } from "@/lib/financeiro-admin/metricas-negocio";
+import { ProjecaoAssinantes } from "./ProjecaoAssinantes";
 
 export const dynamic = "force-dynamic";
 
@@ -469,41 +470,16 @@ export default async function FinanceiroPage() {
       <div className="qa-card">
         <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600 }}>Projeção</h2>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
-            <thead>
-              <tr>
-                {["Assinantes", "Receita Bruta", "- CAKTO", "- Custos", "Resultado Operacional", "Margem"].map((h) => (
-                  <th key={h} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, color: "var(--qa-gray-400)", borderBottom: "1px solid var(--qa-line)" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[1, 3, 5, 10, 20, 50].map((n) => {
-                const rb = n * PRECO_MENSAL;
-                const ck = rb * COMISSAO_CAKTO;
-                const cv = n * custoVariavelPorCliente;
-                const ct = custoManualMes + cv;
-                const ll = rb - ck - ct;
-                const mg = rb - ck > 0 ? ll / (rb - ck) : 0;
-                const isAtual = n === totalAssinantes;
-                return (
-                  <tr key={n} style={{ background: isAtual ? "rgba(0,123,255,0.08)" : "transparent" }}>
-                    <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: isAtual ? 700 : 400 }}>
-                      {n}{isAtual ? " ← atual" : ""}
-                    </td>
-                    <td style={{ padding: "10px 14px", textAlign: "center" }}>{fmt(rb)}</td>
-                    <td style={{ padding: "10px 14px", textAlign: "center", color: "#fcd34d" }}>- {fmt(ck)}</td>
-                    <td style={{ padding: "10px 14px", textAlign: "center", color: "#fca5a5" }}>- {fmt(ct)}</td>
-                    <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: ll >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmt(ll)}</td>
-                    <td style={{ padding: "10px 14px", textAlign: "center", color: ll >= 0 ? "#6ee7b7" : "#fca5a5" }}>{pct(mg)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <ProjecaoAssinantes
+            totalAssinantesAtual={totalAssinantes}
+            precoMensal={PRECO_MENSAL}
+            comissaoCakto={COMISSAO_CAKTO}
+            custoManualMes={custoManualMes}
+            custoVariavelPorCliente={custoVariavelPorCliente}
+          />
         </div>
         <p style={{ fontSize: 11.5, color: "var(--qa-gray-500)", marginTop: 12 }}>
-          Considera o custo fixo lançado este mês ({fmt(custoManualMes)}) + custo médio de IA por cliente ativo ({fmt(custoVariavelPorCliente)}).
+          Considera o custo fixo lançado este mês ({fmt(custoManualMes)}) + custo médio de IA por cliente ativo ({fmt(custoVariavelPorCliente)}). Editar o número de assinantes acima simula outro cenário.
         </p>
       </div>
     </div>

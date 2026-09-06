@@ -40,6 +40,7 @@ export default async function ClientesPage({
       criadoEm: true,
       gratuito: true,
       assinaturaVenceEm: true,
+      isTeste: true,
     },
   });
 
@@ -110,6 +111,11 @@ export default async function ClientesPage({
                       <span className="qa-badge" style={{ background: cor.bg, color: cor.color, border: `1px solid ${cor.border}` }}>
                         {LABEL_STATUS_ASSINATURA[status]}
                       </span>
+                      {cliente.isTeste && (
+                        <span className="qa-badge" style={{ background: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.12)" }}>
+                          Teste — não conta nas métricas
+                        </span>
+                      )}
                     </div>
                     <span style={{ display: "block", color: "var(--qa-gray-400)", fontSize: 13 }}>
                       {cliente.telefone}

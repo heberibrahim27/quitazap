@@ -90,6 +90,11 @@ export default async function ClienteDetalhePage({
             <span className="qa-badge" style={{ background: corStatus.bg, color: corStatus.color, border: `1px solid ${corStatus.border}` }}>
               {LABEL_STATUS_ASSINATURA[statusAssinatura]}
             </span>
+            {cliente.isTeste && (
+              <span className="qa-badge" style={{ background: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.12)" }}>
+                Cadastro de teste — não conta em nenhuma métrica
+              </span>
+            )}
           </div>
           <p className="qa-page-subtitle" style={{ marginBottom: 2 }}>{cliente.telefone}</p>
           {cliente.email && (

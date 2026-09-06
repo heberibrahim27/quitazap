@@ -30,9 +30,11 @@ export default async function AssinaturasPage({
     prisma.cliente.findMany({
       where: statusFiltro ? whereStatusAssinatura(statusFiltro) : undefined,
       orderBy: { criadoEm: "desc" },
-      select: { id: true, nome: true, telefone: true, criadoEm: true, gratuito: true, assinaturaVenceEm: true },
+      select: { id: true, nome: true, telefone: true, criadoEm: true, gratuito: true, assinaturaVenceEm: true, isTeste: true },
     }),
-    prisma.cliente.findMany({ select: { gratuito: true, assinaturaVenceEm: true } }),
+    // isTeste=false: cadastro de teste interno nunca conta nos totais por
+    // status mostrados aqui (mesmo critério de whereStatusAssinatura).
+    prisma.cliente.findMany({ where: { isTeste: false }, select: { gratuito: true, assinaturaVenceEm: true } }),
   ]);
 
   const contagem: Record<StatusAssinatura, number> = { PAGO: 0, CANCELADO: 0, INATIVO: 0 };
@@ -91,6 +93,11 @@ export default async function AssinaturasPage({
                       <span className="qa-badge" style={{ background: cor.bg, color: cor.color, border: `1px solid ${cor.border}` }}>
                         {LABEL_STATUS_ASSINATURA[status]}
                       </span>
+                      {cliente.isTeste && (
+                        <span className="qa-badge" style={{ background: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.12)" }}>
+                          Teste
+                        </span>
+                      )}
                     </div>
                     <span style={{ display: "block", color: "var(--qa-gray-400)", fontSize: 13 }}>{cliente.telefone}</span>
                   </div>
