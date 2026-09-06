@@ -94,12 +94,32 @@ function mensagemPreco(): string {
 👉 ${CAKTO_LINK}`;
 }
 
+// Histórico completo da conversa do funil (pedido do Ibrahim: painel admin
+// pra acompanhar atendimento por lead) — uma linha por mensagem, nunca
+// sobrescreve. Falha aqui nunca pode derrubar o funil de vendas em si,
+// então só loga o erro e segue (mesma postura de persistirLancamentosControle).
+export async function registrarMensagem(leadId: string, direcao: "LEAD" | "BOT", texto: string): Promise<void> {
+  try {
+    await prisma.mensagemLeadVendas.create({ data: { leadId, direcao, texto } });
+  } catch (err) {
+    console.error("[SALES-BOT] Erro ao registrar mensagem no histórico:", err);
+  }
+}
+
+// Envia e já registra no histórico — usado em vez de sendWhatsApp puro em
+// toda resposta do bot pro lead, pra nunca esquecer de logar uma mensagem
+// nova.
+async function enviar(telefone: string, leadId: string, texto: string): Promise<void> {
+  await sendWhatsApp(telefone, texto);
+  await registrarMensagem(leadId, "BOT", texto);
+}
+
 async function talvezEnviarCupom(lead: LeadVendas, telefone: string): Promise<void> {
   if (lead.cupomEnviado) return;
   const cupom = process.env.CAKTO_CUPOM ?? "";
   if (!cupom) return;
   await delay(2500);
-  await sendWhatsApp(telefone, msgCupom(cupom));
+  await enviar(telefone, lead.id, msgCupom(cupom));
   await prisma.leadVendas.update({ where: { id: lead.id }, data: { cupomEnviado: true } });
 }
 
@@ -110,19 +130,22 @@ async function processarRespostaPosOferta(lead: LeadVendas, mensagem: string, te
   const decisao = decidirRespostaPosOferta(lead, mensagem);
 
   if (decisao.acao === "parar" || decisao.acao === "desistir") {
-    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
-    await sendWhatsApp(telefone, ENCERRAMENTO);
+    await prisma.leadVendas.update({
+      where: { id: lead.id },
+      data: { etapa: "DESISTIU", motivoDesistencia: decisao.acao === "parar" ? "OPTOUT" : "OBJECAO_ESGOTADA" },
+    });
+    await enviar(telefone, lead.id, ENCERRAMENTO);
     return;
   }
 
   if (decisao.acao === "responder_preco") {
-    await sendWhatsApp(telefone, mensagemPreco());
+    await enviar(telefone, lead.id, mensagemPreco());
     return;
   }
 
   if (decisao.acao === "enviar_link") {
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "FOLLOWUP" } });
-    await sendWhatsApp(telefone, `Show! 🙌 Aqui está o link pra começar agora:\n\n👉 ${CAKTO_LINK}`);
+    await enviar(telefone, lead.id, `Show! 🙌 Aqui está o link pra começar agora:\n\n👉 ${CAKTO_LINK}`);
     return;
   }
 
@@ -138,7 +161,7 @@ async function processarRespostaPosOferta(lead: LeadVendas, mensagem: string, te
   // Objeção composta (ex: preço + concorrente na mesma frase) rebate as
   // duas em uma única mensagem, em vez de responder só a primeira e
   // descartar o resto do que o lead disse.
-  await sendWhatsApp(telefone, decisao.angulos.map((a) => REBATIDAS[a]).join("\n\n"));
+  await enviar(telefone, lead.id, decisao.angulos.map((a) => REBATIDAS[a]).join("\n\n"));
 
   // Cupom real (não é urgência inventada) só entra depois da 2ª rodada de
   // objeção — não no primeiro "não", pra não parecer que o preço já
@@ -169,10 +192,11 @@ export async function processarLeadVendas(
 
   // ── Novo contato: cria lead e envia boas-vindas ──
   if (!lead) {
-    await prisma.leadVendas.create({
+    const novoLead = await prisma.leadVendas.create({
       data: { telefone, etapa: "QUALIFICACAO", msgCount: 1 },
     });
-    await sendWhatsApp(telefone, SAUDACAO);
+    await registrarMensagem(novoLead.id, "LEAD", mensagem);
+    await enviar(telefone, novoLead.id, SAUDACAO);
     return;
   }
 
@@ -181,6 +205,11 @@ export async function processarLeadVendas(
     where: { id: lead.id },
     data: { msgCount: { increment: 1 } },
   });
+
+  // Registra a mensagem do lead ANTES de qualquer outra coisa — mesmo se o
+  // lead já estiver encerrado (linha abaixo), pra o histórico mostrar que
+  // ele ainda mandou algo depois do funil ter parado.
+  await registrarMensagem(lead.id, "LEAD", mensagem);
 
   // Lead já encerrado — ignora novas mensagens
   if (lead.etapa === "CONVERTIDO" || lead.etapa === "DESISTIU") return;
@@ -192,7 +221,7 @@ export async function processarLeadVendas(
   // demonstração pra saber o valor.
   if (lead.etapa !== "OFERTA" && lead.etapa !== "FOLLOWUP" && RE_PERGUNTA_PRECO.test(norm)) {
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "OFERTA" } });
-    await sendWhatsApp(telefone, mensagemOferta());
+    await enviar(telefone, lead.id, mensagemOferta());
     await agendarFollowup(telefone);
     return;
   }
@@ -200,33 +229,39 @@ export async function processarLeadVendas(
   // ── Momento 1: DOR — aguardando resposta à pergunta de abertura ──
   if (lead.etapa === "QUALIFICACAO") {
     if (RE_PARAR.test(norm) || ehRecusaClara(mensagem)) {
-      await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
-      await sendWhatsApp(telefone, ENCERRAMENTO);
+      await prisma.leadVendas.update({
+        where: { id: lead.id },
+        data: { etapa: "DESISTIU", motivoDesistencia: RE_PARAR.test(norm) ? "OPTOUT" : "RECUSOU" },
+      });
+      await enviar(telefone, lead.id, ENCERRAMENTO);
       return;
     }
 
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "PROVA" } });
-    await sendWhatsApp(telefone, RECONHECIMENTO_DOR);
+    await enviar(telefone, lead.id, RECONHECIMENTO_DOR);
     await delay(1200);
     // ── Momento 2: DEMONSTRAÇÃO ──
-    await sendWhatsApp(telefone, DEMONSTRACAO);
+    await enviar(telefone, lead.id, DEMONSTRACAO);
     await delay(1800);
     // ── Momento 3: DIFERENCIAL ──
-    await sendWhatsApp(telefone, DIFERENCIAL);
+    await enviar(telefone, lead.id, DIFERENCIAL);
     return;
   }
 
   // ── Lead reagiu à demonstração/diferencial ──
   if (lead.etapa === "PROVA") {
     if (RE_PARAR.test(norm) || ehRecusaClara(mensagem)) {
-      await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
-      await sendWhatsApp(telefone, ENCERRAMENTO);
+      await prisma.leadVendas.update({
+        where: { id: lead.id },
+        data: { etapa: "DESISTIU", motivoDesistencia: RE_PARAR.test(norm) ? "OPTOUT" : "RECUSOU" },
+      });
+      await enviar(telefone, lead.id, ENCERRAMENTO);
       return;
     }
 
     // ── Momento 5: CTA (preço sempre junto, nunca escondido) ──
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "OFERTA" } });
-    await sendWhatsApp(telefone, mensagemOferta());
+    await enviar(telefone, lead.id, mensagemOferta());
 
     // Agenda follow-up automático via QStash — dispara após 4h de silêncio
     await agendarFollowup(telefone);
