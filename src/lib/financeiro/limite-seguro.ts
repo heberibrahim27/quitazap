@@ -11,6 +11,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { calcularResumoFinanceiro, limitesDoMes, anoMesAtualBrasil } from "./motor";
+import type { ResumoFinanceiro } from "./motor-contrato";
 
 export interface ItemDiaApertado {
   credor: string;
@@ -36,14 +37,23 @@ export interface LimiteSeguro {
   semDadosSuficientes: boolean;
 }
 
+// resumoPrecalculado (achado de performance): quem já calculou o resumo
+// financeiro do mês atual pra outra coisa (ex: a Home, que sempre precisa
+// dele pro Resumo/hero) pode passar aqui pra evitar recalcular a mesma
+// cadeia de consultas (totais + plano de pagamento + parcelas) uma segunda
+// vez no mesmo request — só é seguro passar quando `referencia` cai no
+// mesmo mês do resumo, responsabilidade de quem chama garantir isso.
 export async function calcularLimiteSeguro(
   clienteId: string,
   referencia: Date = new Date(),
+  resumoPrecalculado?: ResumoFinanceiro,
 ): Promise<LimiteSeguro> {
   const { ano, mes } = anoMesAtualBrasil(referencia);
   const periodo = limitesDoMes(ano, mes);
-  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
-  const resumo = await calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
+  const resumo = resumoPrecalculado ?? await (async () => {
+    const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
+    return calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
+  })();
   const semDadosSuficientes = !resumo.comprometimento.calculavel;
 
   const diasRestantes = resumo.previsao?.diasRestantes ?? 0;

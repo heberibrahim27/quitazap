@@ -236,20 +236,30 @@ export async function calcularMediaMensal(
   quantidadeMeses: number,
 ): Promise<MediaMensal> {
   const { ano, mes } = anoMesAtualBrasil(periodoReferencia.inicio);
+
+  // Os N períodos anteriores só dependem de aritmética de data (nunca do
+  // resultado de uma consulta) — calcula todos primeiro, depois dispara as
+  // N consultas em paralelo, em vez de um `for` com `await` em série
+  // (achado de performance: essa era uma das causas da demora ao trocar de
+  // mês no MesFiltro, já que esta função roda em toda carga da Home).
+  const periodos: PeriodoFinanceiro[] = [];
   let anoIter = ano;
   let mesIter = mes;
+  for (let i = 0; i < quantidadeMeses; i++) {
+    const anterior = mesAnteriorDe(anoIter, mesIter);
+    anoIter = anterior.ano;
+    mesIter = anterior.mes;
+    periodos.push(limitesDoMes(anoIter, mesIter));
+  }
+
+  const resultadosPorMes = await Promise.all(periodos.map((periodo) => calcularTotaisBase(clienteId, periodo)));
 
   let somaFixas = 0;
   let somaVariaveis = 0;
   let somaCartoes = 0;
   const somaPorCategoria = new Map<string, number>();
 
-  for (let i = 0; i < quantidadeMeses; i++) {
-    const anterior = mesAnteriorDe(anoIter, mesIter);
-    anoIter = anterior.ano;
-    mesIter = anterior.mes;
-    const periodo = limitesDoMes(anoIter, mesIter);
-    const { totais, porCategoria } = await calcularTotaisBase(clienteId, periodo);
+  for (const { totais, porCategoria } of resultadosPorMes) {
     somaFixas += totais.despesasFixas;
     somaVariaveis += totais.despesasVariaveis;
     somaCartoes += totais.cartoes;

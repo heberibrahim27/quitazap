@@ -42,27 +42,39 @@ export async function detectarVazamentosSalario(
   mesesAnalisados = 3,
 ): Promise<VazamentoDetectado[]> {
   const { ano, mes } = anoMesAtualBrasil(referencia);
+
+  // Períodos são só aritmética de data — calcula todos antes de tocar o
+  // banco, e dispara as N consultas (uma por mês analisado) em paralelo em
+  // vez de um `for` com `await` em série (mesma otimização de
+  // calcularMediaMensal em motor.ts — essa era uma das causas da demora ao
+  // trocar de mês na tela "Onde está indo").
+  const periodos: ReturnType<typeof limitesDoMes>[] = [];
   let anoIter = ano;
   let mesIter = mes;
-
-  const porDescricao = new Map<string, { descricaoOriginal: string; valoresPorMes: number[] }>();
-
   for (let i = 0; i < mesesAnalisados; i++) {
     const anterior = mesIter === 1 ? { ano: anoIter - 1, mes: 12 } : { ano: anoIter, mes: mesIter - 1 };
     anoIter = anterior.ano;
     mesIter = anterior.mes;
-    const periodo = limitesDoMes(anoIter, mesIter);
+    periodos.push(limitesDoMes(anoIter, mesIter));
+  }
 
-    const lancamentos = await prisma.lancamento.findMany({
-      where: {
-        clienteId,
-        data: { gte: periodo.inicio, lt: periodo.fim },
-        tipo: { in: [...TIPOS_ALLOWLIST] },
-        categoria: { not: "Metas" },
-      },
-      select: { descricao: true, valor: true },
-    });
+  const lancamentosPorMes = await Promise.all(
+    periodos.map((periodo) =>
+      prisma.lancamento.findMany({
+        where: {
+          clienteId,
+          data: { gte: periodo.inicio, lt: periodo.fim },
+          tipo: { in: [...TIPOS_ALLOWLIST] },
+          categoria: { not: "Metas" },
+        },
+        select: { descricao: true, valor: true },
+      })
+    )
+  );
 
+  const porDescricao = new Map<string, { descricaoOriginal: string; valoresPorMes: number[] }>();
+
+  for (const lancamentos of lancamentosPorMes) {
     // Duas cobranças do mesmo estabelecimento no mesmo mês somam (evita
     // subestimar), em vez de virar duas ocorrências separadas.
     const somaNoMes = new Map<string, { descricaoOriginal: string; total: number }>();
