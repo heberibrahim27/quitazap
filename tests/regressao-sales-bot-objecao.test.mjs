@@ -11,6 +11,15 @@ import ts from "typescript";
 // combinações de objeção em sequência sem precisar de banco nem mock de
 // rede — pedido do Ibrahim: "testar extensivamente com várias combinações
 // de objeções em sequência... garantir que não trava nem repete script".
+//
+// Rodada 2 (achados do Ibrahim testando com frase livre, não só botões):
+// 1) objeção composta (preço + concorrente na mesma frase) só respondia a
+//    primeira e descartava o resto;
+// 2) "planilha" não estava no vocabulário de CONCORRENTE, então uma
+//    objeção real caía no ângulo genérico errado (CONFIANCA);
+// 3) o detector de "pedido pra parar" exigia substring quase exata de um
+//    dos botões prontos ("para de mandar") e ignorava variações naturais
+//    como "para de ME mandar mensagem".
 
 const root = path.resolve(import.meta.dirname, "..");
 
@@ -46,7 +55,7 @@ function loadTsModule(relativePath) {
   return mod.exports;
 }
 
-const { decidirRespostaPosOferta, REBATIDAS, PRECO_MENSAL } = loadTsModule("src/lib/sales-bot-objecao.ts");
+const { decidirRespostaPosOferta, REBATIDAS, PRECO_MENSAL, ehRecusaClara } = loadTsModule("src/lib/sales-bot-objecao.ts");
 
 function estadoInicial() {
   return { tentativasObjecao: 0, angulosUsados: "" };
@@ -57,19 +66,19 @@ test("objeção de preço → desconfiança → adiar: nunca repete ângulo, var
 
   const r1 = decidirRespostaPosOferta(estado, "nossa, achei caro");
   assert.equal(r1.acao, "rebater");
-  assert.equal(r1.angulo, "PRECO");
+  assert.deepEqual(r1.angulos, ["PRECO"]);
   estado = r1.novoEstado;
   assert.equal(estado.tentativasObjecao, 1);
 
   const r2 = decidirRespostaPosOferta(estado, "sei lá, não confio muito nisso não");
   assert.equal(r2.acao, "rebater");
-  assert.equal(r2.angulo, "CONFIANCA");
+  assert.deepEqual(r2.angulos, ["CONFIANCA"]);
   estado = r2.novoEstado;
   assert.equal(estado.tentativasObjecao, 2);
 
   const r3 = decidirRespostaPosOferta(estado, "acho que vou pensar com calma");
   assert.equal(r3.acao, "rebater");
-  assert.equal(r3.angulo, "ADIAR");
+  assert.deepEqual(r3.angulos, ["ADIAR"]);
   estado = r3.novoEstado;
   assert.equal(estado.tentativasObjecao, 3);
 
@@ -91,7 +100,7 @@ test("mesma objeção repetida (só 'não') pula pro próximo ângulo em ordem f
   for (let i = 0; i < 3; i++) {
     const r = decidirRespostaPosOferta(estado, "não");
     assert.equal(r.acao, "rebater", `rodada ${i + 1} deveria rebater, veio ${r.acao}`);
-    angulosVistos.push(r.angulo);
+    angulosVistos.push(...r.angulos);
     estado = r.novoEstado;
   }
 
@@ -109,6 +118,68 @@ test("pedido explícito pra parar interrompe na hora, mesmo em qualquer rodada",
   let estado = decidirRespostaPosOferta(estadoInicial(), "caro demais").novoEstado;
   const comObjecaoEmAndamento = decidirRespostaPosOferta(estado, "não quero mais falar, descadastra meu número");
   assert.equal(comObjecaoEmAndamento.acao, "parar");
+});
+
+// Achado #3 do Ibrahim — o mais grave: frases naturais de "quer parar" que
+// não usam a substring exata dos botões prontos.
+test("pedido de parar reconhece variações naturais, não só a frase do botão", () => {
+  const frasesQueDevemParar = [
+    "para de me mandar mensagem, cansei disso",
+    "pfv chega de mensagem",
+    "nao quero mais receber mensagem sua",
+    "me deixa em paz por favor",
+    "nao insiste mais comigo",
+    "quero que voce remova meu numero da lista",
+    "nao me chama mais aqui",
+  ];
+
+  for (const frase of frasesQueDevemParar) {
+    const decisao = decidirRespostaPosOferta(estadoInicial(), frase);
+    assert.equal(decisao.acao, "parar", `deveria reconhecer "${frase}" como pedido de parar, veio "${decisao.acao}"`);
+  }
+});
+
+// Não pode ficar tão frouxo a ponto de confundir uma objeção comum de
+// preço/decisão com um pedido de parar.
+test("pedido de parar não confunde com objeções comuns (não deve disparar à toa)", () => {
+  const frasesQueNaoDevemParar = [
+    "não quero pagar isso agora",
+    "vou parar pra pensar melhor",
+    "ainda não decidi",
+    "não sei se vale a pena",
+  ];
+
+  for (const frase of frasesQueNaoDevemParar) {
+    const decisao = decidirRespostaPosOferta(estadoInicial(), frase);
+    assert.notEqual(decisao.acao, "parar", `"${frase}" não deveria disparar parar, mas dispararou`);
+  }
+});
+
+// Achado #2 do Ibrahim — "planilha" é o concorrente mais comum na vida
+// real e não estava no vocabulário; a objeção caía no ângulo genérico
+// errado (CONFIANCA) em vez de CONCORRENTE.
+test("objeção de 'minha planilha resolve' é reconhecida como CONCORRENTE, não CONFIANCA", () => {
+  // Simula que PRECO já foi usado numa rodada anterior — é justamente esse
+  // cenário que expôs o bug (fallback de ordem fixa caindo em CONFIANCA).
+  const estado = { tentativasObjecao: 1, angulosUsados: "PRECO" };
+  const decisao = decidirRespostaPosOferta(estado, "nao sei, ainda acho que minha planilha resolve, pra que pagar");
+  assert.equal(decisao.acao, "rebater");
+  assert.deepEqual(decisao.angulos, ["CONCORRENTE"]);
+});
+
+// Achado #1 do Ibrahim — objeção composta (preço + concorrente na mesma
+// mensagem) precisa responder as duas, não só a primeira.
+test("objeção composta (preço + concorrente na mesma frase) rebate as duas, não descarta nenhuma", () => {
+  const decisao = decidirRespostaPosOferta(
+    estadoInicial(),
+    "caro d+, isso e so um app de anotar gasto, minha planilha ja faz de graca"
+  );
+  assert.equal(decisao.acao, "rebater");
+  assert.deepEqual(decisao.angulos.sort(), ["CONCORRENTE", "PRECO"].sort());
+  // As duas rodadas contam como 1 rodada de objeção (1 mensagem do lead),
+  // não 2 — senão uma frase só já gastaria metade do orçamento de 3 tentativas.
+  assert.equal(decisao.novoEstado.tentativasObjecao, 1);
+  assert.equal(decisao.novoEstado.angulosUsados, "PRECO,CONCORRENTE");
 });
 
 test("pergunta de preço não consome rodada de objeção (pode perguntar várias vezes)", () => {
@@ -171,4 +242,53 @@ test("nenhuma rebatida usa urgência falsa nem promete resultado garantido", () 
 
 test("preço mencionado nas rebatidas usa a constante real, nunca um valor solto diferente", () => {
   assert.ok(REBATIDAS.PRECO.includes(PRECO_MENSAL));
+});
+
+// Achado do Ibrahim (rodada 3): "Não sei pra onde meu dinheiro vai" —
+// resposta real à pergunta de abertura ("o que mais te atrapalha com seu
+// dinheiro?") — encerrava o funil na 1ª mensagem, como se fosse recusa.
+// Causa: a etapa QUALIFICACAO/PROVA usava detectaNegativo() (que casa com
+// QUALQUER "não" na frase) pra decidir se o lead recusou continuar.
+// ehRecusaClara() é o detector certo pra esse ponto — bem mais restrito.
+test("ehRecusaClara: respostas substantivas que só contêm a palavra 'não' NÃO são recusa", () => {
+  const respostasValidas = [
+    "Não sei pra onde meu dinheiro vai",
+    "Não sei bem, mas acho que gasto demais com besteira",
+    "Cartão estoura todo mês",
+    "Esqueço de pagar conta e atraso",
+    "Tenho dívida acumulada",
+    "Não consigo guardar dinheiro nunca",
+  ];
+  for (const resposta of respostasValidas) {
+    assert.equal(ehRecusaClara(resposta), false, `"${resposta}" não deveria ser recusa clara`);
+  }
+});
+
+test("ehRecusaClara: recusas de verdade continuam sendo reconhecidas", () => {
+  const recusas = [
+    "não",
+    "n",
+    "não, obrigado",
+    "nada",
+    "não tenho problema com dinheiro",
+    "não me interessa",
+    "não quero continuar",
+    "tá tudo certo",
+    "sem interesse",
+  ];
+  for (const recusa of recusas) {
+    assert.equal(ehRecusaClara(recusa), true, `"${recusa}" deveria ser reconhecida como recusa clara`);
+  }
+});
+
+test("fluxo completo: os 4 pontos de dor do botão de abertura avançam pro funil, nenhum encerra à toa", () => {
+  const pontosDeDor = [
+    "Esqueço de pagar conta e atraso",
+    "Cartão estoura todo mês",
+    "Não sei pra onde meu dinheiro vai",
+    "Tenho dívida acumulada",
+  ];
+  for (const dor of pontosDeDor) {
+    assert.equal(ehRecusaClara(dor), false, `"${dor}" não deveria encerrar o funil na abertura`);
+  }
 });
