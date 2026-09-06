@@ -13,18 +13,27 @@
 //
 // "Resultado operacional" (não "lucro líquido") de propósito: falta
 // imposto e custo geral de infraestrutura (Vercel/Supabase) integrados —
-// ver `custos` abaixo, que já reserva as linhas com status ESTIMATED até
-// as credenciais chegarem (ver README/instruções da migração da Cakto).
+// ver `custos` abaixo, que já reserva as linhas com status INDISPONIVEL
+// até as credenciais chegarem (ver README/instruções da migração da Cakto).
 
 export type FonteReceita = "OBSERVADA" | "ESTIMADA";
 
 /** OBSERVED = veio de dado real (LogIA, CustoMensal, EventoCakto.valorPago).
- * ESTIMATED = fallback calculado (contagem × preço fixo) ou zero por falta
- * de credencial — nunca deve ser tratado como fatura real numa exportação. */
-export type StatusLinhaCusto = "OBSERVED" | "ESTIMATED";
+ * ESTIMATED = calculado por fórmula com fato conhecido (ex: comissão Cakto
+ * = receita × percentual fixo) — o valor é real, mesmo que hoje dê zero
+ * (zero clientes = zero comissão, não é "sem dado"). INDISPONIVEL = não
+ * existe fonte de dado NENHUMA pra essa linha ainda (sem credencial de
+ * billing) — `valor` não deve ser lido nem exibido como número, é só um
+ * placeholder estrutural; achado em 2026-09-06: o assistente admin leu
+ * `valor: 0` de uma linha INDISPONIVEL como "custo zero" numa resposta,
+ * quando na real o dado simplesmente não existe. */
+export type StatusLinhaCusto = "OBSERVED" | "ESTIMATED" | "INDISPONIVEL";
 
 export interface LinhaCusto {
   categoria: string;
+  /** Só tem valor numérico com sentido quando status é OBSERVED ou
+   * ESTIMATED. Quando INDISPONIVEL, `valor` é sempre 0 por convenção do
+   * schema mas NUNCA deve ser lido como "custo é zero" — ver `observacao`. */
   valor: number;
   status: StatusLinhaCusto;
   observacao?: string;

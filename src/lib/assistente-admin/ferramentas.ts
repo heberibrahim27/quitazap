@@ -36,6 +36,7 @@ Status de assinatura — só existem 3, não invente um quarto:
 Regras rígidas, sem exceção:
 - Você só sabe o que as ferramentas abaixo devolvem (além dos fatos fixos acima). Nunca invente número, nome ou ID.
 - Todo valor em reais tem no máximo 2 casas decimais (formato R$ 0,00) — nunca escreva um valor monetário com 3+ casas decimais.
+- Na lista de custos de buscar_dre_mes, cada linha tem um status — trate os três de forma BEM diferente na resposta, nunca misturando: "OBSERVED" = valor medido de verdade; "ESTIMATED" = valor calculado por fórmula com dado real (pode legitimamente dar R$0,00, ex: comissão Cakto sem receita no mês — isso É um valor real, não falta de dado); "INDISPONIVEL" = não existe fonte de dado nenhuma pra essa linha ainda (sem credencial de billing). Uma linha INDISPONIVEL NUNCA tem o campo "valor" no retorno da ferramenta — se aparecer assim, diga que o custo não está disponível/integrado ainda (cite a "observacao"), e jamais escreva "R$ 0,00" pra ela — isso lê como "custo zero" e é enganoso.
 - Você NUNCA tem acesso a dado financeiro pessoal do cliente final (renda, despesas, dívidas, contracheque) — isso é por design, não por instrução: nenhuma ferramenta sua expõe esse dado. Se perguntarem, explique que esse dado é privado do cliente e não fica disponível aqui.
 - Ferramentas de escrita (marcar_cliente_como_pago, cadastrar_contato_social) nunca executam a ação de verdade quando você as chama — elas só geram uma proposta que a pessoa confirma manualmente na tela. Ainda assim, só chame uma ferramenta de escrita quando o pedido for específico o bastante (já souber qual cliente/contato). Se o nome for ambíguo ou faltar informação, pergunte antes ou use buscar_cliente pra resolver.
 - Pra qualquer ação envolvendo um cliente específico, sempre chame buscar_cliente antes se ainda não tiver o ID exato — nunca invente ou adivinhe um clienteId.
@@ -125,7 +126,16 @@ const buscarDreMes: ResultadoLeitura = {
       custoIAGratuitos: arredondarMoeda(dre.custoIAGratuitos),
       custoManual: arredondarMoeda(dre.custoManual),
       resultadoOperacional: arredondarMoeda(dre.resultadoOperacional),
-      custos: dre.custos.map((c) => ({ ...c, valor: arredondarMoeda(c.valor) })),
+      // status INDISPONIVEL: omite `valor` de propósito — 0 aqui é só um
+      // placeholder estrutural do schema, não "custo zero" (achado do
+      // Ibrahim: o modelo leu Vercel/Supabase como R$0,00 real). OBSERVED/
+      // ESTIMATED mantêm o valor arredondado normalmente, incluindo
+      // quando ele legitimamente dá zero (ex: comissão Cakto sem receita).
+      custos: dre.custos.map((c) =>
+        c.status === "INDISPONIVEL"
+          ? { categoria: c.categoria, status: c.status, observacao: c.observacao }
+          : { ...c, valor: arredondarMoeda(c.valor) }
+      ),
     };
   },
 };
@@ -318,7 +328,7 @@ export const FERRAMENTAS_OPENAI = [
     type: "function",
     function: {
       name: "buscar_dre_mes",
-      description: "Receita, custo e resultado operacional (DRE) do mês. Use pra perguntas sobre receita, resultado, lucro, custo do negócio.",
+      description: "Receita, custo e resultado operacional (DRE) do mês, incluindo o detalhamento por categoria em `custos`. Use pra perguntas sobre receita, resultado, lucro, custo do negócio. Cada linha de `custos` tem status OBSERVED (medido), ESTIMATED (calculado, pode ser R$0,00 de verdade) ou INDISPONIVEL (sem fonte de dado — nesse caso não vem `valor` nenhum, nunca trate como R$0,00).",
       parameters: {
         type: "object",
         properties: { mes: { type: "string", description: "Mês no formato AAAA-MM. Se omitido, usa o mês atual." } },
