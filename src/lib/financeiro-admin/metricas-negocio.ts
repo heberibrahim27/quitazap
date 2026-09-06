@@ -14,12 +14,30 @@
 // payload real da Cakto ainda não foi confirmado. Preferível não rotular
 // isso como "falha" sem confirmar. Fica pra fase 2 quando o schema real de
 // webhook da Cakto for validado.
+//
+// Duas únicas queries (todos os clientes, todos os eventos Cakto) — o
+// resto (série de 12 meses, churn, reativação) é calculado em memória.
+// Versão anterior fazia ~14 queries "agora/mês anterior" mais 12 meses ×
+// ~6 queries cada (incluindo uma sub-query por aprovação Cakto pra
+// detectar reativação) — sob o pool de conexão pequeno da Supabase
+// (connection_limit: 5), isso já causou timeout de pool em produção pelo
+// menos uma vez (P2024, ver checagem de 2026-09-06). Clientes/eventos são
+// tabelas pequenas nesse estágio do produto — buscar tudo de uma vez é
+// mais barato que dezenas de round-trips, mesmo que cresça um pouco o
+// volume de dado trafegado por request.
 
 import { prisma } from "@/lib/prisma";
-import { whereStatusAssinatura } from "@/lib/status-assinatura";
+import { calcularStatusAssinaturaEm } from "@/lib/status-assinatura";
 import { PRECO_MENSAL, limitesDoMes, mesAtualBrasil } from "./motor";
 
 const NOMES_MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+// Cancelamento/reembolso/chargeback contam como "esse cliente já saiu
+// antes" pra detectar reativação; só reembolso/chargeback aparecem na
+// métrica visível de "problema" (cancelamento simples de assinatura não é
+// necessariamente um problema de pagamento).
+const STATUS_ENCERRAMENTO = new Set(["CANCELADA", "REEMBOLSADA", "CHARGEBACK"]);
+const STATUS_PROBLEMA = new Set(["REEMBOLSADA", "CHARGEBACK"]);
 
 export function mesAnterior(mes: string): string {
   const [ano, mesNum] = mes.split("-").map(Number);
@@ -42,68 +60,68 @@ function ultimosNMeses(mesFinal: string, n: number): string[] {
   return meses;
 }
 
-/** Quantos clientes pagantes estavam com assinatura ativa num instante —
- * fim do mês (histórico) ou agora (mês corrente ainda em andamento). Pra
- * "agora" reaproveita a mesma definição canônica de PAGO usada em
- * /clientes, /assinaturas e no motor DRE (status-assinatura.ts) — não dá
- * pra reconstruir o histórico exato de churn/reativação dentro de meses
- * passados sem uma tabela de snapshot dedicada, mas o "agora" tem que
- * bater com o resto do admin sempre. */
-async function ativosNoInstante(corte: Date, agora: boolean): Promise<number> {
-  if (agora) {
-    return prisma.cliente.count({ where: whereStatusAssinatura("PAGO") });
-  }
-  return prisma.cliente.count({
-    where: {
-      gratuito: false,
-      criadoEm: { lt: corte },
-      OR: [{ assinaturaVenceEm: null }, { assinaturaVenceEm: { gte: corte } }],
-    },
-  });
+interface ClienteResumo {
+  criadoEm: Date;
+  gratuito: boolean;
+  assinaturaVenceEm: Date | null;
 }
 
-async function movimentoDoMes(mes: string) {
+interface EventoResumo {
+  clienteId: string | null;
+  status: string;
+  criadoEm: Date;
+}
+
+interface PontoInterno {
+  mes: string;
+  rotulo: string;
+  ativos: number;
+  novos: number;
+  cancelados: number;
+  mrr: number;
+  eventosProblema: number;
+  reativacoes: number;
+}
+
+/** Calcula um mês inteiro (ativos/novos/cancelados/eventos) a partir dos
+ * arrays já carregados — nenhuma query aqui, só iteração em memória. Não
+ * reconstrói o histórico exato de gratuito/status dentro de meses
+ * passados (não existe snapshot dedicado) — é a melhor aproximação
+ * possível a partir do estado atual de cada cliente, igual já era antes
+ * desta otimização. */
+function calcularPontoMensal(
+  mes: string,
+  corte: Date,
+  clientes: ClienteResumo[],
+  eventos: EventoResumo[],
+  primeiroEncerramentoPorCliente: Map<string, Date>
+): PontoInterno {
   const { inicio, fim } = limitesDoMes(mes);
   const hoje = new Date();
 
-  const [novos, canceladosCandidatos, inativosNovos, eventosAprovados, eventosProblema] = await Promise.all([
-    prisma.cliente.count({ where: { gratuito: false, criadoEm: { gte: inicio, lt: fim } } }),
-    prisma.cliente.findMany({
-      where: { gratuito: false, assinaturaVenceEm: { gte: inicio, lt: fim } },
-      select: { assinaturaVenceEm: true },
-    }),
-    prisma.cliente.count({ where: { gratuito: true, criadoEm: { gte: inicio, lt: fim } } }),
-    prisma.eventoCakto.findMany({
-      where: { status: "APROVADA", criadoEm: { gte: inicio, lt: fim }, clienteId: { not: null } },
-      select: { clienteId: true, criadoEm: true },
-    }),
-    prisma.eventoCakto.count({
-      where: { status: { in: ["REEMBOLSADA", "CHARGEBACK"] }, criadoEm: { gte: inicio, lt: fim } },
-    }),
-  ]);
-
-  // Cancelado de fato = assinatura venceu neste mês E continua vencida hoje
-  // (não renovou depois) — cobre tanto cancelamento explícito (webhook põe
-  // assinaturaVenceEm = agora) quanto o cliente simplesmente não renovar.
-  const cancelados = canceladosCandidatos.filter((c) => c.assinaturaVenceEm && c.assinaturaVenceEm < hoje).length;
-
-  // Reativação = aprovação neste mês de um cliente que já tinha, antes
-  // dela, pelo menos um evento de cancelamento/reembolso/chargeback.
-  let reativacoes = 0;
-  for (const evento of eventosAprovados) {
-    if (!evento.clienteId) continue;
-    const cancelamentoAnterior = await prisma.eventoCakto.findFirst({
-      where: {
-        clienteId: evento.clienteId,
-        status: { in: ["CANCELADA", "REEMBOLSADA", "CHARGEBACK"] },
-        criadoEm: { lt: evento.criadoEm },
-      },
-      select: { id: true },
-    });
-    if (cancelamentoAnterior) reativacoes++;
+  let ativos = 0;
+  let novos = 0;
+  let cancelados = 0;
+  for (const c of clientes) {
+    if (c.criadoEm < corte && calcularStatusAssinaturaEm(c, corte) === "PAGO") ativos++;
+    if (!c.gratuito && c.criadoEm >= inicio && c.criadoEm < fim) novos++;
+    if (!c.gratuito && c.assinaturaVenceEm && c.assinaturaVenceEm >= inicio && c.assinaturaVenceEm < fim && c.assinaturaVenceEm < hoje) {
+      cancelados++;
+    }
   }
 
-  return { novos, cancelados, inativosNovos, eventosProblema, reativacoes };
+  let eventosProblema = 0;
+  let reativacoes = 0;
+  for (const e of eventos) {
+    if (e.criadoEm < inicio || e.criadoEm >= fim) continue;
+    if (STATUS_PROBLEMA.has(e.status)) eventosProblema++;
+    if (e.status === "APROVADA" && e.clienteId) {
+      const primeiroEncerramento = primeiroEncerramentoPorCliente.get(e.clienteId);
+      if (primeiroEncerramento && primeiroEncerramento < e.criadoEm) reativacoes++;
+    }
+  }
+
+  return { mes, rotulo: rotuloMes(mes), ativos, novos, cancelados, mrr: ativos * PRECO_MENSAL, eventosProblema, reativacoes };
 }
 
 export interface PontoMensal {
@@ -145,73 +163,83 @@ export interface MetricasNegocio {
 export async function calcularMetricasNegocio(mesRef?: string): Promise<MetricasNegocio> {
   const mes = mesRef ?? mesAtualBrasil();
   const mesAnt = mesAnterior(mes);
-  const mesRetrasado = mesAnterior(mesAnt);
-  const meses12 = ultimosNMeses(mes, 12);
+  // 13 meses (não 12): o 13º só serve pra ter o denominador (ativos no
+  // fim do mês retrasado) do churn do mês anterior — não entra na série
+  // pública, que continua mostrando exatamente 12 meses.
+  const meses13 = ultimosNMeses(mes, 13);
 
-  const [
-    ativosAtual,
-    ativosMesAnterior,
-    ativosMesRetrasado,
-    movAtual,
-    movAnterior,
-    inativosTotal,
-    inativosTotalMesAnterior,
-    serieMensal,
-  ] = await Promise.all([
-    ativosNoInstante(new Date(), true),
-    ativosNoInstante(limitesDoMes(mesAnt).fim, false),
-    ativosNoInstante(limitesDoMes(mesRetrasado).fim, false),
-    movimentoDoMes(mes),
-    movimentoDoMes(mesAnt),
-    prisma.cliente.count({ where: { gratuito: true } }),
-    prisma.cliente.count({ where: { gratuito: true, criadoEm: { lt: limitesDoMes(mesAnt).fim } } }),
-    Promise.all(
-      meses12.map(async (m, idx) => {
-        const isUltimo = idx === meses12.length - 1;
-        const corte = isUltimo ? new Date() : limitesDoMes(m).fim;
-        const [ativos, mov] = await Promise.all([ativosNoInstante(corte, isUltimo), movimentoDoMes(m)]);
-        return { mes: m, rotulo: rotuloMes(m), ativos, novos: mov.novos, cancelados: mov.cancelados, mrr: ativos * PRECO_MENSAL };
-      })
-    ),
+  const [clientes, eventos] = await Promise.all([
+    prisma.cliente.findMany({ select: { criadoEm: true, gratuito: true, assinaturaVenceEm: true } }),
+    prisma.eventoCakto.findMany({ select: { clienteId: true, status: true, criadoEm: true } }),
   ]);
 
-  const mrrAtual = ativosAtual * PRECO_MENSAL;
-  const mrrMesAnterior = ativosMesAnterior * PRECO_MENSAL;
+  const primeiroEncerramentoPorCliente = new Map<string, Date>();
+  for (const e of eventos) {
+    if (!e.clienteId || !STATUS_ENCERRAMENTO.has(e.status)) continue;
+    const atual = primeiroEncerramentoPorCliente.get(e.clienteId);
+    if (!atual || e.criadoEm < atual) primeiroEncerramentoPorCliente.set(e.clienteId, e.criadoEm);
+  }
+
+  const hoje = new Date();
+  const pontos = meses13.map((m, idx) => {
+    const corte = idx === meses13.length - 1 ? hoje : limitesDoMes(m).fim;
+    return calcularPontoMensal(m, corte, clientes, eventos, primeiroEncerramentoPorCliente);
+  });
+
+  const atual = pontos[pontos.length - 1];
+  const anterior = pontos[pontos.length - 2];
+  const retrasado = pontos[pontos.length - 3];
+
+  const mrrAtual = atual.mrr;
+  const mrrMesAnterior = anterior.mrr;
   const crescimentoMrrPct = mrrMesAnterior > 0 ? ((mrrAtual - mrrMesAnterior) / mrrMesAnterior) * 100 : null;
 
-  const churnPct = ativosMesAnterior > 0 ? (movAtual.cancelados / ativosMesAnterior) * 100 : 0;
-  const churnMesAnteriorPct = ativosMesRetrasado > 0 ? (movAnterior.cancelados / ativosMesRetrasado) * 100 : 0;
+  const churnPct = anterior.ativos > 0 ? (atual.cancelados / anterior.ativos) * 100 : 0;
+  const churnMesAnteriorPct = retrasado.ativos > 0 ? (anterior.cancelados / retrasado.ativos) * 100 : 0;
   const churnVariacaoPP = churnPct - churnMesAnteriorPct;
 
-  const arpu = ativosAtual > 0 ? mrrAtual / ativosAtual : 0;
-  const receitaPerdidaCancelamentos = movAtual.cancelados * PRECO_MENSAL;
+  const arpu = atual.ativos > 0 ? mrrAtual / atual.ativos : 0;
+  const receitaPerdidaCancelamentos = atual.cancelados * PRECO_MENSAL;
 
   const alertas: string[] = [];
   if (churnVariacaoPP > 0.5) alertas.push(`Churn subiu ${churnVariacaoPP.toFixed(1)} p.p. vs mês anterior`);
-  if (movAtual.eventosProblema > 0) alertas.push(`${movAtual.eventosProblema} reembolso(s)/chargeback(s) neste mês`);
+  if (atual.eventosProblema > 0) alertas.push(`${atual.eventosProblema} reembolso(s)/chargeback(s) neste mês`);
   if (crescimentoMrrPct != null && crescimentoMrrPct > 0.5) alertas.push(`MRR cresceu ${crescimentoMrrPct.toFixed(1)}% no mês`);
   if (crescimentoMrrPct != null && crescimentoMrrPct < -0.5) alertas.push(`MRR caiu ${Math.abs(crescimentoMrrPct).toFixed(1)}% no mês`);
+
+  const fimMesAnterior = limitesDoMes(mesAnt).fim;
+  const inativosTotal = clientes.reduce((n, c) => n + (c.gratuito ? 1 : 0), 0);
+  const inativosTotalMesAnterior = clientes.reduce((n, c) => n + (c.gratuito && c.criadoEm < fimMesAnterior ? 1 : 0), 0);
+
+  const serieMensal: PontoMensal[] = pontos.slice(1).map((p) => ({
+    mes: p.mes,
+    rotulo: p.rotulo,
+    mrr: p.mrr,
+    ativos: p.ativos,
+    novos: p.novos,
+    cancelados: p.cancelados,
+  }));
 
   return {
     mes,
     mrrAtual,
     mrrMesAnterior,
     crescimentoMrrPct,
-    ativos: ativosAtual,
-    ativosMesAnterior,
+    ativos: atual.ativos,
+    ativosMesAnterior: anterior.ativos,
     churnPct,
     churnMesAnteriorPct,
     churnVariacaoPP,
-    novosAssinantes: movAtual.novos,
-    novosAssinantesMesAnterior: movAnterior.novos,
-    cancelamentos: movAtual.cancelados,
-    cancelamentosMesAnterior: movAnterior.cancelados,
+    novosAssinantes: atual.novos,
+    novosAssinantesMesAnterior: anterior.novos,
+    cancelamentos: atual.cancelados,
+    cancelamentosMesAnterior: anterior.cancelados,
     inativosTotal,
     inativosTotalMesAnterior,
-    reativacoes: movAtual.reativacoes,
-    reativacoesMesAnterior: movAnterior.reativacoes,
-    eventosProblema: movAtual.eventosProblema,
-    eventosProblemaMesAnterior: movAnterior.eventosProblema,
+    reativacoes: atual.reativacoes,
+    reativacoesMesAnterior: anterior.reativacoes,
+    eventosProblema: atual.eventosProblema,
+    eventosProblemaMesAnterior: anterior.eventosProblema,
     arpu,
     receitaPerdidaCancelamentos,
     serieMensal,
