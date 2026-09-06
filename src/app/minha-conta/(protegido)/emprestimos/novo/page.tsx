@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
-import { prisma } from "@/lib/prisma";
+import { criarDividaComParcelas } from "@/lib/divida-service";
 import { NovoEmprestimoForm } from "./NovoEmprestimoForm";
 
 export default async function NovoEmprestimoPage({
@@ -29,86 +29,27 @@ export default async function NovoEmprestimoPage({
     const valorTotalInformado = valorTotalTexto ? Number(valorTotalTexto) : null;
     const valorParcelaInformado = valorParcelaTexto ? Number(valorParcelaTexto) : null;
 
-    if (!credor) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Digite quem emprestou.")}`);
-    }
-    if (!Number.isInteger(totalParcelas) || totalParcelas <= 0 || totalParcelas > 360) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Digite uma quantidade de parcelas válida.")}`);
-    }
     if (!primeiraDataTexto) {
       redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Escolha a data da primeira parcela.")}`);
     }
-    if (valorTotalTexto && (!Number.isFinite(valorTotalInformado) || (valorTotalInformado as number) <= 0)) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("O valor total tomado emprestado é inválido.")}`);
-    }
-    if (valorParcelaTexto && (!Number.isFinite(valorParcelaInformado) || (valorParcelaInformado as number) <= 0)) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("O valor da parcela é inválido.")}`);
-    }
-    if (valorTotalInformado == null && valorParcelaInformado == null) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Preencha o valor total ou o valor da parcela.")}`);
-    }
 
-    // Se o valor da parcela foi informado, ele manda (é o que o contrato do
-    // empréstimo realmente cobra por mês, já com juros embutidos — não faz
-    // sentido recalcular). Sem ele, cai pro rateio simples do valor total
-    // dividido igualmente pelas parcelas (a última absorve o resto do
-    // arredondamento, ex: R$1.000 em 3x = 333,33 + 333,33 + 333,34).
-    let valorPorParcela: number;
-    let valorTotalFinal: number;
-    if (valorParcelaInformado != null) {
-      valorPorParcela = Math.round(valorParcelaInformado * 100) / 100;
-      valorTotalFinal = valorTotalInformado ?? Math.round(valorPorParcela * totalParcelas * 100) / 100;
-    } else {
-      valorTotalFinal = valorTotalInformado as number;
-      valorPorParcela = Math.floor((valorTotalFinal / totalParcelas) * 100) / 100;
-    }
+    const resultado = await criarDividaComParcelas({
+      clienteId: clienteAtual.id,
+      credor,
+      totalParcelas,
+      primeiraData: new Date(`${primeiraDataTexto}T12:00:00`),
+      valorTotal: valorTotalTexto ? valorTotalInformado : null,
+      valorParcela: valorParcelaTexto ? valorParcelaInformado : null,
+      descontadoEmFolha,
+      tipo: "EMPRESTIMO",
+    });
 
-    const primeiraData = new Date(`${primeiraDataTexto}T12:00:00`);
-    if (Number.isNaN(primeiraData.getTime())) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Data da primeira parcela inválida.")}`);
-    }
-
-    const restoUltimaParcela =
-      valorParcelaInformado != null
-        ? 0
-        : Math.round((valorTotalFinal - valorPorParcela * totalParcelas) * 100) / 100;
-
-    let dividaId: string;
-    try {
-      const divida = await prisma.divida.create({
-        data: {
-          clienteId: clienteAtual.id,
-          credor,
-          tipo: "EMPRESTIMO",
-          status: "ATIVA",
-          valorTotal: valorTotalFinal,
-          totalParcelas,
-          diaVencimento: primeiraData.getDate(),
-          descontadoEmFolha,
-        },
-      });
-      dividaId = divida.id;
-
-      const parcelasData = Array.from({ length: totalParcelas }, (_, i) => {
-        const vencimento = new Date(primeiraData);
-        vencimento.setMonth(vencimento.getMonth() + i);
-        const ehUltima = i === totalParcelas - 1;
-        return {
-          dividaId,
-          numero: i + 1,
-          valor: ehUltima ? Math.round((valorPorParcela + restoUltimaParcela) * 100) / 100 : valorPorParcela,
-          vencimento,
-          status: "PENDENTE",
-        };
-      });
-      await prisma.parcela.createMany({ data: parcelasData });
-    } catch (err) {
-      console.error("[MINHA-CONTA] Erro ao criar empréstimo:", err);
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Não foi possível salvar o empréstimo. Tente de novo.")}`);
+    if (!resultado.ok) {
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent(resultado.erro)}`);
     }
 
     revalidatePath("/minha-conta", "layout");
-    redirect(`/minha-conta/emprestimos/${dividaId}`);
+    redirect(`/minha-conta/emprestimos/${resultado.dividaId}`);
   }
 
   return (

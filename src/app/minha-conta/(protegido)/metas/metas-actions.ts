@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
+import { criarMetaTyped, criarDepositoTyped, criarSaqueTyped } from "@/lib/meta-service";
 
 export async function criarMeta(formData: FormData): Promise<{ erro?: string }> {
   const cliente = await getClienteAtual();
@@ -13,12 +14,8 @@ export async function criarMeta(formData: FormData): Promise<{ erro?: string }> 
   const valorTexto = String(formData.get("valorAlvo") || "").replace(",", ".").trim();
   const valorAlvo = Number(valorTexto);
 
-  if (!nome) return { erro: "Digite o nome da meta." };
-  if (!Number.isFinite(valorAlvo) || valorAlvo <= 0) {
-    return { erro: "Digite um valor válido pra guardar." };
-  }
-
-  await prisma.meta.create({ data: { clienteId: cliente.id, nome, valorAlvo } });
+  const resultado = await criarMetaTyped(cliente.id, nome, valorAlvo);
+  if (!resultado.ok) return { erro: resultado.erro };
 
   revalidatePath("/minha-conta", "layout");
   return {};
@@ -39,25 +36,8 @@ export async function criarDeposito(formData: FormData): Promise<{ erro?: string
   const valorTexto = String(formData.get("valor") || "").replace(",", ".").trim();
   const valor = Number(valorTexto);
 
-  if (!Number.isFinite(valor) || valor <= 0) return { erro: "Digite um valor válido." };
-
-  const meta = await prisma.meta.findUnique({ where: { id: metaId } });
-  if (!meta || meta.clienteId !== cliente.id) return { erro: "Meta não encontrada." };
-
-  await prisma.$transaction(async (tx) => {
-    const lancamento = await tx.lancamento.create({
-      data: {
-        clienteId: cliente.id,
-        tipo: "DESPESA_VARIAVEL",
-        descricao: `Depósito: ${meta.nome}`,
-        categoria: "Metas",
-        valor,
-        data: new Date(),
-        origem: "WEB",
-      },
-    });
-    await tx.depositoMeta.create({ data: { metaId, valor, lancamentoId: lancamento.id } });
-  });
+  const resultado = await criarDepositoTyped(cliente.id, metaId, valor, "WEB");
+  if (!resultado.ok) return { erro: resultado.erro };
 
   revalidatePath("/minha-conta", "layout");
   return {};
@@ -75,30 +55,8 @@ export async function criarSaque(formData: FormData): Promise<{ erro?: string }>
   const valorTexto = String(formData.get("valor") || "").replace(",", ".").trim();
   const valor = Number(valorTexto);
 
-  if (!Number.isFinite(valor) || valor <= 0) return { erro: "Digite um valor válido." };
-
-  const meta = await prisma.meta.findUnique({ where: { id: metaId }, include: { depositos: true } });
-  if (!meta || meta.clienteId !== cliente.id) return { erro: "Meta não encontrada." };
-
-  const guardado = meta.depositos.reduce((soma, d) => soma + d.valor, 0);
-  if (valor > guardado) {
-    return { erro: `Só tem ${guardado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} guardado nessa meta.` };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    const lancamento = await tx.lancamento.create({
-      data: {
-        clienteId: cliente.id,
-        tipo: "RECEITA",
-        descricao: `Saque: ${meta.nome}`,
-        categoria: "Metas",
-        valor,
-        data: new Date(),
-        origem: "WEB",
-      },
-    });
-    await tx.depositoMeta.create({ data: { metaId, valor: -valor, lancamentoId: lancamento.id } });
-  });
+  const resultado = await criarSaqueTyped(cliente.id, metaId, valor, "WEB");
+  if (!resultado.ok) return { erro: resultado.erro };
 
   revalidatePath("/minha-conta", "layout");
   return {};

@@ -7,7 +7,7 @@ import {
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
 import { normalizarDescricaoFinanceira, normalizarTextoBusca } from "./descricao-financeira";
-import type { FinanceiroIntent, ItemFinanceiroInterpretado } from "./ia/financeiro-intent-schema";
+import type { FinanceiroIntent, ItemFinanceiroInterpretado, TipoDividaFinanceiro } from "./ia/financeiro-intent-schema";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
 
@@ -110,6 +110,31 @@ export type CartaoParaPersistirControle = {
   vencimento?: number;
 };
 
+// Dívida/empréstimo NOVO confirmado pela IA — quem resolve credor→dividaId
+// (não existe aqui, esse módulo é puro) é o webhook, via
+// criarDividaComParcelas (divida-service.ts).
+export type DividaParaPersistirControle = {
+  credor: string;
+  tipo: TipoDividaFinanceiro;
+  valorTotal: number | null;
+  valorParcela: number | null;
+  totalParcelas: number;
+};
+
+// Baixa de uma dívida JÁ EXISTENTE — o webhook resolve "credorAproximado"
+// pra um dividaId (fuzzy match, mesmo padrão de encontrarMetaPorNome) antes
+// de chamar marcarDividaComoPaga.
+export type PagamentoDividaParaPersistirControle = {
+  credorAproximado: string;
+  valor: number;
+};
+
+// Meta confirmada pela IA — "depositar" também passa por fuzzy match no
+// webhook (encontrarMetaPorNome), igual ao pagamento de dívida.
+export type MetaParaPersistirControle =
+  | { acao: "criar"; nome: string; valorAlvo: number }
+  | { acao: "depositar"; nomeAproximado: string; valor: number };
+
 function itemDespesaFixaParaPersistir(item: DespesaFixaRegistradaControle): ItemParaPersistirControle {
   return { tipo: "DESPESA_FIXA", descricao: item.descricao, valor: item.valor, recorrente: true };
 }
@@ -121,6 +146,9 @@ export type ResultadoGastoControle = {
   etapa?: string;
   itensParaPersistir?: ItemParaPersistirControle[];
   cartaoParaPersistir?: CartaoParaPersistirControle;
+  dividaParaPersistir?: DividaParaPersistirControle;
+  pagamentoDividaParaPersistir?: PagamentoDividaParaPersistirControle;
+  metaParaPersistir?: MetaParaPersistirControle;
 };
 
 const DESPESAS_FIXAS_ANTERIORES = "Despesas fixas anteriores";
@@ -825,11 +853,117 @@ function resumoAtualizadoMes(estado: EstadoControleFinanceiro): string {
   );
 }
 
+// As 4 categorias novas (dívida, pagamento de dívida, meta, config de
+// cartão) resolvem pra um dividaId/metaId por fuzzy match de nome, algo que
+// esse módulo — puro, sem Prisma — não pode fazer sozinho. Por isso só
+// tratamos aqui quando a intent tem EXATAMENTE um item de um desses tipos:
+// a resposta descreve o que foi entendido, e quem persiste de fato (webhook,
+// via divida-service/meta-service/pagamento-divida-service) confirma se o
+// credor/meta existe antes de gravar. Misturado com outros itens, cai no
+// bloqueio de "tipo financeiro que precisa de tratamento específico" de
+// sempre — pedir separado evita ambiguidade sem duplicar essa resolução.
+function salvarItemEspecialIA(
+  estadoAtual: EstadoControleFinanceiro,
+  item: ItemFinanceiroInterpretado
+): ResultadoGastoControle | null {
+  if (item.tipo === "divida") {
+    const valorTotal = valorValidoItemFinanceiro({ ...item, valor: item.valorTotalDivida ?? null } as ItemFinanceiroInterpretado);
+    const valorParcela = valorValidoItemFinanceiro(item);
+    if (!valorTotal && !valorParcela) return null;
+    const credor = descricaoItemFinanceiro(item);
+    const totalParcelas = item.totalParcelas && item.totalParcelas > 0 ? Math.floor(item.totalParcelas) : 1;
+
+    const partes = [`Credor: ${credor}`];
+    if (valorTotal) partes.push(`Total: ${formatarValorBR(valorTotal)}`);
+    if (valorParcela) partes.push(`Parcela: ${formatarValorBR(valorParcela)}${totalParcelas > 1 ? ` (${totalParcelas}x)` : ""}`);
+
+    return {
+      resposta: "✅ *Dívida cadastrada.*\n\n" + partes.join("\n"),
+      estado: { ...estadoAtual, confirmacaoPendente: undefined },
+      atualizouEstado: true,
+      dividaParaPersistir: {
+        credor,
+        tipo: item.tipoDivida ?? "OUTRO",
+        valorTotal,
+        valorParcela,
+        totalParcelas,
+      },
+    };
+  }
+
+  if (item.tipo === "pagamento_divida") {
+    const valor = valorValidoItemFinanceiro(item);
+    if (!valor) return null;
+    const credorAproximado = descricaoItemFinanceiro(item);
+
+    return {
+      resposta:
+        "✅ *Pagamento registrado.*\n\n" + `${credorAproximado} — ${formatarValorBR(valor)}\n\n` + "Vou dar baixa nessa dívida.",
+      estado: { ...estadoAtual, confirmacaoPendente: undefined },
+      atualizouEstado: true,
+      pagamentoDividaParaPersistir: { credorAproximado, valor },
+    };
+  }
+
+  if (item.tipo === "meta") {
+    const nome = descricaoItemFinanceiro(item);
+    if (item.acaoMeta === "criar") {
+      const valorAlvo = valorValidoItemFinanceiro({ ...item, valor: item.valorAlvoMeta ?? null } as ItemFinanceiroInterpretado);
+      if (!valorAlvo) return null;
+      return {
+        resposta: "✅ *Meta criada.*\n\n" + `${nome} — alvo de ${formatarValorBR(valorAlvo)}`,
+        estado: { ...estadoAtual, confirmacaoPendente: undefined },
+        atualizouEstado: true,
+        metaParaPersistir: { acao: "criar", nome, valorAlvo },
+      };
+    }
+    if (item.acaoMeta === "depositar") {
+      const valor = valorValidoItemFinanceiro(item);
+      if (!valor) return null;
+      return {
+        resposta: "✅ *Depósito registrado na meta.*\n\n" + `${nome} — ${formatarValorBR(valor)}`,
+        estado: { ...estadoAtual, confirmacaoPendente: undefined },
+        atualizouEstado: true,
+        metaParaPersistir: { acao: "depositar", nomeAproximado: nome, valor },
+      };
+    }
+    return null;
+  }
+
+  if (item.tipo === "cartao" || item.tipo === "fatura") {
+    const nome = descricaoItemFinanceiro(item);
+    if (!nome || (item.diaFechamentoCartao == null && item.diaVencimentoCartao == null)) return null;
+
+    const partes: string[] = [];
+    if (item.diaFechamentoCartao != null) partes.push(`Fecha dia ${item.diaFechamentoCartao}`);
+    if (item.diaVencimentoCartao != null) partes.push(`Vence dia ${item.diaVencimentoCartao}`);
+
+    return {
+      resposta: `✅ *Cartão ${nome} configurado.*\n\n` + partes.join(" · "),
+      estado: { ...estadoAtual, confirmacaoPendente: undefined },
+      atualizouEstado: true,
+      cartaoParaPersistir: {
+        nome,
+        ...(item.diaFechamentoCartao != null ? { fechamento: item.diaFechamentoCartao } : {}),
+        ...(item.diaVencimentoCartao != null ? { vencimento: item.diaVencimentoCartao } : {}),
+      },
+    };
+  }
+
+  return null;
+}
+
 export function salvarItensConfirmadosIA(
   estadoAtual: EstadoControleFinanceiro,
   intent: FinanceiroIntent
 ): ResultadoGastoControle {
   const itens = Array.isArray(intent.itens) ? intent.itens : [];
+
+  if (itens.length === 1 && ["divida", "pagamento_divida", "meta", "cartao", "fatura"].includes(itens[0].tipo)) {
+    const especial = salvarItemEspecialIA(estadoAtual, itens[0]);
+    if (especial) return especial;
+  }
+
   const tiposPermitidos = new Set(["receita", "despesa_variavel", "despesa_fixa"]);
   const itensValidos: Array<ItemFinanceiroInterpretado & { valor: number }> = [];
   const tiposBloqueados = new Set<string>();

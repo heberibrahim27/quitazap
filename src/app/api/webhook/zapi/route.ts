@@ -41,6 +41,11 @@ import {
   type OrigemLancamentoControle,
 } from "@/lib/controle-financeiro-service";
 import {
+  persistirDividaConfirmadaIA,
+  persistirPagamentoDividaConfirmadoIA,
+  persistirMetaConfirmadaIA,
+} from "@/lib/rescue-financeiro-service";
+import {
   formatarPreviaIntentFinanceiro,
   intentFinanceiroConfirmavel,
   resolverLoteGastosCartao,
@@ -1429,6 +1434,10 @@ Pode mandar tudo em uma mensagem só.`;
       });
 
       after(() => persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
+      after(() => persistirCartaoControle(sessao.clienteId, gerenciamentoDespesasFixas.cartaoParaPersistir));
+      after(() => persistirDividaConfirmadaIA(sessao.clienteId, gerenciamentoDespesasFixas.dividaParaPersistir));
+      after(() => persistirPagamentoDividaConfirmadoIA(sessao.clienteId, telefone, gerenciamentoDespesasFixas.pagamentoDividaParaPersistir));
+      after(() => persistirMetaConfirmadaIA(sessao.clienteId, telefone, gerenciamentoDespesasFixas.metaParaPersistir));
 
       return NextResponse.json({ ok: true });
     }
@@ -2236,7 +2245,8 @@ Pode mandar tudo em uma mensagem só.`;
       mensagem,
       sessao.nome ?? "cliente",
       sessao.clienteId,
-      clienteGratuito
+      clienteGratuito,
+      telefone
     );
 
     const historicoAtualizado: Mensagem[] = [
@@ -2244,43 +2254,11 @@ Pode mandar tudo em uma mensagem só.`;
       { role: "user", content: mensagem },
     ];
 
-    // ── Diagnóstico/plano de quitação: aposentado ────────────
-    // Esse é o sistema antigo (gerar um "plano de quitação" automático a
-    // partir de um diagnóstico da IA) — decisão de produto tomada em chat:
-    // o QuitaZAP Controle deixou de ser gerador de plano e virou app de
-    // controle de entrada/saída. Não apaga os dados já existentes
-    // (Divida/PlanoEnviado antigos continuam visíveis no painel admin,
-    // ex. histórico de planos) nem o código de diagnóstico/relatório em
-    // src/lib/plano.ts e diagnostico-normalizer.ts (só ficou sem uso a
-    // partir daqui, mas segue coberto por teste de regressão) — só para
-    // de criar `Divida`/`PlanoEnviado` novos e de mandar o relatório de
-    // plano pro cliente a partir de agora. Reencaminha pro fluxo normal
-    // de conversa do Controle em vez disso.
-    if (resultado.diagnostico) {
-      const respostaRedirecionamento =
-        "Entendi as informações que você passou! 👍\n\n" +
-        "Aqui no QuitaZAP você pode ir me contando suas dívidas e gastos aos poucos, naturalmente — por exemplo:\n\n" +
-        "_\"devo 500 pro Nubank\"_\n" +
-        "_\"gastei 50 no mercado\"_\n" +
-        "_\"lembrete: pagar a luz dia 10, R$150\"_\n\n" +
-        "Vou guardando tudo e você acompanha o resumo na sua Minha Conta.";
-
-      await prisma.botSessao.updateMany({
-        where: { id: sessao.id },
-        data: {
-          dividasTemp: JSON.stringify([
-            ...historicoAtualizado,
-            { role: "assistant", content: respostaRedirecionamento },
-          ]),
-        },
-      });
-
-      await sendWhatsApp(telefone, respostaRedirecionamento);
-
-      return NextResponse.json({ ok: true });
-    }
-
-    // ── Resposta conversacional ──────────────
+    // ── Resposta conversacional (rescue ladder) ──────────────
+    // processarMensagemIA não gera mais diagnóstico algum (ver ai-bot.ts) —
+    // src/lib/plano.ts e diagnostico-normalizer.ts seguem sem uso aqui,
+    // mas cobertos por teste de regressão porque o comando QUITASCORE
+    // ainda usa os tipos DividaIA/DiagnosticoIA a partir de Divida reais.
     await prisma.botSessao.updateMany({
       where: { id: sessao.id },
       data: {

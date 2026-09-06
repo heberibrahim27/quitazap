@@ -1,5 +1,8 @@
 import { prisma } from "./prisma";
 import { enviarPush } from "./push-service";
+import { sendWhatsApp } from "./zapi";
+import { calcularLimiteSeguro } from "./financeiro/limite-seguro";
+import { responderLimiteSeguro } from "./ia/limite-seguro-resolver";
 
 const TIPOS_GASTO = ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"] as const;
 
@@ -68,4 +71,37 @@ export async function verificarOrcamentoEAvisar(
     corpo: `Você passou do limite de ${fmtValor(orcamento.limiteMensal)} em ${categoria} este mês (já gastou ${fmtValor(totalDepois)}).`,
     url: "/minha-conta/gastos",
   });
+}
+
+// Chamada depois de QUALQUER lançamento confirmado (gasto ou receita) —
+// pedido do Ibrahim (2026-09-06): quando o mês tá apertado (sobra prevista
+// até o fim do mês já negativa), manda uma dica proativa. Reaproveita o
+// motor determinístico que já existe pra isso (calcularLimiteSeguro +
+// responderLimiteSeguro, o mesmo usado quando o cliente pergunta "quanto
+// tenho até o próximo salário?") em vez de duplicar a lógica de detecção —
+// só decide QUANDO mandar, a fórmula e o texto continuam vindo de lá.
+//
+// Sem controle de "já mandei hoje" — se o cliente lançar vários gastos no
+// mesmo dia já no vermelho, pode repetir. Aceitável pra v1 (é sempre um
+// aviso verdadeiro, nunca um falso positivo); revisitar se incomodar.
+export async function verificarApertoEAvisar(clienteId: string | null | undefined): Promise<void> {
+  if (!clienteId) return;
+
+  try {
+    const fatos = await calcularLimiteSeguro(clienteId);
+    if (fatos.semDadosSuficientes || fatos.saldoLivre >= 0) return;
+
+    const cliente = await prisma.cliente.findUnique({
+      where: { id: clienteId },
+      select: { telefone: true, gratuito: true, aceitaProativas: true },
+    });
+    // Mensagem proativa (não é resposta direta a algo que o cliente acabou
+    // de perguntar) — respeita o consentimento, igual lembrete de tarefa.
+    if (!cliente || !cliente.aceitaProativas) return;
+
+    const dica = await responderLimiteSeguro(clienteId, cliente.gratuito);
+    await sendWhatsApp(cliente.telefone, `⚠️ ${dica}`);
+  } catch (err) {
+    console.error("[Aperto] Erro ao verificar/avisar:", err);
+  }
 }

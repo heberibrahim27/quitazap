@@ -2,127 +2,147 @@
 // QuitaZAP — Bot de Vendas
 // Funil: Instagram/Facebook Ads → WhatsApp → CAKTO
 // ─────────────────────────────────────────
+// Reposicionado (Ibrahim, 2026-09) de "quitar dívida" pra "controle
+// financeiro contínuo" — o produto hoje registra renda/gasto/dívida/meta
+// e avisa quando o mês aperta, não gera plano de quitação automático (ver
+// ai-bot.ts). A demonstração abaixo reflete isso: mostra o registro pelo
+// WhatsApp e o aviso de aperto, nunca uma "previsão de quitação em X meses"
+// (isso seria promessa de resultado, que o CDC não deixa e o produto não
+// cumpre mais).
+//
+// Estrutura em 5 momentos (Dor → Demonstração → Diferencial → Objeção →
+// CTA), sempre em poucas interações (nunca uma bateria de perguntas antes
+// do preço — preço é respondido na hora, sempre que perguntado). Loop de
+// objeção: nunca aceita o primeiro "não"/"vou pensar" como resposta final
+// — tenta reverter por um ângulo diferente (preço→valor, desconfiança→como
+// funciona, "já uso outro app"→diferencial, "vou pensar"→sem pressão) até
+// 3 rodadas reais, sem repetir o mesmo argumento, e solta a mão na hora se
+// o lead pedir explicitamente pra parar. Sem urgência falsa (nada de "só
+// hoje"/contagem regressiva) e sem prometer resultado financeiro garantido
+// — decisão de produto: WhatsApp Business API pode banir o número por
+// padrão de mensagem insistente/spam, e propaganda enganosa é proibida
+// pelo CDC.
 
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp } from "@/lib/zapi";
+import type { LeadVendas } from "@prisma/client";
+import {
+  PRECO_MENSAL,
+  RE_PARAR,
+  RE_PERGUNTA_PRECO,
+  detectaNegativo,
+  normalizarTexto,
+  decidirRespostaPosOferta,
+  REBATIDAS,
+} from "@/lib/sales-bot-objecao";
 
 const CAKTO_LINK = "https://pay.cakto.com.br/3fz3gz6_945044";
 
 // ── Mensagens do funil ────────────────────
 
-const SAUDACAO = `Olá! 👋
+const SAUDACAO = `Olá! 👋 Aqui é o *QuitaZAP*.
 
-Aqui é o *QuitaZAP* — o assistente que organiza suas dívidas pelo WhatsApp usando Inteligência Artificial. 🤖💚
+Hoje, o que mais te atrapalha com seu dinheiro? Pode ser não saber pra onde ele vai, esquecer de pagar uma conta, cartão que estoura todo mês, dívida acumulando... me conta o que pesa mais pra você agora.`;
 
-Você chegou até aqui porque quer organizar suas finanças, certo?
+const RECONHECIMENTO_DOR = `Entendi. Isso é super comum — a maioria das pessoas perde o controle do dinheiro sem nem perceber, porque fica tudo espalhado (extrato, papel, memória...). 😉
 
-*Você tem dívidas para organizar?* Responde sim ou não 👇`;
+Deixa eu te mostrar rapidinho como o QuitaZAP ajuda com isso 👇`;
 
-const QUALIFICACAO = `Entendi! Você não está sozinho(a) nisso. 😊
+const DEMONSTRACAO = `💬 *É assim que funciona:*
 
-Milhares de brasileiros estão na mesma situação — e o QuitaZAP foi criado exatamente para isso.
+👤 _Você manda:_ "gastei 45 no mercado"
+🤖 _QuitaZAP:_ ✅ Gasto registrado — Mercado — R$ 45,00
 
-A ideia é simples: você me conta suas dívidas aqui no WhatsApp — pode ser por texto, áudio ou até *foto do boleto* — e nossa IA cria um *plano de quitação personalizado* pra você.
+👤 _Você manda:_ "recebi 3000 de salário"
+🤖 _QuitaZAP:_ ✅ Receita registrada — R$ 3.000,00
 
-Deixa eu te mostrar como funciona na prática 👇`;
+Sem formulário, sem planilha — só manda por texto, áudio ou foto que eu organizo pra você. 📲`;
 
-const PROVA_EXEMPLO = `💬 *Veja como é simples — exemplo real:*
+const DIFERENCIAL = `E não é só registrar: se em algum momento eu perceber que o mês tá ficando apertado — gasto chegando perto ou passando da sua renda — eu te aviso na hora, com uma dica prática. 🔔
 
-👤 _Cliente:_ "Tenho cartão Nubank de R$ 2.800, empréstimo no banco de R$ 4.200 e uma dívida de moto de R$ 10.440"
+Tudo isso 24h por dia, direto no seu WhatsApp, sem precisar abrir nenhum app.
 
-🤖 _QuitaZAP:_ Recebi! Organizando suas dívidas...
-
-✅ *3 dívidas cadastradas*
-💳 Nubank (rotativo) → R$ 2.800
-🏦 Empréstimo → R$ 4.200
-🏍️ Financiamento moto → R$ 10.440
-━━━━━━━━━━━
-💰 *Total: R$ 17.440*
-
-É exatamente assim que funciona — você fala do jeito que quiser, eu organizo tudo. 👆`;
-
-const PROVA_PLANO = `📋 *Plano de quitação gerado pela IA:*
-
-👤 Renda mensal: R$ 3.500
-💸 Total em dívidas: R$ 17.440
-
-*Ordem de prioridade:*
-1️⃣ Nubank rotativo — R$ 560/mês ⚡ _eliminar juros de 400% a.a._
-2️⃣ Empréstimo banco — R$ 420/mês
-3️⃣ Financiamento moto — R$ 580/mês
-
-📊 Parcela total: *R$ 1.560/mês*
-✅ Sobra livre: *R$ 1.940/mês*
-🏁 Previsão de quitação: *14 meses*
-
-Isso é o que o QuitaZAP faz por você — em minutos, pelo WhatsApp. 👇`;
-
-const PROVA_CHAMADA = `Tudo isso disponível *24h por dia*, direto no seu WhatsApp. Sem precisar instalar nada. 📱
-
-Você pode perguntar a qualquer hora:
-📊 _"Qual meu saldo devedor total?"_
-📅 _"Quanto preciso pagar essa semana?"_
-💰 _"Quanto sobra do meu salário?"_
-
-*Quer ter seu plano personalizado agora?* 👇`;
-
-const OFERTA = `🚀 *QuitaZAP — R$ 14,90/mês*
-
-✅ Plano de quitação personalizado por IA
-✅ Funciona 24h no seu WhatsApp
-✅ Manda dívidas por texto, áudio ou foto de boleto
-✅ Relatórios e resumos automáticos
-✅ Cancele quando quiser — sem burocracia
-
-Por apenas *R$ 14,90 por mês* — menos que uma pizza — você tem um consultor financeiro no bolso.
-
-👇 *Assine agora e comece hoje:*
-${CAKTO_LINK}`;
-
-const FOLLOWUP = `Ficou com alguma dúvida? Me conta que eu te ajudo! 😊
-
-Muita gente pensa que é complicado, mas é tudo pelo WhatsApp mesmo — igual a essa conversa aqui. 💬
-
-*O que ficou faltando saber?*`;
+*Quer começar a usar agora?* 👇`;
 
 function msgCupom(cupom: string): string {
-  return `Espera! 🎁 Tenho uma condição especial para você.
+  return `Ah, e tem mais uma coisa: 🎁
 
-Preparamos um *cupom de desconto* exclusivo:
+Use o cupom *${cupom}* na hora de assinar e garanta desconto na sua primeira mensalidade:
 
-👉 Use o cupom *${cupom}* na hora de assinar e garanta seu desconto!
-
-${CAKTO_LINK}
-
-Oferta por tempo limitado ⏰`;
+${CAKTO_LINK}`;
 }
 
-const ENCERRAMENTO = `Tudo bem! Se mudar de ideia, pode me chamar aqui a qualquer hora. 😊
+const ENCERRAMENTO = `Tudo bem, sem problema! Se mudar de ideia, é só me chamar aqui a qualquer hora. 😊
 
-Boa sorte nas suas finanças! 🍀`;
+Boa sorte com suas finanças! 🍀`;
 
-const ULTIMA_CHANCE = `Aqui está o link mais uma vez, caso mude de ideia:
+function mensagemOferta(): string {
+  return `🚀 *QuitaZAP — ${PRECO_MENSAL}/mês*
 
-👉 ${CAKTO_LINK}
+✅ Registre renda, gastos, contas, cartão e dívidas direto pelo WhatsApp
+✅ Aviso automático quando o mês fica apertado
+✅ Funciona por texto, áudio ou foto
+✅ Cancele quando quiser — sem burocracia
 
-Qualquer dúvida, pode me chamar! 😊`;
-
-// ── Detecção de intenção ──────────────────
-
-function detectaPositivo(msg: string): boolean {
-  const m = msg
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return /\b(sim|s|quero|tenho|claro|pode|vamos|bora|to dentro|to|tô|ok|oba|isso|queria|preciso|ajuda|show|vai|top|legal|gostei|perfeito|exato|verdade|1)\b/.test(m);
+👇 Pra começar agora:
+${CAKTO_LINK}`;
 }
 
-function detectaNegativo(msg: string): boolean {
-  const m = msg
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return /\b(nao|n|nope|agora nao|depois|nao quero|obrigad[ao]|tchau|ate logo|flw|bye|2|nope|nn|nein)\b/.test(m);
+function mensagemPreco(): string {
+  return `O QuitaZAP custa *${PRECO_MENSAL} por mês* — sem contrato, cancela quando quiser.
+
+👉 ${CAKTO_LINK}`;
+}
+
+async function talvezEnviarCupom(lead: LeadVendas, telefone: string): Promise<void> {
+  if (lead.cupomEnviado) return;
+  const cupom = process.env.CAKTO_CUPOM ?? "";
+  if (!cupom) return;
+  await delay(2500);
+  await sendWhatsApp(telefone, msgCupom(cupom));
+  await prisma.leadVendas.update({ where: { id: lead.id }, data: { cupomEnviado: true } });
+}
+
+// Trata qualquer resposta depois que o preço/CTA já foi mostrado (etapas
+// OFERTA e FOLLOWUP) — efeitos colaterais (Prisma/WhatsApp) em cima da
+// decisão pura acima.
+async function processarRespostaPosOferta(lead: LeadVendas, mensagem: string, telefone: string): Promise<void> {
+  const decisao = decidirRespostaPosOferta(lead, mensagem);
+
+  if (decisao.acao === "parar" || decisao.acao === "desistir") {
+    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
+    await sendWhatsApp(telefone, ENCERRAMENTO);
+    return;
+  }
+
+  if (decisao.acao === "responder_preco") {
+    await sendWhatsApp(telefone, mensagemPreco());
+    return;
+  }
+
+  if (decisao.acao === "enviar_link") {
+    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "FOLLOWUP" } });
+    await sendWhatsApp(telefone, `Show! 🙌 Aqui está o link pra começar agora:\n\n👉 ${CAKTO_LINK}`);
+    return;
+  }
+
+  // decisao.acao === "rebater"
+  const tentativaAtualizada = await prisma.leadVendas.update({
+    where: { id: lead.id },
+    data: {
+      etapa: "FOLLOWUP",
+      tentativasObjecao: decisao.novoEstado.tentativasObjecao,
+      angulosUsados: decisao.novoEstado.angulosUsados,
+    },
+  });
+  await sendWhatsApp(telefone, REBATIDAS[decisao.angulo]);
+
+  // Cupom real (não é urgência inventada) só entra depois da 2ª rodada de
+  // objeção — não no primeiro "não", pra não parecer que o preço já
+  // começa negociável.
+  if (tentativaAtualizada.tentativasObjecao >= 2) {
+    await talvezEnviarCupom(tentativaAtualizada, telefone);
+  }
 }
 
 // ── Processador principal do lead ─────────
@@ -162,63 +182,57 @@ export async function processarLeadVendas(
   // Lead já encerrado — ignora novas mensagens
   if (lead.etapa === "CONVERTIDO" || lead.etapa === "DESISTIU") return;
 
-  // ── Etapa: QUALIFICACAO ──────────────────
-  // Aguardando resposta: "tem dívidas?"
-  if (lead.etapa === "QUALIFICACAO") {
-    if (detectaNegativo(mensagem)) {
-      await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
-      await sendWhatsApp(telefone, ENCERRAMENTO);
-      return;
-    }
-    // Resposta positiva ou qualquer coisa → avança
-    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "PROVA" } });
-    await sendWhatsApp(telefone, QUALIFICACAO);
-    await delay(1500);
-    await sendWhatsApp(telefone, PROVA_EXEMPLO);
-    await delay(2000);
-    await sendWhatsApp(telefone, PROVA_PLANO);
-    await delay(2000);
-    await sendWhatsApp(telefone, PROVA_CHAMADA);
+  const norm = normalizarTexto(mensagem);
+
+  // Pergunta de preço antes da oferta é sinal forte de interesse — responde
+  // na hora e já mostra o CTA, em vez de fazer o lead esperar terminar a
+  // demonstração pra saber o valor.
+  if (lead.etapa !== "OFERTA" && lead.etapa !== "FOLLOWUP" && RE_PERGUNTA_PRECO.test(norm)) {
+    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "OFERTA" } });
+    await sendWhatsApp(telefone, mensagemOferta());
+    await agendarFollowup(telefone);
     return;
   }
 
-  // ── Etapa: PROVA ─────────────────────────
-  // Aguardando reação às imagens
-  if (lead.etapa === "PROVA") {
-    if (detectaNegativo(mensagem)) {
+  // ── Momento 1: DOR — aguardando resposta à pergunta de abertura ──
+  if (lead.etapa === "QUALIFICACAO") {
+    if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
       await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
       await sendWhatsApp(telefone, ENCERRAMENTO);
       return;
     }
+
+    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "PROVA" } });
+    await sendWhatsApp(telefone, RECONHECIMENTO_DOR);
+    await delay(1200);
+    // ── Momento 2: DEMONSTRAÇÃO ──
+    await sendWhatsApp(telefone, DEMONSTRACAO);
+    await delay(1800);
+    // ── Momento 3: DIFERENCIAL ──
+    await sendWhatsApp(telefone, DIFERENCIAL);
+    return;
+  }
+
+  // ── Lead reagiu à demonstração/diferencial ──
+  if (lead.etapa === "PROVA") {
+    if (RE_PARAR.test(norm) || detectaNegativo(mensagem)) {
+      await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
+      await sendWhatsApp(telefone, ENCERRAMENTO);
+      return;
+    }
+
+    // ── Momento 5: CTA (preço sempre junto, nunca escondido) ──
     await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "OFERTA" } });
-    await sendWhatsApp(telefone, OFERTA);
+    await sendWhatsApp(telefone, mensagemOferta());
 
     // Agenda follow-up automático via QStash — dispara após 4h de silêncio
     await agendarFollowup(telefone);
     return;
   }
 
-  // ── Etapa: OFERTA ────────────────────────
-  // Lead respondeu após receber link → follow-up + cupom (se configurado)
-  if (lead.etapa === "OFERTA") {
-    const cupom = process.env.CAKTO_CUPOM ?? "";
-    await prisma.leadVendas.update({
-      where: { id: lead.id },
-      data: { etapa: "FOLLOWUP", cupomEnviado: !!cupom },
-    });
-    await sendWhatsApp(telefone, FOLLOWUP);
-    if (cupom) {
-      await delay(3000);
-      await sendWhatsApp(telefone, msgCupom(cupom));
-    }
-    return;
-  }
-
-  // ── Etapa: FOLLOWUP ──────────────────────
-  // Última tentativa com link
-  if (lead.etapa === "FOLLOWUP") {
-    await prisma.leadVendas.update({ where: { id: lead.id }, data: { etapa: "DESISTIU" } });
-    await sendWhatsApp(telefone, ULTIMA_CHANCE);
+  // ── Momento 4: OBJEÇÃO (e possíveis rodadas seguintes) ──
+  if (lead.etapa === "OFERTA" || lead.etapa === "FOLLOWUP") {
+    await processarRespostaPosOferta(lead, mensagem, telefone);
     return;
   }
 }
