@@ -19,9 +19,29 @@ export function normalizarTexto(msg: string): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
+// Achado do Ibrahim: "acho que consigo fazer isso de graça no bloco de
+// notas do celular mesmo" (uma objeção de "faço sozinho/DIY", não um
+// aceite) disparava "enviar_link" e marcava conversão — porque "isso" (um
+// pronome genérico que aparece em qualquer frase) tava na lista de
+// palavras de aceite. Mesmo problema existiria com "tenho"/"pode" (ex:
+// "tenho uma dúvida", "pode ser que eu não use direito" — nem aceite nem
+// objeção reconhecida, mas dispara aceite do mesmo jeito). A causa raiz é
+// tratar palavra solta como sinal forte em frase livre qualquer, igual os
+// outros bugs desta rodada. Fix: só um pequeno grupo de palavras
+// inequívocas ("sim", "quero", "claro"...) conta como aceite em QUALQUER
+// frase; o resto (mais genérico/ambíguo: "isso", "tenho", "pode"...) só
+// conta quando a mensagem inteira é uma resposta curta e direta — nunca
+// dentro de uma frase mais longa e substantiva, onde essas palavras
+// aparecem à toa sem relação nenhuma com aceitar a oferta.
+const RE_CONFIRMACAO_FORTE = /\b(sim|quero|claro|bora|show|perfeito|exato|to dentro|partiu|confirmado)\b/;
+const RE_CONFIRMACAO_FRACA = /\b(s|tenho|pode|vamos|to|tô|ok|oba|isso|queria|preciso|ajuda|vai|top|legal|gostei|verdade|1)\b/;
+
 export function detectaPositivo(msg: string): boolean {
-  const m = normalizarTexto(msg);
-  return /\b(sim|s|quero|tenho|claro|pode|vamos|bora|to dentro|to|tô|ok|oba|isso|queria|preciso|ajuda|show|vai|top|legal|gostei|perfeito|exato|verdade|1)\b/.test(m);
+  const m = normalizarTexto(msg).trim();
+  if (RE_CONFIRMACAO_FORTE.test(m)) return true;
+
+  const palavras = m.replace(/[.,!?]/g, "").split(/\s+/).filter(Boolean);
+  return palavras.length <= 4 && RE_CONFIRMACAO_FRACA.test(m);
 }
 
 export function detectaNegativo(msg: string): boolean {
@@ -77,7 +97,7 @@ const RE_OBJ_CONFIANCA = /\b(confio|desconfio|sera que funciona|isso e golpe|e s
 // (próximo ângulo não usado) em vez de CONCORRENTE — parecia estar
 // "classificando errado por causa do 'não sei'", mas na real é essa
 // lacuna de vocabulário.
-const RE_OBJ_CONCORRENTE = /\b(ja uso|ja tenho (um |outro )?app|mobills|guiabolso|organizze|minhas economias|uso outro aplicativo|planilha|excel|google sheets|no papel|no caderno|anoto (tudo )?(na mao|no papel|no caderno)|resolvo (isso )?sozinho|meu jeito (ja )?resolve)\b/;
+const RE_OBJ_CONCORRENTE = /\b(ja uso|ja tenho (um |outro )?app|mobills|guiabolso|organizze|minhas economias|uso outro aplicativo|planilha|excel|google sheets|no papel|no caderno|bloco de notas|no notion|anoto (tudo )?(na mao|no papel|no caderno)|resolvo (isso )?sozinho|meu jeito (ja )?resolve)\b/;
 const RE_OBJ_ADIAR = /\b(vou pensar|depois eu vejo|depois eu falo|mais tarde|agora nao|nao agora|preciso pensar|deixa eu ver|vou ver)\b/;
 
 // Retorna TODOS os ângulos presentes na mensagem, não só o primeiro —

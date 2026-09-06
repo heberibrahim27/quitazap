@@ -55,7 +55,7 @@ function loadTsModule(relativePath) {
   return mod.exports;
 }
 
-const { decidirRespostaPosOferta, REBATIDAS, PRECO_MENSAL, ehRecusaClara } = loadTsModule("src/lib/sales-bot-objecao.ts");
+const { decidirRespostaPosOferta, REBATIDAS, PRECO_MENSAL, ehRecusaClara, detectaPositivo } = loadTsModule("src/lib/sales-bot-objecao.ts");
 
 function estadoInicial() {
   return { tentativasObjecao: 0, angulosUsados: "" };
@@ -278,6 +278,52 @@ test("ehRecusaClara: recusas de verdade continuam sendo reconhecidas", () => {
   ];
   for (const recusa of recusas) {
     assert.equal(ehRecusaClara(recusa), true, `"${recusa}" deveria ser reconhecida como recusa clara`);
+  }
+});
+
+// Achado do Ibrahim (rodada 4) — o mais grave de todos: falso positivo de
+// CONVERSÃO. "acho que consigo fazer isso de graça no bloco de notas do
+// celular mesmo" é uma objeção de DIY/concorrente, não um aceite, mas
+// disparava "enviar_link" e marcava "Lead converteu" — porque a palavra
+// solta "isso" (um pronome genérico) estava na lista de sinais de aceite.
+test("objeção de 'faço de graça no bloco de notas' NÃO é tratada como aceite (não manda link)", () => {
+  const decisao = decidirRespostaPosOferta(
+    estadoInicial(),
+    "acho que consigo fazer isso de graca no bloco de notas do celular mesmo"
+  );
+  assert.notEqual(decisao.acao, "enviar_link");
+  // Idealmente reconhecida como objeção de concorrente (bloco de notas),
+  // mas o essencial pra segurança é NUNCA declarar conversão aqui.
+  assert.equal(decisao.acao, "rebater");
+});
+
+test("detectaPositivo: palavras genéricas ('isso', 'tenho', 'pode') não contam como aceite dentro de frase substantiva", () => {
+  const frasesQueNaoSaoAceite = [
+    "acho que consigo fazer isso de graca no bloco de notas do celular mesmo",
+    "tenho uma duvida sobre como funciona isso direito",
+    "pode ser que eu nao use direito, fico com receio",
+  ];
+  for (const frase of frasesQueNaoSaoAceite) {
+    assert.equal(detectaPositivo(frase), false, `"${frase}" não deveria contar como aceite`);
+  }
+});
+
+test("detectaPositivo: aceite direto e confirmações curtas continuam funcionando", () => {
+  const aceites = ["sim", "quero", "show, bora", "isso", "isso mesmo", "pode ser", "beleza, quero sim"];
+  for (const aceite of aceites) {
+    assert.equal(detectaPositivo(aceite), true, `"${aceite}" deveria contar como aceite`);
+  }
+});
+
+test("variações próximas da frase-gatilho relatada continuam corretas (nenhuma delas devia disparar, e continuam sem disparar)", () => {
+  const variacoes = [
+    "acho que consigo fazer sozinho",
+    "consigo fazer de graca no bloco de notas do celular mesmo",
+    "acho que consigo fazer de graca no bloco de notas do celular mesmo",
+  ];
+  for (const variacao of variacoes) {
+    const decisao = decidirRespostaPosOferta(estadoInicial(), variacao);
+    assert.notEqual(decisao.acao, "enviar_link", `"${variacao}" não deveria mandar link`);
   }
 });
 
