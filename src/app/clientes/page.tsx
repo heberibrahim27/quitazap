@@ -37,6 +37,7 @@ export default async function ClientesPage({
       id: true,
       nome: true,
       telefone: true,
+      email: true,
       criadoEm: true,
       gratuito: true,
       assinaturaVenceEm: true,
@@ -120,6 +121,11 @@ export default async function ClientesPage({
                     <span style={{ display: "block", color: "var(--qa-gray-400)", fontSize: 13 }}>
                       {cliente.telefone}
                     </span>
+                    {cliente.email && (
+                      <span style={{ display: "block", color: "var(--qa-gray-500)", fontSize: 12.5 }}>
+                        {cliente.email}
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
