@@ -8,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 const PALAVRA_CONFIRMACAO = "RESETAR";
 
 // Reset "total" só no sentido de dados financeiros do Controle — receitas,
-// despesas, compras no cartão, cartões, agenda e orçamentos por categoria.
+// despesas, compras no cartão, cartões, agenda, orçamentos por categoria e
+// metas (com seus depósitos, via cascade do schema).
 // Deliberadamente NÃO mexe em Divida/Parcela/Pagamento (Empréstimos e
 // Dívidas): essa tabela é compartilhada com o painel administrativo de
 // cobrança, sem um campo que diferencie o que o próprio cliente cadastrou
@@ -30,6 +31,8 @@ export async function resetarDadosFinanceiros(formData: FormData): Promise<{ err
     prisma.tarefa.deleteMany({ where: { clienteId: cliente.id } }),
     prisma.orcamentoCategoria.deleteMany({ where: { clienteId: cliente.id } }),
     prisma.pushSubscription.deleteMany({ where: { clienteId: cliente.id } }),
+    // DepositoMeta cai sozinho via onDelete: Cascade no schema.
+    prisma.meta.deleteMany({ where: { clienteId: cliente.id } }),
   ]);
 
   revalidatePath("/minha-conta", "layout");
