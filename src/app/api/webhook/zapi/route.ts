@@ -22,6 +22,7 @@ import {
   gerenciarFaturaCartaoControle,
   gerenciarDespesasFixasControle,
   registrarGastoControle,
+  resolverValorGastoPendente,
   salvarItensConfirmadosIA,
   type EstadoControleFinanceiro,
   type ResultadoGastoControle,
@@ -1616,6 +1617,48 @@ Pode mandar tudo em uma mensagem só.`;
     }
 
     const estadoAntesGasto = estadoAntesFluxosControle;
+
+    // Detector de lançamento duplicado (Skill Analista): busca só o
+    // suficiente pra registrarGastoControle/resolverValorGastoPendente
+    // comparar valor+estabelecimento contra o que já foi lançado hoje —
+    // nunca recalcula nada financeiro, só compara texto/valor bruto.
+    const lancamentosRecentesControle = sessao.clienteId
+      ? await prisma.lancamento.findMany({
+          where: { clienteId: sessao.clienteId, data: { gte: inicioDoDiaBrasil(new Date()) } },
+          select: { descricao: true, valor: true },
+        })
+      : [];
+
+    // ── Resposta a "Qual foi o valor desse gasto?" pendente ────────────────
+    // Antes de qualquer outra coisa (inclusive antes do interpretador de
+    // IA): se o bot ficou esperando só o número de um gasto sem valor, a
+    // resposta ("500") é resolvida direto aqui. Sem isso, essa resposta,
+    // sozinha e sem contexto, não parece financeira o suficiente pra IA
+    // reconhecer e a informação do cliente se perdia (bug encontrado em
+    // testes, set/2026).
+    if (estadoAntesGasto.confirmacaoPendente?.tipo === "aguardar_valor_gasto") {
+      const resolvidoPendente = resolverValorGastoPendente(mensagem, estadoAntesGasto, lancamentosRecentesControle);
+      if (resolvidoPendente) {
+        await sendWhatsApp(telefone, resolvidoPendente.resposta);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: resolvidoPendente.resposta },
+              ...(resolvidoPendente.atualizouEstado ? [criarMensagemEstadoControle(resolvidoPendente.estado)] : []),
+            ]),
+          },
+        });
+
+        after(() => persistirLancamentosControle(sessao.clienteId, resolvidoPendente.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     const correcaoOrigem = corrigirOrigemUltimoGastoControle(mensagem, estadoAntesGasto);
     if (correcaoOrigem) {
       await sendWhatsApp(telefone, correcaoOrigem.resposta);
@@ -1978,17 +2021,6 @@ Pode mandar tudo em uma mensagem só.`;
 
       return NextResponse.json({ ok: true });
     }
-
-    // Detector de lançamento duplicado (Skill Analista): busca só o
-    // suficiente pra registrarGastoControle comparar valor+estabelecimento
-    // contra o que já foi lançado hoje — nunca recalcula nada financeiro,
-    // só compara texto/valor bruto.
-    const lancamentosRecentesControle = sessao.clienteId
-      ? await prisma.lancamento.findMany({
-          where: { clienteId: sessao.clienteId, data: { gte: inicioDoDiaBrasil(new Date()) } },
-          select: { descricao: true, valor: true },
-        })
-      : [];
 
     const gastoRapido = registrarGastoControle(mensagem, estadoAntesGasto, new Date(), lancamentosRecentesControle);
     if (gastoRapido) {
