@@ -229,6 +229,21 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   // os resolvedores locais — só evita que a mensagem pule direto pro
   // fallback 100% regex de registrarGastoControle sem passar pela IA.
   if (pareceValorMonetarioForte(texto)) return true;
+  // Mesma ideia, mas pra valor INTEIRO sem vírgula/"reais"/"R$" (ex.: "recebi
+  // 200 de salário", "ganhei 200", "gastei 80 no posto") — pareceValorMonetarioForte
+  // sozinho não pega isso (exige decimal ou sufixo), e sem essa checagem a
+  // mensagem nunca chegava a passar pela IA: caía direto num fallback
+  // determinístico (às vezes o detector de renda mensal, que não é o que o
+  // cliente quis dizer). Verbo de ação financeira + qualquer número já é
+  // sinal forte o bastante mesmo sem decimal.
+  if (
+    /\b(?:recebi|ganhei|gastei|comprei|paguei|guardei|depositei|coloquei|devo|emprestimo|financiamento|consignado)\b/.test(
+      texto
+    ) &&
+    /\b\d[\d.,]*\b/.test(texto)
+  ) {
+    return true;
+  }
   return false;
 }
 
