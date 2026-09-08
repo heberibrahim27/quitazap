@@ -30,6 +30,7 @@ import {
   type EstadoControleFinanceiro,
   type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
+import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
@@ -1307,7 +1308,15 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const estadoAntesFluxosControle = carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda);
+    // Sincroniza com o motor central (mesmo que o Dashboard usa) antes de
+    // qualquer fluxo usar o estado — ver controle-financeiro-sync.ts pro
+    // porquê (bug real achado ao vivo: saldo do WhatsApp divergindo do
+    // Dashboard porque o "estado" antigo era um acumulador vitalício).
+    const estadoAntesFluxosControle = await sincronizarEstadoComMotorCentral(
+      sessao.clienteId,
+      carregarEstadoControle(servidorHistoricoSessao as Mensagem[], sessao.renda),
+      sessao.renda
+    );
     const correcaoRenda = corrigirRendaControle(mensagem, estadoAntesFluxosControle);
     if (correcaoRenda) {
       await sendWhatsApp(telefone, correcaoRenda.resposta);
