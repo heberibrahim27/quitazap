@@ -38,10 +38,14 @@ import { calcularResumoFinanceiro, anoMesAtualBrasil, limitesDoMes } from "@/lib
 import type { EstadoControleFinanceiro } from "./controle-financeiro-flow";
 
 export async function sincronizarEstadoComMotorCentral(
-  clienteId: string,
+  clienteId: string | null | undefined,
   estado: EstadoControleFinanceiro,
   rendaDeclarada?: number | null
 ): Promise<EstadoControleFinanceiro> {
+  // Sessão ainda sem Cliente vinculado (ex: onboarding não terminou) — não
+  // tem o que sincronizar, devolve o estado como veio do histórico.
+  if (!clienteId) return estado;
+
   const { ano, mes } = anoMesAtualBrasil(new Date());
   const periodo = limitesDoMes(ano, mes);
 
