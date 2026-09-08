@@ -22,6 +22,7 @@ import {
   gerenciarFaturaCartaoControle,
   gerenciarDespesasFixasControle,
   registrarGastoControle,
+  salvarItensConfirmadosIA,
   type EstadoControleFinanceiro,
   type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
@@ -51,7 +52,7 @@ import {
   resolverLoteGastosCartao,
   resolverIntencaoFinanceiraIA,
 } from "@/lib/ia/financeiro-intent-resolver";
-import { MENSAGEM_FORA_ESCOPO_FINANCEIRO } from "@/lib/ia/financeiro-intent-schema";
+import { MENSAGEM_FORA_ESCOPO_FINANCEIRO, type FinanceiroIntent } from "@/lib/ia/financeiro-intent-schema";
 import { extrairDadosServidorPublicoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { parseMoneyBR } from "@/lib/money";
@@ -697,6 +698,58 @@ async function jáProcessouPersistente(id: string): Promise<boolean> {
     console.warn("[Z-API] Checagem persistente de duplicata falhou (seguindo só com a checagem em memória):", err);
     return false;
   }
+}
+
+// Decisão do Ibrahim (set/2026): o bot deixou de "conduzir diálogo" pra
+// registrar qualquer coisa — ele deve interpretar e já lançar direto,
+// sem perguntar "confirma?", DESDE QUE a interpretação seja confiável.
+// Só mensagem genuinamente confusa/ambígua (confiança baixa) ainda passa
+// pelo fluxo de confirmação por texto (1-Sim / 2-Não). O corte abaixo
+// separa os dois casos usando o campo `confianca` que todo FinanceiroIntent
+// já carrega (resolvedores locais ficam quase todos entre 0.75 e 0.95; só
+// os casos propositalmente incertos — ex.: pagamento de dívida sem credor
+// identificado — ficam abaixo disso e continuam pedindo confirmação).
+const LIMIAR_CONFIANCA_AUTO_REGISTRO = 0.75;
+
+function podeAutoRegistrarIntentFinanceiro(intent: FinanceiroIntent): boolean {
+  return intent.confianca >= LIMIAR_CONFIANCA_AUTO_REGISTRO;
+}
+
+// Aplica no webhook o mesmo conjunto de persistências que o fluxo de
+// confirmação por texto ("1-Sim") já fazia — reaproveitado aqui pra
+// registrar direto, sem esperar a resposta do cliente, quando a
+// interpretação é confiável o suficiente (ver podeAutoRegistrarIntentFinanceiro).
+async function registrarIntentFinanceiroDireto(
+  sessao: { id: string; clienteId: string | null },
+  telefone: string,
+  mensagem: string,
+  servidorHistoricoSessao: Array<{ role: string; content?: string | null }>,
+  estadoAtual: EstadoControleFinanceiro,
+  intent: FinanceiroIntent,
+  origemLancamentoControle: OrigemLancamentoControle,
+  comprovanteUrlImagem: string | undefined
+): Promise<void> {
+  const resultado = salvarItensConfirmadosIA(estadoAtual, intent);
+
+  await sendWhatsApp(telefone, resultado.resposta);
+
+  await prisma.botSessao.updateMany({
+    where: { id: sessao.id },
+    data: {
+      dividasTemp: JSON.stringify([
+        ...servidorHistoricoSessao,
+        { role: "user", content: mensagem },
+        { role: "assistant", content: resultado.resposta },
+        ...(resultado.atualizouEstado ? [criarMensagemEstadoControle(resultado.estado)] : []),
+      ]),
+    },
+  });
+
+  after(() => persistirLancamentosControle(sessao.clienteId, resultado.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
+  after(() => persistirCartaoControle(sessao.clienteId, resultado.cartaoParaPersistir));
+  after(() => persistirDividaConfirmadaIA(sessao.clienteId, resultado.dividaParaPersistir));
+  after(() => persistirPagamentoDividaConfirmadoIA(sessao.clienteId, telefone, resultado.pagamentoDividaParaPersistir));
+  after(() => persistirMetaConfirmadaIA(sessao.clienteId, telefone, resultado.metaParaPersistir));
 }
 
 // Os dois wrappers abaixo mantêm gerenciarDespesasFixasControle e
@@ -1393,6 +1446,23 @@ Pode mandar tudo em uma mensagem só.`;
 
     const loteGastosCartao = resolverLoteGastosCartao(mensagem);
     if (loteGastosCartao) {
+      if (
+        intentFinanceiroConfirmavel(loteGastosCartao) &&
+        podeAutoRegistrarIntentFinanceiro(loteGastosCartao)
+      ) {
+        await registrarIntentFinanceiroDireto(
+          sessao,
+          telefone,
+          mensagem,
+          servidorHistoricoSessao,
+          estadoAntesFluxosControle,
+          loteGastosCartao,
+          origemLancamentoControle,
+          comprovanteUrlImagem
+        );
+        return NextResponse.json({ ok: true });
+      }
+
       const respostaIntent = formatarPreviaIntentFinanceiro(loteGastosCartao);
       const estadoComIntent = criarEstadoComConfirmacaoInterpretacaoFinanceira(
         estadoAntesFluxosControle,
@@ -1512,12 +1582,14 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const aguardandoRendaControle =
-      servidorHistoricoSessao.some(
-        (h) =>
-          h.role === "assistant" &&
-          (h.content ?? "").includes("Para começar, me diga quanto entra por mês.")
-      ) && !servidorHistoricoSessao.some((h) => h.role === "user");
+    // Decisão do Ibrahim (set/2026): acabou o onboarding guiado (perguntar
+    // renda mensal, depois despesas fixas, antes de liberar o resto). O
+    // cliente novo já pode mandar qualquer gasto/receita/dívida/meta/cartão
+    // desde a primeira mensagem — sem passar por um "assistente" que
+    // conduz o diálogo. Constante travada em false (em vez de apagar o
+    // bloco inteiro) pra manter o histórico de como funcionava, caso
+    // precise voltar atrás.
+    const aguardandoRendaControle = false;
 
     if (aguardandoRendaControle) {
       if (pareceForaEscopoControle(mensagem)) {
@@ -1765,6 +1837,21 @@ Pode mandar tudo em uma mensagem só.`;
     });
     if (intentFinanceiro) {
       const intentConfirmavel = intentFinanceiroConfirmavel(intentFinanceiro);
+
+      if (intentConfirmavel && podeAutoRegistrarIntentFinanceiro(intentFinanceiro)) {
+        await registrarIntentFinanceiroDireto(
+          sessao,
+          telefone,
+          mensagem,
+          servidorHistoricoSessao,
+          estadoAntesGasto,
+          intentFinanceiro,
+          origemLancamentoControle,
+          comprovanteUrlImagem
+        );
+        return NextResponse.json({ ok: true });
+      }
+
       const respostaIntent = formatarPreviaIntentFinanceiro(intentFinanceiro);
       const estadoComIntent = intentConfirmavel
         ? criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoAntesGasto, intentFinanceiro)
@@ -1821,12 +1908,13 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
-    const aguardandoRendaControleDepoisDoGasto =
-      servidorHistoricoSessao.some(
-        (h) =>
-          h.role === "assistant" &&
-          (h.content ?? "").includes("Para começar, me diga quanto entra por mês.")
-      ) && !servidorHistoricoSessao.some((h) => h.role === "user");
+    // Decisão do Ibrahim (set/2026): sem onboarding guiado, não existe mais
+    // "aguardando a primeira resposta de renda" — quem quiser
+    // atualizar/declarar a renda mensal usa a correção explícita
+    // (corrigirRendaControle, mais acima na cascata: "minha renda é 3000",
+    // "corrigir renda pra 3000"), não esse fallback genérico. Constante
+    // travada em false pelo mesmo motivo do aguardandoRendaControle acima.
+    const aguardandoRendaControleDepoisDoGasto = false;
 
     const rendaControle = extrairRendaControle(mensagem, aguardandoRendaControleDepoisDoGasto);
     if (rendaControle) {
