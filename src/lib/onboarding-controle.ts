@@ -60,17 +60,35 @@ function normalizarTexto(texto: string): string {
     .trim();
 }
 
+// Precisa ser uma frase que DECLARA renda mensal/recorrente ("minha renda é
+// 3800", "recebo 3000 por mês", "renda mensal 3500", "entra por mês 4000"),
+// nunca só a presença solta de "renda"/"salário"/"ganho" em qualquer frase —
+// isso incluía "recebi 200 de salário" (uma receita AVULSA, no passado, não
+// uma redeclaração da renda cadastrada) e fazia o bot sequestrar esse tipo
+// de mensagem como se o cliente estivesse recadastrando a renda mensal dele
+// no meio de uma conversa normal, meses depois do onboarding. Verbo no
+// presente/recorrente ("recebo", "entra") ou uma frase de declaração
+// explícita ("minha renda", "renda mensal", "renda e"/"renda=", "salário
+// líquido de") são os únicos sinais fortes o suficiente pra isso; "recebi"/
+// "ganhei" no passado, sozinhos, não contam.
+const PADRAO_DECLARACAO_RENDA_MENSAL =
+  /\b(minha renda|renda mensal|renda e \d|renda=|recebo (?:por mes|mensalmente|todo mes)|entra por mes|entra no mes|salario liquido de)\b/;
+
 export function extrairRendaControle(mensagem: string, aceitarValorSolto = false): number | undefined {
   const texto = normalizarTexto(mensagem);
-  const mencionaRenda = /\b(renda|salario|salario liquido|ganho|recebo|entra por mes|entra no mes)\b/.test(texto);
-  if (!mencionaRenda && !aceitarValorSolto) return undefined;
+  if (!aceitarValorSolto) {
+    if (pareceReceitaAvulsaControle(mensagem)) return undefined;
+    if (!PADRAO_DECLARACAO_RENDA_MENSAL.test(texto)) return undefined;
+  }
 
   return parseMoneyBR(mensagem);
 }
 
 export function pareceReceitaAvulsaControle(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
-  return /\b(cliente pagou|recebi pix|caiu pix|entrou|entrou dinheiro|vendi|me pagaram)\b/.test(texto);
+  return /\b(cliente pagou|recebi\b.*\b(pix|salario|comissao|bonus|extra|freela|freelance|diaria)|recebi pix|caiu pix|entrou|entrou dinheiro|vendi|me pagaram|ganhei)\b/.test(
+    texto
+  );
 }
 
 export function pareceGastoVariavelControle(mensagem: string): boolean {
