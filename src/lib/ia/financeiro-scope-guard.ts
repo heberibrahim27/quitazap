@@ -2,6 +2,7 @@ import {
   criarIntentForaEscopo,
   type FinanceiroIntent,
 } from "./financeiro-intent-schema";
+import { valorPorExtenso } from "../numero-por-extenso";
 
 function normalizarTexto(texto: string): string {
   return texto
@@ -185,6 +186,24 @@ function pareceValorMonetarioForte(texto: string): boolean {
   return false;
 }
 
+// Mesmo verbo financeiro forte usado no gate de deveChamarInterpretadorFinanceiroIA
+// logo abaixo — mantido num só lugar pra evitar as duas listas divergirem.
+const VERBO_FINANCEIRO_FORTE =
+  /\b(?:recebi|ganhei|gastei|comprei|paguei|guardei|depositei|coloquei|devo|emprestimo|financiamento|consignado)\b/;
+
+// Valor por extenso ("gastei cem reais", "recebi mil e duzentos") não tem
+// NENHUM dígito — achado em teste ao vivo, set/2026: sem essa checagem a
+// mensagem inteira caía fora de escopo (nenhum PADRAO_ESCOPO bate, e
+// pareceValorMonetarioForte/pareceGastoEmCartao exigem \d), mesmo com verbo
+// financeiro claríssimo. Só conta como sinal de escopo quando combinado com
+// um verbo financeiro forte, pra não confundir "comprei duas coca" com
+// lançamento (valorPorExtenso já filtra isso por conta própria, mas manter
+// o verbo aqui também documenta a intenção e evita regressão se o filtro de
+// lá mudar).
+function temValorPorExtensoComVerbo(texto: string): boolean {
+  return VERBO_FINANCEIRO_FORTE.test(texto) && valorPorExtenso(texto) !== undefined;
+}
+
 function pareceGastoEmCartao(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
   if (!/\b\d[\d.,]*\b/.test(texto)) return false;
@@ -212,7 +231,8 @@ export function avaliarEscopoFinanceiro(mensagem: string): FinanceiroIntent {
   const emEscopo =
     PADROES_ESCOPO.some((regex) => regex.test(texto)) ||
     pareceGastoEmCartao(mensagem) ||
-    pareceValorMonetarioForte(texto);
+    pareceValorMonetarioForte(texto) ||
+    temValorPorExtensoComVerbo(texto);
 
   return emEscopo
     ? {
@@ -258,14 +278,12 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   // determinístico (às vezes o detector de renda mensal, que não é o que o
   // cliente quis dizer). Verbo de ação financeira + qualquer número já é
   // sinal forte o bastante mesmo sem decimal.
-  if (
-    /\b(?:recebi|ganhei|gastei|comprei|paguei|guardei|depositei|coloquei|devo|emprestimo|financiamento|consignado)\b/.test(
-      texto
-    ) &&
-    /\b\d[\d.,]*\b/.test(texto)
-  ) {
+  if (VERBO_FINANCEIRO_FORTE.test(texto) && /\b\d[\d.,]*\b/.test(texto)) {
     return true;
   }
+  // Mesmo caso acima, mas pro valor vir por extenso ("gastei cem reais",
+  // "recebi mil e duzentos") — achado em teste ao vivo, set/2026.
+  if (temValorPorExtensoComVerbo(texto)) return true;
   // Pagamento de dívida SEM valor na mensagem — ex.: "Já paguei a parcela
   // do Carlos", "Paguei o carnê hoje" (achado em teste, set/2026: sem essa
   // checagem, essa mensagem nunca chegava em resolverLocal/resolverPagamentoDivida
