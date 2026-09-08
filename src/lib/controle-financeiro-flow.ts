@@ -65,6 +65,11 @@ export type ConfirmacaoPendenteControle = {
   categoria: string;
   dataISO: string;
   cartao?: string | null;
+  // Quando a pendência foi criada — usado pro TTL (ver
+  // TTL_AGUARDAR_VALOR_GASTO_MS) que evita ela ficar viva pra sempre se o
+  // cliente simplesmente mudar de assunto sem nunca responder com um valor
+  // (revisão do ChatGPT, set/2026).
+  criadoEmISO: string;
 };
 
 /** Lançamento recente já persistido (buscado pelo route.ts via Prisma antes
@@ -410,12 +415,20 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
     typeof raw.confirmacaoPendente.dataISO === "string" &&
     !Number.isNaN(Date.parse(raw.confirmacaoPendente.dataISO))
   ) {
+    // Pendência gravada antes desse campo existir não tem criadoEmISO — trata
+    // como recém-criada (não descarta) em vez de quebrar a compatibilidade.
+    const criadoEmISO =
+      typeof raw.confirmacaoPendente.criadoEmISO === "string" &&
+      !Number.isNaN(Date.parse(raw.confirmacaoPendente.criadoEmISO))
+        ? raw.confirmacaoPendente.criadoEmISO
+        : new Date().toISOString();
     confirmacaoPendente = {
       tipo: "aguardar_valor_gasto",
       descricao: typeof raw.confirmacaoPendente.descricao === "string" ? raw.confirmacaoPendente.descricao : "",
       categoria: raw.confirmacaoPendente.categoria,
       dataISO: raw.confirmacaoPendente.dataISO,
       cartao: typeof raw.confirmacaoPendente.cartao === "string" ? raw.confirmacaoPendente.cartao : undefined,
+      criadoEmISO,
     };
   }
 
@@ -2558,6 +2571,7 @@ export function registrarGastoControle(
           categoria: gasto.categoria,
           dataISO: gasto.data.toISOString(),
           cartao,
+          criadoEmISO: agora.toISOString(),
         },
       },
       atualizouEstado: true,
@@ -2565,6 +2579,24 @@ export function registrarGastoControle(
   }
 
   return finalizarGastoDetectado(gasto as GastoDetectado & { valor: number }, cartao, estadoAtual, lancamentosRecentes);
+}
+
+// TTL da pendência "aguardar_valor_gasto" — revisão do ChatGPT (set/2026):
+// sem isso, se o cliente simplesmente mudar de assunto e nunca responder com
+// o valor, um número solto mandado bem mais tarde (por outro motivo
+// qualquer) podia ser grudado incorretamente nessa pendência antiga.
+const TTL_AGUARDAR_VALOR_GASTO_MS = 15 * 60 * 1000; // 15 minutos
+
+// Só trata a mensagem como "a resposta com o valor da pendência" se ela for
+// PRATICAMENTE só o número — "500", "500,00", "R$ 500", "500 reais", "500
+// conto" — revisão do ChatGPT (set/2026). "500 no mercado" também tem um
+// valor, mas é um gasto NOVO e independente (outro estabelecimento); se
+// qualquer texto com número fosse aceito aqui, esse gasto novo seria
+// incorretamente absorvido pela descrição/categoria do gasto anterior (o que
+// ainda está pendente), em vez de virar seu próprio lançamento.
+const REGEX_APENAS_VALOR_MONETARIO = /^\s*(?:r\$\s*)?\d[\d.,]*\s*(?:reais?|contos?)?\s*$/i;
+function ehApenasValorMonetario(mensagem: string): boolean {
+  return REGEX_APENAS_VALOR_MONETARIO.test(mensagem);
 }
 
 // Retomada de um gasto que ficou faltando só o valor (ver o "aguardar_valor_gasto"
@@ -2579,6 +2611,12 @@ export function resolverValorGastoPendente(
 ): ResultadoGastoControle | null {
   const pendente = estadoAtual.confirmacaoPendente;
   if (!pendente || pendente.tipo !== "aguardar_valor_gasto") return null;
+
+  const criadoEm = Date.parse(pendente.criadoEmISO);
+  const expirada = Number.isNaN(criadoEm) || Date.now() - criadoEm > TTL_AGUARDAR_VALOR_GASTO_MS;
+  if (expirada) return null;
+
+  if (!ehApenasValorMonetario(mensagem)) return null;
 
   const valor = parseMoneyBR(mensagem);
   if (!valor) return null;
@@ -2603,12 +2641,19 @@ function finalizarGastoDetectado(
   estadoAtual: EstadoControleFinanceiro,
   lancamentosRecentes: ItemRecenteControle[]
 ): ResultadoGastoControle {
+  // Limpa qualquer pendência antiga sempre que um gasto é finalizado com
+  // sucesso (revisão do ChatGPT, set/2026): sem isso, se o cliente tivesse
+  // um "aguardar_valor_gasto" pendente e mandasse um gasto NOVO e completo
+  // ("gastei 30 no lanche", já com valor — não passa por
+  // resolverValorGastoPendente), a pendência antiga ficava esquecida no
+  // estado e podia "grudar" numa mensagem bem posterior sem relação nenhuma.
   const estado = cartao
     ? {
         ...estadoAtual,
         cartoes: estadoAtual.cartoes ?? [],
         faturasFechadas: estadoAtual.faturasFechadas ?? [],
         faturas: somarFatura(estadoAtual.faturas ?? [], cartao, gasto.valor),
+        confirmacaoPendente: undefined,
         ultimoGasto: {
           descricao: gasto.descricao || gasto.categoria,
           valor: gasto.valor,
@@ -2624,6 +2669,7 @@ function finalizarGastoDetectado(
         faturas: estadoAtual.faturas ?? [],
         faturasFechadas: estadoAtual.faturasFechadas ?? [],
         totalGastosSaldo: (estadoAtual.totalGastosSaldo ?? 0) + gasto.valor,
+        confirmacaoPendente: undefined,
         ultimoGasto: {
           descricao: gasto.descricao || gasto.categoria,
           valor: gasto.valor,
