@@ -4,6 +4,7 @@ import {
   formatarValorBR,
   processarFluxoGasto,
   type GastoDetectado,
+  type CategoriaGasto,
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
 import { normalizarDescricaoFinanceira, normalizarTextoBusca } from "./descricao-financeira";
@@ -53,6 +54,17 @@ export type ConfirmacaoPendenteControle = {
   tipo: "confirmar_gasto_duplicado";
   item: ItemParaPersistirControle;
   respostaOriginal: string;
+} | {
+  // Cliente mandou um gasto sem valor ("paguei a parcela do empréstimo do
+  // Carlos") — o bot já perguntou "Qual foi o valor desse gasto?" e fica
+  // esperando a próxima mensagem só com o número. Sem isso, a resposta
+  // ("500") caía sozinha, sem contexto nenhum, no guardião de escopo/IA e
+  // se perdia (bug encontrado em testes, set/2026).
+  tipo: "aguardar_valor_gasto";
+  descricao: string;
+  categoria: string;
+  dataISO: string;
+  cartao?: string | null;
 };
 
 /** Lançamento recente já persistido (buscado pelo route.ts via Prisma antes
@@ -390,6 +402,20 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       cartao: raw.confirmacaoPendente.cartao,
       valorAnterior: Number(raw.confirmacaoPendente.valorAnterior),
       novoValor: Number(raw.confirmacaoPendente.novoValor),
+    };
+  } else if (
+    raw.confirmacaoPendente &&
+    raw.confirmacaoPendente.tipo === "aguardar_valor_gasto" &&
+    typeof raw.confirmacaoPendente.categoria === "string" &&
+    typeof raw.confirmacaoPendente.dataISO === "string" &&
+    !Number.isNaN(Date.parse(raw.confirmacaoPendente.dataISO))
+  ) {
+    confirmacaoPendente = {
+      tipo: "aguardar_valor_gasto",
+      descricao: typeof raw.confirmacaoPendente.descricao === "string" ? raw.confirmacaoPendente.descricao : "",
+      categoria: raw.confirmacaoPendente.categoria,
+      dataISO: raw.confirmacaoPendente.dataISO,
+      cartao: typeof raw.confirmacaoPendente.cartao === "string" ? raw.confirmacaoPendente.cartao : undefined,
     };
   }
 
@@ -2519,13 +2545,64 @@ export function registrarGastoControle(
   const gasto = ajustarDescricaoControle(gastoDetectado);
 
   if (!gasto.valor) {
+    // Guarda a descrição/categoria/data já entendidas e fica esperando só
+    // o valor na próxima mensagem (ver resolverValorGastoPendente) — antes
+    // disso a pergunta ficava sem estado nenhum e a resposta se perdia.
     return {
       resposta: gasto.resposta,
-      estado: estadoAtual,
-      atualizouEstado: false,
+      estado: {
+        ...estadoAtual,
+        confirmacaoPendente: {
+          tipo: "aguardar_valor_gasto",
+          descricao: gasto.descricao,
+          categoria: gasto.categoria,
+          dataISO: gasto.data.toISOString(),
+          cartao,
+        },
+      },
+      atualizouEstado: true,
     };
   }
 
+  return finalizarGastoDetectado(gasto as GastoDetectado & { valor: number }, cartao, estadoAtual, lancamentosRecentes);
+}
+
+// Retomada de um gasto que ficou faltando só o valor (ver o "aguardar_valor_gasto"
+// acima). Chamado pelo route.ts assim que detecta essa pendência, ANTES de
+// tentar o interpretador de IA — a resposta costuma ser só um número
+// ("500"), que sozinho não tem contexto suficiente pra IA reconhecer como
+// financeiro.
+export function resolverValorGastoPendente(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro,
+  lancamentosRecentes: ItemRecenteControle[] = []
+): ResultadoGastoControle | null {
+  const pendente = estadoAtual.confirmacaoPendente;
+  if (!pendente || pendente.tipo !== "aguardar_valor_gasto") return null;
+
+  const valor = parseMoneyBR(mensagem);
+  if (!valor) return null;
+
+  const data = new Date(pendente.dataISO);
+  const gasto: GastoDetectado & { valor: number } = {
+    pareceGasto: true,
+    valor,
+    descricao: pendente.descricao,
+    categoria: pendente.categoria as CategoriaGasto,
+    data: Number.isNaN(data.getTime()) ? new Date() : data,
+    resposta: "",
+  };
+
+  const estadoSemPendente = { ...estadoAtual, confirmacaoPendente: undefined };
+  return finalizarGastoDetectado(gasto, pendente.cartao ?? null, estadoSemPendente, lancamentosRecentes);
+}
+
+function finalizarGastoDetectado(
+  gasto: GastoDetectado & { valor: number },
+  cartao: string | null,
+  estadoAtual: EstadoControleFinanceiro,
+  lancamentosRecentes: ItemRecenteControle[]
+): ResultadoGastoControle {
   const estado = cartao
     ? {
         ...estadoAtual,
