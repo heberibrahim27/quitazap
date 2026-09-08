@@ -266,6 +266,20 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   ) {
     return true;
   }
+  // Pagamento de dívida SEM valor na mensagem — ex.: "Já paguei a parcela
+  // do Carlos", "Paguei o carnê hoje" (achado em teste, set/2026: sem essa
+  // checagem, essa mensagem nunca chegava em resolverLocal/resolverPagamentoDivida
+  // — que consegue reconhecer o credor mesmo sem valor, deixando pra uma
+  // pendência perguntar o valor depois — e caía direto no fluxo genérico de
+  // gasto, virando uma DESPESA errada em vez de baixa de dívida).
+  if (
+    /\b(paguei|quitei|quitado|quitada|acabei de pagar|baixei|dei baixa|liquidei|amortizei|fiz o pagamento|fiz um pagamento)\b/.test(
+      texto
+    ) &&
+    /\b(parcela|divida|emprestimo|financiamento|carne|consignado)\b/.test(texto)
+  ) {
+    return true;
+  }
   return false;
 }
 
