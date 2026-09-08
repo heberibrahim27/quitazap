@@ -22,6 +22,7 @@
 import { simularParcela } from "@/lib/financeiro/simulador-parcela";
 import { chatCompletion } from "@/lib/ai/openai-client";
 import { parseMoneyBR } from "@/lib/money";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 export interface SimulacaoParcelaDetectada {
   valorParcela: number;
@@ -104,7 +105,8 @@ async function frasearComIA(
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Cite o nome do mês em que o comprometimento sobe e, se existir primeiroMesQueNaoFecha, avise claramente qual mês fecharia no vermelho. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Cite o nome do mês em que o comprometimento sobe e, se existir primeiroMesQueNaoFecha, avise claramente qual mês fecharia no vermelho. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação." +
+            INSTRUCAO_FORMATACAO_WHATSAPP,
         },
         { role: "user", content: `Pergunta do cliente: "${pergunta}"\n\nDados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],

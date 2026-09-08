@@ -7,6 +7,7 @@
 
 import { detectarVazamentosSalario } from "@/lib/financeiro/vazamentos-salario";
 import { chatCompletion } from "@/lib/ai/openai-client";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 const REGEX_VAZAMENTOS =
   /\b(?:vazamentos?\s+(?:do\s+)?sal[aá]rio|gastos?\s+recorrentes?|assinaturas?\s+(?:que\s+)?(?:eu\s+)?(?:pago|tenho)|quanto\s+gasto\s+(?:por\s+ano|no\s+ano)\s+com\s+assinaturas?)\b/i;
@@ -48,7 +49,8 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Sempre mostre o valor mensal E o valor anualizado de cada item (a virada pro valor anual costuma impactar mais a percepção). Responda em português do Brasil, tom direto e amigável, no máximo 6 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Sempre mostre o valor mensal E o valor anualizado de cada item (a virada pro valor anual costuma impactar mais a percepção). Responda em português do Brasil, tom direto e amigável, no máximo 6 linhas, emoji com moderação." +
+            INSTRUCAO_FORMATACAO_WHATSAPP,
         },
         { role: "user", content: `Dados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],

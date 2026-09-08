@@ -12,6 +12,7 @@
 
 import { calcularLimiteSeguro } from "@/lib/financeiro/limite-seguro";
 import { chatCompletion } from "@/lib/ai/openai-client";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 const REGEX_LIMITE_SEGURO =
   /\b(?:limite\s+(?:seguro\s+)?(?:por\s+dia|di[aá]rio)|quanto\s+(?:tenho|sobra)\s+(?:por\s+dia|at[eé]\s+o\s+(?:pr[oó]ximo\s+)?sal[aá]rio)|at[eé]\s+o\s+(?:pr[oó]ximo\s+)?sal[aá]rio|quanto\s+falta\s+(?:pro|para\s+o)\s+(?:pr[oó]ximo\s+)?sal[aá]rio)\b/i;
@@ -62,7 +63,8 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. \"Próximo salário\" aqui é uma aproximação pro fim do mês corrente (o app não sabe a data exata do salário) — não afirme uma data de salário que não está nos dados. saldoLivre JÁ desconta compromissosRestantes — nunca apresente os dois como se fossem descontos separados ou como se compromissosRestantes ainda fosse subtrair de saldoLivre; mencione compromissosRestantes só como explicação do que já está refletido em saldoLivre (ex: \"já descontando X em dívidas que ainda vencem\"). Se diaApertado não for null, avise claramente a data e quantas contas coincidem nela. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. \"Próximo salário\" aqui é uma aproximação pro fim do mês corrente (o app não sabe a data exata do salário) — não afirme uma data de salário que não está nos dados. saldoLivre JÁ desconta compromissosRestantes — nunca apresente os dois como se fossem descontos separados ou como se compromissosRestantes ainda fosse subtrair de saldoLivre; mencione compromissosRestantes só como explicação do que já está refletido em saldoLivre (ex: \"já descontando X em dívidas que ainda vencem\"). Se diaApertado não for null, avise claramente a data e quantas contas coincidem nela. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação." +
+            INSTRUCAO_FORMATACAO_WHATSAPP,
         },
         { role: "user", content: `Dados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],

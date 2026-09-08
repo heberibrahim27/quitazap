@@ -8,6 +8,7 @@
 
 import { calcularRotaLivreDividas } from "@/lib/financeiro/rota-livre-dividas";
 import { chatCompletion } from "@/lib/ai/openai-client";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 const REGEX_ROTA_DIVIDAS =
   /\b(?:qual\s+d[ií]vida\s+(?:eu\s+|devo\s+)?(?:pag[oaer]*|quit[oaer]*)\s+primeiro|por\s+onde\s+(?:eu\s+)?come[cç]o\s+a\s+pagar|como\s+(?:eu\s+)?fic(?:o|ar)\s+livre\s+d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|como\s+(?:eu\s+)?sa(?:io|ir)\s+(?:livre\s+)?d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|rota\s+(?:pra|para)\s+(?:ficar\s+livre|sair)\s+d(?:e|as)\s+d[ií]vidas)\b/i;
@@ -57,7 +58,8 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Explique as duas estratégias (menor saldo primeiro vs maior juros primeiro) de forma simples, cite os nomes reais das dívidas do JSON, e se prioridadeJuros não for null, destaque quanto de juros dá pra economizar quitando ela à vista. Se prioridadeJuros for null, diga que não há juros identificável nos dados. Responda em português do Brasil, tom direto e amigável, no máximo 6 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Explique as duas estratégias (menor saldo primeiro vs maior juros primeiro) de forma simples, cite os nomes reais das dívidas do JSON, e se prioridadeJuros não for null, destaque quanto de juros dá pra economizar quitando ela à vista. Se prioridadeJuros for null, diga que não há juros identificável nos dados. Responda em português do Brasil, tom direto e amigável, no máximo 6 linhas, emoji com moderação." +
+            INSTRUCAO_FORMATACAO_WHATSAPP,
         },
         { role: "user", content: `Dados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],

@@ -8,6 +8,7 @@
 import { calcularHorasTrabalho } from "@/lib/financeiro/horas-trabalho";
 import { chatCompletion } from "@/lib/ai/openai-client";
 import { parseMoneyBR } from "@/lib/money";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 const REGEX_HORAS_TRABALHO =
   /\b(?:quantas?\s+horas?(?:\s+de\s+trabalho)?|quantos?\s+dias?\s+(?:de\s+trabalho|[uú]teis)|quanto\s+tempo\s+(?:de\s+trabalho)?)\b[\s\S]{0,40}\b(?:pra|para|custa|equivale|trabalhar|comprar|pagar)\b/i;
@@ -47,7 +48,8 @@ async function frasearComIA(pergunta: string, fatos: unknown, clienteId: string,
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Se jornadaEhPadrao for true, horasTrabalhoMensalAssumidas é um PADRÃO da CLT (44h semanais), não um dado real da pessoa — deixe isso claro e sugira cadastrar a jornada real no Perfil. Se jornadaEhPadrao for false, é a jornada que a pessoa mesma cadastrou — trate como dado real, sem ressalva de padrão. Responda em português do Brasil, tom direto e amigável, no máximo 4 linhas, emoji com moderação.",
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Se jornadaEhPadrao for true, horasTrabalhoMensalAssumidas é um PADRÃO da CLT (44h semanais), não um dado real da pessoa — deixe isso claro e sugira cadastrar a jornada real no Perfil. Se jornadaEhPadrao for false, é a jornada que a pessoa mesma cadastrou — trate como dado real, sem ressalva de padrão. Responda em português do Brasil, tom direto e amigável, no máximo 4 linhas, emoji com moderação." +
+            INSTRUCAO_FORMATACAO_WHATSAPP,
         },
         { role: "user", content: `Pergunta do cliente: "${pergunta}"\n\nDados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
       ],

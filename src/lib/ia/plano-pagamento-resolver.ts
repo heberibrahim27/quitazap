@@ -22,6 +22,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularPlanoPagamento, calcularParaMeta, type ItemPlano } from "@/lib/plano-pagamento-motor";
 import { encontrarDividaCorrespondente } from "@/lib/tarefa-flow";
 import { chatCompletion } from "@/lib/ai/openai-client";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 const REGEX_PLANO_PAGAMENTO =
   /\b(?:(?:monta|montar|monte|faz|fazer|faça|ver|mostra|mostrar)\s+(?:o\s+)?meu\s+plano\s+de\s+pagamento|plano\s+de\s+pagamento|o\s+que\s+(?:eu\s+)?(?:devo\s+)?pag(?:o|ar)\s+primeiro\s+esse\s+m[eê]s|ordem\s+(?:de\s+|pra\s+|para\s+)?pag(?:ar|amento)|quais\s+contas\s+(?:eu\s+)?(?:devo\s+|preciso\s+)?pag(?:ar)?\s+esse\s+m[eê]s)\b/i;
@@ -125,7 +126,8 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
 }
 
 const INSTRUCAO_PLANO_PAGAMENTO =
-  "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números e nomes do JSON fornecido — nunca invente, recalcule, reordene ou arredonde de forma diferente do que já vem pronto (a ordem de pagarAgora já é a ordem recomendada). Liste os itens de pagarAgora numerados, citando credor, valor e o motivo (campo motivo). Diga quanto fica livre ou faltando depois desses pagamentos (livreDepoisDePagar). Se negociarRever não estiver vazio, avise que o mês não fecha e cite esses credores. Responda em português do Brasil, tom direto e amigável, no máximo 8 linhas, emoji com moderação.";
+  "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números e nomes do JSON fornecido — nunca invente, recalcule, reordene ou arredonde de forma diferente do que já vem pronto (a ordem de pagarAgora já é a ordem recomendada). Liste os itens de pagarAgora numerados, citando credor, valor e o motivo (campo motivo). Diga quanto fica livre ou faltando depois desses pagamentos (livreDepoisDePagar). Se negociarRever não estiver vazio, avise que o mês não fecha e cite esses credores. Responda em português do Brasil, tom direto e amigável, no máximo 8 linhas, emoji com moderação." +
+  INSTRUCAO_FORMATACAO_WHATSAPP;
 
 export async function responderPlanoPagamento(clienteId: string, gratuito: boolean): Promise<string> {
   const fatos = await fatosPlanoPagamento(clienteId);
@@ -144,7 +146,8 @@ async function localizarDividaPorNome(clienteId: string, credorTexto: string) {
 }
 
 const INSTRUCAO_META_PRAZO =
-  "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Diga qual seria a parcela necessária (parcelaNecessaria) pra quitar em prazoDesejadoMeses, comparando com a parcela atual (parcelaAtual) quando existir, e se diferencaMensal for positivo avise que a parcela ficaria maior; se for negativo, que ficaria menor. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação.";
+  "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Diga qual seria a parcela necessária (parcelaNecessaria) pra quitar em prazoDesejadoMeses, comparando com a parcela atual (parcelaAtual) quando existir, e se diferencaMensal for positivo avise que a parcela ficaria maior; se for negativo, que ficaria menor. Responda em português do Brasil, tom direto e amigável, no máximo 5 linhas, emoji com moderação." +
+  INSTRUCAO_FORMATACAO_WHATSAPP;
 
 function fallbackMetaPrazo(m: Awaited<ReturnType<typeof calcularParaMeta>>): string {
   if (!m) return "Não encontrei essa dívida pra calcular a meta.";

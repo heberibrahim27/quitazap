@@ -29,6 +29,7 @@ import { calcularResumoFinanceiro, calcularMediaMensal, limitesDoMes, anoMesAtua
 import type { PorCategoria } from "@/lib/financeiro/motor-contrato";
 import { chatCompletion } from "@/lib/ai/openai-client";
 import { parseMoneyBR } from "@/lib/money";
+import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 export type TipoConsultaFinanceira = "posso_gastar" | "onde_gasto_mais" | "como_economizar";
 
@@ -152,6 +153,7 @@ async function frasearComIA(
           role: "system",
           content:
             "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Responda em português do Brasil, tom direto e amigável, no máximo 4-5 linhas, emoji com moderação." +
+            INSTRUCAO_FORMATACAO_WHATSAPP +
             (instrucoesExtras ? ` ${instrucoesExtras}` : ""),
         },
         { role: "user", content: `Pergunta do cliente: "${pergunta}"\n\nDados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
