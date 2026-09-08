@@ -468,6 +468,14 @@ export function resolverDivida(mensagemOriginal: string): FinanceiroIntent | nul
     /\btenho uma divida\b/.test(texto);
   if (!ehDivida) return null;
 
+  // Bug encontrado em testes (set/2026): "paguei 500 da parcela do
+  // emprestimo do Carlos" batia aqui só por causa da palavra "emprestimo"
+  // e virava uma dívida NOVA com credor genérico "Dívida" — quando na
+  // verdade é pagamento de uma dívida já existente. Verbo de pagamento no
+  // início da frase quase sempre indica isso; deixa pra
+  // resolverPagamentoDivida (chamado logo depois, no resolverLocal).
+  if (/^\s*(paguei|quitei|acabei de pagar)\b/.test(texto)) return null;
+
   const valores = extrairTodosValores(mensagemOriginal);
   if (valores.length === 0) return null;
 
