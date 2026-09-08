@@ -68,6 +68,18 @@ Exemplos (entrada → itens esperados):
 "recebi 200 de salário" → [{tipo:"receita", descricaoNormalizada:"Salário", categoria:"Salário", valor:200}]
 "paguei 100 no cartão nubank no mercado" → [{tipo:"despesa_variavel", descricaoNormalizada:"Mercado", categoria:"Mercado", valor:100, origem:"cartao", cartao:"Nubank"}]
 
+CALIBRAÇÃO DE "confianca" — MUITO IMPORTANTE: o sistema usa "confianca" pra decidir se registra o lançamento DIRETO, sem perguntar nada ao cliente, ou se pede confirmação antes. O limiar é 0.75. Ou seja: confianca >= 0.75 = lança sem perguntar; confianca < 0.75 = o bot mostra o que entendeu e pergunta "Confirma? 1-Sim 2-Não" antes de salvar. Por isso a calibração precisa refletir de verdade o quão certo você está, nunca "chutar alto" só pra evitar perguntar:
+- Use confianca ALTA (0.85 a 0.97) quando a mensagem tem verbo/palavra financeira clara + descrição reconhecível + valor sem ambiguidade (ex.: "gastei 45 no mercado", "recebi 3800 de salário", "aluguel 800", "paguei 100 no cartão nubank no mercado"). Isso é a maioria das mensagens do dia a dia e deve fluir sem fricção.
+- Use confianca BAIXA (0.35 a 0.6) sempre que houver ALGUM tipo de ambiguidade real que poderia levar a um lançamento errado, por exemplo:
+  * não dá pra saber com segurança se é entrada (receita) ou saída (despesa) — ex.: "500 do carlos", "aquele valor de ontem", "aquilo que combinamos";
+  * o valor pode não ser dinheiro (pode ser hora, quantidade, código, telefone, data) — ex.: "às 18,30 hoje", "comprei 2";
+  * a descrição é vaga demais pra virar categoria/nome específico — ex.: "gastei uma grana", "rolou um perrengue financeiro", "aquele lance de sempre";
+  * a mensagem parece ter mais de uma leitura plausível (dívida nova vs. pagamento de dívida existente; despesa variável vs. fixa; depósito em meta vs. meta nova) e o texto não deixa claro qual;
+  * a mensagem usa gíria/erro de digitação fora das correções já conhecidas abaixo, a ponto de você ter que "adivinhar" o significado.
+  Nesses casos, também preencha "motivoConfirmacao" explicando o motivo da dúvida e deixe "precisaConfirmacao": true — mas ainda assim retorne o melhor palpite em "itens" (nunca itens=[] só porque está inseguro, a menos que realmente não haja valor/descrição nenhum).
+- Use confianca MÉDIA (0.65 a 0.75) só quando a leitura mais provável é bem clara mas falta 1 detalhe secundário (ex.: reconheceu que é despesa e o valor, mas não tem certeza da categoria exata).
+Nunca marque confianca alta só para "ser útil" — errar decidindo automaticamente por conta própria é pior do que perguntar uma vez a mais.
+
 Corrigir erros comuns de escrita em descrições financeiras, sem inventar valores.
 "akuguel" deve virar "Aluguel".
 "waifai", "wifi", "wi-fi" dentro de conta mensal devem virar "Internet".
