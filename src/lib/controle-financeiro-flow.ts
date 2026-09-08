@@ -70,6 +70,17 @@ export type ConfirmacaoPendenteControle = {
   // cliente simplesmente mudar de assunto sem nunca responder com um valor
   // (revisão do ChatGPT, set/2026).
   criadoEmISO: string;
+} | {
+  // Cliente mandou um pagamento de dívida SEM valor ("Já paguei a parcela
+  // do Carlos") — mesma ideia do "aguardar_valor_gasto" acima, mas pra
+  // pagamento de dívida. Achado em teste (set/2026): sem isso, essa
+  // mensagem caía no fluxo genérico de gasto (registrarGastoControle) e
+  // virava uma DESPESA VARIÁVEL errada em vez de baixa de dívida — bug da
+  // mesma família do "aguardar_valor_gasto", só que pra outro tipo de
+  // lançamento.
+  tipo: "aguardar_valor_pagamento_divida";
+  credorAproximado: string;
+  criadoEmISO: string;
 };
 
 /** Lançamento recente já persistido (buscado pelo route.ts via Prisma antes
@@ -428,6 +439,22 @@ function sanitizarEstado(valor: unknown, rendaMensal?: number | null): EstadoCon
       categoria: raw.confirmacaoPendente.categoria,
       dataISO: raw.confirmacaoPendente.dataISO,
       cartao: typeof raw.confirmacaoPendente.cartao === "string" ? raw.confirmacaoPendente.cartao : undefined,
+      criadoEmISO,
+    };
+  } else if (
+    raw.confirmacaoPendente &&
+    raw.confirmacaoPendente.tipo === "aguardar_valor_pagamento_divida" &&
+    typeof raw.confirmacaoPendente.credorAproximado === "string" &&
+    raw.confirmacaoPendente.credorAproximado
+  ) {
+    const criadoEmISO =
+      typeof raw.confirmacaoPendente.criadoEmISO === "string" &&
+      !Number.isNaN(Date.parse(raw.confirmacaoPendente.criadoEmISO))
+        ? raw.confirmacaoPendente.criadoEmISO
+        : new Date().toISOString();
+    confirmacaoPendente = {
+      tipo: "aguardar_valor_pagamento_divida",
+      credorAproximado: raw.confirmacaoPendente.credorAproximado,
       criadoEmISO,
     };
   }
@@ -2633,6 +2660,63 @@ export function resolverValorGastoPendente(
 
   const estadoSemPendente = { ...estadoAtual, confirmacaoPendente: undefined };
   return finalizarGastoDetectado(gasto, pendente.cartao ?? null, estadoSemPendente, lancamentosRecentes);
+}
+
+// Cria a pendência "aguardar_valor_pagamento_divida" (ver o tipo acima) e a
+// pergunta que a acompanha — chamado pelo route.ts quando o interpretador
+// financeiro reconhece um pagamento de dívida (com credor) mas SEM valor.
+export function criarEstadoComPendenciaPagamentoDivida(
+  estadoAtual: EstadoControleFinanceiro,
+  credorAproximado: string
+): EstadoControleFinanceiro {
+  return {
+    ...estadoAtual,
+    faturas: estadoAtual.faturas ?? [],
+    faturasFechadas: estadoAtual.faturasFechadas ?? [],
+    cartoes: estadoAtual.cartoes ?? [],
+    despesasFixas: estadoAtual.despesasFixas ?? [],
+    confirmacaoPendente: {
+      tipo: "aguardar_valor_pagamento_divida",
+      credorAproximado,
+      criadoEmISO: new Date().toISOString(),
+    },
+  };
+}
+
+export function respostaAguardarValorPagamentoDivida(credorAproximado: string): string {
+  return credorAproximado && credorAproximado !== "Dívida"
+    ? `Entendi que foi um pagamento de dívida — ${credorAproximado}. Qual foi o valor?`
+    : "Entendi que foi um pagamento de dívida. Qual foi o valor?";
+}
+
+// Retomada de um pagamento de dívida que ficou faltando só o valor (ver
+// "aguardar_valor_pagamento_divida" acima) — mesmo padrão de
+// resolverValorGastoPendente, chamado pelo route.ts ANTES do interpretador
+// de IA assim que detecta essa pendência.
+export function resolverValorPagamentoDividaPendente(
+  mensagem: string,
+  estadoAtual: EstadoControleFinanceiro
+): ResultadoGastoControle | null {
+  const pendente = estadoAtual.confirmacaoPendente;
+  if (!pendente || pendente.tipo !== "aguardar_valor_pagamento_divida") return null;
+
+  const criadoEm = Date.parse(pendente.criadoEmISO);
+  const expirada = Number.isNaN(criadoEm) || Date.now() - criadoEm > TTL_AGUARDAR_VALOR_GASTO_MS;
+  if (expirada) return null;
+
+  if (!ehApenasValorMonetario(mensagem)) return null;
+
+  const valor = parseMoneyBR(mensagem);
+  if (!valor) return null;
+
+  const credorAproximado = pendente.credorAproximado;
+  return {
+    resposta:
+      "✅ *Pagamento registrado.*\n\n" + `${credorAproximado} — ${formatarValorBR(valor)}\n\n` + "Vou dar baixa nessa dívida.",
+    estado: { ...estadoAtual, confirmacaoPendente: undefined },
+    atualizouEstado: true,
+    pagamentoDividaParaPersistir: { credorAproximado, valor },
+  };
 }
 
 function finalizarGastoDetectado(
