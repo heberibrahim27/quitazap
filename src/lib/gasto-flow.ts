@@ -32,12 +32,12 @@ export type GastoDetectado = {
 const PERGUNTA_VALOR = "Qual foi o valor desse gasto?";
 
 export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
-  { categoria: "Mercado", palavras: ["mercado", "supermercado", "atacadao", "assai", "atacarejo"] },
-  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanxe", "lanches", "restaurante", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
-  { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "combustivel", "transporte", "trasporte", "tranporte"] },
+  { categoria: "Mercado", palavras: ["mercado", "mercadinho", "mercadin", "mercadao", "mercearia", "feira", "supermercado", "hipermercado", "atacadao", "assai", "atacarejo"] },
+  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanxe", "lanches", "restaurante", "restarante", "padaria", "padoca", "lanchonete", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
+  { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "gazolina", "combustivel", "posto", "transporte", "trasporte", "tranporte"] },
   { categoria: "Moradia", palavras: ["aluguel", "condominio", "prestacao da casa"] },
   { categoria: "Contas da casa", palavras: ["energia", "luz", "agua", "internet", "celular", "gas"] },
-  { categoria: "Saúde/Farmácia", palavras: ["remedio", "farmacia", "consulta", "exame", "medico"] },
+  { categoria: "Saúde/Farmácia", palavras: ["remedio", "farmacia", "farmasa", "drogaria", "consulta", "exame", "medico"] },
   { categoria: "Educação", palavras: ["escola", "curso", "faculdade", "material escolar"] },
   { categoria: "Filhos/Família", palavras: ["filho", "filha", "fralda", "leite", "pensao", "brinquedo"] },
   { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "chat gpt", "claude", "assinatura", "prime"] },
@@ -121,6 +121,14 @@ const PALAVRAS_GASTO = [
 const TERMOS_APOSTAS =
   /\b(?:apostei|aposta|apostas|bet|betano|blaze|tigrinho|jogo\s+do\s+tigrinho|jogo\s+de\s+aposta|cassino|cassino\s+online|roleta|foguetinho|pix\s+bet|banca|casa\s+de\s+aposta|jogo\s+online)\b/;
 
+// Saudação/marcador de conversa e de horário do dia — nunca fazem parte da
+// descrição do gasto (bug achado em teste ao vivo, set/2026: "oi bom dia
+// gastei 45 no mercadin hoje de manha" virava descrição "Oi bom dia mercadin
+// manha"). Removidos só da DESCRIÇÃO — a extração de data (definirDataGasto)
+// lê a mensagem original à parte, então "ontem"/"hoje" continuam valendo lá.
+const SAUDACOES_E_MARCADORES_TEMPO =
+  "oi|ola|opa|eae|oie|bom|boa|dia|tarde|noite|manha|cedo|agora|fala|blz|beleza";
+
 function normalizarTexto(texto: string): string {
   return texto
     .toLowerCase()
@@ -184,6 +192,7 @@ function extrairDescricaoQuantidade(
       /\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|de|do|da|no|na|em|com|pra|para|mim|mais|uma|um|duas|dois|amigos?|cada|unidade)\b/gi,
       " "
     )
+    .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
     .replace(/[,.]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -266,6 +275,7 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     .replace(/\d+(?:[.,]\d{1,2})?\s*(?:reais|real)/gi, " ")
     .replace(/\b\d+\b/g, " ")
     .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|cada|unidade|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
+    .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
     .replace(/\s+/g, " ")
     .trim();
 
