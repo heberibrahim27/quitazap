@@ -1,5 +1,6 @@
 import { parseMoneyBR } from "./money";
 import { normalizarDescricaoFinanceira } from "./descricao-financeira";
+import { valorPorExtenso, removerValorPorExtenso } from "./numero-por-extenso";
 
 export type CategoriaGasto =
   | "Mercado"
@@ -173,7 +174,11 @@ export function extrairValorGasto(mensagem: string): number | undefined {
     if (valor) return valor;
   }
 
-  return undefined;
+  // Sem nenhum dígito na mensagem ("gastei cem reais no mercado", "recebi
+  // mil e duzentos") — tenta ler o valor por extenso antes de desistir (bug
+  // achado em teste ao vivo, set/2026: sem isso, o bot ignorava o valor que
+  // o cliente já tinha informado e perguntava de novo "Qual foi o valor?").
+  return valorPorExtenso(texto);
 }
 
 function extrairDescricaoQuantidade(
@@ -273,7 +278,9 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     .replace(/r\$\s*\d{1,3}(?:\.\d{3})*,\d{1,2}/gi, " ")
     .replace(/\d{1,3}(?:\.\d{3})*,\d{1,2}\s*(?:reais|real)?/gi, " ")
     .replace(/\d+(?:[.,]\d{1,2})?\s*(?:reais|real)/gi, " ")
-    .replace(/\b\d+\b/g, " ")
+    .replace(/\b\d+\b/g, " ");
+  texto = removerValorPorExtenso(texto);
+  texto = texto
     .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|cada|unidade|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
     .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
     .replace(/\s+/g, " ")
