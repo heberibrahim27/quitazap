@@ -81,6 +81,17 @@ const NOTA_TRANSPARENCIA = "\n\n_Análise baseada nas informações registradas 
 export async function responderLimiteSeguro(clienteId: string, gratuito: boolean): Promise<string> {
   const fatos = await fatosLimiteSeguro(clienteId);
   if (fatos.semDadosSuficientes) return `${fallbackLimiteSeguro(fatos)}${NOTA_TRANSPARENCIA}`;
+  // Bug encontrado em teste ao vivo (Héber, set/2026): com saldoLivre já
+  // negativo, deixar a IA parafrasear livremente o JSON produzia frases
+  // tipo "seu limite seguro diário é de aproximadamente -R$27,95" — não
+  // existe "limite seguro" quando já se está no vermelho, e apresentar um
+  // número negativo como se fosse um limite de gasto confunde o cliente
+  // (pode até parecer que ele "ainda pode gastar -27,95", sem sentido). O
+  // texto determinístico (fallbackLimiteSeguro) já trata esse caso
+  // corretamente ("sua sobra prevista já está negativa") sem mencionar
+  // limite diário nenhum — usa ele direto, sem passar pela IA, sempre que
+  // saldoLivre < 0.
+  if (fatos.saldoLivre < 0) return `${fallbackLimiteSeguro(fatos)}${NOTA_TRANSPARENCIA}`;
   const resposta = await frasearComIA(fatos, clienteId, gratuito, () => fallbackLimiteSeguro(fatos));
   return `${resposta}${NOTA_TRANSPARENCIA}`;
 }

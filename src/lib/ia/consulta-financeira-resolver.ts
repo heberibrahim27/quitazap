@@ -176,11 +176,20 @@ export async function responderConsultaFinanceira(
     const valor = parseMoneyBR(mensagemOriginal);
     if (valor == null) return "Me diz o valor — ex: \"posso gastar 50 hoje?\"";
     const fatos = await fatosPossoGastar(clienteId, valor);
-    const resposta = await frasearComIA(
-      mensagemOriginal, fatos, clienteId, gratuito,
-      () => fallbackPossoGastar(fatos),
-      "Nunca chame esses números de saldo bancário real — são só o que já está cadastrado no QuitaZap.",
-    );
+    // Mesmo bug de "limite seguro diário negativo" encontrado ao vivo no
+    // fluxo irmão (limite-seguro-resolver.ts, set/2026): com sobraDoMes já
+    // negativa, limiteDiarioSeguro também fica negativo, e deixar a IA
+    // parafrasear livremente pode gerar algo tipo "seu limite diário é de
+    // -R$30" — não existe limite seguro quando já se está no vermelho. O
+    // fallback determinístico já responde bem esse caso ("Melhor segurar
+    // essa...") sem mencionar limite diário nenhum, então usa ele direto.
+    const resposta = fatos.sobraDoMes < 0
+      ? fallbackPossoGastar(fatos)
+      : await frasearComIA(
+          mensagemOriginal, fatos, clienteId, gratuito,
+          () => fallbackPossoGastar(fatos),
+          "Nunca chame esses números de saldo bancário real — são só o que já está cadastrado no QuitaZap.",
+        );
     // Aviso fixo, anexado em código (não depende da IA obedecer o prompt) —
     // ver guarda-corpo 1 no cabeçalho do arquivo.
     return `${resposta}${DISCLAIMER_POSSO_GASTAR}`;

@@ -456,25 +456,42 @@ function extrairCredorPorUltimoConector(mensagemOriginal: string): string | null
   return limparNomeCapturado(nome);
 }
 
+// Sinais de que a mensagem é sobre PAGAR/BAIXAR algo que já existe (parcela,
+// fatura, dívida), não sobre criar uma dívida nova. Revisão feita com apoio
+// do ChatGPT (set/2026): um guard só com `startsWith` no verbo pega "paguei
+// 500 do empréstimo do Carlos" mas deixa passar "Já paguei a parcela do
+// Carlos", "A parcela do empréstimo do Carlos eu paguei hoje", "Baixei 500
+// da dívida do Carlos", "O empréstimo do Carlos foi quitado" — por isso o
+// verbo é procurado em qualquer posição da frase (não só no início) e a
+// lista cobre mais formas de dizer "já paguei isso".
+function temIndicadorDePagamento(texto: string): boolean {
+  return /\b(paguei|quitei|quitado|quitada|acabei de pagar|baixei|dei baixa|liquidei|amortizei|fiz o pagamento|fiz um pagamento)\b/.test(
+    texto
+  );
+}
+
 // Dívida/empréstimo NOVO — ex.: "peguei um empréstimo de 3000 com o Carlos,
 // pago 500 por mês", "to devendo 2000 pro meu primo", "tenho uma dívida de
 // 1500 no cartão nubank". Cobertura por regex é parcial de propósito: o que
 // não bater aqui cai pro classificador remoto (chamarOpenAIInterpretador).
 export function resolverDivida(mensagemOriginal: string): FinanceiroIntent | null {
   const texto = normalizarTexto(mensagemOriginal);
+
+  // Bug encontrado em testes (set/2026): "paguei 500 da parcela do
+  // emprestimo do Carlos" batia aqui só por causa da palavra "emprestimo" e
+  // virava uma dívida NOVA com credor genérico "Dívida" — quando na verdade
+  // é pagamento de uma dívida já existente. resolverPagamentoDivida agora
+  // roda ANTES desta função no resolverLocal (mais específico primeiro,
+  // mais genérico depois), mas mantemos esta proteção semântica aqui também
+  // como segunda barreira, caso o pagamento chegue sem palavra de
+  // dívida/parcela reconhecida por resolverPagamentoDivida.
+  if (temIndicadorDePagamento(texto)) return null;
+
   const ehDivida =
     /\b(emprestimo|financiamento|consignado)\b/.test(texto) ||
     (/\b(to devendo|estou devendo|devo)\b/.test(texto) && /\b(pro|pra|para)\b/.test(texto)) ||
     /\btenho uma divida\b/.test(texto);
   if (!ehDivida) return null;
-
-  // Bug encontrado em testes (set/2026): "paguei 500 da parcela do
-  // emprestimo do Carlos" batia aqui só por causa da palavra "emprestimo"
-  // e virava uma dívida NOVA com credor genérico "Dívida" — quando na
-  // verdade é pagamento de uma dívida já existente. Verbo de pagamento no
-  // início da frase quase sempre indica isso; deixa pra
-  // resolverPagamentoDivida (chamado logo depois, no resolverLocal).
-  if (/^\s*(paguei|quitei|acabei de pagar)\b/.test(texto)) return null;
 
   const valores = extrairTodosValores(mensagemOriginal);
   if (valores.length === 0) return null;
@@ -535,7 +552,7 @@ export function resolverDivida(mensagemOriginal: string): FinanceiroIntent | nul
 export function resolverPagamentoDivida(mensagemOriginal: string): FinanceiroIntent | null {
   const texto = normalizarTexto(mensagemOriginal);
   const ehPagamento =
-    /\b(paguei|quitei|acabei de pagar)\b/.test(texto) &&
+    temIndicadorDePagamento(texto) &&
     /\b(parcela|divida|emprestimo|financiamento|carne|consignado)\b/.test(texto);
   if (!ehPagamento) return null;
 
@@ -664,10 +681,16 @@ function resolverLocal(mensagem: string): FinanceiroIntent {
   const escopo = avaliarEscopoFinanceiro(mensagem);
   if (!escopo.emEscopo) return escopo;
 
+  // Ordem importa: intenções mais ESPECÍFICAS antes das mais GENÉRICAS
+  // (revisão do ChatGPT, set/2026). "pagamento_divida" é um caso mais
+  // específico de "menciona empréstimo/dívida" do que "divida" (dívida
+  // nova) — rodar resolverPagamentoDivida primeiro evita que uma mensagem
+  // de pagamento seja capturada pelo resolver de dívida nova só por conter
+  // a palavra "empréstimo"/"dívida"/etc.
   return resolverLoteGastosCartao(mensagem) ??
     resolverLancamentosSimples(mensagem) ??
-    resolverDivida(mensagem) ??
     resolverPagamentoDivida(mensagem) ??
+    resolverDivida(mensagem) ??
     resolverMeta(mensagem) ??
     resolverConfigCartao(mensagem) ??
     resolverReceita(mensagem) ??
