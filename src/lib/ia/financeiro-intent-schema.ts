@@ -1,3 +1,5 @@
+import { parseMoneyBR } from "../money";
+
 export const MENSAGEM_FORA_ESCOPO_FINANCEIRO =
   "Eu sou o assistente financeiro do QuitaZAP. Posso te ajudar a registrar gastos, receitas, despesas fixas, renda, cartões, faturas, dívidas, pagamentos, metas e organizar sua vida financeira pelo WhatsApp.";
 
@@ -96,8 +98,71 @@ export function criarIntentForaEscopo(): FinanceiroIntent {
   };
 }
 
+// Rede de segurança independente do prompt: a IA remota às vezes devolve
+// valor como string ("50,00", "R$ 50", "50 reais") mesmo quando instruída a
+// sempre mandar número puro. Em vez de derrubar o item inteiro (e cair no
+// "não consegui classificar"), tenta reaproveitar o mesmo parser usado nos
+// fluxos determinísticos (parseMoneyBR) antes de desistir.
 function numeroOuNull(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const parseado = parseMoneyBR(v);
+    if (typeof parseado === "number" && Number.isFinite(parseado)) return parseado;
+  }
+  return null;
+}
+
+const TIPOS_ITEM_VALIDOS = new Set<TipoItemFinanceiro>([
+  "renda",
+  "receita",
+  "despesa_fixa",
+  "despesa_variavel",
+  "cartao",
+  "fatura",
+  "boleto",
+  "divida",
+  "pagamento_divida",
+  "meta",
+  "aposta",
+  "transferencia",
+  "correcao",
+  "remocao",
+  "consulta",
+  "desconhecido",
+]);
+
+// Mesma ideia do numeroOuNull acima: a IA remota ocasionalmente usa um
+// sinônimo plausível em vez do valor exato do enum (ex.: "gasto" ou
+// "despesa" em vez de "despesa_variavel"). Normaliza os sinônimos mais
+// comuns em vez de descartar o item inteiro por causa do nome do tipo.
+function normalizarTipoItem(tipo: unknown): TipoItemFinanceiro {
+  if (typeof tipo === "string") {
+    const normalizado = tipo.trim().toLowerCase();
+    if (TIPOS_ITEM_VALIDOS.has(normalizado as TipoItemFinanceiro)) {
+      return normalizado as TipoItemFinanceiro;
+    }
+    const SINONIMOS: Record<string, TipoItemFinanceiro> = {
+      gasto: "despesa_variavel",
+      despesa: "despesa_variavel",
+      "despesa_variável": "despesa_variavel",
+      "despesa variavel": "despesa_variavel",
+      "despesa fixa": "despesa_fixa",
+      "conta fixa": "despesa_fixa",
+      entrada: "receita",
+      renda_avulsa: "receita",
+      "dívida": "divida",
+      emprestimo: "divida",
+      "empréstimo": "divida",
+      pagamento: "pagamento_divida",
+      "pagamento_dívida": "pagamento_divida",
+    };
+    if (SINONIMOS[normalizado]) return SINONIMOS[normalizado];
+  }
+  return "desconhecido";
+}
+
+function categoriaOuOutros(v: unknown): string {
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : "Outros";
 }
 
 export function validarFinanceiroIntent(valor: unknown): FinanceiroIntent | null {
@@ -119,10 +184,10 @@ export function validarFinanceiroIntent(valor: unknown): FinanceiroIntent | null
     itens: raw.itens
       .filter((item): item is ItemFinanceiroInterpretado => Boolean(item && typeof item === "object"))
       .map((item) => ({
-        tipo: item.tipo ?? "desconhecido",
+        tipo: normalizarTipoItem(item.tipo),
         descricaoOriginal: item.descricaoOriginal ?? "",
         descricaoNormalizada: item.descricaoNormalizada ?? "",
-        categoria: item.categoria ?? "Outros",
+        categoria: categoriaOuOutros(item.categoria),
         valor: numeroOuNull(item.valor),
         quantidade: numeroOuNull(item.quantidade),
         valorUnitario: numeroOuNull(item.valorUnitario),
