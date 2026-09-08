@@ -32,6 +32,7 @@ export const CARTOES_CONHECIDOS: Record<string, CartaoConhecido> = {
   BTG: { gradiente: ["#0A2E4D", "#001830"] },
   "Will Bank": { gradiente: ["#7B3FE4", "#4A1FA0"] },
   PagBank: { gradiente: ["#3AC1E0", "#0080A8"] },
+  "Mercado Pago": { gradiente: ["#00B1EA", "#0072BC"] },
 };
 
 /** Gradiente único pra qualquer cartão fora da lista de conhecidos. */
