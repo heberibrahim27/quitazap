@@ -7,17 +7,23 @@ export const RESET_CONTROLE_MENSAGEM_1 =
 export const ETAPA_AGUARDANDO_DESPESAS_FIXAS = "AGUARDANDO_DESPESAS_FIXAS";
 export const ETAPA_AGUARDANDO_GASTOS = "AGUARDANDO_GASTOS";
 
+// Decisão do Ibrahim (set/2026): acabou o onboarding guiado — o bot não
+// pergunta mais "quanto entra por mês" nem conduz um diálogo antes de
+// aceitar lançamentos. A mensagem de boas-vindas agora só explica o que o
+// bot faz e convida o cliente a mandar qualquer coisa (gasto, receita,
+// dívida, etc.) desde a primeira mensagem, sem etapa obrigatória.
 export function mensagemInicioControle(nome: string): string {
   const nomeSeguro = nome?.trim() || "cliente";
 
   return (
     `Olá, ${nomeSeguro}! 👋\n\n` +
     "Eu sou o *QuitaZAP Controle*, sua IA de organização financeira pelo WhatsApp.\n\n" +
-    "Vou te ajudar a registrar renda, despesas, gastos, cartões, dívidas, vencimentos e limites por categoria.\n\n" +
-    "Para começar, me diga quanto entra por mês.\n\n" +
-    "Exemplo:\n" +
+    "Pode me mandar qualquer coisa: um gasto, uma receita, uma dívida, um cartão, uma meta... eu já entendo e registro pra você, sem precisar seguir um roteiro.\n\n" +
+    "Exemplos:\n" +
     "```\n" +
-    "minha renda é 3800\n" +
+    "gastei 45 no mercado\n" +
+    "recebi 3800 de salário\n" +
+    "aluguel 800 todo mês\n" +
     "```"
   );
 }
@@ -35,11 +41,12 @@ export function mensagemBoasVindasControle(nome: string, oferta: string): string
     "Seu acesso ao *QuitaZAP Controle* foi ativado.\n\n" +
     `Sua assinatura do *${ofertaSegura}* está confirmada ✅\n\n` +
     "Eu sou o *QuitaZAP Controle*, sua IA de organização financeira pelo WhatsApp.\n\n" +
-    "Vou te ajudar a registrar renda, despesas, gastos, cartões, dívidas, vencimentos e limites por categoria.\n\n" +
-    "Para começar, me diga quanto entra por mês.\n\n" +
-    "Exemplo:\n" +
+    "Pode me mandar qualquer coisa: um gasto, uma receita, uma dívida, um cartão, uma meta... eu já entendo e registro pra você, sem precisar seguir um roteiro.\n\n" +
+    "Exemplos:\n" +
     "```\n" +
-    "minha renda é 3800\n" +
+    "gastei 45 no mercado\n" +
+    "recebi 3800 de salário\n" +
+    "aluguel 800 todo mês\n" +
     "```"
   );
 }
@@ -322,30 +329,15 @@ export function formatarMensagensDespesasFixasControle(
   return [mensagemDespesas, mensagemResumo, mensagemProximaEtapa];
 }
 
+// Decisão do Ibrahim (set/2026): acabou o onboarding guiado. O bot não
+// conduz mais diálogo pedindo despesas fixas depois da renda — ele recebe
+// qualquer mensagem, interpreta e lança direto (ver
+// registrarIntentFinanceiroDireto em route.ts). Corpo original mantido
+// como referência histórica, mas o gate nunca mais deve travar uma
+// mensagem esperando uma resposta de despesas fixas.
 export function deveAguardarDespesasFixasControle(
-  etapa: string | null | undefined,
-  historico: Array<{ role: string; content?: string | null }>
+  _etapa: string | null | undefined,
+  _historico: Array<{ role: string; content?: string | null }>
 ): boolean {
-  if (etapa === ETAPA_AGUARDANDO_GASTOS) return false;
-  if (etapa === ETAPA_AGUARDANDO_DESPESAS_FIXAS) return true;
-
-  const ultimoIndiceUsuario = historico
-    .map((h, index) => ({ h, index }))
-    .filter(({ h }) => h.role === "user")
-    .map(({ index }) => index)
-    .pop() ?? -1;
-  const ultimoPedidoDespesasFixas = historico
-    .map((h, index) => ({ h, index }))
-    .filter(
-      ({ h }) =>
-        h.role === "assistant" &&
-        (
-          (h.content ?? "").includes("Agora me diga suas despesas fixas.") ||
-          (h.content ?? "").includes("*Despesas fixas*")
-        )
-    )
-    .map(({ index }) => index)
-    .pop() ?? -1;
-
-  return ultimoPedidoDespesasFixas > ultimoIndiceUsuario;
+  return false;
 }
