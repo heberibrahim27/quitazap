@@ -11,11 +11,11 @@ const PALAVRA_CONFIRMACAO = "RESETAR";
 // despesas, compras no cartão, cartões, agenda, orçamentos por categoria e
 // metas (com seus depósitos, via cascade do schema).
 // Deliberadamente NÃO mexe em Divida/Parcela/Pagamento (Empréstimos e
-// Dívidas): essa tabela é compartilhada com o painel administrativo de
-// cobrança, sem um campo que diferencie o que o próprio cliente cadastrou
-// do que a agência lançou sobre ele — apagar aqui poderia destruir um
-// registro de cobrança que não é do cliente decidir apagar. Também não
-// mexe no login/perfil (nome, telefone, senha, foto).
+// Dívidas): esse é um módulo à parte, e o cliente já tem controle próprio
+// sobre cada dívida individual em /minha-conta/emprestimos (pode apagar
+// uma por uma lá). Um reset em massa aqui apagaria tudo de uma vez sem
+// essa granularidade, então fica de fora por segurança. Também não mexe
+// no login/perfil (nome, telefone, senha, foto).
 export async function resetarDadosFinanceiros(formData: FormData): Promise<{ erro?: string }> {
   const cliente = await getClienteAtual();
   if (!cliente) return { erro: "Sessão expirada. Entre novamente." };
