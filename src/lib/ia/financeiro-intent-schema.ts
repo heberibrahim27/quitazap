@@ -1,4 +1,5 @@
 import { parseMoneyBR } from "../money";
+import { definirCategoriaGasto } from "../gasto-flow";
 
 export const MENSAGEM_FORA_ESCOPO_FINANCEIRO =
   "Eu sou o assistente financeiro do QuitaZAP. Posso te ajudar a registrar gastos, receitas, despesas fixas, renda, cartões, faturas, dívidas, pagamentos, metas e organizar sua vida financeira pelo WhatsApp.";
@@ -165,6 +166,27 @@ function categoriaOuOutros(v: unknown): string {
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : "Outros";
 }
 
+// Rede de segurança independente do prompt (achada em teste ao vivo, set/2026):
+// a IA remota às vezes acerta descrição e valor mas erra a categoria óbvia
+// (ex.: "lanche" virando categoria "Outros" em vez de "Alimentação", num
+// lançamento composto tipo "gastei 20 no busao e 15 no lanche"). Em vez de
+// confiar cegamente na categoria da IA quando ela devolve "Outros", tenta o
+// mesmo casador de palavra-chave determinístico usado no fluxo sem IA
+// (definirCategoriaGasto, gasto-flow.ts) — se ele reconhecer uma categoria
+// melhor a partir da descrição, usa essa. Só entra em ação quando a IA disse
+// "Outros" (nunca sobrescreve uma categoria específica que a IA já acertou).
+function categoriaComRedeDeSeguranca(item: { tipo?: unknown; categoria: string; descricaoOriginal: string; descricaoNormalizada: string }): string {
+  const tipo = typeof item.tipo === "string" ? item.tipo : "";
+  if (tipo !== "despesa_variavel" && tipo !== "despesa_fixa") return item.categoria;
+  if (item.categoria.toLowerCase() !== "outros") return item.categoria;
+
+  const textoParaCategorizar = item.descricaoOriginal || item.descricaoNormalizada;
+  if (!textoParaCategorizar) return item.categoria;
+
+  const categoriaDeterministica = definirCategoriaGasto(textoParaCategorizar);
+  return categoriaDeterministica !== "Outros" ? categoriaDeterministica : item.categoria;
+}
+
 export function validarFinanceiroIntent(valor: unknown): FinanceiroIntent | null {
   if (!valor || typeof valor !== "object") return null;
   const raw = valor as Partial<FinanceiroIntent>;
@@ -183,11 +205,21 @@ export function validarFinanceiroIntent(valor: unknown): FinanceiroIntent | null
     mensagemForaEscopo: typeof raw.mensagemForaEscopo === "string" ? raw.mensagemForaEscopo : undefined,
     itens: raw.itens
       .filter((item): item is ItemFinanceiroInterpretado => Boolean(item && typeof item === "object"))
-      .map((item) => ({
-        tipo: normalizarTipoItem(item.tipo),
-        descricaoOriginal: item.descricaoOriginal ?? "",
-        descricaoNormalizada: item.descricaoNormalizada ?? "",
-        categoria: categoriaOuOutros(item.categoria),
+      .map((item) => {
+        const tipo = normalizarTipoItem(item.tipo);
+        const descricaoOriginal = item.descricaoOriginal ?? "";
+        const descricaoNormalizada = item.descricaoNormalizada ?? "";
+        const categoria = categoriaComRedeDeSeguranca({
+          tipo,
+          categoria: categoriaOuOutros(item.categoria),
+          descricaoOriginal,
+          descricaoNormalizada,
+        });
+        return {
+        tipo,
+        descricaoOriginal,
+        descricaoNormalizada,
+        categoria,
         valor: numeroOuNull(item.valor),
         quantidade: numeroOuNull(item.quantidade),
         valorUnitario: numeroOuNull(item.valorUnitario),
@@ -204,7 +236,8 @@ export function validarFinanceiroIntent(valor: unknown): FinanceiroIntent | null
         diaVencimentoDivida: numeroOuNull(item.diaVencimentoDivida),
         acaoMeta: item.acaoMeta ?? null,
         valorAlvoMeta: numeroOuNull(item.valorAlvoMeta),
-      })),
+        };
+      }),
     perguntasEsclarecimento: Array.isArray(raw.perguntasEsclarecimento)
       ? raw.perguntasEsclarecimento.filter((item): item is string => typeof item === "string")
       : undefined,
