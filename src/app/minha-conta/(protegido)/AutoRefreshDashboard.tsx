@@ -16,12 +16,13 @@ import { useRouter } from "next/navigation";
  * perder o scroll nem precisar de WebSocket/infra nova.
  *
  * Cuidados: só faz polling com a aba visível (evita gasto de bateria/rede
- * e chamadas ao banco à toa quando o cliente trocou de aba), e usa um
- * intervalo folgado (20s) — é atualização "quase em tempo real" (o
- * suficiente pra refletir um lançamento feito no WhatsApp segundos atrás),
- * não um substituto de WebSocket/Supabase Realtime.
+ * e chamadas ao banco à toa quando o cliente trocou de aba). Intervalo de
+ * 4s (reduzido de 20s a pedido do Héber — 20s dava a impressão de que
+ * precisava dar F5): é "quase em tempo real", suficiente pra refletir um
+ * lançamento feito no WhatsApp poucos segundos depois, sem precisar de
+ * WebSocket/Supabase Realtime.
  */
-export function AutoRefreshDashboard({ intervalMs = 20000 }: { intervalMs?: number }) {
+export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: number }) {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
