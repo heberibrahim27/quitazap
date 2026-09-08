@@ -52,11 +52,11 @@ import {
   resolverLoteGastosCartao,
   resolverIntencaoFinanceiraIA,
 } from "@/lib/ia/financeiro-intent-resolver";
-import { MENSAGEM_FORA_ESCOPO_FINANCEIRO, type FinanceiroIntent } from "@/lib/ia/financeiro-intent-schema";
+import { MENSAGEM_FORA_ESCOPO_FINANCEIRO, type FinanceiroIntent, type TipoItemFinanceiro } from "@/lib/ia/financeiro-intent-schema";
 import { extrairDadosServidorPublicoManual } from "@/lib/diagnostico-normalizer";
 import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from "@/lib/servidor-publico-flow";
 import { parseMoneyBR } from "@/lib/money";
-import { normalizarRespostaCompraImagem } from "@/lib/gasto-flow";
+import { normalizarRespostaCompraImagem, formatarValorBR } from "@/lib/gasto-flow";
 import { transcreverAudio, analisarImagem } from "@/lib/ai/openai-client";
 import {
   deveAguardarDespesasFixasControle,
@@ -532,6 +532,17 @@ function detectarComando(msg: string): string | null {
   ) return "DIAGNOSTICO";
 
   if (/quita.?score|meu score|ver (meu )?score|score financeiro|saude financeira|minha saude financeira|meu (indice|index|pontu|nota financ)|como (estou|ta|está) (financ|meu score|meu quita)|pontuacao financ/.test(m)) return "QUITASCORE";
+
+  // Desfazer/apagar o último lançamento — rede de segurança pro registro
+  // automático sem confirmação (sugestão do debate com o ChatGPT, set/2026):
+  // como agora o bot lança direto quando está confiante, o custo de um erro
+  // precisa ser baixo — "desfazer" tem que ser tão fácil quanto mandar o
+  // lançamento errado foi. Ancorado no início da frase (como RESETAR) pra
+  // não disparar em qualquer texto que contenha essas palavras soltas.
+  if (
+    /^(desfaz(er)?|apaga(r)?\s+(isso|esse|essa|o ultimo|a ultima)|cancela(r)?\s+(o ultimo lancamento|essa despesa|esse gasto|essa receita|o ultimo gasto|o ultimo registro)|errei|foi engano|nao foi isso|nao era isso)\b/.test(m)
+  ) return "DESFAZER_LANCAMENTO";
+
   return null;
 }
 
@@ -709,10 +720,32 @@ async function jáProcessouPersistente(id: string): Promise<boolean> {
 // já carrega (resolvedores locais ficam quase todos entre 0.75 e 0.95; só
 // os casos propositalmente incertos — ex.: pagamento de dívida sem credor
 // identificado — ficam abaixo disso e continuam pedindo confirmação).
+//
+// Revisão feita em debate com ChatGPT (set/2026): um único corte de
+// confiança pra qualquer tipo de lançamento trata "errei a categoria de um
+// gasto de mercado" com a mesma gravidade de "errei se é dívida nova ou
+// pagamento de dívida existente" — o segundo caso é bem mais caro de errar
+// sozinho (mexe em saldo/dívida de forma mais permanente e mais difícil do
+// cliente perceber o erro de relance). Por isso, lançamentos de tipos de
+// maior risco (dívida, pagamento de dívida, meta, configuração de cartão,
+// transferência) exigem uma confiança mais alta pra auto-registrar; os
+// demais (despesa/receita do dia a dia — o grosso do volume) seguem no
+// limiar original.
 const LIMIAR_CONFIANCA_AUTO_REGISTRO = 0.75;
+const LIMIAR_CONFIANCA_AUTO_REGISTRO_ALTO_RISCO = 0.85;
+const TIPOS_ALTO_RISCO_AUTO_REGISTRO = new Set<TipoItemFinanceiro>([
+  "divida",
+  "pagamento_divida",
+  "meta",
+  "cartao",
+  "transferencia",
+]);
 
 function podeAutoRegistrarIntentFinanceiro(intent: FinanceiroIntent): boolean {
-  return intent.confianca >= LIMIAR_CONFIANCA_AUTO_REGISTRO;
+  const limiar = intent.itens.some((item) => TIPOS_ALTO_RISCO_AUTO_REGISTRO.has(item.tipo))
+    ? LIMIAR_CONFIANCA_AUTO_REGISTRO_ALTO_RISCO
+    : LIMIAR_CONFIANCA_AUTO_REGISTRO;
+  return intent.confianca >= limiar;
 }
 
 // Aplica no webhook o mesmo conjunto de persistências que o fluxo de
@@ -1064,6 +1097,76 @@ export async function POST(req: NextRequest) {
 
       await sendWhatsApp(telefone, respostaReset);
       await sendWhatsApp(telefone, respostaInicio);
+
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Desfazer o último lançamento ───────────────────────────────────
+    // Complemento do registro automático sem confirmação: se o bot lançar
+    // errado, o cliente precisa conseguir desfazer com a mesma facilidade
+    // que mandou a mensagem original, sem precisar entrar no painel web.
+    // Escopo intencionalmente restrito ao último Lancamento (gasto/receita/
+    // despesa fixa) do cliente — é o caso de longe mais comum; desfazer
+    // dívida/meta/cartão continua exigindo o fluxo específico de cada um.
+    if (sessao.clienteId && detectarComando(mensagem) === "DESFAZER_LANCAMENTO") {
+      const historicoParaDesfazer = (() => {
+        try {
+          return JSON.parse(sessao.dividasTemp ?? "[]") as Array<{ role: string; content?: string | null }>;
+        } catch {
+          return [];
+        }
+      })();
+
+      const ultimoLancamento = await prisma.lancamento.findFirst({
+        where: { clienteId: sessao.clienteId },
+        orderBy: { criadoEm: "desc" },
+      });
+
+      if (!ultimoLancamento) {
+        const respostaNada = "Não achei nenhum lançamento recente pra desfazer.";
+        await sendWhatsApp(telefone, respostaNada);
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...historicoParaDesfazer,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaNada },
+            ]),
+          },
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      await prisma.lancamento.delete({ where: { id: ultimoLancamento.id } });
+
+      const rotuloTipo =
+        ultimoLancamento.tipo === "RECEITA"
+          ? "Receita"
+          : ultimoLancamento.tipo === "DESPESA_FIXA"
+            ? "Despesa fixa"
+            : ultimoLancamento.tipo === "COMPRA_CARTAO"
+              ? "Gasto no cartão"
+              : ultimoLancamento.tipo === "FATURA_FECHADA"
+                ? "Fatura"
+                : "Despesa";
+      const respostaDesfeito =
+        `↩️ *Desfeito.*\n\n` +
+        `${rotuloTipo} removida:\n` +
+        `${ultimoLancamento.descricao} — ${formatarValorBR(ultimoLancamento.valor)}\n\n` +
+        `Se não era esse, me avisa que eu confiro. Pode mandar o lançamento certo agora.`;
+
+      await sendWhatsApp(telefone, respostaDesfeito);
+      await prisma.botSessao.updateMany({
+        where: { id: sessao.id },
+        data: {
+          dividasTemp: JSON.stringify([
+            ...historicoParaDesfazer,
+            { role: "user", content: mensagem },
+            { role: "assistant", content: respostaDesfeito },
+          ]),
+        },
+      });
 
       return NextResponse.json({ ok: true });
     }
