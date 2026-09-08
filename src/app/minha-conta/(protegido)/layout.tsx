@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Header } from "./Header";
 import { BottomNav } from "./BottomNav";
 import { FundoParallax } from "./FundoParallax";
+import { AutoRefreshDashboard } from "./AutoRefreshDashboard";
 import "./minha-conta.css";
 
 export default async function MinhaContaLayout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default async function MinhaContaLayout({ children }: { children: React.R
 
   return (
     <div className="mc-shell">
+      <AutoRefreshDashboard />
       <FundoParallax />
       <Header nome={cliente.nome.split(" ")[0]} fotoUrl={cliente.fotoUrl} />
 
