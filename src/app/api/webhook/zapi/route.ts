@@ -23,6 +23,9 @@ import {
   gerenciarDespesasFixasControle,
   registrarGastoControle,
   resolverValorGastoPendente,
+  criarEstadoComPendenciaPagamentoDivida,
+  respostaAguardarValorPagamentoDivida,
+  resolverValorPagamentoDividaPendente,
   salvarItensConfirmadosIA,
   type EstadoControleFinanceiro,
   type ResultadoGastoControle,
@@ -1659,6 +1662,35 @@ Pode mandar tudo em uma mensagem só.`;
       }
     }
 
+    // ── Resposta a "Qual foi o valor desse pagamento?" pendente ────────────
+    // Mesma ideia do bloco acima, mas pra pagamento de dívida sem valor
+    // (ex.: "Já paguei a parcela do Carlos") — bug da mesma família
+    // encontrado em teste (set/2026): sem isso, a mensagem caía no fluxo
+    // genérico de gasto e virava uma despesa errada em vez de baixa de
+    // dívida no credor certo.
+    if (estadoAntesGasto.confirmacaoPendente?.tipo === "aguardar_valor_pagamento_divida") {
+      const resolvidoPagamento = resolverValorPagamentoDividaPendente(mensagem, estadoAntesGasto);
+      if (resolvidoPagamento) {
+        await sendWhatsApp(telefone, resolvidoPagamento.resposta);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: resolvidoPagamento.resposta },
+              ...(resolvidoPagamento.atualizouEstado ? [criarMensagemEstadoControle(resolvidoPagamento.estado)] : []),
+            ]),
+          },
+        });
+
+        after(() => persistirPagamentoDividaConfirmadoIA(sessao.clienteId, telefone, resolvidoPagamento.pagamentoDividaParaPersistir));
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     const correcaoOrigem = corrigirOrigemUltimoGastoControle(mensagem, estadoAntesGasto);
     if (correcaoOrigem) {
       await sendWhatsApp(telefone, correcaoOrigem.resposta);
@@ -1995,6 +2027,40 @@ Pode mandar tudo em uma mensagem só.`;
           origemLancamentoControle,
           comprovanteUrlImagem
         );
+        return NextResponse.json({ ok: true });
+      }
+
+      // Pagamento de dívida reconhecido (com credor) mas SEM valor — ex.:
+      // "Já paguei a parcela do Carlos". A mensagem genérica de "reenviar
+      // em lista" (pensada pra listas de despesas fixas) não faz sentido
+      // aqui; pergunta o valor especificamente e guarda o credor já
+      // identificado numa pendência, em vez de deixar a informação se
+      // perder (bug da mesma família do "aguardar_valor_gasto", achado em
+      // teste set/2026).
+      if (
+        !intentConfirmavel &&
+        intentFinanceiro.emEscopo &&
+        intentFinanceiro.itens.length === 1 &&
+        intentFinanceiro.itens[0].tipo === "pagamento_divida"
+      ) {
+        const credorAproximado = intentFinanceiro.itens[0].descricaoNormalizada || "Dívida";
+        const respostaPendencia = respostaAguardarValorPagamentoDivida(credorAproximado);
+        const estadoComPendencia = criarEstadoComPendenciaPagamentoDivida(estadoAntesGasto, credorAproximado);
+
+        await sendWhatsApp(telefone, respostaPendencia);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaPendencia },
+              criarMensagemEstadoControle(estadoComPendencia),
+            ]),
+          },
+        });
+
         return NextResponse.json({ ok: true });
       }
 
