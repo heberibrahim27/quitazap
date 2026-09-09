@@ -82,6 +82,25 @@ export const PALAVRAS_NUMERICAS_EXTENSO = new Set<string>([
   ...MILHAO,
 ]);
 
+// Achado em teste ao vivo (09/09/2026): "financiei uma moto de dez mil, vou
+// pagar em 24x de quinhentos" devolvia 10 em vez de 10000 — e "recebi mil e
+// duzentos, de bico" devolvia 1000 em vez de 1200. Causa: o split ingênuo
+// por espaço deixa pontuação GRUDADA no token vizinho ("mil," em vez de
+// "mil", "duzentos," em vez de "duzentos"), e todo o resto do módulo compara
+// tokens por igualdade exata contra as tabelas acima — "mil," !== "mil"
+// nunca bate, cortando o número no meio silenciosamente (sem erro, só um
+// valor menor/errado). Vírgula depois do valor é como qualquer brasileiro
+// escreve uma frase corrida ("...de dez mil, vou pagar..."), então isso NÃO
+// é caso raro. Corrigido tirando pontuação de borda de cada token só para
+// fins de COMPARAÇÃO (lerGrupoCentena/lerNumeroApartir/encontrarSpanValor-
+// PorExtenso operam todos sobre o array já "limpo") — os índices continuam
+// válidos pro array original (limpar nunca funde nem quebra um token em
+// outro), então removerValorPorExtenso ainda consegue fatiar/reconstruir a
+// frase original (com a pontuação) certinho a partir das mesmas posições.
+function limparToken(token: string): string {
+  return token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
 // Lê um grupo de 0-999 a partir do índice i. consumidos=0 quando não achou
 // nada reconhecível ali (não é erro, só "não tem número aqui").
 function lerGrupoCentena(tokens: string[], i: number): { valor: number; consumidos: number } {
@@ -215,7 +234,7 @@ function encontrarSpanValorPorExtenso(
 }
 
 export function valorPorExtenso(textoNormalizado: string): number | undefined {
-  const tokens = textoNormalizado.split(/\s+/).filter(Boolean);
+  const tokens = textoNormalizado.split(/\s+/).filter(Boolean).map(limparToken);
   return encontrarSpanValorPorExtenso(tokens)?.valor;
 }
 
@@ -228,11 +247,15 @@ export function valorPorExtenso(textoNormalizado: string): number | undefined {
  */
 export function removerValorPorExtenso(textoNormalizado: string): string {
   const tokens = textoNormalizado.split(/\s+/).filter(Boolean);
-  const span = encontrarSpanValorPorExtenso(tokens);
+  // Busca o trecho pelo array LIMPO (sem pontuação de borda em cada token —
+  // ver comentário de limparToken acima), mas fatia/reconstrói a partir do
+  // array original `tokens`: limpar nunca funde nem quebra token, então os
+  // mesmos índices continuam apontando pros mesmos elementos em `tokens`.
+  const span = encontrarSpanValorPorExtenso(tokens.map(limparToken));
   if (!span) return textoNormalizado;
 
   let fim = span.fim;
-  if (PALAVRAS_MOEDA.has(tokens[fim])) fim += 1;
+  if (PALAVRAS_MOEDA.has(limparToken(tokens[fim] ?? ""))) fim += 1;
 
   return [...tokens.slice(0, span.inicio), ...tokens.slice(fim)].join(" ");
 }
