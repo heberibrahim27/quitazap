@@ -1645,7 +1645,19 @@ Pode mandar tudo em uma mensagem só.`;
     if (sessao.clienteId) {
       const tipoConsulta = detectarConsultaFinanceira(mensagem);
       if (tipoConsulta) {
-        const respostaConsulta = await responderConsultaFinanceira(tipoConsulta, sessao.clienteId, mensagem, isGratuito);
+        // Bug achado em teste ao vivo (09/09/2026): "posso gastar" SEM
+        // nenhum valor na frase (ex: "quanto eu posso gastar esse mes",
+        // pergunta genérica de limite) sempre caía no beco sem saída "Me
+        // diz o valor — ex: posso gastar 50 hoje?", mesmo quando o cliente
+        // claramente queria saber o limite seguro geral, não se cabia um
+        // gasto específico. Nesse caso reaproveita o fluxo de limite
+        // seguro (já teria a mesma resposta que "quanto posso gastar por
+        // dia" pediria à IA classificadora) em vez de travar pedindo pra
+        // repetir com um número.
+        const perguntaSemValorEspecifico = tipoConsulta === "posso_gastar" && parseMoneyBR(mensagem) == null;
+        const respostaConsulta = perguntaSemValorEspecifico
+          ? await responderLimiteSeguro(sessao.clienteId, isGratuito)
+          : await responderConsultaFinanceira(tipoConsulta, sessao.clienteId, mensagem, isGratuito);
         await sendWhatsApp(telefone, respostaConsulta);
 
         await prisma.botSessao.updateMany({
