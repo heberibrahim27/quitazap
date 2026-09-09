@@ -1,4 +1,4 @@
-import { parseMoneyBR } from "./money";
+import { parseMoneyBR, valorComMultiplicadorEscrito } from "./money";
 import { normalizarDescricaoFinanceira } from "./descricao-financeira";
 import { valorPorExtenso, removerValorPorExtenso } from "./numero-por-extenso";
 
@@ -187,6 +187,17 @@ export function detectarMensagemDeGasto(mensagem: string): boolean {
 
 export function extrairValorGasto(mensagem: string): number | undefined {
   const texto = normalizarTexto(mensagem);
+
+  // Bug achado em teste ao vivo (09/09/2026): "gastei 8 mil no conserto do
+  // carro", "comprei uma moto de 15 mil" — a regex de candidato logo abaixo
+  // (\d[\d.,]*) sempre cortava o dígito ANTES de "mil"/"milhão" (ex.: "8" de
+  // "8 mil"), então parseMoneyBR nunca via o padrão completo e devolvia 8 em
+  // vez de 8000 — silenciosamente 1000x menor, sem erro nenhum. Precisa
+  // rodar ANTES da extração de candidato normal, na mensagem crua, senão o
+  // "mil"/"milhão" já foi perdido.
+  const valorComMil = valorComMultiplicadorEscrito(texto);
+  if (valorComMil !== undefined) return valorComMil;
+
   const candidatos = texto.match(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?/gi) ?? [];
   const candidatosComFormatoFinanceiro = candidatos.filter((candidato) =>
     /r\$|,|\.\d{1,2}\b|\b(reais|real)\b/i.test(candidato)
