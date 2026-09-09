@@ -798,6 +798,19 @@ function totalParcelasPlausivel(item: ItemFinanceiroInterpretado): boolean {
   return tp <= MAX_PARCELAS_PLAUSIVEL;
 }
 
+// Segunda trava, achada testando a primeira ao vivo (09/09/2026): a mesma
+// confusão de números da IA também aparece de outro jeito — "tenho um
+// financiamento de carro em 48x de 500 reais" virou valorTotalDivida: 48
+// (devia ser o "48" das parcelas) com totalParcelas: 1 e valor (parcela):
+// 500. totalParcelasPlausivel sozinha não pega esse caso (1 parcela é bem
+// plausível!) — mas o valor total de uma dívida NUNCA pode ser menor que
+// uma parcela individual dela (isso valeria mesmo com juros: o total só
+// tende a ser MAIOR que soma das parcelas, nunca menor que uma parcela só).
+function valorTotalDividaConsistente(item: ItemFinanceiroInterpretado): boolean {
+  if (!valorPositivo(item.valorTotalDivida) || !valorPositivo(item.valor)) return true; // falta um dos dois — nada pra comparar
+  return item.valorTotalDivida >= item.valor;
+}
+
 function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
   if (!TIPOS_CONFIRMAVEIS.has(item.tipo)) return false;
   if (typeof item.descricaoNormalizada !== "string" || item.descricaoNormalizada.trim().length === 0) return false;
@@ -813,7 +826,11 @@ function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
         (item.origem !== "cartao" || (typeof item.cartao === "string" && item.cartao.trim().length > 0))
       );
     case "divida":
-      return (valorPositivo(item.valorTotalDivida) || valorPositivo(item.valor)) && totalParcelasPlausivel(item);
+      return (
+        (valorPositivo(item.valorTotalDivida) || valorPositivo(item.valor)) &&
+        totalParcelasPlausivel(item) &&
+        valorTotalDividaConsistente(item)
+      );
     case "pagamento_divida":
       return valorPositivo(item.valor);
     case "meta":
