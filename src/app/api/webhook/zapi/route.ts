@@ -93,6 +93,20 @@ import {
 } from "@/lib/plano";
 import { urlPainelCobrador } from "@/lib/cobrador-token";
 import { boletoValido, mensagemPreviaBoleto, detectarRespostaBoleto, salvarBoletoComoDivida, type BoletoDetectado } from "@/lib/boleto-flow";
+import {
+  faturaCartaoValida,
+  hashPDF,
+  hashJaProcessado,
+  montarFaturaCartaoPendente,
+  mensagemPerguntaAmbiguo,
+  mensagemFaturaSemNovidade,
+  mensagemResumoLote,
+  mensagemLoteConfirmado,
+  detectarRespostaFaturaCartao,
+  salvarComprasParceladasFatura,
+  type FaturaCartaoDetectada,
+  type FaturaCartaoPendente,
+} from "@/lib/fatura-cartao-flow";
 
 // GIF de celebração quando o cliente avisa que pagou uma dívida
 const GIF_PARABENS = "https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif";
@@ -247,12 +261,26 @@ type PDFBoleto = {
   linhaDigitavel: string | null;
 };
 
+type PDFParceladaFatura = {
+  descricao: string;
+  parcelaAtual: number;
+  totalParcelas: number;
+  valorParcela: number;
+};
+
+type PDFFaturaCartao = {
+  tipo: "FATURA_CARTAO";
+  emissor: string;
+  vencimentoFatura: string; // YYYY-MM-DD
+  parceladas: PDFParceladaFatura[];
+};
+
 type PDFOutro = {
   tipo: "OUTRO";
   texto: string;
 };
 
-type PDFResult = PDFContracheque | PDFBoleto | PDFOutro;
+type PDFResult = PDFContracheque | PDFBoleto | PDFFaturaCartao | PDFOutro;
 
 // Contracheque continua pausado no MVP (motivo: erro nos valores extraídos
 // em alguns formatos, ver mensagem de fallback abaixo) — mas boleto
@@ -431,7 +459,30 @@ Regras para o boleto:
 - linhaDigitavel: a linha digitável completa (os números abaixo do código de barras), como texto, mantendo os espaços. Se não conseguir ler com certeza, use null — nunca invente números.
 - Se não conseguir extrair valor OU vencimento com confiança, responda com tipo "OUTRO" em vez de arriscar um valor errado.
 
-Se não for contracheque nem boleto (for fatura de cartão, extrato, etc), responda com:
+Se for uma FATURA DE CARTÃO DE CRÉDITO (documento com lista de compras do mês, geralmente com nome do banco/cartão, valor total da fatura e data de vencimento — não confundir com boleto avulso nem contracheque), responda APENAS com este JSON (sem markdown):
+
+{
+  "tipo": "FATURA_CARTAO",
+  "emissor": "nome popular do banco ou cartão",
+  "vencimentoFatura": "AAAA-MM-DD",
+  "parceladas": [
+    { "descricao": "nome da compra/loja", "parcelaAtual": 3, "totalParcelas": 10, "valorParcela": 299.90 }
+  ]
+}
+
+Regras para a fatura de cartão:
+- emissor: o nome popular/comercial do banco ou cartão, como o cliente reconheceria (ex: "Nubank", "Itaú", "Inter", "C6 Bank", "Bradesco") — NUNCA a razão social legal (ex: nunca "NU PAGAMENTOS S.A.", nunca CNPJ).
+- vencimentoFatura: a data de VENCIMENTO da fatura (não a de fechamento), formato AAAA-MM-DD. Se não conseguir ler com certeza, use null.
+- parceladas: liste APENAS compras com parcelamento explicitamente impresso no documento, no formato "parcela X/Y", "X de Y" ou equivalente, onde ainda restam parcelas futuras (Y maior que X). NUNCA inclua:
+  - compra à vista (sem nenhuma indicação de parcelamento) — não gera compromisso futuro;
+  - compra cuja parcela atual já é a última (X igual a Y) — nada de futuro a lançar;
+  - qualquer parcelamento que você tenha que INFERIR ou ADIVINHAR — se X e Y não estiverem explicitamente impressos na linha da compra, não inclua essa compra na lista, mesmo que pareça parcelada pelo nome da loja.
+- descricao: nome da loja/compra, sem incluir o texto da parcela (ex: "Magazine Luiza", nunca "Magazine Luiza 03/10").
+- parcelaAtual/totalParcelas: números inteiros, exatamente como impressos (ex: "03/10" → parcelaAtual=3, totalParcelas=10).
+- valorParcela: valor da parcela impresso na linha daquela compra, sempre número.
+- Se não conseguir identificar o emissor OU a data de vencimento com confiança, responda com tipo "OUTRO" em vez de arriscar.
+
+Se não for contracheque, boleto nem fatura de cartão (for extrato bancário, comprovante avulso, etc), responda com:
 { "tipo": "OUTRO", "texto": "descrição do documento em português" }`,
             },
           ],
@@ -455,7 +506,9 @@ response_format: { type: "json_object" },
       ? `emp=${parsed.emprestimos.length} assoc=${parsed.associacoes.length}`
       : parsed.tipo === "BOLETO"
         ? `temLinhaDigitavel=${parsed.linhaDigitavel != null}`
-        : "");
+        : parsed.tipo === "FATURA_CARTAO"
+          ? `parceladas=${parsed.parceladas?.length ?? 0}`
+          : "");
     return parsed;
 
   } finally {
@@ -1021,6 +1074,48 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: true });
           }
         }
+
+        // "Fatura Inteligente" — mesma lógica do Boleto Inteligente acima,
+        // mas pode ter várias compras e precisa checar duplicidade antes de
+        // pedir confirmação (ver fatura-cartao-flow.ts).
+        if (resultado.tipo === "FATURA_CARTAO" && sessao.clienteId) {
+          const fatura: FaturaCartaoDetectada = {
+            emissor: resultado.emissor,
+            vencimentoFatura: resultado.vencimentoFatura,
+            parceladas: resultado.parceladas ?? [],
+          };
+          if (faturaCartaoValida(fatura)) {
+            const hash = await hashPDF(body.document.documentUrl);
+            const jaProcessado = await hashJaProcessado(sessao.clienteId, hash);
+            if (jaProcessado) {
+              await sendWhatsApp(sessao.telefone, "📄 Essa fatura já foi processada antes — não lancei de novo.");
+              return NextResponse.json({ ok: true });
+            }
+
+            const pendente = await montarFaturaCartaoPendente(sessao.clienteId, hash, fatura);
+
+            if (pendente.filaAmbiguos.length > 0) {
+              await prisma.botSessao.updateMany({
+                where: { id: sessao.id },
+                data: { faturaCartaoPendente: pendente as unknown as Prisma.InputJsonValue },
+              });
+              await sendWhatsApp(sessao.telefone, mensagemPerguntaAmbiguo(pendente.filaAmbiguos[0]));
+              return NextResponse.json({ ok: true });
+            }
+
+            if (pendente.confirmados.length === 0) {
+              await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendente.jaCadastradas));
+              return NextResponse.json({ ok: true });
+            }
+
+            await prisma.botSessao.updateMany({
+              where: { id: sessao.id },
+              data: { faturaCartaoPendente: pendente as unknown as Prisma.InputJsonValue },
+            });
+            await sendWhatsApp(sessao.telefone, mensagemResumoLote(pendente));
+            return NextResponse.json({ ok: true });
+          }
+        }
       } catch (err) {
         console.error("[Z-API] Erro ao extrair PDF:", err);
       }
@@ -1067,6 +1162,63 @@ export async function POST(req: NextRequest) {
           await sendWhatsApp(sessao.telefone, "✅ Salvei o boleto como um compromisso no seu Controle. Vou te lembrar antes do vencimento.");
         } else {
           await sendWhatsApp(sessao.telefone, "Beleza, não salvei. 👌");
+        }
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // ── Confirmação de fatura de cartão pendente ("Fatura Inteligente") ──
+    // Duas etapas possíveis, na ordem: (1) enquanto sobrar item na fila de
+    // ambíguos, cada sim/não resolve um item por vez ("sim" = é a mesma
+    // compra já cadastrada, não duplica; "não" = compra diferente, entra na
+    // lista); (2) só depois da fila zerada, um sim/não final confirma o
+    // lote inteiro. Mesma limitação conhecida do bloco de boleto acima
+    // (pendência dupla com o fluxo de texto é rara e não perde/duplica
+    // nada, só pode pedir a confirmação de novo).
+    if (sessao.faturaCartaoPendente && tipoEntrada === "texto") {
+      const resposta = detectarRespostaFaturaCartao(mensagem);
+      if (resposta) {
+        const pendente = sessao.faturaCartaoPendente as unknown as FaturaCartaoPendente;
+
+        if (pendente.indice < pendente.filaAmbiguos.length) {
+          const itemAtual = pendente.filaAmbiguos[pendente.indice];
+          const proximoIndice = pendente.indice + 1;
+          const confirmados =
+            resposta === "negar"
+              ? [...pendente.confirmados, { descricao: itemAtual.descricao, parcelaAtual: itemAtual.parcelaAtual, totalParcelas: itemAtual.totalParcelas, valorParcela: itemAtual.valorParcela }]
+              : pendente.confirmados;
+          const pendenteAtualizado: FaturaCartaoPendente = { ...pendente, indice: proximoIndice, confirmados };
+
+          if (proximoIndice < pendenteAtualizado.filaAmbiguos.length) {
+            await prisma.botSessao.updateMany({
+              where: { id: sessao.id },
+              data: { faturaCartaoPendente: pendenteAtualizado as unknown as Prisma.InputJsonValue },
+            });
+            await sendWhatsApp(sessao.telefone, mensagemPerguntaAmbiguo(pendenteAtualizado.filaAmbiguos[proximoIndice]));
+            return NextResponse.json({ ok: true });
+          }
+
+          if (pendenteAtualizado.confirmados.length === 0) {
+            await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { faturaCartaoPendente: Prisma.JsonNull } });
+            await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendenteAtualizado.jaCadastradas));
+            return NextResponse.json({ ok: true });
+          }
+
+          await prisma.botSessao.updateMany({
+            where: { id: sessao.id },
+            data: { faturaCartaoPendente: pendenteAtualizado as unknown as Prisma.InputJsonValue },
+          });
+          await sendWhatsApp(sessao.telefone, mensagemResumoLote(pendenteAtualizado));
+          return NextResponse.json({ ok: true });
+        }
+
+        // Fila de ambíguos já zerada — essa resposta é sobre o lote final.
+        await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { faturaCartaoPendente: Prisma.JsonNull } });
+        if (resposta === "confirmar" && sessao.clienteId) {
+          await salvarComprasParceladasFatura(sessao.clienteId, pendente);
+          await sendWhatsApp(sessao.telefone, mensagemLoteConfirmado(pendente));
+        } else {
+          await sendWhatsApp(sessao.telefone, "Beleza, não lancei nada dessa fatura. 👌");
         }
         return NextResponse.json({ ok: true });
       }
