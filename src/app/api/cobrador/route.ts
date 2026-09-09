@@ -10,6 +10,19 @@ import { prisma } from "@/lib/prisma";
 import { normalizarTelefone } from "@/lib/zapi";
 import { verificarTokenCobrador } from "@/lib/cobrador-token";
 
+const COOKIE_NAME  = "qz_auth";
+const COOKIE_TOKEN = "qz_autenticado";
+
+// Caminho cliente (link mágico id+token) OU admin (cookie qz_auth) —
+// nunca acesso implícito por ausência de credencial (achado de auditoria:
+// mesmo padrão já corrigido em /api/exportar e /api/cobrador/disparar).
+function autenticado(req: NextRequest, clienteId: string | null, token: string | null): boolean {
+  if (clienteId && token) {
+    return verificarTokenCobrador(clienteId, token);
+  }
+  return req.cookies.get(COOKIE_NAME)?.value === COOKIE_TOKEN;
+}
+
 // GET — lista cobranças de um cliente (ou todas para admin)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,9 +32,8 @@ export async function GET(req: NextRequest) {
   const page      = parseInt(searchParams.get("page") ?? "1");
   const limit     = parseInt(searchParams.get("limit") ?? "50");
 
-  // Se vier token, valida — caso contrário assume acesso admin (sem filtro)
-  if (clienteId && token && !verificarTokenCobrador(clienteId, token)) {
-    return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+  if (!autenticado(req, clienteId, token)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
   const where: Record<string, unknown> = {};
@@ -48,6 +60,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       clienteId,
+      token,
       credorNome,
       devedorNome,
       devedorFone,
@@ -57,6 +70,10 @@ export async function POST(req: NextRequest) {
       mensagem,
       pixChave,
     } = body;
+
+    if (!autenticado(req, clienteId ?? null, token ?? null)) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
 
     if (!clienteId || !devedorNome || !devedorFone || !valor) {
       return NextResponse.json(
@@ -126,9 +143,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "id e status são obrigatórios" }, { status: 400 });
     }
 
-    // Valida token se vier de cliente (não admin)
-    if (clienteId && token && !verificarTokenCobrador(clienteId, token)) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+    if (!autenticado(req, clienteId ?? null, token ?? null)) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
     }
     // Se tiver clienteId+token válido, garante que a cobrança pertence ao cliente
     if (clienteId && token) {

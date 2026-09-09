@@ -6,13 +6,21 @@
 
 import { createHmac } from "crypto";
 
+// Falha fechado: sem nenhuma das env vars configuradas, lança erro em vez
+// de cair num valor fixo conhecido publicamente no código-fonte (achado de
+// auditoria — o fallback hardcoded permitia forjar token de cliente/painel
+// do Cobrador só lendo o repositório).
 function getSecret(): string {
-  return (
+  const secret =
     process.env.COBRADOR_TOKEN_SECRET ??
     process.env.CRON_SECRET ??
-    process.env.NEXTAUTH_SECRET ??
-    "quitazap-cobrador-2024"
-  );
+    process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error(
+      "Nenhuma env var de secret configurada para o Cobrador (COBRADOR_TOKEN_SECRET / CRON_SECRET / NEXTAUTH_SECRET)."
+    );
+  }
+  return secret;
 }
 
 /** Gera token para um clienteId. */

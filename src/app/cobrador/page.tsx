@@ -131,6 +131,7 @@ function CobradorContent() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clienteId:     modoCliente ? clienteIdParam : undefined,
+        token:         modoCliente ? tokenParam : undefined,
         devedorNome:   form.devedorNome.trim(),
         devedorFone:   form.devedorFone.trim(),
         valor:         parseFloat(form.valor.replace(",", ".")),

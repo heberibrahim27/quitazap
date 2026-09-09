@@ -58,9 +58,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Valida secret
+    // Valida secret — falha fechado: sem CAKTO_SECRET configurada, nunca
+    // aceita por omissão (achado de auditoria: antes, sem a env setada,
+    // qualquer evento forjado era aceito como compra aprovada).
     const secret = process.env.CAKTO_SECRET;
-    if (secret && body.secret !== secret) {
+    if (!secret) {
+      console.error("[CAKTO] CAKTO_SECRET não configurado — recusando webhook.");
+      return NextResponse.json({ error: "CAKTO_SECRET não configurado" }, { status: 500 });
+    }
+    if (body.secret !== secret) {
       console.warn("[CAKTO] Secret inválido recebido.");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

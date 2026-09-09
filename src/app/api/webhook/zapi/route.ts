@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────
 
 import { NextRequest, NextResponse, after } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, sendWhatsAppImage, normalizarTelefone, variacoesTelefone } from "@/lib/zapi";
@@ -892,6 +893,27 @@ async function gerenciarFaturaCartaoComFallbackIA(
 
 // ── Webhook principal ─────────────────────
 export async function POST(req: NextRequest) {
+  // Verifica a origem do webhook. A Z-API não oferece header customizado
+  // nem assinatura HMAC na configuração de webhook (confirmado na doc
+  // oficial) — o secret vai na própria URL configurada no painel da Z-API,
+  // como query param. Falha fechado: sem a env configurada, nunca aceita
+  // (achado de auditoria: antes, qualquer POST era processado sem checar
+  // a origem, permitindo forjar mensagem de WhatsApp de qualquer cliente).
+  const zapiSecret = process.env.ZAPI_WEBHOOK_SECRET;
+  if (!zapiSecret) {
+    console.error("[Z-API] ZAPI_WEBHOOK_SECRET não configurado — recusando webhook.");
+    return NextResponse.json({ error: "ZAPI_WEBHOOK_SECRET não configurado" }, { status: 500 });
+  }
+  const secretEsperado = Buffer.from(zapiSecret);
+  const secretRecebido = Buffer.from(req.nextUrl.searchParams.get("secret") ?? "");
+  const secretValido =
+    secretEsperado.length === secretRecebido.length &&
+    timingSafeEqual(secretEsperado, secretRecebido);
+  if (!secretValido) {
+    console.warn("[Z-API] Webhook rejeitado: secret ausente ou inválido.");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
 
