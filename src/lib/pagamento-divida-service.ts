@@ -53,9 +53,21 @@ export async function marcarDividaComoPaga(clienteId: string, dividaId: string, 
     if (!proximaParcela) return { ok: false, erro: "Não há parcela pendente pra pagar nessa dívida." };
 
     const jaEstavaPaga = await prisma.$transaction(async (tx) => {
+      // Não sobrescreve Parcela.valor com o valor informado no pagamento —
+      // achado em teste (09/09/2026): quando esse `valor` vem de uma
+      // mensagem livre no WhatsApp (ex: "paguei o cartão Nubank, 1800"),
+      // ele pode ser o valor TOTAL de uma fatura, não desta parcela
+      // específica (ex: R$300), e sobrescrever corrompe o histórico da
+      // parcela pra sempre. Parcela.valor é o valor CONTRATADO/original,
+      // imutável depois de criado; o valor de fato pago fica só no
+      // Pagamento (criado logo abaixo) — os dois podem ser diferentes por
+      // desconto, juros/multa ou pagamento parcial, e é isso mesmo. A UI
+      // web (plano/page.tsx) sempre manda o próprio valor da parcela aqui,
+      // então pra ela isso não muda nada na prática — é puramente uma
+      // trava de segurança pro caminho do WhatsApp.
       const resultado = await tx.parcela.updateMany({
         where: { id: proximaParcela.id, status: { not: "PAGA" } },
-        data: { status: "PAGA", valor },
+        data: { status: "PAGA" },
       });
       if (resultado.count === 0) return true;
       await tx.pagamento.create({ data: { clienteId, dividaId, valor, data: new Date() } });

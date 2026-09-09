@@ -2080,9 +2080,33 @@ function substituirFaturaFechada(
   ];
 }
 
+// Achado em investigação de bug real (09/09/2026, com o ChatGPT): antes
+// isso só bloqueava a palavra "fatura". Mensagens como "paguei o cartão
+// Nubank, 1800" ou "paguei o boleto da Enel, 150" passavam direto e viravam
+// um Lancamento NOVO no fluxo genérico de gasto (registrarGastoControle),
+// enquanto a Parcela correspondente daquela dívida continuava PENDENTE —
+// duplicando (às vezes triplicando) o gasto no Comprometido do mês. Até o
+// pagamento de fatura/cartão ter um fluxo de baixa de verdade (reconciliar
+// com Divida+Parcela pelo cartaoId — anotado como próximo passo, discutido
+// com o ChatGPT), o mais seguro é NÃO deixar essas frases virarem gasto
+// novo, mesmo sem ainda saber processar a baixa.
 function detectarPagamentoFaturaCartao(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
-  return /\b(?:paguei|pagar|paga|quitei|quitar|pagamento)\b/.test(texto) && /\bfatura\b/.test(texto);
+  const temVerboPagamento = /\b(?:paguei|pagar|paga|quitei|quitar|pagamento)\b/.test(texto);
+  if (!temVerboPagamento) return false;
+
+  if (/\bfatura\b/.test(texto)) return true;
+  if (/\bboleto\b/.test(texto)) return true;
+
+  // "cartão" como OBJETO do pagamento ("paguei o cartão nubank", "quitei o
+  // cartão") é dívida sendo quitada. "no cartão"/"com o cartão"/"pelo
+  // cartão" é só o MEIO de pagamento de uma compra comum ("paguei 50 no
+  // cartão no mercado") — não pode disparar o mesmo bloqueio, senão toda
+  // compra no crédito/débito vira falso positivo.
+  const cartaoComoMeioDePagamento = /\b(no|num|numa|com o|com a|pelo|pela|via)\s+cart[aã]o\b/.test(texto);
+  if (/\bcart[aã]o\b/.test(texto) && !cartaoComoMeioDePagamento) return true;
+
+  return false;
 }
 
 function detectarFechamentoFaturaCartao(mensagem: string): boolean {
@@ -2092,8 +2116,10 @@ function detectarFechamentoFaturaCartao(mensagem: string): boolean {
 
 function respostaPagamentoFaturaNaoImplementado(): string {
   return (
-    "Entendi que você quer registrar pagamento de fatura, mas esse fluxo ainda será conectado. " +
-    "Por enquanto, posso registrar a fatura fechada ou gastos no cartão."
+    "Entendi que você quer registrar o pagamento de uma fatura, cartão ou boleto — esse fluxo automático por aqui ainda está sendo construído, " +
+    "e por segurança eu prefiro não registrar nada errado do que arriscar contar esse gasto errado.\n\n" +
+    "Se essa compra/parcela já estava cadastrada como dívida no seu Controle, você já consegue dar baixa certinha em *Meu Plano* no site, no botão \"Marcar pago\". " +
+    "Se for uma despesa nova (ainda não cadastrada), me diga o valor e onde foi que eu registro como gasto normal."
   );
 }
 
