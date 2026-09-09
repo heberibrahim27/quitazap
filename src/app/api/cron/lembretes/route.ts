@@ -120,11 +120,27 @@ export async function GET(req: NextRequest) {
 
   // ══════════════════════════════════════════════════════
   // SISTEMA NOVO — QuitaZAP Receber (modelo Pendencia)
+  //
+  // ENVIO PAUSADO (09/09/2026): decisão do Ibrahim pós-incidente de spam —
+  // "não podemos mais mandar mensagem pra ninguém, quem tem que chegar são
+  // eles no nosso bot". Achado ao revisar isso: o contato dessa régua
+  // (ContatoReceber) é o CLIENTE DE UM ASSINANTE — alguém que nunca falou
+  // com o número da QuitaZAP. sendWhatsAppInstancia() só usa a instância
+  // própria do assinante (wpInstancia) quando o provider é "evolution"; com
+  // Z-API (o provider ativo hoje) ela SEMPRE cai no número compartilhado da
+  // QuitaZAP (sendWhatsApp() global) — e o schema do Usuario nem guarda um
+  // token de Z-API próprio pra isso funcionar diferente. Ou seja, todo
+  // lembrete desse sistema saía, na prática, pelo NOSSO número, pra gente
+  // que nunca falou com a gente — mesmo padrão de risco do Cobrador. Como
+  // não há nenhuma Pendencia real ainda (0 linhas), pausar aqui não afeta
+  // nenhum cliente de verdade. Mantém marcação de VENCIDA (não é envio) e
+  // só pula o laço de envio; ver `enviarLembretesReceberPausado` abaixo.
   // ══════════════════════════════════════════════════════
 
   let lembretes      = 0;
   let lembreteErros  = 0;
   let vencidasMarcadas = 0;
+  const enviarLembretesReceberPausado = true;
 
   try {
     // ── 1. Marcar pendências vencidas ─────────────────────
@@ -143,110 +159,114 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 2. Buscar pendências nos próximos 3 dias ──────────
-    const pendencias = await prisma.pendencia.findMany({
-      where: {
-        vencimento:   { gte: hoje, lt: d4 },
-        reguaPausada: false,
-        status: {
-          notIn: [
-            "RASCUNHO",
-            "PAGA",
-            "PARCIALMENTE_PAGA",
-            "CANCELADA",
-            "PAUSADA",
-            "VENCIDA",
-            "FALHOU",
-          ],
-        },
-      },
-      include: {
-        contato: { select: { nome: true, telefone: true } },
-        usuario: {
-          select: {
-            nome:        true,
-            wpInstancia: true,
-            wpConectado: true,
-            configuracoes: { select: { nomeNegocio: true } },
+    if (enviarLembretesReceberPausado) {
+      console.log("[LEMBRETES] Envio do sistema novo (Receber) pausado — pulando laço de envio (só marcação de VENCIDA acima).");
+    } else {
+      const pendencias = await prisma.pendencia.findMany({
+        where: {
+          vencimento:   { gte: hoje, lt: d4 },
+          reguaPausada: false,
+          status: {
+            notIn: [
+              "RASCUNHO",
+              "PAGA",
+              "PARCIALMENTE_PAGA",
+              "CANCELADA",
+              "PAUSADA",
+              "VENCIDA",
+              "FALHOU",
+            ],
           },
         },
-        // Carrega apenas os envios que correspondem aos slots de lembrete
-        envios: {
-          select: { etapa: true },
-          where: { etapa: { in: [SLOT_D3, SLOT_D2, SLOT_D1, SLOT_D0] } },
+        include: {
+          contato: { select: { nome: true, telefone: true } },
+          usuario: {
+            select: {
+              nome:        true,
+              wpInstancia: true,
+              wpConectado: true,
+              configuracoes: { select: { nomeNegocio: true } },
+            },
+          },
+          // Carrega apenas os envios que correspondem aos slots de lembrete
+          envios: {
+            select: { etapa: true },
+            where: { etapa: { in: [SLOT_D3, SLOT_D2, SLOT_D1, SLOT_D0] } },
+          },
         },
-      },
-    });
+      });
 
-    console.log(`[LEMBRETES] ${pendencias.length} pendência(s) encontrada(s) no período hoje → D+3`);
+      console.log(`[LEMBRETES] ${pendencias.length} pendência(s) encontrada(s) no período hoje → D+3`);
 
-    for (const p of pendencias) {
-      // Precisa de telefone do contato para enviar
-      if (!p.contato?.telefone) continue;
+      for (const p of pendencias) {
+        // Precisa de telefone do contato para enviar
+        if (!p.contato?.telefone) continue;
 
-      // Determina em qual slot de dia esse vencimento se encaixa
-      let slot: number;
-      if (p.vencimento >= d3 && p.vencimento < d4) {
-        slot = SLOT_D3;
-      } else if (p.vencimento >= d2 && p.vencimento < d3) {
-        slot = SLOT_D2;
-      } else if (p.vencimento >= d1 && p.vencimento < d2) {
-        slot = SLOT_D1;
-      } else {
-        slot = SLOT_D0;
+        // Determina em qual slot de dia esse vencimento se encaixa
+        let slot: number;
+        if (p.vencimento >= d3 && p.vencimento < d4) {
+          slot = SLOT_D3;
+        } else if (p.vencimento >= d2 && p.vencimento < d3) {
+          slot = SLOT_D2;
+        } else if (p.vencimento >= d1 && p.vencimento < d2) {
+          slot = SLOT_D1;
+        } else {
+          slot = SLOT_D0;
+        }
+
+        // Deduplicação: pula se já enviamos esse slot para essa pendência
+        if (p.envios.some((e) => e.etapa === slot)) {
+          continue;
+        }
+
+        const contatoNome = p.contato.nome;
+        const negocioNome = p.usuario.configuracoes?.nomeNegocio ?? p.usuario.nome;
+        const telefone    = normalizarTelefone(p.contato.telefone);
+
+        // Monta mensagem conforme slot
+        const mensagem =
+          slot === SLOT_D3 ? msgD3(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom)
+          : slot === SLOT_D2 ? msgD2(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom)
+          : slot === SLOT_D1 ? msgD1(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom)
+          : msgD0(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom);
+
+        try {
+          // Evolution API: usa instância por usuário se conectado
+          // Z-API: ignora instancia, usa variáveis de ambiente globais
+          const instancia = p.usuario.wpConectado ? p.usuario.wpInstancia : null;
+          await sendWhatsAppInstancia(telefone, mensagem, instancia);
+
+          // Registra o envio na tabela EnvioBot (deduplicação futura)
+          await prisma.envioBot.create({
+            data: {
+              usuarioId:   p.usuarioId,
+              pendenciaId: p.id,
+              etapa:       slot,
+              mensagem,
+              status:      "ENVIADO",
+            },
+          });
+
+          // Atualiza contadores da pendência
+          await prisma.pendencia.update({
+            where: { id: p.id },
+            data: {
+              ultimoEnvio: agora,
+              tentativas:  { increment: 1 },
+            },
+          });
+
+          lembretes++;
+          const slotLabel = slot === SLOT_D3 ? "D-3" : slot === SLOT_D2 ? "D-2" : slot === SLOT_D1 ? "D-1" : "D+0";
+          console.log(`[LEMBRETES] ✓ [${slotLabel}] id=${p.id} → ${contatoNome} (${telefone})`);
+        } catch (err) {
+          lembreteErros++;
+          console.error(`[LEMBRETES] ✗ id=${p.id} (${contatoNome}):`, err);
+        }
+
+        // Pausa entre envios para não sobrecarregar a API do WhatsApp
+        await new Promise((r) => setTimeout(r, 500));
       }
-
-      // Deduplicação: pula se já enviamos esse slot para essa pendência
-      if (p.envios.some((e) => e.etapa === slot)) {
-        continue;
-      }
-
-      const contatoNome = p.contato.nome;
-      const negocioNome = p.usuario.configuracoes?.nomeNegocio ?? p.usuario.nome;
-      const telefone    = normalizarTelefone(p.contato.telefone);
-
-      // Monta mensagem conforme slot
-      const mensagem =
-        slot === SLOT_D3 ? msgD3(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom)
-        : slot === SLOT_D2 ? msgD2(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom)
-        : slot === SLOT_D1 ? msgD1(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom)
-        : msgD0(contatoNome, negocioNome, p.descricao, p.valor, p.vencimento, p.pixChave, p.mensagemCustom);
-
-      try {
-        // Evolution API: usa instância por usuário se conectado
-        // Z-API: ignora instancia, usa variáveis de ambiente globais
-        const instancia = p.usuario.wpConectado ? p.usuario.wpInstancia : null;
-        await sendWhatsAppInstancia(telefone, mensagem, instancia);
-
-        // Registra o envio na tabela EnvioBot (deduplicação futura)
-        await prisma.envioBot.create({
-          data: {
-            usuarioId:   p.usuarioId,
-            pendenciaId: p.id,
-            etapa:       slot,
-            mensagem,
-            status:      "ENVIADO",
-          },
-        });
-
-        // Atualiza contadores da pendência
-        await prisma.pendencia.update({
-          where: { id: p.id },
-          data: {
-            ultimoEnvio: agora,
-            tentativas:  { increment: 1 },
-          },
-        });
-
-        lembretes++;
-        const slotLabel = slot === SLOT_D3 ? "D-3" : slot === SLOT_D2 ? "D-2" : slot === SLOT_D1 ? "D-1" : "D+0";
-        console.log(`[LEMBRETES] ✓ [${slotLabel}] id=${p.id} → ${contatoNome} (${telefone})`);
-      } catch (err) {
-        lembreteErros++;
-        console.error(`[LEMBRETES] ✗ id=${p.id} (${contatoNome}):`, err);
-      }
-
-      // Pausa entre envios para não sobrecarregar a API do WhatsApp
-      await new Promise((r) => setTimeout(r, 500));
     }
   } catch (err) {
     console.error("[LEMBRETES] Erro geral (sistema novo):", err);
