@@ -240,8 +240,18 @@ function pareceValorMonetarioForte(texto: string): boolean {
 
 // Mesmo verbo financeiro forte usado no gate de deveChamarInterpretadorFinanceiroIA
 // logo abaixo — mantido num só lugar pra evitar as duas listas divergirem.
+//
+// Achado em teste ao vivo (09/09/2026): só "devo" estava coberto aqui —
+// "devendo" (gerúndio, como em "to devendo 2 mil pro meu primo"/"tô devendo
+// pro banco") é jeito pelo menos tão comum quanto "devo" de descrever uma
+// dívida, e sem ele mensagens assim (principalmente com valor por extenso,
+// sem nenhum dígito) nunca disparavam deveChamarInterpretadorFinanceiroIA:
+// caíam silenciosamente fora do fluxo financeiro inteiro (nem resolvedor
+// local, nem IA), apesar de avaliarEscopoFinanceiro já aceitar "devendo"
+// como escopo (PADROES_ESCOPO) e resolverDivida já saber interpretar "to
+// devendo ... pro/pra" como dívida nova.
 const VERBO_FINANCEIRO_FORTE =
-  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|torrei|desembolsei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
+  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|torrei|desembolsei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|devendo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
 
 // Valor por extenso ("gastei cem reais", "recebi mil e duzentos") não tem
 // NENHUM dígito — achado em teste ao vivo, set/2026: sem essa checagem a

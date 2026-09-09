@@ -1,5 +1,6 @@
 import { formatarValorBR } from "../gasto-flow";
 import { parseMoneyBR, valorComMultiplicadorEscrito } from "../money";
+import { valorPorExtenso } from "../numero-por-extenso";
 import { normalizarDescricaoFinanceira } from "../descricao-financeira";
 import {
   avaliarEscopoFinanceiro,
@@ -432,6 +433,17 @@ function resolverLancamentosSimples(mensagem: string): FinanceiroIntent | null {
 // completo. Mesma causa raiz já corrigida em gasto-flow.ts e
 // controle-financeiro-flow.ts — aqui o candidato também precisa incluir o
 // sufixo opcional pra valorComMultiplicadorEscrito funcionar.
+//
+// Achado em teste ao vivo (09/09/2026), junto com o fix de "devendo" em
+// VERBO_FINANCEIRO_FORTE: mensagens de dívida com o valor TOTALMENTE por
+// extenso e sem nenhum dígito ("to devendo dois mil pro meu primo", "tenho
+// uma divida de mil e duzentos no cartao", "peguei um emprestimo de cinco
+// mil reais") tinham candidatos=[] (a regex acima exige \d) e caíam em
+// "valores.length === 0" — resolverDivida devolvia null mesmo com ehDivida
+// true, mesmo já reconhecendo "to devendo ... pro/pra" há tempos. Só cai
+// aqui quando a busca por dígito não achou NADA — mensagens mistas (ex.:
+// "devo 2 mil e mais quinhentos") já resolvem tudo via dígito+multiplicador
+// acima e nem chegam a tentar isso.
 function extrairTodosValores(texto: string): number[] {
   const candidatos =
     texto.match(/\d[\d.,]*(?:\s*(?:milh[õo]es|milh[ãa]o|mil)\b)?(?:\s*k\b)?/gi) ?? [];
@@ -439,6 +451,10 @@ function extrairTodosValores(texto: string): number[] {
   for (const candidato of candidatos) {
     const valor = valorComMultiplicadorEscrito(candidato) ?? extrairPrimeiroValor(candidato);
     if (valor) valores.push(valor);
+  }
+  if (valores.length === 0) {
+    const porExtenso = valorPorExtenso(normalizarTexto(texto));
+    if (porExtenso) valores.push(porExtenso);
   }
   return valores;
 }
