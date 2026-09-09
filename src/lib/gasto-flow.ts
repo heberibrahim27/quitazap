@@ -101,6 +101,11 @@ export const NOMES_CATEGORIAS_RECEITA: CategoriaReceita[] = [
 const PALAVRAS_GASTO = [
   "gastei",
   "gasto",
+  // "acabei de gastar 60 reais" / "vou gastar 100 no mercado" (achado em
+  // teste ao vivo, 09/09/2026) — só as formas conjugadas "gastei"/"gasto"
+  // estavam cobertas, faltava o infinitivo "gastar", jeito comum de contar
+  // um gasto que acabou de acontecer.
+  "gastar",
   "apostei",
   "paguei",
   // Gírias muito comuns pra "gastei" (achado em teste ao vivo, 09/09/2026) —
@@ -259,7 +264,7 @@ function extrairDescricaoQuantidade(
       // refrigerantes a 5 cada" sobrava com "Refrigerantes a" na descrição
       // — a preposição "a" (de "a X reais cada"/"a X cada") não estava
       // nessa lista de palavras a remover.
-      /\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|de|do|da|no|na|em|com|pra|para|mim|mais|uma|um|duas|dois|amigos?|cada|unidade|a)\b/gi,
+      /\b(gastei|gasto|gastar|acabei|vou|apostei|paguei|pago|comprei|compra|pix|custou|de|do|da|no|na|em|com|pra|para|mim|mais|uma|um|duas|dois|amigos?|cada|unidade|a)\b/gi,
       " "
     )
     .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
@@ -357,7 +362,7 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     // — remove a locução inteira antes do strip de palavra única abaixo, pra
     // não sobrar "minha parte foi" grudado na descrição.
     .replace(/\bminha parte (?:foi|ficou|deu)\b/g, " ")
-    .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|cada|unidade|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
+    .replace(/\b(gastei|gasto|gastar|acabei|vou|apostei|paguei|pago|comprei|compra|pix|custou|cada|unidade|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
     .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
     .replace(/\s+/g, " ")
     .trim();
