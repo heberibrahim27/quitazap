@@ -1561,6 +1561,42 @@ Pode mandar tudo em uma mensagem só.`;
       }
     }
 
+    // "Treinamento contínuo" (pedido do Ibrahim, 09/2026) — se a mensagem
+    // sobreviveu aos 8 regex de consulta acima (nenhum bateu) mas ainda
+    // assim parece uma pergunta, tenta um classificador de IA pra rotear
+    // pra uma das 6 skills de consulta mais seguras de generalizar (só
+    // leitura, nunca cria/altera dado) em vez de deixar cair no
+    // resolverIntencaoFinanceiraIA logo abaixo. Precisa rodar ANTES desse
+    // resolver geral, não depois: achado ao vivo (teste real, 09/2026) —
+    // resolverIntencaoFinanceiraIA tenta classificar QUALQUER mensagem
+    // (inclusive consultas) e, quando decide "fora de escopo" (emEscopo:
+    // false), já responde com a mensagem genérica de apresentação e
+    // encerra a requisição — um classificador de consulta colocado depois
+    // dele (como cheguei a subir numa primeira versão) nunca seria
+    // alcançado nesses casos. Ver classificador-consulta-livre.ts pro
+    // racional completo (revisado com ChatGPT antes de subir) e pra Fase 2
+    // proposta (exemplos aprovados + correção do usuário como sinal de
+    // treino, com humano aprovando antes de virar regra nova).
+    if (sessao.clienteId) {
+      const respostaConsultaLivre = await tentarResponderConsultaLivre(mensagem, sessao.clienteId, isGratuito);
+      if (respostaConsultaLivre) {
+        await sendWhatsApp(telefone, respostaConsultaLivre);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaConsultaLivre },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     const loteGastosCartao = resolverLoteGastosCartao(mensagem);
     if (loteGastosCartao) {
       if (
@@ -2537,37 +2573,6 @@ Pode mandar tudo em uma mensagem só.`;
         select: { gratuito: true },
       });
       clienteGratuito = cli?.gratuito ?? false;
-    }
-
-    // "Treinamento contínuo" (pedido do Ibrahim, 09/2026) — última chance
-    // antes do rescue ladder genérico: se a mensagem sobreviveu a TODA a
-    // cascata determinística acima (nenhum dos 8 regex de consulta bateu,
-    // nenhum lançamento/tarefa/lembrete concreto foi reconhecido) e ainda
-    // assim parece uma pergunta, tenta um classificador de IA pra rotear
-    // pra uma das 6 skills de consulta mais seguras de generalizar (só
-    // leitura, nunca cria/altera dado) em vez de já desistir pro menu fixo
-    // "1-gasto 2-renda 3-dívida 4-outro". Ver classificador-consulta-livre.ts
-    // pro racional completo (revisado com ChatGPT antes de subir) e pra
-    // Fase 2 proposta (exemplos aprovados + correção do usuário como sinal
-    // de treino, com humano aprovando antes de virar regra nova).
-    if (sessao.clienteId) {
-      const respostaConsultaLivre = await tentarResponderConsultaLivre(mensagem, sessao.clienteId, clienteGratuito);
-      if (respostaConsultaLivre) {
-        await sendWhatsApp(telefone, respostaConsultaLivre);
-
-        await prisma.botSessao.updateMany({
-          where: { id: sessao.id },
-          data: {
-            dividasTemp: JSON.stringify([
-              ...servidorHistoricoSessao,
-              { role: "user", content: mensagem },
-              { role: "assistant", content: respostaConsultaLivre },
-            ]),
-          },
-        });
-
-        return NextResponse.json({ ok: true });
-      }
     }
 
     const resultado = await processarMensagemIA(
