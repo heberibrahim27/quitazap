@@ -15,7 +15,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp, sendWhatsAppInstancia, normalizarTelefone } from "@/lib/zapi";
+import { sendWhatsAppInstancia, normalizarTelefone } from "@/lib/zapi";
+import { deliverReminder } from "@/lib/reminder-delivery";
 
 // ── Formatação ────────────────────────────
 
@@ -293,7 +294,12 @@ export async function GET(req: NextRequest) {
       if (!mensagem) continue;
 
       try {
-        await sendWhatsApp(sessao.telefone, mensagem);
+        // Áudio só nos lembretes mais importantes (vence hoje/amanhã) —
+        // pedido do Ibrahim (09/09/2026), recomendação do ChatGPT: não vale
+        // gerar TTS pra todo aviso pequeno (custo recorrente por cliente
+        // ativo). O D-3 sempre sai só em texto.
+        const modoPermitido = diasRestantes <= 1 ? divida.cliente.modoLembrete : "TEXTO";
+        await deliverReminder({ phone: sessao.telefone, mensagem, modo: modoPermitido });
         legadoEnviados++;
       } catch (err) {
         legadoErros.push(`${nomeCliente} (${divida.credor}): ${err}`);
