@@ -1,5 +1,5 @@
 import { formatarValorBR } from "../gasto-flow";
-import { parseMoneyBR } from "../money";
+import { parseMoneyBR, valorComMultiplicadorEscrito } from "../money";
 import { normalizarDescricaoFinanceira } from "../descricao-financeira";
 import {
   avaliarEscopoFinanceiro,
@@ -423,11 +423,21 @@ function resolverLancamentosSimples(mensagem: string): FinanceiroIntent | null {
   };
 }
 
+// Bug achado em teste ao vivo (09/09/2026): "financiei uma moto de 15 mil,
+// vou pagar em 24x de 800" (e o mesmíssimo problema já existente em "tenho
+// um financiamento de carro em 48x de 500 reais") extraía valores=[15, 24,
+// 800] em vez de [15000, 24, 800] — o candidato aqui era só o dígito solto
+// (\d[\d.,]*), cortando "mil"/"k" ANTES de extrairPrimeiroValor (que já usa
+// parseMoneyBR, capaz de entender o multiplicador) sequer ver o texto
+// completo. Mesma causa raiz já corrigida em gasto-flow.ts e
+// controle-financeiro-flow.ts — aqui o candidato também precisa incluir o
+// sufixo opcional pra valorComMultiplicadorEscrito funcionar.
 function extrairTodosValores(texto: string): number[] {
-  const candidatos = texto.match(/\d[\d.,]*/g) ?? [];
+  const candidatos =
+    texto.match(/\d[\d.,]*(?:\s*(?:milh[õo]es|milh[ãa]o|mil)\b)?(?:\s*k\b)?/gi) ?? [];
   const valores: number[] = [];
   for (const candidato of candidatos) {
-    const valor = extrairPrimeiroValor(candidato);
+    const valor = valorComMultiplicadorEscrito(candidato) ?? extrairPrimeiroValor(candidato);
     if (valor) valores.push(valor);
   }
   return valores;
@@ -492,19 +502,63 @@ export function resolverDivida(mensagemOriginal: string): FinanceiroIntent | nul
   // dívida/parcela reconhecida por resolverPagamentoDivida.
   if (temIndicadorDePagamento(texto)) return null;
 
+  // "financiei"/"vou financiar" (achado em teste ao vivo, 09/09/2026) — só o
+  // substantivo "financiamento" era reconhecido aqui; o verbo "financiar"
+  // conjugado (forma muito mais comum de contar uma compra financiada, ex.:
+  // "financiei uma moto de 15 mil") nunca batia, caindo na resposta
+  // genérica de fora de escopo mesmo depois do scope-guard já liberar a
+  // mensagem (achado alinhado: precisa das duas correções juntas).
   const ehDivida =
-    /\b(emprestimo|financiamento|consignado)\b/.test(texto) ||
+    /\b(emprestimo|financiamento|financi(?:ei|ou|aram|ando|ar)|consignado)\b/.test(texto) ||
     (/\b(to devendo|estou devendo|devo)\b/.test(texto) && /\b(pro|pra|para)\b/.test(texto)) ||
     /\btenho uma divida\b/.test(texto);
   if (!ehDivida) return null;
 
-  const valores = extrairTodosValores(mensagemOriginal);
-  if (valores.length === 0) return null;
+  // "Nx [de] VALOR" (ex.: "24x de 800", "48x de 500 reais") — jeito padrão
+  // brasileiro de descrever parcelamento. Achado em teste ao vivo
+  // (09/09/2026): sem tratar isso à parte, o "24"/"48" solto entrava na
+  // lista genérica de valores igual um valor monetário qualquer, e
+  // resolverDivida pegava valores[0]/valores[1] às cegas — pra "financiei
+  // uma moto de 15 mil, vou pagar em 24x de 800" isso virava valor:24,
+  // valorTotalDivida:15000/24=625 parcelas, tudo errado (achado ao vivo o
+  // mesmo problema, de forma mais sutil, no exemplo já documentado acima:
+  // "financiamento de carro em 48x de 500 reais" virava valorTotalDivida:48,
+  // valor:500 — só não confirmava por sorte, porque 48 < 500 disparava
+  // valorTotalDividaConsistente). Captura o par (parcelas, valor da
+  // parcela) direto quando vêm colados, e tira esse trecho da mensagem
+  // antes de extrair os outros valores (pra não contar "24"/"48" de novo
+  // como se fosse valor total).
+  const parcelaExplicitaMatch = mensagemOriginal.match(
+    /\b(\d{1,3})\s*x\s*(?:de\s*)?((?:r\$\s*)?\d[\d.,]*(?:\s*(?:milh[õo]es|milh[ãa]o|mil)\b)?(?:\s*k\b)?(?:\s*(?:reais|real))?)/i
+  );
+  const parcelaBareMatch = parcelaExplicitaMatch ?? mensagemOriginal.match(/\b(\d{1,3})\s*x\b/i);
+
+  let totalParcelasExplicito: number | null = null;
+  let valorParcelaExplicito: number | null = null;
+  let mensagemSemParcelas = mensagemOriginal;
+  if (parcelaBareMatch && parcelaBareMatch.index != null) {
+    totalParcelasExplicito = Number(parcelaBareMatch[1]) || null;
+    if (parcelaExplicitaMatch && parcelaExplicitaMatch[2]) {
+      valorParcelaExplicito =
+        valorComMultiplicadorEscrito(parcelaExplicitaMatch[2]) ?? parseMoneyBR(parcelaExplicitaMatch[2]) ?? null;
+    }
+    mensagemSemParcelas =
+      mensagemOriginal.slice(0, parcelaBareMatch.index) +
+      mensagemOriginal.slice(parcelaBareMatch.index + parcelaBareMatch[0].length);
+  }
+
+  const valores = extrairTodosValores(mensagemSemParcelas);
+  if (valores.length === 0 && !valorParcelaExplicito) return null;
 
   const mensal = /\b(por mes|mensal|todo mes)\b/.test(texto);
   let valorTotalDivida: number | null = null;
-  let valorParcela: number | null = null;
-  if (valores.length >= 2) {
+  let valorParcela: number | null = valorParcelaExplicito;
+  if (valorParcelaExplicito) {
+    // "Nx de VALOR" já resolveu a parcela — o que sobrar de valor solto na
+    // frase (se houver) só pode ser o total mencionado à parte (ex.: "de 15
+    // mil" antes do "em 24x de 800").
+    if (valores.length >= 1) valorTotalDivida = valores[0];
+  } else if (valores.length >= 2) {
     valorTotalDivida = valores[0];
     valorParcela = valores[1];
   } else if (mensal) {
@@ -513,9 +567,16 @@ export function resolverDivida(mensagemOriginal: string): FinanceiroIntent | nul
     valorTotalDivida = valores[0];
   }
 
-  let totalParcelas: number | null = null;
-  if (valorTotalDivida && valorParcela && valorParcela > 0) {
+  let totalParcelas: number | null =
+    totalParcelasExplicito && totalParcelasExplicito > 0 ? totalParcelasExplicito : null;
+  if (!totalParcelas && valorTotalDivida && valorParcela && valorParcela > 0) {
     totalParcelas = Math.max(1, Math.ceil(valorTotalDivida / valorParcela));
+  }
+  // Total não foi dito explicitamente, mas dá pra calcular com certeza a
+  // partir de parcelas × valor da parcela (não é estimativa, é multiplicação
+  // direta do que o cliente informou).
+  if (!valorTotalDivida && totalParcelas && valorParcela && valorParcela > 0) {
+    valorTotalDivida = Math.round(totalParcelas * valorParcela * 100) / 100;
   }
 
   const credorMatch =
@@ -525,7 +586,7 @@ export function resolverDivida(mensagemOriginal: string): FinanceiroIntent | nul
 
   const tipoDivida: TipoDividaFinanceiro = /\bcartao\b/.test(texto)
     ? "CARTAO"
-    : /\b(emprestimo|financiamento|consignado)\b/.test(texto)
+    : /\b(emprestimo|financiamento|financi(?:ei|ou|aram|ando|ar)|consignado)\b/.test(texto)
       ? "EMPRESTIMO"
       : /\bboleto\b/.test(texto)
         ? "BOLETO"

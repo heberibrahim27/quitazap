@@ -93,6 +93,13 @@ const PADROES_ESCOPO = [
   // teste do requisito "não deixar passar nenhuma informação do cliente".
   /\bemprestimo\b/,
   /\bfinanciamento\b/,
+  // "financiei uma moto"/"vou financiar um carro" (achado em teste ao vivo,
+  // 09/09/2026) — só o SUBSTANTIVO "financiamento" estava coberto, o VERBO
+  // "financiar" conjugado (jeito muito mais comum de contar que comprou algo
+  // financiado) nunca batia em nenhum lugar, nem aqui nem no resolvedor
+  // local de dívida — a mensagem inteira caía na resposta genérica de
+  // "não entendi" sem registrar nada.
+  /\bfinanci(?:ei|ou|aram|ando|ar)\b/,
   /\bconsignado\b/,
   /\bparcelas?\b/,
   /\bquitei\b/,
@@ -199,7 +206,7 @@ function pareceValorMonetarioForte(texto: string): boolean {
 // Mesmo verbo financeiro forte usado no gate de deveChamarInterpretadorFinanceiroIA
 // logo abaixo — mantido num só lugar pra evitar as duas listas divergirem.
 const VERBO_FINANCEIRO_FORTE =
-  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|emprestimo|financiamento|consignado)\b/;
+  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
 
 // Valor por extenso ("gastei cem reais", "recebi mil e duzentos") não tem
 // NENHUM dígito — achado em teste ao vivo, set/2026: sem essa checagem a
