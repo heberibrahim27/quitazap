@@ -68,11 +68,8 @@ function CobradorContent() {
   const [loading, setLoading]         = useState(true);
   const [filtro, setFiltro]           = useState("");
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [mostrarBroadcast, setMostrarBroadcast] = useState(false);
   const [criando, setCriando]         = useState(false);
   const [disparando, setDisparando]   = useState<string | null>(null);
-  const [broadcasting, setBroadcasting] = useState(false);
-  const [broadcastPreview, setBroadcastPreview] = useState<{ totalDestinatarios: number; mensagemPreview: string } | null>(null);
   const [toast, setToast]             = useState<{ msg: string; ok: boolean } | null>(null);
   const [form, setForm]               = useState({
     devedorNome: "", devedorFone: "", valor: "", diaVencimento: "", mensagem: "", pixChave: "",
@@ -167,30 +164,8 @@ function CobradorContent() {
     }
   }
 
-  async function abrirBroadcast() {
-    const res = await fetch("/api/broadcast/cobrador", {
-      headers: { "x-internal-call": "1" },
-    });
-    if (res.ok) {
-      const d = await res.json();
-      setBroadcastPreview(d);
-    }
-    setMostrarBroadcast(true);
-  }
-
-  async function enviarBroadcast() {
-    setBroadcasting(true);
-    const res = await fetch("/api/broadcast/cobrador", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-internal-call": "1" },
-      body: JSON.stringify({}),
-    });
-    const d = await res.json();
-    setBroadcasting(false);
-    setMostrarBroadcast(false);
-    if (res.ok) showToast(`📣 Broadcast enviado para ${d.enviados} cliente(s)!`);
-    else showToast("Erro no broadcast.", false);
-  }
+  // abrirBroadcast()/enviarBroadcast() removidas em 09/09/2026 junto com o
+  // botão e modal "Avisar clientes" — ver comentário acima do botão.
 
   // KPIs
   const pendentes     = cobrancas.filter((c) => c.status === "PENDENTE").length;
@@ -274,12 +249,10 @@ function CobradorContent() {
               </p>
             </div>
             <div className="cobrador-hero-btns">
-              {!modoCliente && (
-                <button onClick={abrirBroadcast}
-                  style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
-                  📣 Avisar clientes
-                </button>
-              )}
+              {/* Botão "📣 Avisar clientes" (broadcast em massa) removido em
+                  09/09/2026 — decisão do Ibrahim pós-incidente de spam: sem
+                  envio por iniciativa nossa, nem pra clientes já cadastrados.
+                  Rota /api/broadcast/cobrador desativada no backend. */}
               <button onClick={() => setMostrarForm(!mostrarForm)}
                 style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
                 + Nova cobrança
@@ -307,35 +280,8 @@ function CobradorContent() {
       {/* ── Corpo ── */}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
 
-        {/* Modal broadcast */}
-        {mostrarBroadcast && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-            <div style={{ background: "white", borderRadius: 20, padding: 28, maxWidth: 480, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                <div>
-                  <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>📣 Avisar clientes</h2>
-                  <p style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                    Envia mensagem sobre o Cobrador para <strong>{broadcastPreview?.totalDestinatarios ?? "..."}</strong> cliente(s) ativo(s)
-                  </p>
-                </div>
-                <button onClick={() => setMostrarBroadcast(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>✕</button>
-              </div>
-              <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: 14, fontSize: 12, color: "#374151", whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto", fontFamily: "monospace", lineHeight: 1.6, marginBottom: 16 }}>
-                {broadcastPreview?.mensagemPreview ?? "Carregando..."}
-              </div>
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button onClick={() => setMostrarBroadcast(false)}
-                  style={{ padding: "9px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "white", cursor: "pointer", fontSize: 13 }}>
-                  Cancelar
-                </button>
-                <button onClick={enviarBroadcast} disabled={broadcasting}
-                  style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: DARK2, color: "white", fontWeight: 700, cursor: "pointer", fontSize: 13, opacity: broadcasting ? 0.6 : 1 }}>
-                  {broadcasting ? "⏳ Enviando..." : `📣 Enviar para ${broadcastPreview?.totalDestinatarios ?? "..."} clientes`}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Modal broadcast removido em 09/09/2026 junto com o botão "Avisar
+            clientes" — ver comentário acima. */}
 
         {/* Formulário nova cobrança */}
         {mostrarForm && (
