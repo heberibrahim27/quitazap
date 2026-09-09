@@ -144,9 +144,20 @@ export async function calcularResumoFinanceiro(
   // divida.descontadoEmFolha=true = consignado, já refletido no salário
   // líquido que o cliente lança/declara como renda (ver schema.prisma) —
   // excluído aqui pra não abater a mesma dívida duas vezes do saldo.
+  // Mesma correção de resumoPlanoSimplificado (plano-pagamento-service.ts,
+  // achado ao vivo Ibrahim 09/09/2026): soma parcela PENDENTE com vencimento
+  // no período OU parcela PAGA cujo pagamento caiu no período (via
+  // atualizadoEm), pra não "esquecer" parcela já paga no cálculo do que já
+  // comprometeu o saldo do mês. Ver comentário completo lá.
   const parcelasDoPeriodo = resumoPlano.calculavel
     ? await prisma.parcela.findMany({
-        where: { status: "PENDENTE", vencimento: { gte: periodo.inicio, lt: periodo.fim }, divida: { clienteId, status: "ATIVA", descontadoEmFolha: false } },
+        where: {
+          divida: { clienteId, descontadoEmFolha: false, status: { not: "CANCELADA" } },
+          OR: [
+            { status: "PENDENTE", vencimento: { gte: periodo.inicio, lt: periodo.fim } },
+            { status: "PAGA", atualizadoEm: { gte: periodo.inicio, lt: periodo.fim } },
+          ],
+        },
         select: { valor: true, divida: { select: { tipo: true } } },
       })
     : [];
