@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp } from "@/lib/zapi";
+import { deliverReminder } from "@/lib/reminder-delivery";
 import { calcularProximaOcorrencia } from "@/lib/tarefa-flow";
 import { enviarPush } from "@/lib/push-service";
 
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
         status: "PENDENTE",
         vencimento: { gte: doisDiasAntes, lt: doisDiasDepois },
       },
-      include: { cliente: { select: { telefone: true, aceitaProativas: true } } },
+      include: { cliente: { select: { telefone: true, aceitaProativas: true, modoLembrete: true } } },
     });
 
     for (const t of candidatasHoje) {
@@ -130,7 +130,10 @@ export async function GET(req: NextRequest) {
       const telefone = t.cliente?.telefone;
       if (telefone && t.cliente?.aceitaProativas) {
         try {
-          await sendWhatsApp(telefone, mensagemWhatsApp);
+          // Mesma régua do cron/lembretes: áudio só pra tarefa que já está
+          // em cima da hora (hoje/amanhã) — aqui os dois casos possíveis já
+          // são D-1/D+0, então não precisa de checagem extra de prazo.
+          await deliverReminder({ phone: telefone, mensagem: mensagemWhatsApp, modo: t.cliente?.modoLembrete });
           enviouAlgo = true;
         } catch (err) {
           erros.push(`whatsapp ${t.id} (${t.descricao}): ${err}`);
