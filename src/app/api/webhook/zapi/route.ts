@@ -473,13 +473,15 @@ Se for uma FATURA DE CARTÃO DE CRÉDITO (documento com lista de compras do mês
 Regras para a fatura de cartão:
 - emissor: o nome popular/comercial do banco ou cartão, como o cliente reconheceria (ex: "Nubank", "Itaú", "Inter", "C6 Bank", "Bradesco") — NUNCA a razão social legal (ex: nunca "NU PAGAMENTOS S.A.", nunca CNPJ).
 - vencimentoFatura: a data de VENCIMENTO da fatura (não a de fechamento), formato AAAA-MM-DD. Se não conseguir ler com certeza, use null.
-- parceladas: liste APENAS compras com parcelamento explicitamente impresso no documento, no formato "parcela X/Y", "X de Y" ou equivalente, onde ainda restam parcelas futuras (Y maior que X). NUNCA inclua:
+- IMPORTANTE — cobertura completa: percorra TODAS as seções de lançamentos do documento (normalmente "Transações"/"Compras" E também "Pagamentos e Financiamentos"/"Parcelamentos" quando existirem como seções separadas — Pix parcelado no crédito, empréstimo ou financiamento pelo cartão também contam, não são só "compras em loja"), linha por linha, do início ao fim, mesmo em documentos com várias páginas. NUNCA pule ou deduplique uma linha só porque o nome se repete: é comum a MESMA loja/pessoa aparecer várias vezes na fatura com parcelamentos DIFERENTES e não relacionados (ex: "Loja X - Parcela 2/2" e, em outra linha, "Loja X - Parcela 1/3") — trate cada linha como uma compra independente e avalie cada uma pela própria fração impressa, nunca pelo que outra linha do mesmo nome mostrou.
+- parceladas: liste TODA compra/lançamento com parcelamento explicitamente impresso no documento, no formato "parcela X/Y", "X de Y" ou equivalente, onde ainda restam parcelas futuras (Y maior que X). NUNCA inclua:
   - compra à vista (sem nenhuma indicação de parcelamento) — não gera compromisso futuro;
   - compra cuja parcela atual já é a última (X igual a Y) — nada de futuro a lançar;
   - qualquer parcelamento que você tenha que INFERIR ou ADIVINHAR — se X e Y não estiverem explicitamente impressos na linha da compra, não inclua essa compra na lista, mesmo que pareça parcelada pelo nome da loja.
-- descricao: nome da loja/compra, sem incluir o texto da parcela (ex: "Magazine Luiza", nunca "Magazine Luiza 03/10").
+- descricao: nome da loja/pessoa/compra, sem incluir o texto da parcela (ex: "Magazine Luiza", nunca "Magazine Luiza 03/10").
 - parcelaAtual/totalParcelas: números inteiros, exatamente como impressos (ex: "03/10" → parcelaAtual=3, totalParcelas=10).
-- valorParcela: valor da parcela impresso na linha daquela compra, sempre número.
+- valorParcela: valor da parcela impresso na linha daquela compra (quando a linha mostrar "total a pagar" da parcela com juros/IOF embutido, use esse total — é o valor que realmente vai cobrar do cliente), sempre número.
+- Antes de responder, revise sua própria lista contra o documento mais uma vez: confira se todo "X/Y" com Y maior que X que aparece em QUALQUER seção de lançamentos da fatura está presente na lista, incluindo casos de nomes repetidos.
 - Se não conseguir identificar o emissor OU a data de vencimento com confiança, responda com tipo "OUTRO" em vez de arriscar.
 
 Se não for contracheque, boleto nem fatura de cartão (for extrato bancário, comprovante avulso, etc), responda com:
