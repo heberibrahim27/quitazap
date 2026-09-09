@@ -103,6 +103,11 @@ const PALAVRAS_GASTO = [
   "gasto",
   "apostei",
   "paguei",
+  // Gírias muito comuns pra "gastei" (achado em teste ao vivo, 09/09/2026) —
+  // sem elas, "torrei 200 no rolê"/"desembolsei 300 pro conserto" nunca
+  // eram detectados como gasto em lugar nenhum.
+  "torrei",
+  "desembolsei",
   "pago",
   "comprei",
   "compra",
