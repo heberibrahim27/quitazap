@@ -26,18 +26,25 @@
 //    mais inteligente, chamado a cada mensagem — nada fica "aprendido"
 //    entre uma mensagem e outra.
 //
-// 2) Roda por ÚLTIMO na cascata do webhook, não logo após os 8 regex —
-//    ver route.ts, chamado só imediatamente antes do rescue ladder. Isso
-//    garante que TODO fluxo determinístico (os 8 regex, registro de
-//    gasto/renda/dívida, tarefas, lembretes) já teve a chance de resolver
-//    a mensagem primeiro. Importante: NÃO filtra por "a mensagem não pode
-//    conter gastei/paguei/comprei/recebi" (erro que quase cometi) — isso
+// 2) Roda logo APÓS os 8 regex de consulta, ANTES do
+//    resolverIntencaoFinanceiraIA (o classificador geral de gasto/renda/
+//    dívida) — ver route.ts. Cheguei a subir uma primeira versão rodando
+//    só no fim da cascata (imediatamente antes do rescue ladder), mas
+//    achado ao vivo (teste real, 09/2026): resolverIntencaoFinanceiraIA
+//    tenta classificar QUALQUER mensagem que sobra, inclusive consultas, e
+//    quando decide "fora de escopo" (emEscopo: false) já responde com uma
+//    mensagem genérica de apresentação e ENCERRA a requisição — nesse
+//    caso este classificador, colocado depois, nunca seria alcançado.
+//    Rodando antes, ele tem a primeira chance de reconhecer uma consulta
+//    de leitura antes do resolver geral errar a classificação dela.
+//    Importante: NÃO filtra por "a mensagem não pode conter
+//    gastei/paguei/comprei/recebi" (erro que quase cometi) — isso
 //    bloquearia consultas 100% legítimas tipo "quanto gastei esse mês?"
-//    ou "quanto paguei de cartão?", que usam esses mesmos verbos. Como
-//    esse classificador só roda DEPOIS que o registro determinístico de
-//    lançamento já teve sua chance e não encontrou nada concreto pra
-//    lançar, não tem risco de "roubar" uma mensagem que devia virar
-//    lançamento — nesse ponto da cascata, ela já não é uma.
+//    ou "quanto paguei de cartão?", que usam esses mesmos verbos. A
+//    heurística de "parece pergunta" (ver pareceConsultaLivre) já basta
+//    pra não roubar uma mensagem declarativa de registro ("gastei 50 no
+//    mercado" não tem "?" nem palavra interrogativa, então nem chega a
+//    chamar IA aqui) — não precisa esperar nenhum outro fluxo rodar antes.
 //
 // 3) SÓ pode rotear pra skills de LEITURA PURA (nunca cria/altera
 //    Lancamento, Divida, Cartao etc) — pior caso de erro de classificação
@@ -55,12 +62,11 @@
 //    palavra" — a API já garante o formato da resposta, sem parsing de
 //    texto livre torcendo pra vir certo.
 //
-// Custo/latência: só dispara quando (a) nenhum dos 8 regex bateu, (b) o
-// fluxo determinístico de registro (gasto/renda/dívida/tarefa/lembrete)
-// não reconheceu nada concreto, e (c) a mensagem PARECE uma pergunta
-// (heurística barata — ver pareceConsultaLivre). Mensagens declarativas
-// puras ("gastei 50 no mercado") nunca chegam aqui: são resolvidas antes,
-// mais acima na cascata.
+// Custo/latência: só dispara quando (a) nenhum dos 8 regex de consulta
+// bateu e (b) a mensagem PARECE uma pergunta (heurística barata — ver
+// pareceConsultaLivre). Mensagens declarativas puras ("gastei 50 no
+// mercado") não têm "?" nem palavra interrogativa, então nunca chamam IA
+// aqui — seguem intactas pro resolverIntencaoFinanceiraIA logo depois.
 
 import { chatCompletion } from "@/lib/ai/openai-client";
 import { responderConsultaFinanceira, type TipoConsultaFinanceira } from "./consulta-financeira-resolver";
