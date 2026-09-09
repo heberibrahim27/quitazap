@@ -274,6 +274,12 @@ model BotSessao {
   // comentário acima: tipos de documento e schemas de confirmação
   // diferentes).
   faturaCartaoPendente Json?
+  // Comprovante de compra (foto) com loja/valor extraído por IA de visão,
+  // aguardando confirmação (sim/não) antes de virar Lancamento — ver
+  // src/lib/comprovante-foto-flow.ts. Campo isolado dos dois acima de
+  // propósito (mesmo motivo: tipos de origem e schemas de confirmação
+  // diferentes).
+  comprovanteFotoPendente Json?
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
