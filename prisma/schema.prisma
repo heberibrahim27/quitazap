@@ -692,6 +692,30 @@ model MetaFinanceira {
 }
 
 // ─────────────────────────────────────────
+// MONITOR Z-API — detecta instância de WhatsApp desconectada e avisa
+// ─────────────────────────────────────────
+// Achado ao vivo (09/09/2026, Ibrahim: "bot não responde números diferentes
+// do meu"): a instância Z-API do QuitaZAP estava (e talvez ainda esteja,
+// dependendo do dia) desconectada do WhatsApp — sem ninguém checando, isso
+// só aparece quando um cliente reclama. Ibrahim pediu uma solução pra não
+// precisar ficar de olho na tela o tempo todo.
+//
+// Esta tabela guarda só o último estado conhecido de cada instância (1
+// linha por instância — "quitazap" por enquanto, mas dá pra reusar pra
+// outras no futuro). src/app/api/cron/zapi-status/route.ts lê o estado
+// atual direto na Z-API, compara com o que tá salvo aqui, e só marca
+// `alertar: true` na resposta quando o estado MUDOU (caiu agora, ou voltou
+// agora) — assim quem chama esse endpoint periodicamente (ex: uma tarefa
+// agendada) só manda aviso pro Ibrahim quando há algo novo, nunca em loop
+// repetido enquanto o problema continua sem solução.
+model MonitorZapi {
+  id           String   @id @default(cuid())
+  instancia    String   @unique // "quitazap"
+  conectado    Boolean
+  atualizadoEm DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
 // MARKETING — investimento em aquisição paga (Ads)
 // ─────────────────────────────────────────
 // Pedido do Ibrahim (2026-09-06): tela /marketing pra projetar meses de
