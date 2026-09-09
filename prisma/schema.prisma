@@ -64,6 +64,7 @@ model Cliente {
   insightsDetectados        InsightDetectado[]
   saudeFinanceiraLogs       SaudeFinanceiraLog[]
   mensagensPendentesRevisao MensagemPendenteRevisao[]
+  documentosImportados      DocumentoImportado[]
 }
 
 // ─────────────────────────────────────────
@@ -175,10 +176,18 @@ model Divida {
   // evento de abatimento, já que o dinheiro nunca "saiu" de um saldo
   // controlado pelo app.
   descontadoEmFolha Boolean   @default(false)
+  // Cartão de origem, só quando tipo="CARTAO" E a dívida veio de uma compra
+  // parcelada identificável a um cartão específico (hoje: importação de
+  // fatura em PDF — ver fatura-cartao-flow.ts). Compra parcelada declarada
+  // por TEXTO ("comprei uma TV em 10x") continua sem cartaoId (o cliente
+  // raramente informa qual cartão nesse fluxo) — nullable de propósito,
+  // não retroagir pras dívidas antigas.
+  cartaoId          String?
   criadoEm          DateTime  @default(now())
   atualizadoEm      DateTime  @updatedAt
 
   cliente    Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cartao     Cartao?     @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
   parcelas   Parcela[]
   pagamentos Pagamento[]
   tarefas    Tarefa[]
@@ -249,6 +258,15 @@ model BotSessao {
   // preocupações diferentes: confirmação de documento vs. continuação de
   // conversa em texto).
   boletoPendente Json?
+  // Fatura de cartão extraída de PDF aguardando confirmação — ver
+  // src/lib/fatura-cartao-flow.ts. Guarda: cartão resolvido, fila de
+  // compras parecidas com dívida já existente (aguardando sim/não uma por
+  // uma, pra nunca duplicar o mesmo parcelamento entre faturas de meses
+  // diferentes) e, depois, a lista final aguardando confirmação em lote.
+  // Campo isolado do boletoPendente de propósito (mesmo motivo do
+  // comentário acima: tipos de documento e schemas de confirmação
+  // diferentes).
+  faturaCartaoPendente Json?
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
@@ -269,6 +287,26 @@ model MensagemProcessada {
   id        String   @id @default(cuid())
   messageId String   @unique
   criadoEm  DateTime @default(now())
+}
+
+// ─────────────────────────────────────────
+// DOCUMENTO IMPORTADO (dedupe de PDF já processado)
+// ─────────────────────────────────────────
+// Guarda o hash (SHA-256) de cada PDF cujas informações já viraram
+// lançamento/dívida, pra nunca reprocessar o MESMO arquivo duas vezes se o
+// cliente reenviar por engano (ver fatura-cartao-flow.ts). Só grava depois
+// de uma importação confirmada pelo cliente (sim) — se ele cancelar (não),
+// não grava, pra permitir reenviar/tentar de novo depois.
+model DocumentoImportado {
+  id        String   @id @default(cuid())
+  clienteId String
+  hash      String
+  tipo      String // ex: "FATURA_CARTAO"
+  criadoEm  DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, hash])
 }
 
 // ─────────────────────────────────────────
@@ -402,6 +440,7 @@ model Cartao {
 
   cliente     Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   lancamentos Lancamento[]
+  dividas     Divida[]
 
   @@unique([clienteId, nome])
 }
