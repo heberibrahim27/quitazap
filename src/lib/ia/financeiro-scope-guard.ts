@@ -131,6 +131,38 @@ const PADROES_ESCOPO = [
   /\bwaifai\b/,
   /\bwifi\b/,
   /\bchat ?gpt\b/,
+  // Achado em teste ao vivo (09/09/2026): mensagens SÓ com o nome do
+  // comércio/categoria + valor redondo (sem verbo tipo "gastei", sem
+  // decimal tipo "25,00", sem "R$", sem "reais") — jeito de digitar
+  // extremamente comum ("uber 25", "farmacia 30", "lanche 15") — nunca
+  // batiam em NADA aqui, mesmo o gasto-flow.ts já sabendo reconhecer e
+  // extrair o valor certinho dessas mesmas palavras (PALAVRAS_GASTO). Só
+  // "escapavam" por acidente quando o valor tinha decimal tipo ",90"
+  // (sinal financeiro à parte). Todas essas palavras já existem em
+  // PALAVRAS_GASTO — mantidas em listas separadas por design, mas
+  // precisam estar nas DUAS pra mensagem chegar até o resolvedor.
+  /\buber\b/,
+  /\bifood\b/,
+  /\blanche\b/,
+  /\blanxe\b/,
+  /\blanches\b/,
+  /\bagua\b/,
+  /\baguas\b/,
+  /\bpao\b/,
+  /\bpaes\b/,
+  /\bcoca\b/,
+  /\btransporte\b/,
+  /\btrasporte\b/,
+  /\btranporte\b/,
+  /\bsupermercado\b/,
+  /\bfarmacia\b/,
+  /\bremedio\b/,
+  /\bcredito\b/,
+  /\bdebito\b/,
+  /\bnetflix\b/,
+  /\bspotify\b/,
+  /\bcompra\b/,
+  /\bpago\b/,
 ];
 
 const ALIASES_CARTAO_ESCOPO = [
