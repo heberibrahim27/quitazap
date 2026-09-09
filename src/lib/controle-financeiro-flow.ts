@@ -698,8 +698,11 @@ function limparTextoDespesaFixa(linha: string): string {
 // do bug de gasto-flow.ts — a regex de valor cortava o dígito ANTES de
 // "mil"). Estende a captura pra incluir opcionalmente o multiplicador, e usa
 // valorComMultiplicadorEscrito antes de parseMoneyBR.
+// Achado depois, mesmo teste ao vivo: "Financiamento carro 8k" tinha o
+// mesmíssimo problema — "k" não estava na lista de sufixos aceitos aqui,
+// então nunca entrava no candidato pra valorComMultiplicadorEscrito ver.
 const REGEX_VALOR_DESPESA_FIXA =
-  /(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?(?:\s*(?:mil|milhoes|milhões|milhao|milhão)\b)?/i;
+  /(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?(?:\s*(?:mil|milhoes|milhões|milhao|milhão)\b)?(?:\s*k\b)?/i;
 
 function extrairItemDespesaFixa(linha: string): DespesaFixaRegistradaControle | null {
   const limpa = limparTextoDespesaFixa(linha);
