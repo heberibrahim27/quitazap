@@ -1155,7 +1155,14 @@ export async function POST(req: NextRequest) {
     // abertas ao mesmo tempo); não justificou unificar os dois mecanismos
     // de confirmação antes do lançamento.
     if (sessao.boletoPendente && tipoEntrada === "texto") {
-      const resposta = detectarRespostaBoleto(mensagem);
+      // Regex exata primeiro (grátis, instantânea); só cai pra IA quando o
+      // cliente não respondeu num dos formatos exatos esperados — cobre
+      // frases naturais tipo "isso mesmo pode salvar" ou "não quero não" que
+      // clientes de qualquer nível de escolaridade mandam no dia a dia (achado
+      // ao revisar o fluxo em 09/09/2026: sem isso o bot simplesmente não
+      // reagia e o boleto ficava pendente pra sempre). Mesmo padrão já usado
+      // em gerenciarDespesasFixasComFallbackIA/gerenciarFaturaCartaoComFallbackIA.
+      const resposta = detectarRespostaBoleto(mensagem) ?? (await classificarConfirmacaoIA(mensagem));
       if (resposta) {
         const boletoPendente = sessao.boletoPendente as unknown as BoletoDetectado;
         await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { boletoPendente: Prisma.JsonNull } });
@@ -1178,7 +1185,8 @@ export async function POST(req: NextRequest) {
     // (pendência dupla com o fluxo de texto é rara e não perde/duplica
     // nada, só pode pedir a confirmação de novo).
     if (sessao.faturaCartaoPendente && tipoEntrada === "texto") {
-      const resposta = detectarRespostaFaturaCartao(mensagem);
+      // Mesmo fallback por IA do bloco de boleto acima, mesmo motivo.
+      const resposta = detectarRespostaFaturaCartao(mensagem) ?? (await classificarConfirmacaoIA(mensagem));
       if (resposta) {
         const pendente = sessao.faturaCartaoPendente as unknown as FaturaCartaoPendente;
 
