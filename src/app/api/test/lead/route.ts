@@ -1,33 +1,30 @@
 // ─────────────────────────────────────────
 // QuitaZAP — API de teste do funil de vendas
 // POST /api/test/lead  →  dispara boas-vindas para um número
+//
+// DESATIVADA (09/09/2026): essa rota mandava uma mensagem REAL de WhatsApp
+// pra QUALQUER número digitado, sem exigir que a pessoa tivesse mandado
+// mensagem antes — e sem exigir login nenhum (a checagem "bloqueia em
+// produção" dependia da env var ENABLE_TEST_ROUTES, que estava LIGADA em
+// produção, deixando a rota aberta pra qualquer um bater nela direto, mesmo
+// sem passar pela tela /testar-funil). Confirmado ao vivo: uma sequência de
+// números falsos (98765-1111 até 98765-7777, tudo dígito repetido —
+// claramente digitado à mão pra teste) recebeu mensagem real do funil essa
+// manhã; ninguém respondeu (números não têm dono de verdade), e esse padrão
+// — várias mensagens "a frio" pra número sem relação nenhuma com o negócio
+// — foi exatamente o que fez o WhatsApp marcar a conta como spam e
+// desconectar. Enquanto essa rota não tiver um guard de verdade (login de
+// admin, número já com conversa, ou algo assim), ela fica desligada — o
+// risco de banimento permanente do número é grande demais. O simulador em
+// /testar-funil (lógica pura, sem mandar WhatsApp nenhum) continua
+// funcionando normalmente pra testar o funil.
 // ─────────────────────────────────────────
 
-import { NextRequest, NextResponse } from "next/server";
-import { processarLeadVendas } from "@/lib/sales-bot";
-import { normalizarTelefone } from "@/lib/zapi";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  // Bloqueia em produção se não tiver flag de teste
-  if (process.env.NODE_ENV === "production" && !process.env.ENABLE_TEST_ROUTES) {
-    return NextResponse.json({ error: "Rota de teste desabilitada em produção" }, { status: 403 });
-  }
-
-  try {
-    const body = await req.json();
-    const rawPhone = body.telefone ?? "";
-    const telefone = normalizarTelefone(String(rawPhone));
-
-    if (telefone.length < 12) {
-      return NextResponse.json({ error: "Número inválido. Use formato: 5511999999999" }, { status: 400 });
-    }
-
-    // Dispara o funil para o número (como se fosse uma primeira mensagem)
-    await processarLeadVendas(telefone, "oi");
-
-    return NextResponse.json({ ok: true, telefone });
-  } catch (err) {
-    console.error("[TEST/LEAD]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "Rota desativada — envio real de teste para número arbitrário causou denúncia de spam no WhatsApp (09/09/2026)." },
+    { status: 403 }
+  );
 }
