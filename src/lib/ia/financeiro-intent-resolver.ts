@@ -54,10 +54,15 @@ FORMATO DE CADA Item em "itens" — preencha SEMPRE os campos obrigatórios do t
 }
 
 CATEGORIAS VÁLIDAS pra "despesa_variavel"/"despesa_fixa" (escolha a mais parecida com o gasto descrito; nunca invente uma categoria nova nem deixe em branco — na dúvida use "Outros"):
-Mercado, Alimentação, Transporte, Moradia, Contas da casa, Saúde/Farmácia, Educação, Filhos/Família, Assinaturas, Apostas, Lazer, Beleza/Cuidados, Trabalho/Negócio, Dívidas/Cartões, Outros.
+Mercado, Alimentação, Transporte, Moradia, Contas da casa, Saúde/Farmácia, Educação, Filhos/Família, Assinaturas, Apostas, Lazer, Beleza/Cuidados, Compras pessoais, Impostos/Taxas, Trabalho/Negócio, Dívidas/Cartões, Outros.
+"Compras pessoais" = roupa, calçado, eletrônico, item pessoal avulso (ex: "comprei uma camisa 90", "tênis novo 250") — não é Lazer nem Beleza/Cuidados.
+"Impostos/Taxas" = IPVA, IPTU, multa, tarifa bancária, taxa, documento — não é Dívidas/Cartões.
 
 CATEGORIAS VÁLIDAS pra "receita" (escolha a mais parecida; na dúvida use "Outros"):
-Salário, Bico/Freelance, Dividendos/Investimentos, Prêmio, Gorjeta, Reembolso, Outros.
+Salário, Bico/Freelance, Dividendos/Investimentos, Aluguel recebido, Venda, Benefício/Auxílio, Prêmio, Gorjeta, Reembolso, Outros.
+"Aluguel recebido" = cliente recebendo aluguel de imóvel próprio (ex: "recebi 1200 de aluguel do apartamento") — nunca confundir com pagar aluguel (isso é despesa_fixa categoria Moradia).
+"Venda" = venda avulsa de bem próprio (ex: "vendi minha TV por 800", "vendi umas roupas por 200") — não é Bico/Freelance.
+"Benefício/Auxílio" = benefício, auxílio, pensão, aposentadoria, programa social.
 
 REGRA MAIS IMPORTANTE — NUNCA DEIXAR DE ENTENDER UM LANÇAMENTO SIMPLES: qualquer mensagem citando algo do dia a dia com um valor em dinheiro — mesmo curta, sem verbo, sem "reais", sem pontuação, tipo "Mercado 50,00" ou "50 uber" — é um lançamento válido e DEVE virar um item completo e confirmável (com tipo, descricaoNormalizada, categoria e valor todos preenchidos). Nunca devolva itens=[] nem um item incompleto quando a mensagem tiver uma descrição + um valor identificáveis — extraia o melhor palpite em vez de pedir pra reenviar. Só devolva itens=[] (ou emEscopo=false) quando a mensagem realmente não tiver nenhum valor/descrição financeira reconhecível.
 Exemplos (entrada → itens esperados):
