@@ -616,8 +616,24 @@ export function resolverMeta(mensagemOriginal: string): FinanceiroIntent | null 
     };
   }
 
+  // Bug achado em teste ao vivo (09/09/2026): "quero comecar a juntar
+  // dinheiro pra comprar uma moto, uns 8 mil" não batia aqui — a versão
+  // antiga exigia "quero" IMEDIATAMENTE seguido de "guardar"/"juntar", sem
+  // nada no meio. Isso fazia essa mensagem (bem comum, principalmente com
+  // "quero começar a...") cair pro classificador remoto, cujo próprio
+  // prompt (ver SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO acima, seção "VALOR
+  // MENCIONADO SEM SER TRANSAÇÃO") trata "quero juntar 10 mil" como
+  // hipótese/contexto, não lançamento — emEscopo=false — mesmo sendo
+  // exatamente o tipo de intenção que a funcionalidade de Meta existe pra
+  // capturar. Corrigir o prompt remoto é mais arriscado de testar agora (só
+  // dá pra validar de verdade chamando a IA de verdade); ampliar o
+  // resolvedor local determinístico pra cobrir mais formas comuns de dizer
+  // isso ("quero começar a guardar/juntar/poupar... pra...", "vou
+  // guardar/juntar... pra...", "preciso poupar... pra...") resolve o caso
+  // sem depender da IA pra essa frase específica.
   const criarMatch =
-    /\b(criar?|comec[ao]r?|abrir)\s+(?:uma\s+)?meta\b/.test(texto) || /\bquero (guardar|juntar)\b.*\bpra\b/.test(texto);
+    /\b(criar?|comec[ao]r?|abrir)\s+(?:uma\s+)?meta\b/.test(texto) ||
+    /\b(?:quero|vou|preciso|pretendo)\s+(?:comec[ao]r\s+a\s+)?(?:guardar|juntar|poupar)\b.*\bpra\b/.test(texto);
   if (criarMatch) {
     const nomeMatch =
       mensagemOriginal.match(/\bpra\s+([a-zà-úA-ZÀ-Ú][a-zà-úA-ZÀ-Ú\s]{1,40}?)(?:[,.;]|$)/i) ||
