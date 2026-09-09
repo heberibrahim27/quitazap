@@ -161,6 +161,12 @@ const PALAVRAS_GASTO = [
   "roleta",
   "foguetinho",
   "banca",
+  // Achado em teste ao vivo (09/09/2026): "dei 20 de gorjeta" e "rachei a
+  // conta, minha parte foi 40" são jeitos comuns de descrever um gasto que
+  // não usam nenhum verbo já coberto acima ("gastei"/"paguei"/...) — sem
+  // essas palavras, a mensagem inteira nunca era reconhecida como gasto.
+  "gorjeta",
+  "rachei",
 ];
 
 const TERMOS_APOSTAS =
@@ -347,6 +353,10 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     .replace(/\b\d+\b/g, " ");
   texto = removerValorPorExtenso(texto);
   texto = texto
+    // "rachei a conta, minha parte foi" (achado em teste ao vivo, 09/09/2026)
+    // — remove a locução inteira antes do strip de palavra única abaixo, pra
+    // não sobrar "minha parte foi" grudado na descrição.
+    .replace(/\bminha parte (?:foi|ficou|deu)\b/g, " ")
     .replace(/\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|cada|unidade|de|do|da|no|na|em|com|hoje|ontem)\b/g, " ")
     .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
     .replace(/\s+/g, " ")
