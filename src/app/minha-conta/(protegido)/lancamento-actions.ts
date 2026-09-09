@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { verificarOrcamentoEAvisar } from "@/lib/orcamento-service";
+import { adicionarMeses } from "@/lib/calculos";
 
 // Ações "rápidas" chamadas pelo sheet do botão "+" (BottomNav), disponível
 // em qualquer página — por isso não usam redirect nem dependem de
@@ -57,8 +58,12 @@ export async function criarDespesaRapida(formData: FormData): Promise<{ erro?: s
   if (parcelarNoCartao) {
     await prisma.lancamento.createMany({
       data: Array.from({ length: parcelas }, (_, i) => {
-        const dataParcela = new Date(dataLancamento);
-        dataParcela.setMonth(dataParcela.getMonth() + i);
+        // adicionarMeses — bug achado em teste ao vivo 09/09/2026: setMonth
+        // cru estoura pro mês seguinte quando a compra é feita em 29/30/31
+        // e o mês alvo da parcela tem menos dias, duplicando uma parcela
+        // num mês e pulando o outro por completo (mesmo bug de
+        // divida-service.ts, mesma correção).
+        const dataParcela = adicionarMeses(dataLancamento, i);
         const valorParcela = (centavosPorParcela + (i === parcelas - 1 ? restoCentavos : 0)) / 100;
         return {
           clienteId: cliente.id,
