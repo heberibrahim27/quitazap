@@ -843,7 +843,7 @@ async function registrarIntentFinanceiroDireto(
 
   after(() => persistirLancamentosControle(sessao.clienteId, resultado.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
   after(() => persistirCartaoControle(sessao.clienteId, resultado.cartaoParaPersistir));
-  after(() => persistirDividaConfirmadaIA(sessao.clienteId, resultado.dividaParaPersistir));
+  after(() => persistirDividaConfirmadaIA(sessao.clienteId, telefone, resultado.dividaParaPersistir));
   after(() => persistirPagamentoDividaConfirmadoIA(sessao.clienteId, telefone, resultado.pagamentoDividaParaPersistir));
   after(() => persistirMetaConfirmadaIA(sessao.clienteId, telefone, resultado.metaParaPersistir));
 }
@@ -1922,7 +1922,7 @@ Pode mandar tudo em uma mensagem só.`;
 
       after(() => persistirLancamentosControle(sessao.clienteId, gerenciamentoDespesasFixas.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
       after(() => persistirCartaoControle(sessao.clienteId, gerenciamentoDespesasFixas.cartaoParaPersistir));
-      after(() => persistirDividaConfirmadaIA(sessao.clienteId, gerenciamentoDespesasFixas.dividaParaPersistir));
+      after(() => persistirDividaConfirmadaIA(sessao.clienteId, telefone, gerenciamentoDespesasFixas.dividaParaPersistir));
       after(() => persistirPagamentoDividaConfirmadoIA(sessao.clienteId, telefone, gerenciamentoDespesasFixas.pagamentoDividaParaPersistir));
       after(() => persistirMetaConfirmadaIA(sessao.clienteId, telefone, gerenciamentoDespesasFixas.metaParaPersistir));
 
