@@ -198,6 +198,14 @@ model Divida {
   parcelas   Parcela[]
   pagamentos Pagamento[]
   tarefas    Tarefa[]
+
+  // Achado em auditoria de performance ao vivo (09/09/2026): sem índice
+  // nenhum, toda busca de dívida por cliente (praticamente toda mensagem
+  // do WhatsApp que toca em dívida/plano/resumo — motor.ts, plano-
+  // pagamento-motor.ts, comandos RESUMO_MES/QUITASCORE etc.) fazia table
+  // scan completo, piorando conforme a base de clientes cresce. Mesmo
+  // padrão de índice que Lancamento já tem (@@index([clienteId, data])).
+  @@index([clienteId, status])
 }
 
 // ─────────────────────────────────────────
@@ -216,6 +224,12 @@ model Parcela {
   atualizadoEm DateTime @updatedAt
 
   divida Divida @relation(fields: [dividaId], references: [id], onDelete: Cascade)
+
+  // Mesmo achado de performance do índice em Divida acima: toda dívida
+  // busca suas parcelas pendentes (plano de pagamento, resumo financeiro,
+  // motor de prioridade) filtrando por dividaId+status — sem índice,
+  // table scan em Parcela a cada mensagem que toca nisso.
+  @@index([dividaId, status])
 }
 
 // ─────────────────────────────────────────
