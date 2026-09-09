@@ -46,6 +46,13 @@ model Cliente {
   // vencimento, avisos de novidade) — não afeta respostas do bot a algo que
   // o próprio cliente mandou, isso nunca é bloqueado por este campo.
   aceitaProativas       Boolean   @default(true)
+  // Pedido do Ibrahim (09/09/2026): lembrete de vencimento/tarefa também
+  // pode sair como nota de voz, não só texto — ver reminder-delivery.ts.
+  // "TEXTO" (padrão, ninguém muda sem pedir) | "AUDIO" (só nota de voz,
+  // cai pra texto se TTS/envio falhar) | "TEXTO_E_AUDIO" (manda os dois,
+  // texto primeiro). Cliente troca mandando "lembrete em áudio"/"lembrete
+  // em texto" no WhatsApp (ver detectarComandoModoLembrete no webhook).
+  modoLembrete          String    @default("TEXTO")
   criadoEm              DateTime  @default(now())
   atualizadoEm          DateTime  @updatedAt
 
