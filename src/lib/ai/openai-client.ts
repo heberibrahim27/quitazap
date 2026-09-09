@@ -80,6 +80,16 @@ export type MensagemChat = {
   tool_call_id?: string;
 };
 
+// Structured Outputs (json_schema) — usado quando a chamada precisa de uma
+// classificação fechada (enum) em vez de texto livre pra formatar. Com
+// strict:true a própria API garante que a resposta bate com o schema (nunca
+// precisa de parsing "na esperança" de texto livre). Ver
+// classificador-consulta-livre.ts pro primeiro uso.
+export interface ResponseFormatJsonSchema {
+  type: "json_schema";
+  json_schema: { name: string; strict?: boolean; schema: Record<string, unknown> };
+}
+
 export interface ChatCompletionOpts {
   model: string;
   mensagens: MensagemChat[];
@@ -87,6 +97,7 @@ export interface ChatCompletionOpts {
   toolChoice?: "auto" | "none";
   temperature?: number;
   maxTokens?: number;
+  responseFormat?: ResponseFormatJsonSchema;
   telemetria: TelemetriaIA;
 }
 
@@ -109,6 +120,7 @@ export async function chatCompletion(opts: ChatCompletionOpts): Promise<ChatComp
       ...(opts.tools ? { tools: opts.tools, tool_choice: opts.toolChoice ?? "auto" } : {}),
       ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
       ...(opts.maxTokens != null ? { max_tokens: opts.maxTokens } : {}),
+      ...(opts.responseFormat ? { response_format: opts.responseFormat } : {}),
     }),
   });
 
