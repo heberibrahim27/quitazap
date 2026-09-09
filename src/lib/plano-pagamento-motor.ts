@@ -25,7 +25,7 @@
 // motor.ts/limite-seguro.ts (não é uma decisão de pagamento, é automático).
 
 import { prisma } from "@/lib/prisma";
-import { calcularResumoFinanceiro, limitesDoMes, anoMesAtualBrasil } from "@/lib/financeiro/motor";
+import { calcularResumoFinanceiro, limitesDoMes, anoMesAtualBrasil, inicioDoDiaBrasil, ultimoDiaDoMes } from "@/lib/financeiro/motor";
 import { nivelRiscoPorTipo, riscoCritico } from "@/lib/financeiro/risco-tipo-divida";
 import type { ReasonCode } from "@/lib/plano-pagamento-contrato";
 
@@ -117,8 +117,12 @@ export async function calcularPlanoPagamento(clienteId: string, referencia: Date
     include: { parcelas: { where: { status: "PENDENTE" }, orderBy: { vencimento: "asc" } } },
   });
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  // Bug achado em teste ao vivo (09/09/2026): `new Date(); setHours(0,0,0,0)`
+  // usa o fuso do processo (UTC em produção), não Brasília — ficava um dia
+  // fora de sincronia com o resto do Controle durante 21h-23h59 de Brasília.
+  // `ano`/`mes` já calculados acima (anoMesAtualBrasil) resolvem o mês de
+  // referência; aqui só falta o "hoje" em nível de dia, mesma âncora.
+  const hoje = inicioDoDiaBrasil(referencia);
   const emDiasAPartirDeHoje = (d: Date) => Math.round((d.getTime() - hoje.getTime()) / 86_400_000);
 
   type Bruto = {
@@ -132,7 +136,16 @@ export async function calcularPlanoPagamento(clienteId: string, referencia: Date
       if (saldoDevedor <= 0) return null;
 
       const proximaParcela = d.parcelas[0] ?? null;
-      const vencimento = proximaParcela?.vencimento ?? (d.diaVencimento ? new Date(hoje.getFullYear(), hoje.getMonth(), d.diaVencimento) : null);
+      // Bug achado em teste ao vivo (09/09/2026): diaVencimento=31 num mês
+      // com menos dias (fev/abr/jun/set/nov) estourava pro mês seguinte
+      // (new Date(ano, mes, 31) normaliza pra 2/3 de março, por exemplo),
+      // empurrando a dívida pra uma janela de "dias até vencer" bem maior
+      // que a real e escondendo ela do tier de prioridade certo perto da
+      // virada do mês. Clampa pro último dia válido do mês de referência.
+      const vencimento = proximaParcela?.vencimento
+        ?? (d.diaVencimento
+          ? new Date(Date.UTC(ano, mes - 1, Math.min(d.diaVencimento, ultimoDiaDoMes(ano, mes)), 3, 0, 0, 0))
+          : null);
       const diasAteVencer = vencimento ? emDiasAPartirDeHoje(vencimento) : null;
 
       let custoRelativo: number | null = null;

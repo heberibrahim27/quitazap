@@ -8,6 +8,7 @@
 // parcela/arredondamento.
 
 import { prisma } from "./prisma";
+import { adicionarMeses } from "./calculos";
 
 export type TipoDividaService = "CARTAO" | "EMPRESTIMO" | "BOLETO" | "ACORDO" | "OUTRO";
 
@@ -83,8 +84,11 @@ export async function criarDividaComParcelas(params: CriarDividaParcelaParams): 
     });
 
     const parcelasData = Array.from({ length: totalParcelas }, (_, i) => {
-      const vencimento = new Date(primeiraData);
-      vencimento.setMonth(vencimento.getMonth() + i);
+      // adicionarMeses (não d.setMonth direto) — bug achado em teste ao
+      // vivo 09/09/2026: setMonth cru estoura pro mês seguinte quando
+      // primeiraData cai em 29/30/31 e o mês alvo tem menos dias, gerando
+      // duas parcelas no mesmo mês e pulando um mês inteiro sem nenhuma.
+      const vencimento = adicionarMeses(primeiraData, i);
       const ehUltima = i === totalParcelas - 1;
       return {
         dividaId: divida.id,

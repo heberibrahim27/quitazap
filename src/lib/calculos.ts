@@ -64,9 +64,24 @@ export function diferencaDias(data: Date): number {
   return Math.round((alvo.getTime() - agora.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+// Bug achado em teste ao vivo (09/09/2026): `d.setMonth(d.getMonth()+meses)`
+// não clampa o dia — Date.setMonth() normaliza um dia fora do range
+// estourando pro mês SEGUINTE (ex: 31/01 + 1 mês vira 03/03, não 28/02,
+// porque fevereiro não tem dia 31). Isso corrompia qualquer cronograma
+// gerado com este helper sempre que a data-base cai no dia 29/30/31: dois
+// vencimentos caindo no mesmo mês-calendário (o que deveria ser o mês
+// pulado) e um mês inteiro sem nenhum vencimento. Usado tanto pra exibição
+// (dataQuitacao em gerarCenarios, abaixo) quanto — antes desta correção —
+// replicado inline em divida-service.ts e lancamento-actions.ts pra gerar
+// o cronograma de Parcela/Lancamento de dívidas e compras parceladas, onde
+// o efeito não era só visual: duplicava/zerava total comprometido do mês.
 export function adicionarMeses(data: Date, meses: number): Date {
+  const dia = data.getDate();
   const d = new Date(data);
+  d.setDate(1); // dia 1 sempre existe em qualquer mês — evita overflow ao trocar de mês
   d.setMonth(d.getMonth() + meses);
+  const ultimoDiaMesAlvo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ultimoDiaMesAlvo));
   return d;
 }
 
