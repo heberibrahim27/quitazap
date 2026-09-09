@@ -997,12 +997,20 @@ export async function POST(req: NextRequest) {
     if (sessao.clienteId) {
       const clienteAtual = await prisma.cliente.findUnique({
         where: { id: sessao.clienteId },
-        select: { assinaturaVenceEm: true, gratuito: true },
+        select: { assinaturaVenceEm: true, gratuito: true, isTeste: true },
       });
       const venceEm = clienteAtual?.assinaturaVenceEm;
       isGratuito = clienteAtual?.gratuito ?? false;
 
-      if (!isGratuito && venceEm && venceEm < new Date()) {
+      // Bug de teste achado ao vivo (09/09/2026): conta isTeste=true não
+      // era isenta desse bloqueio — sempre que a assinatura "de mentira"
+      // dela vencia (ela nunca é renovada de verdade), toda mensagem de
+      // teste passava a cair silenciosamente aqui e retornar ok:true sem
+      // NUNCA chegar em nenhum fluxo de verdade, fazendo qualquer teste
+      // nessa conta parecer "não fez nada" sem erro nenhum. Cliente de
+      // teste deve simular uma conta paga funcionando, independente do
+      // relógio de cobrança — mesmo espírito de `gratuito`.
+      if (!isGratuito && !clienteAtual?.isTeste && venceEm && venceEm < new Date()) {
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "nosso site";
         await sendWhatsApp(
           telefone,
