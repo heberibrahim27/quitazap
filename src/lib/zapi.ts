@@ -152,6 +152,82 @@ async function sendImageViaEvolution(phone: string, imageUrl: string, caption?: 
 }
 
 /**
+ * Envia uma nota de voz (áudio) via WhatsApp — usado pelo lembrete em áudio
+ * (reminder-delivery.ts). Recebe o MP3 já pronto em base64 (sem o prefixo
+ * "data:audio/mpeg;base64,", que é adicionado aqui).
+ * @param phone       Número completo com DDI: "5511999999999"
+ * @param audioBase64 Conteúdo do MP3 em base64 (puro, sem data URI)
+ */
+export async function sendWhatsAppAudio(phone: string, audioBase64: string) {
+  if (PROVIDER === "evolution") {
+    return sendAudioViaEvolution(phone, audioBase64);
+  }
+  return sendAudioViaZapi(phone, audioBase64);
+}
+
+async function sendAudioViaZapi(phone: string, audioBase64: string) {
+  if (!ZAPI_INSTANCE || ZAPI_INSTANCE === "SUA_INSTANCIA_AQUI") {
+    console.warn("[ZAPI] Credenciais não configuradas — áudio não enviado.");
+    console.log(`[ZAPI MOCK] Áudio para: ${phone}`);
+    return;
+  }
+
+  // Endpoint próprio de nota de voz (PTT) — documentação da Z-API aceita
+  // MP3 em base64 (data URI) com waveform:true, sem precisar converter pra
+  // OGG/Opus antes de enviar.
+  const url = `https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-audio`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(ZAPI_CLIENT_TOKEN ? { "Client-Token": ZAPI_CLIENT_TOKEN } : {}),
+    },
+    body: JSON.stringify({
+      phone,
+      audio: `data:audio/mpeg;base64,${audioBase64}`,
+      waveform: true,
+      viewOnce: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Z-API audio error ${res.status}: ${err}`);
+  }
+
+  return res.json();
+}
+
+async function sendAudioViaEvolution(phone: string, audioBase64: string) {
+  if (!EVO_URL || !EVO_INSTANCE || !EVO_APIKEY) {
+    console.warn("[EVO] Credenciais não configuradas — áudio não enviado.");
+    return;
+  }
+
+  // Endpoint próprio de nota de voz — diferente do sendMedia genérico usado
+  // pra imagem: é ele que devolve audioMessage.ptt:true (nota de voz de
+  // verdade, não arquivo anexado).
+  const url = `${EVO_URL}/message/sendWhatsAppAudio/${EVO_INSTANCE}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": EVO_APIKEY },
+    body: JSON.stringify({
+      number: phone,
+      audio: `data:audio/mpeg;base64,${audioBase64}`,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Evolution API audio error ${res.status}: ${err}`);
+  }
+
+  return res.json();
+}
+
+/**
  * Envia mensagem via WhatsApp usando instância específica (multi-tenant).
  *
  * Para Evolution API: usa `instancia` fornecida (por usuário) com a APIKEY global.
