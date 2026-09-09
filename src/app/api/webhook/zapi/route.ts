@@ -32,6 +32,7 @@ import {
 } from "@/lib/controle-financeiro-flow";
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
+import { detectarComandoModoLembrete, deliverReminder } from "@/lib/reminder-delivery";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
 import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
@@ -1267,6 +1268,32 @@ export async function POST(req: NextRequest) {
       await sendWhatsApp(telefone, respostaInicio);
 
       return NextResponse.json({ ok: true });
+    }
+
+    // ── Troca do modo de lembrete (texto/áudio) — funciona em qualquer
+    // etapa, igual RESETAR. Pedido do Ibrahim (09/09/2026). ──
+    if (sessao.clienteId && tipoEntrada === "texto") {
+      const modoPedido = detectarComandoModoLembrete(mensagem);
+      if (modoPedido) {
+        await prisma.cliente.update({
+          where: { id: sessao.clienteId },
+          data: { modoLembrete: modoPedido },
+        });
+        if (modoPedido === "AUDIO") {
+          // A própria confirmação já sai em nota de voz — assim o cliente
+          // já ouve na hora como vai ser, e isso serve de teste real do
+          // caminho TTS → Z-API a cada vez que alguém liga essa opção (cai
+          // pra texto sozinho se áudio falhar, igual qualquer lembrete).
+          await deliverReminder({
+            phone: telefone,
+            mensagem: "🔊 Combinado! De agora em diante, o lembrete de vencimento/tarefa mais importante vai chegar assim, em nota de voz (se algo falhar na hora, mando em texto). Pra voltar, é só mandar \"lembrete em texto\".",
+            modo: "AUDIO",
+          });
+        } else {
+          await sendWhatsApp(telefone, "✍️ Combinado! Seus lembretes voltam a ser só em texto.");
+        }
+        return NextResponse.json({ ok: true });
+      }
     }
 
     // ── Desfazer o último lançamento ───────────────────────────────────
