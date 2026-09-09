@@ -69,7 +69,6 @@ function CobradorContent() {
   const [filtro, setFiltro]           = useState("");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [criando, setCriando]         = useState(false);
-  const [disparando, setDisparando]   = useState<string | null>(null);
   const [toast, setToast]             = useState<{ msg: string; ok: boolean } | null>(null);
   const [form, setForm]               = useState({
     devedorNome: "", devedorFone: "", valor: "", diaVencimento: "", mensagem: "", pixChave: "",
@@ -119,25 +118,12 @@ function CobradorContent() {
     } else showToast("Erro ao cancelar.", false);
   }
 
-  async function dispararTodas() {
-    setDisparando("all");
-    const res = await fetch("/api/cobrador/disparar", { method: "POST" });
-    const d   = await res.json();
-    setDisparando(null);
-    if (res.ok) {
-      showToast(d.disparadas > 0 ? `🚀 ${d.disparadas} mensagem(ns) enviada(s)!` : "Nenhuma pendente para hoje.");
-      carregar();
-    } else showToast(res.status >= 500 ? "Não consegui completar agora. Tenta de novo em instantes." : (d.error ?? "Algo deu errado."), false);
-  }
-
-  async function enviarAgora() {
-    setDisparando("now");
-    const res = await fetch("/api/cobrador/disparar", { method: "POST" });
-    const d   = await res.json();
-    setDisparando(null);
-    if (res.ok) { showToast(`📤 ${d.disparadas ?? 0} enviada(s)!`); carregar(); }
-    else showToast("Erro ao disparar.", false);
-  }
+  // dispararTodas()/enviarAgora() removidas em 09/09/2026 — decisão do
+  // Ibrahim pós-incidente de spam: "mensagem fria nunca, não vamos correr o
+  // risco de bloqueio". O devedor nunca falou com o número da QuitaZAP, então
+  // não mandamos mais mensagem pra ele, nem manual nem automática (backend em
+  // /api/cron/cobrador e /api/cobrador/disparar pausados). A cobrança
+  // continua sendo registrada normalmente para o cliente acompanhar.
 
   async function criarCobranca(e: React.FormEvent) {
     e.preventDefault(); setCriando(true);
@@ -257,10 +243,8 @@ function CobradorContent() {
                 style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "white", fontSize: 12, fontWeight: 600, padding: "9px 14px", borderRadius: 10, cursor: "pointer" }}>
                 + Nova cobrança
               </button>
-              <button onClick={dispararTodas} disabled={disparando === "all"}
-                style={{ background: "#3b82f6", border: "none", color: "white", fontSize: 12, fontWeight: 700, padding: "9px 18px", borderRadius: 10, cursor: "pointer", opacity: disparando === "all" ? 0.6 : 1 }}>
-                {disparando === "all" ? "⏳ Enviando..." : "🚀 Disparar pendentes"}
-              </button>
+              {/* Botão "🚀 Disparar pendentes" removido em 09/09/2026 — envio
+                  automático/manual pro devedor pausado (ver comentário acima). */}
             </div>
           </div>
 
@@ -442,12 +426,8 @@ function CobradorContent() {
                           ✅ Paga
                         </button>
                       )}
-                      {c.status === "PENDENTE" && (
-                        <button onClick={enviarAgora} disabled={!!disparando}
-                          style={{ fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 10, border: "none", background: "#3b82f6", color: "white", cursor: "pointer", whiteSpace: "nowrap", opacity: disparando ? 0.6 : 1 }}>
-                          {disparando === "now" ? "⏳" : "📤 Enviar agora"}
-                        </button>
-                      )}
+                      {/* Botão "📤 Enviar agora" removido em 09/09/2026 — envio
+                          pro devedor pausado (ver comentário no topo do arquivo). */}
                       {c.status !== "CANCELADA" && c.status !== "PAGA" && (
                         <button onClick={() => cancelarCobranca(c.id)}
                           style={{ fontSize: 11, background: "none", border: "none", color: "#9ca3af", cursor: "pointer", padding: "2px 0", textAlign: "right" }}>
@@ -467,8 +447,7 @@ function CobradorContent() {
           <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: "#93c5fd", textTransform: "uppercase", marginBottom: 16 }}>Como cobrar</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {[
-              { icon: "💬", title: "Agendar cobrança",     code: "Cobrar João, 71999999999, R$500, dia 20" },
-              { icon: "⚡", title: "Enviar imediatamente", code: "Cobrar Maria, 71988887777, R$200, manda agora" },
+              { icon: "💬", title: "Registrar cobrança",   code: "Cobrar João, 71999999999, R$500, dia 20" },
               { icon: "🔑", title: "Com chave Pix",        code: "Cobrar Ana, 71977776666, R$300, dia 15, pix: 071.234.567-00" },
               { icon: "🎤", title: "Por áudio",            code: "Fale a cobrança — o bot transcreve e processa igual" },
             ].map((item) => (
@@ -484,7 +463,7 @@ function CobradorContent() {
             ))}
           </div>
           <p style={{ fontSize: 11, color: "#93c5fd", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 14, marginTop: 16 }}>
-            Régua: <strong>Amigável</strong> no vencimento → <strong>Firme</strong> em +3 dias → <strong>Última chance</strong> em +7 dias 🔄
+            ⚠️ Envio automático de cobrança pro devedor está pausado no momento — a cobrança fica registrada aqui pra você acompanhar.
           </p>
         </div>
       </div>
