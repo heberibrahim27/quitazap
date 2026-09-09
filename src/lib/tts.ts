@@ -15,8 +15,16 @@
 // ─────────────────────────────────────────
 
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
-// Voz neutra/calma — lembrete financeiro não é propaganda.
-const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || "alloy";
+// "alloy" (default antigo) soou robótica/arrastada no teste real do Ibrahim
+// (09/09/2026). Trocado pra "nova" por recomendação do ChatGPT — mais natural
+// pra fala cotidiana/assistente em pt-BR sem soar solene. Alternativas pra
+// testar via env se quiser comparar: "coral" (mais acolhedora), "shimmer"
+// (mais leve), "marin"/"cedar" (vozes mais novas, se disponíveis na conta).
+const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || "nova";
+// Ritmo levemente acima do normal — ajuda com a sensação de "arrastado" sem
+// comprometer naturalidade (recomendação: começar em 1.05, não pular direto
+// pra 1.15 — velocidade sozinha não resolve prosódia, só ajuda o ritmo).
+const OPENAI_TTS_SPEED = Number(process.env.OPENAI_TTS_SPEED) || 1.05;
 
 /**
  * Remove formatação do WhatsApp (*negrito*, _itálico_, linha de traços,
@@ -63,8 +71,14 @@ export async function gerarAudioLembrete(mensagem: string): Promise<Buffer | nul
         model: OPENAI_TTS_MODEL,
         voice: OPENAI_TTS_VOICE,
         input: texto,
+        speed: OPENAI_TTS_SPEED,
         response_format: "mp3",
-        instructions: "Fale em português do Brasil, tom natural, calmo e direto — como um lembrete financeiro sério, não uma propaganda.",
+        // Instructions reescritas (09/09/2026) por recomendação do ChatGPT —
+        // a versão anterior ("tom natural, calmo e direto — lembrete sério")
+        // ainda soou de locutor/URA no teste real. Pedir explicitamente pra
+        // soar como nota de voz de WhatsApp (não locução) foi o que mudou.
+        instructions:
+          "Fale em português brasileiro natural e conversacional, como uma pessoa enviando uma nota de voz curta pelo WhatsApp. Use ritmo normal e fluido, levemente ágil. Não fale devagar, não faça pausas longas e não use tom de locutor, propaganda, telemarketing ou atendimento eletrônico. Seja claro e tranquilo, sem dramatizar. Leia valores e datas naturalmente.",
       }),
     });
 
