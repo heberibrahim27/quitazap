@@ -14,3 +14,5 @@ prisma/dev.db-journal
 
 # Cache do TypeScript incremental
 *.tsbuildinfo
+.vercel
+.env*
