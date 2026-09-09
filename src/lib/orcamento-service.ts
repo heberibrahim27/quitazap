@@ -36,11 +36,22 @@ function limitesDoMes(data: Date) {
   return { inicio, fim };
 }
 
+// Percentual do limite mensal que dispara o aviso preventivo (antes de
+// estourar de fato) — pesquisa de concorrentes (09/09/2026, ChatGPT +
+// varredura de apps como FinanBot) mostrou que alertar só DEPOIS de
+// estourar chega tarde demais pra o cliente ainda conseguir reagir a
+// tempo; um aviso em 80% dá margem pra segurar o pé antes do limite.
+export const PERCENTUAL_AVISO_PREVENTIVO = 0.8;
+
 // Chamada logo depois de criar um Lancamento de gasto (despesa fixa,
-// variável ou compra no cartão). Se a categoria tiver orçamento definido
-// e essa transação foi a que fez o total do mês passar do limite (não
-// dispara de novo nas próximas compras da mesma categoria, já acima do
-// limite), manda um push avisando.
+// variável ou compra no cartão). Se a categoria tiver orçamento definido,
+// manda no máximo um push por "faixa" cruzada nesta transação:
+// - cruzou 80% do limite (e ainda não tinha estourado): aviso preventivo.
+// - cruzou 100% do limite: aviso de estouro (sempre prevalece sobre o
+//   preventivo — se uma única compra pular de 50% pra 120% do limite,
+//   não faz sentido mandar os dois avisos, só o mais relevante).
+// Em ambos os casos só dispara na transação que efetivamente cruzou a
+// faixa (não repete a cada nova compra já acima dela).
 export async function verificarOrcamentoEAvisar(
   clienteId: string,
   categoria: string | null | undefined,
@@ -62,15 +73,27 @@ export async function verificarOrcamentoEAvisar(
 
   const totalDepois = agregado._sum.valor ?? 0;
   const totalAntes = totalDepois - valorLancamento;
+  const limite = orcamento.limiteMensal;
 
-  const acabouDeEstourar = totalAntes <= orcamento.limiteMensal && totalDepois > orcamento.limiteMensal;
-  if (!acabouDeEstourar) return;
+  const acabouDeEstourar = totalAntes <= limite && totalDepois > limite;
+  if (acabouDeEstourar) {
+    await enviarPush(clienteId, {
+      titulo: "Orçamento estourado",
+      corpo: `Você passou do limite de ${fmtValor(limite)} em ${categoria} este mês (já gastou ${fmtValor(totalDepois)}).`,
+      url: "/minha-conta/gastos",
+    });
+    return;
+  }
 
-  await enviarPush(clienteId, {
-    titulo: "Orçamento estourado",
-    corpo: `Você passou do limite de ${fmtValor(orcamento.limiteMensal)} em ${categoria} este mês (já gastou ${fmtValor(totalDepois)}).`,
-    url: "/minha-conta/gastos",
-  });
+  const limitePreventivo = limite * PERCENTUAL_AVISO_PREVENTIVO;
+  const acabouDeCruzarPreventivo = totalAntes <= limitePreventivo && totalDepois > limitePreventivo && totalDepois <= limite;
+  if (acabouDeCruzarPreventivo) {
+    await enviarPush(clienteId, {
+      titulo: "Orçamento quase no limite",
+      corpo: `Você já usou ${Math.round((totalDepois / limite) * 100)}% do limite de ${fmtValor(limite)} em ${categoria} este mês (gastou ${fmtValor(totalDepois)}).`,
+      url: "/minha-conta/gastos",
+    });
+  }
 }
 
 // Chamada depois de QUALQUER lançamento confirmado (gasto ou receita) —
