@@ -24,6 +24,7 @@ import type {
 
 export async function persistirDividaConfirmadaIA(
   clienteId: string | null | undefined,
+  telefone: string | undefined,
   divida: DividaParaPersistirControle | undefined
 ): Promise<void> {
   if (!clienteId || !divida) return;
@@ -38,9 +39,27 @@ export async function persistirDividaConfirmadaIA(
       valorParcela: divida.valorParcela,
       tipo: divida.tipo,
     });
-    if (!resultado.ok) console.error("[RESCUE-FINANCEIRO] Falha ao cadastrar dívida via IA:", resultado.erro);
+    if (!resultado.ok) {
+      console.error("[RESCUE-FINANCEIRO] Falha ao cadastrar dívida via IA:", resultado.erro);
+      // Bug achado ao vivo (09/09/2026): o bot já mandou "✅ Dívida
+      // cadastrada" antes desse after() rodar — se o save falhar aqui
+      // (ex: extração da IA veio com totalParcelas absurdo e a validação
+      // de criarDividaComParcelas rejeitou), o cliente ficava achando que
+      // deu tudo certo sem nada salvo. Mesmo princípio das outras 2
+      // funções deste arquivo: nunca inventar, sempre avisar quando não
+      // tiver certeza / quando o save de verdade não aconteceu.
+      if (telefone) {
+        await sendWhatsApp(
+          telefone,
+          `Não consegui cadastrar essa dívida: ${resultado.erro}. Acesse Minha Conta > Dívidas pra cadastrar certinho.`
+        );
+      }
+    }
   } catch (err) {
     console.error("[RESCUE-FINANCEIRO] Erro ao cadastrar dívida via IA:", err);
+    if (telefone) {
+      await sendWhatsApp(telefone, `Não consegui cadastrar essa dívida. Acesse Minha Conta > Dívidas pra cadastrar certinho.`);
+    }
   }
 }
 
