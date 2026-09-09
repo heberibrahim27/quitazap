@@ -1187,17 +1187,33 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .cartao-parcelas-mes.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
 /* ── Filtro de mês visível (Receitas/Despesas) ────── */
+/* Pílula com blur/sombra (mesma linguagem visual dos cards premium do
+   painel, ex: .mc-form-card) em vez das duas setas soltas de antes — pedido
+   do Ibrahim (09/09/2026: "não estou achando nada premium"). O :active nas
+   setas dá feedback de toque instantâneo (encolhe na hora do tap, antes da
+   navegação terminar), o que também ajuda a sensação de lentidão ao trocar
+   de mês — a maior causa dela era o auto-refresh do painel colidindo com o
+   clique (ver AutoRefreshDashboard.tsx), já corrigido junto. */
 .mc-mes-filtro {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin: 0 auto 12px; padding: 6px; width: fit-content;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px -10px rgba(60, 70, 90, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.8);
 }
 .mc-mes-seta {
-  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: var(--card-tint); color: var(--mc-ink); text-decoration: none;
+  background: #fff; color: var(--blue); text-decoration: none;
+  box-shadow: 0 4px 10px -4px rgba(30, 99, 233, 0.35);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
+.mc-mes-seta:active { transform: scale(0.88); box-shadow: 0 2px 6px -2px rgba(30, 99, 233, 0.3); }
+.mc-mes-seta[aria-disabled="true"] { background: transparent; box-shadow: none; }
 .mc-mes-seta svg { width: 16px; height: 16px; }
-.mc-mes-label { font-size: 13.5px; font-weight: 700; color: var(--mc-ink); min-width: 110px; text-align: center; }
+.mc-mes-label { font-size: 13.5px; font-weight: 800; color: var(--navy-deep); min-width: 118px; text-align: center; letter-spacing: 0.01em; }
 
 /* ── Formulários (editar lançamento) ─────────────── */
 .mc-form-card {

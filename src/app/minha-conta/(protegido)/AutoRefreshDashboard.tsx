@@ -21,6 +21,17 @@ import { useRouter } from "next/navigation";
  * precisava dar F5): é "quase em tempo real", suficiente pra refletir um
  * lançamento feito no WhatsApp poucos segundos depois, sem precisar de
  * WebSocket/Supabase Realtime.
+ *
+ * Achado ao vivo (Ibrahim, 09/09/2026 — "seletor de mês... bastante
+ * lentidão/não funcionando"): um `router.refresh()` automático disparando
+ * bem no instante em que o cliente toca numa seta de trocar de mês (ou
+ * qualquer outro link) colide com a navegação que o clique acabou de
+ * iniciar — os dois competem pela mesma transição do App Router, e o
+ * resultado sentido é a navegação travando ou "não acontecer" até um
+ * segundo toque. Por isso todo clique reinicia a contagem do intervalo:
+ * nunca dispara um refresh automático nos `intervalMs` seguintes a uma
+ * interação do cliente, sem abrir mão do "quase em tempo real" quando ele
+ * só está olhando a tela parado.
  */
 export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: number }) {
   const router = useRouter();
@@ -30,13 +41,15 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
+    function tick() {
+      if (document.visibilityState === "visible") {
+        routerRef.current.refresh();
+      }
+    }
+
     function iniciar() {
       if (intervalId) return;
-      intervalId = setInterval(() => {
-        if (document.visibilityState === "visible") {
-          routerRef.current.refresh();
-        }
-      }, intervalMs);
+      intervalId = setInterval(tick, intervalMs);
     }
 
     function parar() {
@@ -44,6 +57,12 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
         clearInterval(intervalId);
         intervalId = null;
       }
+    }
+
+    function reiniciarContagem() {
+      if (document.visibilityState !== "visible") return;
+      parar();
+      iniciar();
     }
 
     function aoTrocarVisibilidade() {
@@ -60,10 +79,15 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
 
     if (document.visibilityState === "visible") iniciar();
     document.addEventListener("visibilitychange", aoTrocarVisibilidade);
+    // capture:true pra pegar o clique o mais cedo possível (antes de
+    // qualquer preventDefault/stopPropagation de quem foi clicado) e
+    // passive:true porque só lemos o evento, nunca cancelamos nada aqui.
+    document.addEventListener("click", reiniciarContagem, { capture: true, passive: true });
 
     return () => {
       parar();
       document.removeEventListener("visibilitychange", aoTrocarVisibilidade);
+      document.removeEventListener("click", reiniciarContagem, { capture: true });
     };
   }, [intervalMs]);
 
