@@ -1599,6 +1599,26 @@ Pode mandar tudo em uma mensagem só.`;
         },
       });
 
+      // Bug achado em teste ao vivo (09/09/2026): "corrija minha renda"
+      // só gravava em BotSessao.renda (campo de sessão, usado só pelo
+      // resumo do WhatsApp) e NUNCA em Cliente.rendaMensal — o campo que
+      // limite-seguro.ts, simulador-parcela.ts, horas-trabalho.ts e
+      // plano-pagamento-motor.ts leem de verdade. Resultado: cliente via
+      // "✅ Renda registrada" no WhatsApp, mas toda Skill Analista (posso
+      // gastar, limite seguro, plano de pagamento, simulação de parcela)
+      // continuava achando que não tinha renda declarada nenhuma, a não
+      // ser que o cliente também lançasse uma receita formal no mês.
+      // Cliente.rendaMensal nunca era escrito em NENHUM lugar do código —
+      // só resetado (perfil > reset) — então esse fallback nunca
+      // funcionava de verdade pra ninguém que só declarasse a renda pelo
+      // WhatsApp.
+      if (sessao.clienteId) {
+        await prisma.cliente.updateMany({
+          where: { id: sessao.clienteId },
+          data: { rendaMensal: correcaoRenda.estado.rendaMensal },
+        });
+      }
+
       return NextResponse.json({ ok: true });
     }
 
