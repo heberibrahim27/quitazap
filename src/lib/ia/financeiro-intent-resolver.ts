@@ -780,6 +780,24 @@ function valorPositivo(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && v > 0;
 }
 
+// Rede de segurança achada em teste ao vivo (09/09/2026): a IA remota às
+// vezes confunde o número de parcelas com outro número da frase (ex.:
+// "em 3x, primeira parcela venceu dia 31/01/2026" virou totalParcelas: 1000
+// em vez de 3). Sem essa trava, o item passava direto pra prévia de
+// confirmação mostrando "(1000x)" pro cliente, que podia confirmar sem
+// perceber — e mesmo quando a validação de criarDividaComParcelas rejeitava
+// o salvamento depois, o dano de mostrar um número absurdo já tinha
+// acontecido. 120 parcelas (10 anos) já é bem generoso pra dívida de pessoa
+// física; acima disso tratamos como não confiável e pedimos pro cliente
+// reenviar com clareza em vez de confirmar um valor errado.
+const MAX_PARCELAS_PLAUSIVEL = 120;
+
+function totalParcelasPlausivel(item: ItemFinanceiroInterpretado): boolean {
+  const tp = item.totalParcelas;
+  if (tp == null || !Number.isFinite(tp) || tp <= 0) return true; // não informado/inválido — resolvido como 1 parcela em outro lugar
+  return tp <= MAX_PARCELAS_PLAUSIVEL;
+}
+
 function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
   if (!TIPOS_CONFIRMAVEIS.has(item.tipo)) return false;
   if (typeof item.descricaoNormalizada !== "string" || item.descricaoNormalizada.trim().length === 0) return false;
@@ -795,7 +813,7 @@ function itemFinanceiroConfirmavel(item: ItemFinanceiroInterpretado): boolean {
         (item.origem !== "cartao" || (typeof item.cartao === "string" && item.cartao.trim().length > 0))
       );
     case "divida":
-      return valorPositivo(item.valorTotalDivida) || valorPositivo(item.valor);
+      return (valorPositivo(item.valorTotalDivida) || valorPositivo(item.valor)) && totalParcelasPlausivel(item);
     case "pagamento_divida":
       return valorPositivo(item.valor);
     case "meta":
