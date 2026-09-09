@@ -132,9 +132,6 @@ function AbaFunil() {
   const [resultadoFinal, setResultadoFinal] = useState<"convertido" | "desistiu" | null>(null);
   const [digitando, setDigitando] = useState(false);
   const [input, setInput] = useState("");
-  const [enviandoReal, setEnviandoReal] = useState(false);
-  const [telefoneReal, setTelefoneReal] = useState("");
-  const [statusReal, setStatusReal]     = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const etapaAtual = FLUXO.find((f) => f.etapa === etapa);
@@ -230,27 +227,6 @@ function AbaFunil() {
     setInput("");
   }
 
-  async function enviarParaNumeroReal() {
-    if (!telefoneReal || telefoneReal.length < 10) {
-      setStatusReal("Número inválido.");
-      return;
-    }
-    setEnviandoReal(true);
-    setStatusReal("Enviando...");
-    try {
-      const res = await fetch("/api/test/lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefone: telefoneReal }),
-      });
-      const data = await res.json();
-      setStatusReal(data.ok ? "✅ Mensagem enviada! Verifique o WhatsApp." : (res.status >= 500 ? "Não consegui enviar agora. Tenta de novo em instantes." : (data.error ?? "Não consegui enviar.")));
-    } catch {
-      setStatusReal("Não consegui enviar. Verifica sua conexão e tenta de novo.");
-    }
-    setEnviandoReal(false);
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Chat simulado */}
@@ -317,33 +293,12 @@ function AbaFunil() {
         }
       />
 
-      {/* Enviar para número real */}
-      <div className="qa-card">
-        <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>Testar no WhatsApp real</h3>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--qa-gray-400)" }}>
-          Insira um número não cadastrado para receber a mensagem de boas-vindas do funil agora.
-        </p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input
-            type="tel"
-            placeholder="5511999999999 (com DDI)"
-            value={telefoneReal}
-            onChange={(e) => setTelefoneReal(e.target.value.replace(/\D/g, ""))}
-            className="qa-input"
-            style={{ flex: 1, minWidth: 200 }}
-          />
-          <button
-            onClick={enviarParaNumeroReal}
-            disabled={enviandoReal}
-            className="qa-btn-primary"
-          >{enviandoReal ? "Enviando..." : "Enviar boas-vindas"}</button>
-        </div>
-        {statusReal && (
-          <p style={{ margin: "10px 0 0", fontSize: 13, color: statusReal.startsWith("✅") ? "#6ee7b7" : "#fca5a5" }}>
-            {statusReal}
-          </p>
-        )}
-      </div>
+      {/* "Testar no WhatsApp real" removido em 09/09/2026: mandava mensagem
+          REAL pra qualquer número digitado (sem exigir conversa prévia) via
+          /api/test/lead — foi isso que gerou denúncia de spam no WhatsApp e
+          derrubou a conta. A rota já foi desativada no backend; o card foi
+          removido daqui pra não deixar um botão morto/enganoso na tela.
+          O simulador acima (lógica pura, sem WhatsApp) continua igual. */}
     </div>
   );
 }
