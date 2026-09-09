@@ -106,6 +106,15 @@ const PALAVRAS_GASTO = [
   "pago",
   "comprei",
   "compra",
+  // Bug achado em teste ao vivo (09/09/2026): "passei 2 mil no cartao
+  // nubank" — jeito bem comum de dizer "usei o cartão pra comprar algo" —
+  // nunca era reconhecido como gasto. registrarGastoControle (em
+  // controle-financeiro-flow.ts) remove o trecho do cartão ("no cartao
+  // nubank") ANTES de checar se a mensagem parece um gasto — e como
+  // "cartao"/"nubank" eram as ÚNICAS palavras da lista que apareciam na
+  // frase, sobrava só "passei 2 mil", que não batia em nada aqui.
+  "passei",
+
   "pix",
   "uber",
   "ifood",
