@@ -94,6 +94,7 @@ import {
 } from "@/lib/plano";
 import { urlPainelCobrador } from "@/lib/cobrador-token";
 import { boletoValido, mensagemPreviaBoleto, detectarRespostaBoleto, salvarBoletoComoDivida, type BoletoDetectado } from "@/lib/boleto-flow";
+import { comprovanteFotoValido, mensagemPreviaComprovante, detectarRespostaComprovante, type ComprovanteFotoDetectado } from "@/lib/comprovante-foto-flow";
 import {
   faturaCartaoValida,
   hashPDF,
@@ -929,23 +930,21 @@ export async function POST(req: NextRequest) {
 
     // Usado só pelo Lancamento (dashboard "Minha Conta") — o restante do
     // fluxo de Controle continua distinguindo só por tipoEntrada.
-    const origemLancamentoControle: OrigemLancamentoControle =
+    // `let` (não `const`): quando um comprovante de foto pendente é
+    // confirmado por uma mensagem de TEXTO separada ("sim"), reatribuímos os
+    // dois abaixo pra "FOTO"/URL original — ver bloco de confirmação de
+    // comprovanteFotoPendente mais adiante.
+    let origemLancamentoControle: OrigemLancamentoControle =
       tipoEntrada === "audio" ? "AUDIO" : tipoEntrada === "imagem" ? "FOTO" : "TEXTO";
 
     // URL da própria imagem enviada no WhatsApp/Z-API, salva junto do
     // Lancamento como comprovante visual quando o gasto veio de foto.
-    // 2 limitações aceitas:
-    // 1. É a URL original da Z-API, não uma cópia hospedada por nós — se ela
-    //    expirar (a Z-API não garante que fica acessível pra sempre), o
-    //    comprovante para de abrir. Resolver direito exigiria subir a
-    //    imagem pra um storage próprio (ex: Supabase Storage), com
-    //    credencial nova (service role key) que não temos configurada.
-    // 2. Só cobre o caminho em que o gasto é reconhecido na mesma mensagem
-    //    da foto (o caso comum). Se a foto virar uma pergunta de confirmação
-    //    ("cadastrar essas despesas?") respondida numa mensagem de texto
-    //    separada, o comprovante se perde — a URL não é carregada dentro do
-    //    confirmacaoPendente do JSON da conversa.
-    const comprovanteUrlImagem: string | undefined =
+    // Limitação aceita: é a URL original da Z-API, não uma cópia hospedada
+    // por nós — se ela expirar (a Z-API não garante que fica acessível pra
+    // sempre), o comprovante para de abrir. Resolver direito exigiria subir
+    // a imagem pra um storage próprio (ex: Supabase Storage), com credencial
+    // nova (service role key) que não temos configurada.
+    let comprovanteUrlImagem: string | undefined =
       tipoEntrada === "imagem" ? body.image?.imageUrl : undefined;
 
     if (!mensagem && tipoEntrada === "texto") return NextResponse.json({ ok: true });
@@ -1033,7 +1032,17 @@ export async function POST(req: NextRequest) {
     // ── Processa imagem ──────────────────────
     if (tipoEntrada === "imagem") {
       try {
-        await sendWhatsApp(sessao.telefone, "📷 Recebi sua imagem! Analisando...\n\n_Seu documento será usado para identificar informações financeiras e gerar seu Raio-X do Salário._");
+        // Mensagem de espera diferente pra quem já é cliente Controle (foto
+        // provavelmente é recibo/nota de compra do dia a dia) vs. lead do
+        // funil de vendas (foto provavelmente é contracheque pro
+        // diagnóstico) — antes essa frase citava "Raio-X do Salário" mesmo
+        // pra quem mandava um recibo de mercado, o que não fazia sentido.
+        await sendWhatsApp(
+          sessao.telefone,
+          sessao.clienteId
+            ? "📷 Recebi sua foto! Analisando..."
+            : "📷 Recebi sua imagem! Analisando...\n\n_Seu documento será usado para identificar informações financeiras e gerar seu Raio-X do Salário._"
+        );
         const analise = await analisarImagem(body.image.imageUrl, PROMPT_ANALISE_IMAGEM, { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "vision-webhook" });
         // Não loga o texto da análise em claro: pode conter dados de contracheque
         // (nome, cargo, salário) — só o suficiente pra depurar sem expor PII.
@@ -1044,7 +1053,38 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true });
         }
 
-        mensagem = normalizarRespostaCompraImagem(analise);
+        const normalizado = normalizarRespostaCompraImagem(analise);
+
+        // "Comprovante Inteligente" (09/09/2026, pesquisa de concorrentes +
+        // decisão do Ibrahim): se a IA de visão reconheceu como recibo/nota
+        // de compra (bate no formato "Comprei em X, R$ Y") e é um cliente já
+        // cadastrado no Controle, pausa pra confirmação em vez de lançar
+        // direto — diferente do cliente digitando ele mesmo, a leitura da
+        // foto pode errar valor/estabelecimento sem o cliente perceber até
+        // já ter virado gasto. Lead do funil de vendas (sem clienteId ainda)
+        // continua com o comportamento de sempre (cai direto no cascade de
+        // texto do diagnóstico), porque não é onde compra do dia a dia
+        // normalmente aparece.
+        const matchCompra = normalizado.match(/^Comprei em (.+), R\$ (\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}|\d+)$/);
+        if (matchCompra && sessao.clienteId) {
+          const valorExtraido = parseMoneyBR(matchCompra[2]);
+          const pendente: ComprovanteFotoDetectado = {
+            loja: matchCompra[1],
+            valor: valorExtraido ?? 0,
+            textoNormalizado: normalizado,
+            imageUrl: body.image.imageUrl,
+          };
+          if (comprovanteFotoValido(pendente)) {
+            await prisma.botSessao.updateMany({
+              where: { id: sessao.id },
+              data: { comprovanteFotoPendente: pendente as unknown as Prisma.InputJsonValue },
+            });
+            await sendWhatsApp(sessao.telefone, mensagemPreviaComprovante(pendente));
+            return NextResponse.json({ ok: true });
+          }
+        }
+
+        mensagem = normalizado;
       } catch (err) {
         console.error("[Z-API] Erro ao analisar imagem:", err);
         await sendWhatsApp(sessao.telefone, "Não consegui ler essa imagem. Pode digitar as informações?");
@@ -1177,6 +1217,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Confirmação de comprovante de foto pendente ("Comprovante Inteligente") ──
+    // Mesmo padrão do bloco de boleto acima. Diferença importante: em vez de
+    // persistir aqui, um "sim" reinjeta o texto já normalizado no `mensagem`
+    // e deixa cair no MESMO cascade de gasto de texto mais abaixo (nunca
+    // duplica a lógica de categorização/checagem de orçamento/guard de
+    // fatura já testada) — por isso não faz `return` no caminho de
+    // confirmação, só no de negação.
+    if (sessao.comprovanteFotoPendente && tipoEntrada === "texto") {
+      const respostaComprovante = detectarRespostaComprovante(mensagem) ?? (await classificarConfirmacaoIA(mensagem));
+      if (respostaComprovante) {
+        const comprovantePendente = sessao.comprovanteFotoPendente as unknown as ComprovanteFotoDetectado;
+        await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { comprovanteFotoPendente: Prisma.JsonNull } });
+        if (respostaComprovante === "negar") {
+          await sendWhatsApp(sessao.telefone, "Beleza, não registrei esse gasto. Se quiser, me diga o valor certo digitando a descrição e o valor. 👌");
+          return NextResponse.json({ ok: true });
+        }
+        // Confirmado: a compra é do comprovante original, mesmo a resposta
+        // tendo chegado em texto — preserva a origem/URL pra não perder o
+        // vínculo com a foto (limitação que existia antes desta feature).
+        mensagem = comprovantePendente.textoNormalizado;
+        origemLancamentoControle = "FOTO";
+        comprovanteUrlImagem = comprovantePendente.imageUrl;
+        // Sem return — segue o fluxo normal abaixo com `mensagem` já pronta.
+      }
+    }
+
     // ── Confirmação de fatura de cartão pendente ("Fatura Inteligente") ──
     // Duas etapas possíveis, na ordem: (1) enquanto sobrar item na fila de
     // ambíguos, cada sim/não resolve um item por vez ("sim" = é a mesma
@@ -1257,10 +1323,11 @@ export async function POST(req: NextRequest) {
             { role: "assistant", content: respostaReset },
             { role: "assistant", content: respostaInicio },
           ]),
-          // Sem isso, um boleto detectado antes do reset ficaria pendente
-          // pra sempre — e um "sim" completamente sem relação, dias depois,
-          // recriaria uma dívida com dados velhos.
+          // Sem isso, um boleto/comprovante detectado antes do reset ficaria
+          // pendente pra sempre — e um "sim" completamente sem relação, dias
+          // depois, recriaria uma dívida/gasto com dados velhos.
           boletoPendente: Prisma.JsonNull,
+          comprovanteFotoPendente: Prisma.JsonNull,
         },
       });
 
