@@ -6,7 +6,7 @@ import {
   type GastoDetectado,
   type CategoriaGasto,
 } from "./gasto-flow";
-import { parseMoneyBR } from "./money";
+import { parseMoneyBR, valorComMultiplicadorEscrito } from "./money";
 import { normalizarDescricaoFinanceira, normalizarTextoBusca } from "./descricao-financeira";
 // Achado ao vivo (Ibrahim, 09/09/2026): "Aluguel R$800" (despesa fixa) caía
 // sempre com categoria=NULL no banco → bucket "Outros" na tela de
@@ -693,12 +693,20 @@ function limparTextoDespesaFixa(linha: string): string {
     .trim();
 }
 
+// Bug achado em teste ao vivo (09/09/2026): "Financiamento carro 8 mil" numa
+// lista de despesas fixas caía com valor 8 em vez de 8000 (mesma causa raiz
+// do bug de gasto-flow.ts — a regex de valor cortava o dígito ANTES de
+// "mil"). Estende a captura pra incluir opcionalmente o multiplicador, e usa
+// valorComMultiplicadorEscrito antes de parseMoneyBR.
+const REGEX_VALOR_DESPESA_FIXA =
+  /(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?(?:\s*(?:mil|milhoes|milhões|milhao|milhão)\b)?/i;
+
 function extrairItemDespesaFixa(linha: string): DespesaFixaRegistradaControle | null {
   const limpa = limparTextoDespesaFixa(linha);
-  const valorMatch = limpa.match(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais|real))?/i);
+  const valorMatch = limpa.match(REGEX_VALOR_DESPESA_FIXA);
   if (!valorMatch) return null;
 
-  const valor = parseMoneyBR(valorMatch[0]);
+  const valor = valorComMultiplicadorEscrito(valorMatch[0]) ?? parseMoneyBR(valorMatch[0]);
   if (!valor) return null;
 
   const descricao = formatarDescricaoDespesaFixa(
