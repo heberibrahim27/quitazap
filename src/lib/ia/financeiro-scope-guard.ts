@@ -77,6 +77,9 @@ const PADROES_ESCOPO = [
   // com essa palavra (sem "cartao"/"fatura" junto) nunca chegavam nem no
   // resolvedor local nem na IA.
   /\bpassei\b/,
+  // Gírias muito comuns pra "gastei" (achado em teste ao vivo, 09/09/2026).
+  /\btorrei\b/,
+  /\bdesembolsei\b/,
   /\bdespesas?\b/,
   /\bfixas?\b/,
   /\bmercado\b/,
@@ -238,7 +241,7 @@ function pareceValorMonetarioForte(texto: string): boolean {
 // Mesmo verbo financeiro forte usado no gate de deveChamarInterpretadorFinanceiroIA
 // logo abaixo — mantido num só lugar pra evitar as duas listas divergirem.
 const VERBO_FINANCEIRO_FORTE =
-  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
+  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|torrei|desembolsei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
 
 // Valor por extenso ("gastei cem reais", "recebi mil e duzentos") não tem
 // NENHUM dígito — achado em teste ao vivo, set/2026: sem essa checagem a
