@@ -39,6 +39,7 @@ import { detectarRotaDividas, responderRotaDividas } from "@/lib/ia/rota-dividas
 import { detectarPlanoPagamento, detectarMetaPrazo, responderPlanoPagamento, responderMetaPrazo } from "@/lib/ia/plano-pagamento-resolver";
 import { detectarConsultaVazamentos, responderConsultaVazamentos } from "@/lib/ia/vazamentos-resolver";
 import { detectarHorasTrabalho, responderHorasTrabalho } from "@/lib/ia/horas-trabalho-resolver";
+import { tentarResponderConsultaLivre } from "@/lib/ia/classificador-consulta-livre";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -2536,6 +2537,37 @@ Pode mandar tudo em uma mensagem só.`;
         select: { gratuito: true },
       });
       clienteGratuito = cli?.gratuito ?? false;
+    }
+
+    // "Treinamento contínuo" (pedido do Ibrahim, 09/2026) — última chance
+    // antes do rescue ladder genérico: se a mensagem sobreviveu a TODA a
+    // cascata determinística acima (nenhum dos 8 regex de consulta bateu,
+    // nenhum lançamento/tarefa/lembrete concreto foi reconhecido) e ainda
+    // assim parece uma pergunta, tenta um classificador de IA pra rotear
+    // pra uma das 6 skills de consulta mais seguras de generalizar (só
+    // leitura, nunca cria/altera dado) em vez de já desistir pro menu fixo
+    // "1-gasto 2-renda 3-dívida 4-outro". Ver classificador-consulta-livre.ts
+    // pro racional completo (revisado com ChatGPT antes de subir) e pra
+    // Fase 2 proposta (exemplos aprovados + correção do usuário como sinal
+    // de treino, com humano aprovando antes de virar regra nova).
+    if (sessao.clienteId) {
+      const respostaConsultaLivre = await tentarResponderConsultaLivre(mensagem, sessao.clienteId, clienteGratuito);
+      if (respostaConsultaLivre) {
+        await sendWhatsApp(telefone, respostaConsultaLivre);
+
+        await prisma.botSessao.updateMany({
+          where: { id: sessao.id },
+          data: {
+            dividasTemp: JSON.stringify([
+              ...servidorHistoricoSessao,
+              { role: "user", content: mensagem },
+              { role: "assistant", content: respostaConsultaLivre },
+            ]),
+          },
+        });
+
+        return NextResponse.json({ ok: true });
+      }
     }
 
     const resultado = await processarMensagemIA(
