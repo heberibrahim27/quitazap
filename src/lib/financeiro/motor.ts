@@ -41,6 +41,35 @@ export function limitesDoMes(ano: number, mes: number): PeriodoFinanceiro {
   return { inicio, fim };
 }
 
+// Meia-noite de Brasília do dia de `data`, expressa em UTC — mesma âncora de
+// limitesDoMes acima, só que no nível de DIA em vez de mês. Existe porque
+// `new Date(); d.setHours(0,0,0,0)` (achado em plano-pagamento-motor.ts,
+// bug de teste ao vivo 09/09/2026) usa o fuso do processo Node, que em
+// produção (Vercel serverless) é UTC, não Brasília — durante 21h-23h59 de
+// Brasília isso já contava como "amanhã" pra cálculo de dias até vencer,
+// um dia fora de sincronia com todo o resto do Controle que já usa esta
+// mesma âncora.
+export function inicioDoDiaBrasil(data: Date): Date {
+  const [ano, mes, dia] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(data)
+    .split("-")
+    .map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia, 3, 0, 0, 0));
+}
+
+// Último dia válido do mês (1-12) — usado pra "clampar" um diaVencimento
+// tipo 31 quando o mês de referência tem menos dias (fev, abr, jun, set,
+// nov), em vez de deixar `new Date(ano, mes, dia)` estourar pro mês
+// seguinte (mesmo bug de fundo do adicionarMeses em calculos.ts).
+export function ultimoDiaDoMes(ano: number, mes: number): number {
+  return new Date(ano, mes, 0).getDate();
+}
+
 function mesAnteriorDe(ano: number, mes: number): { ano: number; mes: number } {
   return mes === 1 ? { ano: ano - 1, mes: 12 } : { ano, mes: mes - 1 };
 }
@@ -172,9 +201,14 @@ export async function calcularResumoFinanceiro(
   const resultadoAntesInvestimentos = base.receitas - totalSaidasOperacionais;
   const resultadoSemPlano = base.receitas - totalSaidasSemDividas;
 
+  // Clampa nos dois lados (0 a 1.5) — sem o Math.max(0, ...), um saque de
+  // Meta maior que o resto das despesas do mês somadas deixa
+  // totalComprometido negativo, e o Dashboard mostrava "-24% da renda
+  // comprometida" (achado em teste ao vivo, 09/09/2026). Negativo não faz
+  // sentido pra este indicador — o mínimo é "nada comprometido" (0%).
   const percentualComprometido =
     resumoPlano.calculavel && resumoPlano.rendaDisponivel > 0
-      ? Math.min(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 1.5)
+      ? Math.min(Math.max(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 0), 1.5)
       : null;
 
   const resumo: ResumoFinanceiro = {
