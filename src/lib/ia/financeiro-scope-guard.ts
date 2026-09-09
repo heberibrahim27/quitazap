@@ -189,7 +189,7 @@ function pareceValorMonetarioForte(texto: string): boolean {
 // Mesmo verbo financeiro forte usado no gate de deveChamarInterpretadorFinanceiroIA
 // logo abaixo — mantido num só lugar pra evitar as duas listas divergirem.
 const VERBO_FINANCEIRO_FORTE =
-  /\b(?:recebi|ganhei|gastei|comprei|paguei|guardei|depositei|coloquei|devo|emprestimo|financiamento|consignado)\b/;
+  /\b(?:recebi|ganhei|gastei|comprei|paguei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|emprestimo|financiamento|consignado)\b/;
 
 // Valor por extenso ("gastei cem reais", "recebi mil e duzentos") não tem
 // NENHUM dígito — achado em teste ao vivo, set/2026: sem essa checagem a
@@ -264,6 +264,14 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   if (/[.?!].+\b\d[\d.,]*\b/.test(texto)) return true;
   if (/\b(?:anota pra mim|cliente pagou|recebi pix|caiu pix|entrou|entrou dinheiro|me pagaram|vendi)\b/.test(texto)) return true;
   if (/\b(?:akuguel|waifai|conto|mes|tambem|umas coisa)\b/.test(texto)) return true;
+  // Bug achado em teste ao vivo (09/09/2026): "quero criar uma meta de
+  // guardar 5000 pra viagem" nunca chegava na IA (VERBO_FINANCEIRO_FORTE
+  // não tinha "guardar" no infinitivo, só "guardei") — caía direto no
+  // menu genérico de "não consegui entender" que nem menciona meta como
+  // opção. "meta"/"metas" sozinho já é sinal forte o bastante nesse app
+  // (bot financeiro — não tem outro sentido plausível pra essa palavra
+  // aqui) pra valer a chamada de IA mesmo sem número na mesma frase.
+  if (/\bmetas?\b/.test(texto)) return true;
   // Mensagem de um único gasto, sem nenhuma das palavras acima — ainda
   // assim vale chamar a IA se tiver um valor com cara de dinheiro de
   // verdade. Isso só é alcançado depois que resolverLocal() já tentou e
