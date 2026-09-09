@@ -18,7 +18,12 @@ const TIPOS_GASTO = new Set(["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"
 
 export type OrigemLancamentoControle = "TEXTO" | "AUDIO" | "FOTO";
 
-async function upsertCartao(clienteId: string, nome: string) {
+// Exportado pra fatura-cartao-flow.ts reaproveitar a mesma resolução de
+// cartão (find-or-create por nome) usada pelo fluxo de texto — mesma regra
+// de sempre: nunca duplica Cartao por variação de nome dentro do já
+// cadastrado, e cria automaticamente quando não existe ainda (baixo risco:
+// reversível em Minha Conta > Cartões, ao contrário de duplicar dinheiro).
+export async function upsertCartao(clienteId: string, nome: string) {
   return prisma.cartao.upsert({
     where: { clienteId_nome: { clienteId, nome } },
     update: {},
