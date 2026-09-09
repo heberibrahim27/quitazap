@@ -2551,6 +2551,14 @@ Pode mandar tudo em uma mensagem só.`;
       const credorNome = credor?.nome ?? sessao.nome ?? "QuitaZAP";
       const pixChave   = dados.pixChave ?? null;
 
+      // ENVIO AO DEVEDOR PAUSADO (09/09/2026): decisão do Ibrahim pós-incidente
+      // de spam — "mensagem fria nunca, não vamos correr o risco de bloqueio".
+      // O devedor aqui nunca falou com o número da QuitaZAP; mandar pra ele
+      // (mesmo a pedido do cliente) é exatamente o tipo de contato a frio que
+      // causou o bloqueio da Meta. Continuamos registrando a cobrança (é dado
+      // do próprio cliente, fica só no dashboard dele) mas NUNCA mais mandamos
+      // WhatsApp pro devedor — nem na hora, nem depois (ver cron/cobrador,
+      // também pausado). O cliente que já fala com a gente é avisado disso.
       const cobranca = await prisma.cobranca.create({
         data: {
           clienteId:   sessao.clienteId,
@@ -2561,59 +2569,28 @@ Pode mandar tudo em uma mensagem só.`;
           vencimento:  dataVenc,
           mensagem:    dados.mensagemCustom ?? null,
           pixChave,
-          status:      dados.enviarAgora ? "ENVIADA" : "PENDENTE",
+          status:      "PENDENTE",
           etapa:       1,
-          ultimoEnvio: dados.enviarAgora ? new Date() : null,
-          tentativas:  dados.enviarAgora ? 1 : 0,
+          ultimoEnvio: null,
+          tentativas:  0,
         },
       });
 
       const fmtValor = dados.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       const fmtData  = dataVenc.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
-      // Se "enviar agora", dispara imediatamente para o devedor
-      if (dados.enviarAgora) {
-        try {
-          const msgDevedor =
-            `Oi *${dados.devedorNome}*! 👋\n\n` +
-            `*${credorNome}* está te lembrando de um compromisso financeiro:\n\n` +
-            `💰 *Valor:* ${fmtValor}\n` +
-            `📅 *Vencimento:* hoje\n` +
-            (dados.mensagemCustom ? `\n💬 _"${dados.mensagemCustom}"_\n` : "") +
-            (pixChave ? `\nPara pagar via Pix: 🔑 *${pixChave}*` : "") +
-            `\n\n──────────────────\n` +
-            `💬 _Mensagem enviada pelo QuitaZAP_\n` +
-            `👉 www.quitazap.com.br`;
-          await sendWhatsApp(dados.devedorFone, msgDevedor);
-          console.log(`[COBRAR] Enviado imediatamente para ${dados.devedorNome} (${dados.devedorFone})`);
-        } catch (err) {
-          console.error("[COBRAR] Erro ao enviar imediatamente:", err);
-        }
+      await sendWhatsApp(telefone,
+        `✅ *Cobrança registrada!*\n\n` +
+        `👤 *Devedor:* ${dados.devedorNome}\n` +
+        `📞 *WhatsApp:* ${dados.devedorFone}\n` +
+        `💰 *Valor:* ${fmtValor}\n` +
+        `📅 *Vencimento:* dia ${fmtData}\n` +
+        (pixChave ? `🔑 *Chave Pix:* ${pixChave}\n` : "") +
+        (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
+        `\n⚠️ *Envio automático pro devedor está pausado no momento* — fica só registrado aqui no seu painel. Se quiser, cobra você mesmo por enquanto. 🙏`
+      );
 
-        await sendWhatsApp(telefone,
-          `✅ *Cobrança enviada agora!*\n\n` +
-          `👤 *Devedor:* ${dados.devedorNome}\n` +
-          `📞 *WhatsApp:* ${dados.devedorFone}\n` +
-          `💰 *Valor:* ${fmtValor}\n` +
-          (pixChave ? `🔑 *Chave Pix:* ${pixChave}\n` : "") +
-          (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
-          `\nSe não pagar, reenvio automático em *+3 dias* (mais firme) e *+7 dias* (última chance). 📲`
-        );
-      } else {
-        await sendWhatsApp(telefone,
-          `✅ *Cobrança agendada!*\n\n` +
-          `👤 *Devedor:* ${dados.devedorNome}\n` +
-          `📞 *WhatsApp:* ${dados.devedorFone}\n` +
-          `💰 *Valor:* ${fmtValor}\n` +
-          `📅 *Vencimento:* dia ${fmtData}\n` +
-          (pixChave ? `🔑 *Chave Pix:* ${pixChave}\n` : "") +
-          (dados.mensagemCustom ? `💬 *Mensagem:* "${dados.mensagemCustom}"\n` : "") +
-          `\nA mensagem será enviada automaticamente no dia ${fmtData}. 📲\n` +
-          `Se não pagar, reenvio automático em *+3* e *+7 dias* com tom diferente.`
-        );
-      }
-
-      console.log(`[COBRAR] id=${cobranca.id} devedor=${dados.devedorNome} valor=${dados.valor} enviarAgora=${dados.enviarAgora}`);
+      console.log(`[COBRAR] id=${cobranca.id} devedor=${dados.devedorNome} valor=${dados.valor} (envio ao devedor pausado)`);
       return NextResponse.json({ ok: true });
     }
 
