@@ -15,6 +15,8 @@ export type CategoriaGasto =
   | "Apostas"
   | "Lazer"
   | "Beleza/Cuidados"
+  | "Compras pessoais"
+  | "Impostos/Taxas"
   | "Trabalho/Negócio"
   | "Dívidas/Cartões"
   | "Outros";
@@ -45,6 +47,13 @@ export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }
   { categoria: "Apostas", palavras: ["aposta", "apostas", "bet", "betano", "blaze", "tigrinho", "jogo do tigrinho", "cassino", "cassino online", "roleta", "foguetinho", "pix bet", "banca", "casa de aposta", "jogo online"] },
   { categoria: "Lazer", palavras: ["cerveja", "cinema", "festa", "bar", "viagem", "lazer"] },
   { categoria: "Beleza/Cuidados", palavras: ["cabelo", "unha", "perfume", "skincare", "academia", "barbearia"] },
+  // Revisão com o ChatGPT (09/09/2026): categoria pra "comprei uma camisa
+  // 90"/"tenis novo"/"celular novo" — antes caía sem boa opção em Outros,
+  // Lazer ou Beleza/Cuidados.
+  { categoria: "Compras pessoais", palavras: ["roupa", "roupas", "camisa", "camiseta", "calca", "tenis", "sapato", "celular", "eletronico", "eletronicos", "presente"] },
+  // IPVA/IPTU/multa/tarifa — não é "dívida" nem despesa fixa de moradia,
+  // categoria própria pra não poluir Outros nem Dívidas/Cartões.
+  { categoria: "Impostos/Taxas", palavras: ["ipva", "iptu", "multa", "tarifa", "taxa", "imposto", "documento do carro", "licenciamento"] },
   { categoria: "Trabalho/Negócio", palavras: ["fornecedor", "ferramenta", "anuncio", "trafego", "sistema", "negocio"] },
   { categoria: "Dívidas/Cartões", palavras: ["cartao", "nubank", "fatura", "emprestimo", "parcela"] },
 ];
@@ -56,12 +65,33 @@ export const NOMES_CATEGORIAS_GASTO: CategoriaGasto[] = [...CATEGORIAS.map((c) =
 // Categorias de entrada (Receita) — lista própria, sem nada a ver com as
 // de gasto acima: "Salário" ou "Prêmio" não fazem sentido junto de
 // "Mercado"/"Apostas" no mesmo select.
-export type CategoriaReceita = "Salário" | "Bico/Freelance" | "Dividendos/Investimentos" | "Prêmio" | "Gorjeta" | "Reembolso" | "Outros";
+export type CategoriaReceita =
+  | "Salário"
+  | "Bico/Freelance"
+  | "Dividendos/Investimentos"
+  | "Aluguel recebido"
+  | "Venda"
+  | "Benefício/Auxílio"
+  | "Prêmio"
+  | "Gorjeta"
+  | "Reembolso"
+  | "Outros";
 
 export const NOMES_CATEGORIAS_RECEITA: CategoriaReceita[] = [
   "Salário",
   "Bico/Freelance",
   "Dividendos/Investimentos",
+  // Pedido do Ibrahim (09/09/2026): ele mesmo tem casas alugadas e quer
+  // separar aluguel recebido de "Bico/Freelance"/"Dividendos" — renda
+  // passiva de imóvel é categoria própria, não cabe bem em nenhuma das
+  // outras.
+  "Aluguel recebido",
+  // Sugestão do ChatGPT: "vendi minha TV por 800"/"vendi roupa" não é
+  // salário nem freelance — venda avulsa de bem próprio.
+  "Venda",
+  // Benefício/auxílio/pensão/aposentadoria/programa social — não é
+  // "trabalho" (Salário/Bico) nem "investimento".
+  "Benefício/Auxílio",
   "Prêmio",
   "Gorjeta",
   "Reembolso",

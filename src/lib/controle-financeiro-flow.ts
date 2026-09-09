@@ -8,6 +8,14 @@ import {
 } from "./gasto-flow";
 import { parseMoneyBR } from "./money";
 import { normalizarDescricaoFinanceira, normalizarTextoBusca } from "./descricao-financeira";
+// Achado ao vivo (Ibrahim, 09/09/2026): "Aluguel R$800" (despesa fixa) caía
+// sempre com categoria=NULL no banco → bucket "Outros" na tela de
+// categorias, mesmo a IA já classificando certinho como "Moradia" — ver
+// DespesaFixaRegistradaControle abaixo. definirCategoriaGasto já existe e já
+// cobre "aluguel"/"condominio"→Moradia; reaproveitado aqui como fallback pro
+// caminho regex (parsearItensDespesaFixa) — sem risco de import circular,
+// gasto-flow.ts não importa nada deste arquivo.
+import { definirCategoriaGasto } from "./gasto-flow";
 import type { FinanceiroIntent, ItemFinanceiroInterpretado, TipoDividaFinanceiro } from "./ia/financeiro-intent-schema";
 
 export const CONTROLE_FINANCEIRO_PREFIXO = "__CONTROLE_FINANCEIRO__";
@@ -31,6 +39,12 @@ export type CartaoConfiguradoControle = {
 export type DespesaFixaRegistradaControle = {
   descricao: string;
   valor: number;
+  // Opcional só por compatibilidade com estado antigo já salvo em
+  // BotSessao.dividasTemp (despesas fixas de antes desse campo existir)
+  // — nunca fica de fora numa despesa fixa NOVA (ver extrairItemDespesaFixa/
+  // salvarItensConfirmadosIA, sempre preenchem com a categoria da IA ou
+  // definirCategoriaGasto como fallback).
+  categoria?: string;
 };
 
 export type ConfirmacaoPendenteControle = {
@@ -164,7 +178,13 @@ export type MetaParaPersistirControle =
   | { acao: "depositar"; nomeAproximado: string; valor: number };
 
 function itemDespesaFixaParaPersistir(item: DespesaFixaRegistradaControle): ItemParaPersistirControle {
-  return { tipo: "DESPESA_FIXA", descricao: item.descricao, valor: item.valor, recorrente: true };
+  return {
+    tipo: "DESPESA_FIXA",
+    descricao: item.descricao,
+    categoria: item.categoria ?? definirCategoriaGasto(item.descricao),
+    valor: item.valor,
+    recorrente: true,
+  };
 }
 
 export type ResultadoGastoControle = {
@@ -1121,6 +1141,11 @@ export function salvarItensConfirmadosIA(
     .map((item) => ({
       descricao: descricaoItemFinanceiro(item),
       valor: item.valor,
+      // A IA (financeiro-intent-resolver.ts) já classifica certo (ex:
+      // "Aluguel"→"Moradia") — preserva; item.categoria vem sempre
+      // preenchido pelo prompt, mas mantém o fallback pra nunca perder a
+      // categoria mesmo se algum dia vier vazio.
+      categoria: item.categoria || definirCategoriaGasto(descricaoItemFinanceiro(item)),
     }));
 
   const despesasAtuais = despesasFixasCompatControle(estadoAtual);
