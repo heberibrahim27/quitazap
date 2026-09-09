@@ -328,6 +328,13 @@ export function extrairDescricaoGasto(mensagem: string, categoria: CategoriaGast
     .replace(/r\$\s*\d{1,3}(?:\.\d{3})*,\d{1,2}/gi, " ")
     .replace(/\d{1,3}(?:\.\d{3})*,\d{1,2}\s*(?:reais|real)?/gi, " ")
     .replace(/\d+(?:[.,]\d{1,2})?\s*(?:reais|real)/gi, " ")
+    // Bug achado em teste ao vivo (09/09/2026): "gastei 5k no mercado" e
+    // "gastei 1.5k na consulta" sobravam com "5k"/"1.5k" na descrição —
+    // "5k" é um único token (dígito colado na letra "k", sem fronteira de
+    // palavra entre eles), então o \b\d+\b logo abaixo nunca casava nele.
+    // Precisa de uma regex própria, igual ao "mil" já tratado por
+    // removerValorPorExtenso.
+    .replace(/\b\d+(?:[.,]\d{1,2})?\s*k\b/gi, " ")
     .replace(/\b\d+\b/g, " ");
   texto = removerValorPorExtenso(texto);
   texto = texto
