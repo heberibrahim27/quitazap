@@ -193,8 +193,19 @@ function criarItem(parcial: Partial<ItemFinanceiroInterpretado>): ItemFinanceiro
   };
 }
 
+// Achado em teste ao vivo (09/09/2026), mesma causa raiz do fix em
+// resolverDivida/extrairTodosValores: parseMoneyBR sozinho exige pelo menos
+// um DÍGITO na frase — mensagens com o valor 100% por extenso ("cliente
+// pagou dez mil", "cria uma meta de cem reais pra emergencia", "guardei
+// duzentos na minha meta de viagem") nunca resolviam aqui, mesmo já sendo
+// reconhecidas como escopo financeiro (avaliarEscopoFinanceiro já aceita
+// valorPorExtenso + verbo). Sem isso, TODO caller de extrairPrimeiroValor
+// (receita, pagamento de dívida, meta) delegava esse caso pra IA remota —
+// funciona, mas custa uma chamada de IA e um passo a mais pra algo que dá
+// pra resolver localmente, igual já se faz pra gasto (gasto-flow.ts) e
+// dívida. Só tenta por extenso quando não achou nenhum dígito primeiro.
 function extrairPrimeiroValor(texto: string): number | null {
-  const valor = parseMoneyBR(texto.replace(/[.。]+$/g, ""));
+  const valor = parseMoneyBR(texto.replace(/[.。]+$/g, "")) ?? valorPorExtenso(normalizarTexto(texto));
   return valor && Number.isFinite(valor) ? valor : null;
 }
 
