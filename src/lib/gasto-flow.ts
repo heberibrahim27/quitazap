@@ -249,7 +249,11 @@ function extrairDescricaoQuantidade(
   const semRuido = base
     .replace(new RegExp(`\\b${quantidade}\\b`, "g"), " ")
     .replace(
-      /\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|de|do|da|no|na|em|com|pra|para|mim|mais|uma|um|duas|dois|amigos?|cada|unidade)\b/gi,
+      // "a" adicionado (achado em teste ao vivo, 09/09/2026): "comprei 3
+      // refrigerantes a 5 cada" sobrava com "Refrigerantes a" na descrição
+      // — a preposição "a" (de "a X reais cada"/"a X cada") não estava
+      // nessa lista de palavras a remover.
+      /\b(gastei|gasto|apostei|paguei|pago|comprei|compra|pix|custou|de|do|da|no|na|em|com|pra|para|mim|mais|uma|um|duas|dois|amigos?|cada|unidade|a)\b/gi,
       " "
     )
     .replace(new RegExp(`\\b(${SAUDACOES_E_MARCADORES_TEMPO})\\b`, "gi"), " ")
