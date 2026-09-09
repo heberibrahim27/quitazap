@@ -13,13 +13,12 @@ import "./admin-shell.css";
 const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600"] });
 
 // Rotas que NÃO fazem parte do painel admin com menu lateral — cada uma
-// já tem seu próprio layout/autenticação (painel do cliente, portal do
-// QuitaZAP Receber, página de vendas pública e o redirecionamento antigo
-// dela, login/cadastro, política de privacidade pública). "/" não pode
-// entrar nessa lista com startsWith (bateria em toda rota do site, já
-// que toda rota começa com "/") — por isso tem checagem exata à parte em
-// foraDoPainel().
-const ROTAS_FORA_DO_PAINEL = ["/minha-conta", "/dashboard", "/oferta", "/login", "/cadastro", "/entrar", "/logout", "/privacidade"];
+// já tem seu próprio layout/autenticação (painel do cliente, página de
+// vendas pública e o redirecionamento antigo dela, login, política de
+// privacidade pública). "/" não pode entrar nessa lista com startsWith
+// (bateria em toda rota do site, já que toda rota começa com "/") — por
+// isso tem checagem exata à parte em foraDoPainel().
+const ROTAS_FORA_DO_PAINEL = ["/minha-conta", "/oferta", "/login", "/logout", "/privacidade"];
 
 const GRUPOS = [
   {

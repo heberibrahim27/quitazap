@@ -13,7 +13,6 @@ function revalidarConsumidoresPublicos() {
   revalidatePath("/painel/contatos");
   revalidatePath("/");
   revalidatePath("/privacidade");
-  revalidatePath("/dashboard/plano");
 }
 
 export default async function ContatosSociaisPage({

@@ -228,9 +228,9 @@ export async function GET(req: NextRequest) {
       disparadas,
       erros,
       canceladas: cancelar.length,
-      etapa1: etapa1.length,
-      etapa2: etapa2.length,
-      etapa3: etapa3.length,
+      etapa1: 0,
+      etapa2: 0,
+      etapa3: 0,
     };
 
     console.log("[COBRADOR]", resumo);
