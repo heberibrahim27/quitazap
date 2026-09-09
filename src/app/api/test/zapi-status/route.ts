@@ -40,11 +40,16 @@ export async function GET() {
     }
   }
 
-  const [status, device] = await Promise.all([chamar("/status"), chamar("/device")]);
+  const [status, device, qrcode] = await Promise.all([
+    chamar("/status"),
+    chamar("/device"),
+    chamar("/qr-code/image"),
+  ]);
 
   return NextResponse.json({
     ok: true,
     status,
     device,
+    qrcode,
   });
 }
