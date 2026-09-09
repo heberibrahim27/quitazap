@@ -51,14 +51,43 @@ function extrairValorComMultiplicadorEscrito(input: string): number | undefined 
   return Number.isFinite(valor) && valor > 0 ? valor : undefined;
 }
 
+// Abreviação popular "k" pra mil — "5k", "2k", "1.5k", "2,5k" — tão comum em
+// digitação rápida de whatsapp quanto "8 mil" (achado em teste ao vivo,
+// 09/09/2026: "gastei 5k no mercado", "custou 2k" caíam no mesmíssimo buraco
+// do "8 mil" — parseMoneyBR devolvia 5 e 2, 1000x menor, sem erro). Aceita
+// "." OU "," como decimal aqui (diferente do multiplicador por extenso
+// acima) porque "k" vem colado/perto do número sem a ambiguidade de milhar
+// que o ponto tem em "1.500". `\b` depois do "k" evita casar o "k" de
+// "50km"/"50kg" (não tem fronteira de palavra entre "k" e a letra seguinte).
+const REGEX_VALOR_COM_K = /(\d+)(?:[.,](\d{1,2}))?\s*k\b/i;
+
+function extrairValorComKEscrito(input: string): number | undefined {
+  const match = input.match(REGEX_VALOR_COM_K);
+  if (!match) return undefined;
+
+  const inteiro = Number(match[1]);
+  const decimal = match[2] ? Number(`0.${match[2]}`) : 0;
+  if (!Number.isFinite(inteiro)) return undefined;
+
+  const valor = (inteiro + decimal) * 1_000;
+  return Number.isFinite(valor) && valor > 0 ? valor : undefined;
+}
+
+function extrairValorAbreviado(input: string): number | undefined {
+  const porExtenso = extrairValorComMultiplicadorEscrito(input);
+  if (porExtenso !== undefined) return porExtenso;
+
+  return extrairValorComKEscrito(input);
+}
+
 // Exportado à parte pra quem (ex.: gasto-flow.ts) já faz sua PRÓPRIA
 // extração de candidato via regex antes de chamar parseMoneyBR — nesses
-// casos o candidato isolado já chega sem o "mil"/"milhão" (foi cortado pela
-// regex de quem chamou), então parseMoneyBR sozinho nunca veria o padrão.
-// Quem tem acesso à mensagem crua deve tentar isso PRIMEIRO, antes da sua
-// própria extração de candidato.
+// casos o candidato isolado já chega sem o "mil"/"milhão"/"k" (foi cortado
+// pela regex de quem chamou), então parseMoneyBR sozinho nunca veria o
+// padrão. Quem tem acesso à mensagem crua deve tentar isso PRIMEIRO, antes
+// da sua própria extração de candidato.
 export function valorComMultiplicadorEscrito(input: string): number | undefined {
-  const valor = extrairValorComMultiplicadorEscrito(input);
+  const valor = extrairValorAbreviado(input);
   return valor !== undefined ? arredondarCentavos(valor) : undefined;
 }
 
@@ -69,7 +98,7 @@ export function parseMoneyBR(input: string | number | null | undefined): number 
 
   if (!input) return undefined;
 
-  const comMultiplicador = extrairValorComMultiplicadorEscrito(input);
+  const comMultiplicador = extrairValorAbreviado(input);
   if (comMultiplicador !== undefined) return arredondarCentavos(comMultiplicador);
 
   return parseMoneyBRSemMultiplicador(input);
