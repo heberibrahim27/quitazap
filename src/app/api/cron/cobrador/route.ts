@@ -116,7 +116,19 @@ export async function GET(req: NextRequest) {
   let disparadas = 0;
   let erros = 0;
 
+  // ENVIO PAUSADO (09/09/2026): decisão do Ibrahim pós-incidente de spam —
+  // "mensagem fria nunca, não vamos correr o risco de bloqueio". O devedor
+  // aqui nunca falou com o número da QuitaZAP; esse era o único envio a frio
+  // que ainda restava ativo no produto. Pausado por inteiro (etapas 1/2/3);
+  // mantido só o cancelamento automático após 30 dias, que é atualização de
+  // status, não envio. Ver também webhook/zapi/route.ts (comando COBRAR, que
+  // não dispara mais o envio imediato ao devedor).
+  const enviarCobrancasPausado = true;
+
   try {
+    if (enviarCobrancasPausado) {
+      console.log("[COBRADOR] Envio ao devedor pausado — pulando etapas 1/2/3 (só cancelamento por inatividade abaixo).");
+    } else {
     // ── ETAPA 1: Cobranças que vencem hoje (status PENDENTE) ─────────────────
     const etapa1 = await prisma.cobranca.findMany({
       where: {
@@ -189,6 +201,7 @@ export async function GET(req: NextRequest) {
         erros++;
         console.error(`[COBRADOR] Erro etapa 3 id=${c.id}:`, err);
       }
+    }
     }
 
     // ── CANCELAR: 30 dias sem pagamento após última chance ───────────────────
