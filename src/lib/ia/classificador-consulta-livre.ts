@@ -181,12 +181,21 @@ async function classificarIntentLivre(
 }
 
 // Log estruturado (sem tabela nova ainda — proposto como Fase 2) — dá pra
-// grepar nos logs do Vercel pra ver o que esse fallback está encontrando
-// e alimentar a lista de exemplos/regex no futuro.
+// grepar nos logs do Vercel pra acompanhar volume/distribuição do que esse
+// fallback está encontrando.
+// Ajustado (madrugada 09/09→10/09/2026, recomendação do ChatGPT de uma
+// consultoria anterior, ainda pendente): NÃO loga mais o texto literal da
+// mensagem do cliente — os logs do Vercel não são um lugar apropriado pra
+// guardar o que a pessoa escreveu (pode ter valores, nome de banco, credor,
+// situação pessoal). Fica só o suficiente pra enxergar o volume e a taxa de
+// erro de classificação (tamanho da mensagem + resultado), sem texto
+// verbatim. Se no futuro for necessário capturar exemplos reais pra
+// melhorar a lista de regex (a "Fase 2" citada acima), isso deveria virar
+// uma coleta explícita e anonimizada, não um log solto de produção.
 function logDecisao(mensagem: string, intent: IntentConsultaLivre | null) {
   console.log(
     "[ConsultaLivre]",
-    JSON.stringify({ mensagem, intentDetectado: intent ?? "ERRO_CLASSIFICACAO" }),
+    JSON.stringify({ tamanhoMensagem: mensagem.length, intentDetectado: intent ?? "ERRO_CLASSIFICACAO" }),
   );
 }
 
