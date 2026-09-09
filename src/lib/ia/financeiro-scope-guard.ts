@@ -166,6 +166,11 @@ const PADROES_ESCOPO = [
   /\bspotify\b/,
   /\bcompra\b/,
   /\bpago\b/,
+  // "dei 20 de gorjeta" / "rachei a conta, minha parte foi 40" (achado em
+  // teste ao vivo, 09/09/2026) — mesma causa raiz do "uber 25"/"farmacia 30"
+  // acima: já reconhecidos em PALAVRAS_GASTO (gasto-flow.ts), faltavam aqui.
+  /\bgorjeta\b/,
+  /\brachei\b/,
 ];
 
 const ALIASES_CARTAO_ESCOPO = [
