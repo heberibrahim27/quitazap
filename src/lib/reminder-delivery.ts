@@ -70,10 +70,23 @@ export async function deliverReminder(params: {
   }
 }
 
+// Palavras de negação que, perto de "audio" ou "texto", invertem o sentido
+// (bug real encontrado em teste 09/09/2026: "não quero mais lembrete em
+// áudio, prefiro em texto" estava ligando áudio, porque a versão antiga só
+// olhava se a palavra "audio" aparecia em algum lugar da frase, sem levar
+// negação em conta — e "audio" era checado antes de "texto", então qualquer
+// frase de cancelamento que citasse as duas palavras batia errado).
+const NEGACAO = "nao|sem|cancela|cancelar|desativa|desativar|desliga|desligar|tira|tirar|para de|pare de|chega de|nada de";
+const NEG_PERTO_DE_AUDIO = new RegExp(`\\b(${NEGACAO})\\b[^.!?]{0,25}\\baudio\\b`);
+const NEG_PERTO_DE_TEXTO = new RegExp(`\\b(${NEGACAO})\\b[^.!?]{0,25}\\btexto\\b`);
+
 /** Reconhece o cliente pedindo pra trocar o modo de entrega do lembrete no
  * meio de uma conversa de texto qualquer — funciona em qualquer etapa,
  * igual ao comando RESETAR. Escopo enxuto de propósito: só alterna entre
- * TEXTO e AUDIO (o modo TEXTO_E_AUDIO fica só pra ajuste manual por ora). */
+ * TEXTO e AUDIO (o modo TEXTO_E_AUDIO fica só pra ajuste manual por ora).
+ * Se a frase pedir os dois ao mesmo tempo sem dar pra saber qual prevalece
+ * (nenhum dos dois negado), não arrisca palpite — devolve null e a
+ * mensagem segue o fluxo normal, sem trocar nada. */
 export function detectarComandoModoLembrete(mensagem: string): "AUDIO" | "TEXTO" | null {
   const texto = mensagem
     .toLowerCase()
@@ -81,7 +94,11 @@ export function detectarComandoModoLembrete(mensagem: string): "AUDIO" | "TEXTO"
     .replace(/[̀-ͯ]/g, ""); // remove acentos: "áudio" → "audio"
 
   if (!texto.includes("lembrete")) return null;
-  if (texto.includes("audio")) return "AUDIO";
-  if (texto.includes("texto")) return "TEXTO";
-  return null;
+
+  const querAudio = texto.includes("audio") && !NEG_PERTO_DE_AUDIO.test(texto);
+  const querTexto = texto.includes("texto") && !NEG_PERTO_DE_TEXTO.test(texto);
+
+  if (querAudio && !querTexto) return "AUDIO";
+  if (querTexto && !querAudio) return "TEXTO";
+  return null; // nenhuma menção clara, ou pediu as duas sem negar nenhuma — ambíguo
 }
