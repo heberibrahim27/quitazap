@@ -9,6 +9,7 @@ import { CategoriaAccordion } from "./CategoriaAccordion";
 import { GastosDonut } from "./GastosDonut";
 import { salvarOrcamento, removerOrcamento } from "./orcamento-actions";
 import { detectarVazamentosSalario } from "@/lib/financeiro/vazamentos-salario";
+import { IconDownload } from "@/components/icons";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -159,6 +160,19 @@ export default async function GastosPage({
         hrefSeguinte={`/minha-conta/gastos?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
         label={`${nomeMes}/${ano}`}
       />
+
+      {categorias.length > 0 && (
+        <a
+          href={`/api/minha-conta/exportar-gastos?mes=${paramMes(ano, mes)}`}
+          download={`quitazap-gastos-${paramMes(ano, mes)}.csv`}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600,
+            color: "var(--ink-dim)", margin: "0 0 16px", textDecoration: "none",
+          }}
+        >
+          <IconDownload size={13} /> Baixar {nomeMes.toLowerCase()} em CSV
+        </a>
+      )}
 
       {vazamentos.length > 0 && (
         <div className="mc-card" style={{ marginBottom: 16 }}>
