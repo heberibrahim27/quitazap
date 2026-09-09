@@ -70,6 +70,10 @@ const PADROES_ESCOPO = [
   /\bpix\b/,
   /\bgastei\b/,
   /\bgasto\b/,
+  // "acabei de gastar 60 reais no busao" (achado em teste ao vivo,
+  // 09/09/2026) — infinitivo "gastar" faltava aqui, já coberto em
+  // PALAVRAS_GASTO (gasto-flow.ts).
+  /\bgastar\b/,
   /\bcomprei\b/,
   /\bpaguei\b/,
   // "passei X no cartao" é jeito muito comum de descrever compra no
@@ -256,7 +260,7 @@ function pareceValorMonetarioForte(texto: string): boolean {
 // como escopo (PADROES_ESCOPO) e resolverDivida já saber interpretar "to
 // devendo ... pro/pra" como dívida nova.
 const VERBO_FINANCEIRO_FORTE =
-  /\b(?:recebi|ganhei|gastei|comprei|paguei|passei|torrei|desembolsei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|devendo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
+  /\b(?:recebi|ganhei|gastei|gastar|comprei|paguei|passei|torrei|desembolsei|guardei|guardar|poupar|poupei|juntar|juntei|depositei|coloquei|devo|devendo|emprestimo|financiamento|financiei|financiou|financiaram|financiando|financiar|consignado)\b/;
 
 // Valor por extenso ("gastei cem reais", "recebi mil e duzentos") não tem
 // NENHUM dígito — achado em teste ao vivo, set/2026: sem essa checagem a
