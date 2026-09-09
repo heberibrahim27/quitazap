@@ -33,8 +33,23 @@ export function normalizarTexto(msg: string): string {
 // conta quando a mensagem inteira é uma resposta curta e direta — nunca
 // dentro de uma frase mais longa e substantiva, onde essas palavras
 // aparecem à toa sem relação nenhuma com aceitar a oferta.
+//
+// Achado ao vivo (09/09/2026, teste com webhook real): a proteção acima
+// ("só quando a mensagem inteira é curta") não é suficiente pro exato
+// exemplo citado no comentário original — "tenho uma dúvida" tem 3
+// palavras, então "ainda tenho dúvida" (também 3 palavras) passa pelo
+// filtro de "resposta curta" e ainda dispara "enviar_link" (❌ "Show! Aqui
+// está o link pra começar agora" pra alguém que literalmente disse que
+// AINDA está em dúvida — o oposto de aceitar). Causa: "tenho" sozinho não
+// é uma palavra afirmativa de verdade (é um fragmento de verbo, aparece
+// igual em "tenho dúvida", "tenho medo", "não tenho certeza"...) — ao
+// contrário de "isso"/"pode ser", que no dia a dia do WhatsApp brasileiro
+// realmente funcionam como "sim" sozinhos ("isso", "isso mesmo", "pode
+// ser" continuam válidos, testados abaixo). Fix: tira só "tenho" da lista
+// fraca — os outros itens (isso, pode, vai...) já têm uso real como aceite
+// curto e ficam.
 const RE_CONFIRMACAO_FORTE = /\b(sim|quero|claro|bora|show|perfeito|exato|to dentro|partiu|confirmado)\b/;
-const RE_CONFIRMACAO_FRACA = /\b(s|tenho|pode|vamos|to|tô|ok|oba|isso|queria|preciso|ajuda|vai|top|legal|gostei|verdade|1)\b/;
+const RE_CONFIRMACAO_FRACA = /\b(s|pode|vamos|to|tô|ok|oba|isso|queria|preciso|ajuda|vai|top|legal|gostei|verdade|1)\b/;
 
 export function detectaPositivo(msg: string): boolean {
   const m = normalizarTexto(msg).trim();
