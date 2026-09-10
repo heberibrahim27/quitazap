@@ -14,6 +14,22 @@ import { obterOuCriarSessaoControle, processarMensagemControle } from "@/lib/con
 const MENSAGEM_MAX_LEN = 2000;
 const HISTORICO_LIMITE = 100;
 
+// Uma frase curta e interpretativa no máximo — nunca repete os números que
+// o card já mostra (total, cada categoria, cada lançamento). Ver comentário
+// acima de onde isso é chamado.
+function respostaCurtaParaCard(
+  dados:
+    | { tipo: "lancamento_criado"; lancamentos: unknown[] }
+    | { tipo: "grafico_categoria"; categorias: { nome: string; percentual: number }[] },
+): string {
+  if (dados.tipo === "lancamento_criado") {
+    return dados.lancamentos.length > 1 ? `${dados.lancamentos.length} lançamentos registrados.` : "Lançamento registrado.";
+  }
+  const top = dados.categorias[0];
+  if (!top) return "Aqui está o resumo do período.";
+  return `${top.nome} concentra ${top.percentual}% das despesas registradas neste período.`;
+}
+
 export async function GET(req: NextRequest) {
   const clienteId = getClienteIdDaRequisicao(req);
   if (!clienteId) return erroClienteNaoAutenticado();
@@ -49,7 +65,8 @@ export async function POST(req: NextRequest) {
     });
 
     const sessao = await obterOuCriarSessaoControle(cliente);
-    const { resposta, lancamentosCriados, graficoCategoria } = await processarMensagemControle({ cliente, sessao, mensagem });
+    const resultado = await processarMensagemControle({ cliente, sessao, mensagem });
+    const { lancamentosCriados, graficoCategoria } = resultado;
 
     const dadosEstruturados =
       lancamentosCriados && lancamentosCriados.length > 0
@@ -68,6 +85,15 @@ export async function POST(req: NextRequest) {
         : graficoCategoria
           ? graficoCategoria
           : undefined;
+
+    // `resultado.resposta` é o texto verboso pensado pro WhatsApp (emoji,
+    // categoria por categoria, comentário) — reaproveitá-lo aqui em cima do
+    // card duplicava a mesma informação duas vezes na tela (achado real do
+    // Ibrahim, 10/09/2026). O card já carrega os valores detalhados; o chat
+    // nativo mostra no máximo uma frase curta antes dele. Só cai de volta
+    // pro texto original quando não há card pra mostrar (ex.: consulta sem
+    // dado suficiente pro gráfico).
+    const resposta = dadosEstruturados ? respostaCurtaParaCard(dadosEstruturados) : resultado.resposta;
 
     await prisma.mensagemChat.create({
       data: { clienteId, canal: "APP", direcao: "BOT", texto: resposta, dadosEstruturados },
