@@ -205,7 +205,40 @@ Desenho sugerido:
 
 ---
 
-## 8. Riscos e itens em aberto
+## 8. IA proativa (Fase 6 — pós-MVP de hábito, registrada em 2026-09-10)
+
+Sem pressa — avaliar só depois do MVP de hábito (Fase 4) estar pronto. Ibrahim quer a IA puxando conversa de verdade no chat, não só respondendo — tipo "Dica do Dia" proativa.
+
+### 8.1 Correção de regra (o ChatGPT corrigiu o exemplo original do Ibrahim — vale como regra geral)
+
+**Trocar um gasto por assumir uma parcela/compromisso NÃO é "economia" — é só trocar de obrigação.** A IA nunca deve apresentar isso como economia nem incentivar dívida automaticamente; só apresenta a possibilidade e pergunta, nunca afirma como ganho. Mesma família de cuidado da regra de dado real da seção 6.1 — não inventar um resultado positivo que não existe de fato.
+
+### 8.2 Cinco tipos de abordagem proativa (base do motor de sugestões)
+
+1. **Descoberta pessoal** — ex. "ainda usa essas 3 assinaturas cadastradas?"
+2. **Incentivo ligado a um desejo** — progresso de uma meta que o cliente tem.
+3. **Ajuda no aperto** — falta cobrir R$X até a próxima receita prevista, quer revisar?
+4. **Reconhecimento real** — parcela quitada, uma obrigação a menos (mesma base de dado verificável da seção 6.1, não inferência).
+5. **Retomada combinada** — retomar algo que o cliente pediu pra rever depois (mesmo mecanismo de "Acompanhe isso para mim", seção 7 item 1).
+
+### 8.3 Controles de personalização (o cliente precisa poder ajustar)
+
+- **Estilo da IA**: direto / parceiro / explicativo.
+- **Frequência**: diária / semanal / só quando mudar algo importante.
+- **"Não sugira isso de novo"** — precisa persistir a preferência (por tipo de sugestão, não só um toggle global).
+- **Feedback por sugestão**: `[Foi útil]` / `[Não combina comigo]`, pra calibrar as próximas.
+
+Implica pelo menos duas coisas novas de schema quando essa fase chegar: uma tabela/registro de preferência por cliente (estilo, frequência, tipos silenciados) e um jeito de registrar feedback por sugestão exibida — nenhuma das duas foi desenhada em detalhe ainda, fica pra quando a fase começar de verdade.
+
+### 8.4 Regras técnicas da camada toda (reforça a regra de dado real da seção 6.1)
+
+- **Uma pergunta por vez, nunca despejar relatório.**
+- **Nunca inventar sugestão se não há novidade real** — mesma regra de "nenhuma mudança relevante" da seção 6.1.3, aplicada aqui também.
+- **Todo cálculo mostrado vem do motor financeiro determinístico** (`controle-financeiro-flow.ts` e irmãos) — a IA só explica/conversa em cima do número, **nunca inventa o número**.
+
+---
+
+## 9. Riscos e itens em aberto
 
 - **Refactor do `route.ts` é o item de maior risco de todo o plano** — é o webhook ao vivo do bot que atende clientes pagantes hoje. A Fase 1 evita esse risco por completo (não toca nele); a Fase 2 precisa de disciplina de migrar ramo a ramo com validação, não big-bang.
 - **`dividasTemp` sem cap de tamanho** — achado colateral, não bloqueia este plano, mas vale um item futuro isolado (fora desta fila).
