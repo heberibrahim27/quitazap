@@ -35,9 +35,9 @@ export function ResetTotalForm({ acao }: { acao: (fd: FormData) => Promise<{ err
       <div className="mc-card" style={{ marginBottom: 16, border: "1px solid rgba(226,59,92,0.25)" }}>
         <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: "var(--red)" }}>Zona de risco</p>
         <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: "var(--ink-dim)", lineHeight: 1.5 }}>
-          Apaga receitas, despesas, compras no cartão, cartões, agenda, orçamentos por categoria, metas e a
-          renda/despesa fixa cadastrada — pra recomeçar o controle financeiro do zero. Seu login e perfil (nome,
-          foto, telefone) continuam intactos, e isso não mexe em Empréstimos/Dívidas.
+          Apaga receitas, despesas, compras no cartão, cartões, agenda, orçamentos por categoria, metas, a
+          renda/despesa fixa cadastrada, Empréstimos/Dívidas e todo o histórico do chat — pra recomeçar do zero.
+          Só ficam a sua foto e os dados cadastrais (nome, telefone, login).
         </p>
         <button
           type="button"
@@ -56,8 +56,8 @@ export function ResetTotalForm({ acao }: { acao: (fd: FormData) => Promise<{ err
       <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: "var(--red)" }}>Tem certeza?</p>
       <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: "var(--ink-dim)", lineHeight: 1.5 }}>
         Essa ação é <strong>irreversível</strong>. Vai apagar receitas, despesas, compras no cartão, cartões
-        cadastrados, agenda, orçamentos por categoria, metas e a renda/despesa fixa cadastrada. Não mexe em
-        Empréstimos/Dívidas nem no seu login (nome, foto, telefone continuam).
+        cadastrados, agenda, orçamentos por categoria, metas, a renda/despesa fixa cadastrada, Empréstimos/Dívidas
+        e todo o histórico do chat. Só ficam a sua foto e os dados cadastrais (nome, telefone, login).
       </p>
       <form onSubmit={aoConfirmar}>
         <label className="mc-label">
