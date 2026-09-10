@@ -86,7 +86,19 @@ async function fatosPossoGastar(clienteId: string, valorPretendido: number) {
 async function fatosOndeGastoMais(clienteId: string) {
   const resumo = await calcularResumoFinanceiro({ clienteId, periodo: periodoAtual() });
   const ranking = [...resumo.porCategoria].sort((a, b) => b.total - a.total).slice(0, 5);
-  return { periodo: "mes_atual", ranking, totalDespesasOperacionais: resumo.totais.totalSaidasOperacionais };
+  // Total bate com a própria lista de categorias (nunca soma parcela de
+  // dívida/empréstimo) — achado real (Ibrahim, 10/09/2026): usar
+  // totalSaidasOperacionais aqui (que inclui dívida) fazia a IA citar "o
+  // total é 2457" logo depois de listar categorias que somavam 1657 — uma
+  // resposta sobre CATEGORIA contradizendo a própria lista que ela acabou
+  // de mostrar. Parcela de dívida/empréstimo não é categoria de gasto
+  // discricionário (não tem `categoria`, vem de Divida/Parcela, não de
+  // Lancamento) — já tem espaço próprio no Dashboard e em Meu Plano, não
+  // fica escondida em lugar nenhum, só não deve somar numa resposta que é
+  // especificamente sobre categorias.
+  const totalDespesasCategorizadas = resumo.porCategoria.reduce((soma, c) => soma + c.total, 0);
+  const totalDividasForaDaLista = resumo.totais.emprestimos + resumo.totais.outrasDividas;
+  return { periodo: "mes_atual", ranking, totalDespesasCategorizadas, totalDividasForaDaLista };
 }
 
 async function fatosComoEconomizar(clienteId: string, valorAlvo: number | null) {
@@ -210,7 +222,9 @@ export async function responderConsultaFinanceira(
     return frasearComIA(
       mensagemOriginal, fatos, clienteId, gratuito,
       () => fallbackOndeGastoMais(fatos),
-      "Sempre deixe claro que é o recorte deste mês (período atual) — nunca fale como se fosse um traço permanente da vida financeira da pessoa.",
+      "Sempre deixe claro que é o recorte deste mês (período atual) — nunca fale como se fosse um traço permanente da vida financeira da pessoa. " +
+      "Se citar um total, use exatamente totalDespesasCategorizadas (nunca some totalDividasForaDaLista a ele — são coisas diferentes). " +
+      "Se totalDividasForaDaLista for maior que zero, pode opcionalmente adicionar uma frase curta avisando que parcelas de dívida/empréstimo ficam de fora dessa lista de categorias e que dá pra ver elas em Meu Plano — não é obrigatório, e nunca cite o valor de totalDividasForaDaLista na resposta.",
     );
   }
 
