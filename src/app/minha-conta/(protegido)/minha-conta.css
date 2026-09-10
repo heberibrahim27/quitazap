@@ -1393,6 +1393,14 @@ body.mc-chat-tela {
   inset: 0;
   overflow: hidden;
   width: 100%;
+  /* overflow:hidden sozinho não impede gesto de arrastar/rubber-band no
+     iOS — achado real via print do Ibrahim (a tela inteira, cabeçalho
+     incluso, deslizava lateralmente ao arrastar). touch-action:none no
+     body bloqueia qualquer pan/bounce; a única rolagem permitida
+     (vertical, só na lista de mensagens) é reautorizada explicitamente
+     abaixo, em .mc-chat-lista. */
+  touch-action: none;
+  overscroll-behavior: none;
 }
 body.mc-chat-tela .header,
 body.mc-chat-tela .header-spacer,
@@ -1421,6 +1429,10 @@ body.mc-chat-tela .mc-chat-shell {
 body.mc-chat-tela .mc-chat-lista {
   padding-left: 16px;
   padding-right: 16px;
+  /* Única região com scroll de verdade nessa tela — só vertical, nunca
+     lateral, e contido (não deixa o bounce "vazar" pra fora dela). */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 body.mc-chat-tela .mc-chat-composer {
   flex: 0 0 auto;
