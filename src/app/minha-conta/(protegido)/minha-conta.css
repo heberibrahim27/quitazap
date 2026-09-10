@@ -1324,6 +1324,61 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   min-height: 420px;
 }
 
+/* Tela dedicada full-screen (pedido do Ibrahim, 10/09/2026 — referência: o
+   app do Claude Code no celular, onde entrar numa conversa some com a
+   navegação e o cabeçalho vira só uma seta de voltar). Ativado a partir da
+   montagem de ChatClient (classe no <body>, ver aí), não só quando o
+   campo foca — a tela inteira já nasce nesse modo. Escondemos o
+   Header/BottomNav globais em vez de alterar o layout compartilhado
+   (serve toda página do painel) pra não arriscar as outras telas. */
+body.mc-chat-tela .header,
+body.mc-chat-tela .header-spacer,
+body.mc-chat-tela .bottom-nav {
+  display: none;
+}
+body.mc-chat-tela .mc-main {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+body.mc-chat-tela .mc-chat-shell {
+  /* var(--mc-vvh) é a altura real medida por visualViewport (ver
+     ChatClient.tsx) — já desconta teclado + input accessory view do
+     Safari, ao contrário de 100dvh, que não reage ao teclado. Cai pra
+     100dvh se o JS não rodar (fallback idêntico ao modo não-dedicado). */
+  height: var(--mc-vvh, 100dvh);
+  min-height: 0;
+}
+body.mc-chat-tela .mc-chat-composer {
+  /* Sem BottomNav nessa tela pra reservar a área segura de baixo (home
+     indicator do iPhone) — o compositor assume isso sozinho. */
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.mc-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: calc(max(10px, env(safe-area-inset-top)) + 6px) 4px 10px;
+}
+.mc-chat-voltar {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  color: var(--mc-ink); background: var(--card); border: 1px solid var(--mc-line);
+  flex: 0 0 auto;
+}
+.mc-chat-voltar svg { width: 19px; height: 19px; }
+.mc-chat-header-titulo { font-size: 15px; font-weight: 700; color: var(--mc-ink); }
+
+/* Scroll funciona normal, só sem mostrar a barra (pedido do Ibrahim). */
+.mc-chat-lista {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mc-chat-lista::-webkit-scrollbar {
+  display: none;
+}
+
 .mc-chat-lista {
   flex: 1;
   overflow-y: auto;
