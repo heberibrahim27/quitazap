@@ -236,6 +236,48 @@ Implica pelo menos duas coisas novas de schema quando essa fase chegar: uma tabe
 - **Nunca inventar sugestão se não há novidade real** — mesma regra de "nenhuma mudança relevante" da seção 6.1.3, aplicada aqui também.
 - **Todo cálculo mostrado vem do motor financeiro determinístico** (`controle-financeiro-flow.ts` e irmãos) — a IA só explica/conversa em cima do número, **nunca inventa o número**.
 
+### 8.5 Mais 5 mecanismos de acompanhamento contínuo (complemento, 2026-09-10 — fecha a ideação desta camada por enquanto)
+
+Além dos 5 tipos de abordagem da seção 8.2:
+
+1. **"Combinado comigo"** — cliente define um limite próprio (ex. "R$200/mês em delivery"), a IA cria um combinado editável e acompanha pelos gastos registrados. **Não é regra imposta pelo app — é um acordo que o próprio cliente fez.** Mecanismo favorito nas sugestões que embasaram este documento: junta objetivo pessoal + memória + motivo legítimo de o cliente voltar ao chat.
+2. **Botão "Me ajuda a decidir"** — antes de comprar algo, cliente manda foto ou valor, o chat compara comprar agora / esperar / juntar primeiro (reaproveita o simulador "posso comprar isso?" da Fase 3, seção 5).
+3. **"Modo Estou apertado"** — um botão muda a abordagem da IA: suspende sugestões de compra e desafios de poupança, prioriza organizar contas e próximos passos possíveis, sem sermão.
+4. **"Dicas que viram ações"** — toda dica termina em algo resolvido na própria conversa (ex. "Quer revisar suas assinaturas?" → `[Revisar agora]` abre os serviços cadastrados ali mesmo) — **nunca só texto motivacional solto**.
+5. **"Retorno sobre o que funcionou"** — depois de uma sugestão aceita, pergunta `[Funcionou]` `[Foi difícil]` `[Quero ajustar]` — a resposta calibra a próxima sugestão (menos repetição, mais adaptação). Mesmo mecanismo de feedback da seção 8.3, aplicado pós-ação, não só na hora da sugestão.
+
+### 8.6 Transparência — "Por que você está me sugerindo isso?"
+
+Botão disponível em qualquer sugestão da IA — mostra os registros/objetivo que geraram aquela sugestão especificamente. Constrói confiança e permite o cliente corrigir a IA quando ela interpretar algo errado. Consequência direta da regra da seção 6.1/8.4: se toda sugestão já precisa vir de dado real e verificável, esse botão é só **expor** a justificativa que já existe, não calcular nada novo.
+
+### 8.7 Arquitetura recomendada — "Coach Financeiro QuitaZAP" (skill dedicada, não um prompt solto)
+
+Importante: essa camada **não é** "dar um prompt de dicas financeiras" pro modelo. É uma skill dedicada com 3 peças separadas:
+
+1. **Motor financeiro** — calcula/compara/projeta. Determinístico, reaproveita `controle-financeiro-flow.ts` e irmãos (mesmo motor de sempre, sem lógica nova de cálculo).
+2. **Skill de IA** — interpreta contexto e conduz a conversa. Só decide *como conversar*, nunca *o que é verdade* sobre os números.
+3. **Controle de envio** — decide QUANDO publicar no chat e avisar por push, respeitando a frequência/silêncio que o cliente escolheu (seção 8.3). Peça separada de propósito: mesmo que a skill de IA "queira" comentar algo, o controle de envio pode segurar se não for a hora certa.
+
+Responsabilidades do ciclo completo: **Observar** (gastos/contas/objetivos) → **Identificar** (oportunidade/risco/conquista real, sempre a partir de dado registrado) → **Conversar** (dar a dica, ouvir a resposta) → **Lembrar** (guardar combinados/preferências **no banco**, nunca depender da IA "lembrar sozinha" via prompt/contexto) → **Acompanhar** (retomar no momento certo — mesmo mecanismo de "Acompanhe isso para mim" e "retomada combinada").
+
+Escopo inicial sugerido: 1 skill + 4 funções internas (dica, alerta, conquista, acompanhamento).
+
+### 8.8 Tom de voz configurável + "Modo Linha Dura"
+
+Duas configurações **separadas** (não uma só):
+- **"Jeito de falar"** — 4 estilos: Direto ao ponto / Parceiro / Acolhedor / Puxão de orelha.
+- **"Como receber"** — texto / áudio / ambos.
+
+Ibrahim gostou pessoalmente da ideia de ter um modo dele com sermão em áudio — **"Modo Linha Dura"**: firme na cobrança, mas sempre oferece uma saída (esperar, simular, rever o combinado) — nunca só manda parar.
+
+**Regra importante, não-negociável:** o "sermão"/puxão de orelha só pode cobrar um **combinado que o próprio cliente definiu** (seção 8.5 item 1) — a IA nunca decide sozinha o que é "besteira" (delivery ou um hobby podem ser importantes pra pessoa). Sem combinado do cliente, não há base pra cobrança nenhuma, em nenhum estilo.
+
+**Limites fixos, valem pra todo estilo, não só Linha Dura:**
+- Firmeza sem humilhar, xingar ou ameaçar.
+- Nunca bronca por despesa essencial.
+- Botão "Pega mais leve" sempre disponível.
+- Áudio só toca quando o cliente aperta — **nunca expõe finanças em voz alta automaticamente** (privacidade em ambiente compartilhado/público).
+
 ---
 
 ## 9. Riscos e itens em aberto
