@@ -13,6 +13,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { listarMovimentacoes } from "@/lib/movimentacoes-service";
 
+// Remove acentos pra busca não ser sensível a "farmacia" vs "Farmácia" —
+// usuário digitando no celular raramente acentua.
+function semAcento(s: string) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
 export async function GET(req: NextRequest) {
   const clienteId = getClienteIdDaRequisicao(req);
   if (!clienteId) return erroClienteNaoAutenticado();
@@ -37,7 +43,10 @@ export async function GET(req: NextRequest) {
   let movimentacoes = await listarMovimentacoes({ clienteId, inicio, fim });
 
   if (categoria) movimentacoes = movimentacoes.filter((m) => m.categoria === categoria);
-  if (texto) movimentacoes = movimentacoes.filter((m) => m.descricao.toLowerCase().includes(texto));
+  if (texto) {
+    const textoBusca = semAcento(texto);
+    movimentacoes = movimentacoes.filter((m) => semAcento(m.descricao.toLowerCase()).includes(textoBusca));
+  }
   if (valorMin) movimentacoes = movimentacoes.filter((m) => m.valor >= Number(valorMin));
   if (valorMax) movimentacoes = movimentacoes.filter((m) => m.valor <= Number(valorMax));
 
