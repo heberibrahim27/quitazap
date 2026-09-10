@@ -1467,3 +1467,88 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   grid-template-columns: 2fr 1fr;
   gap: 8px;
 }
+
+/* ── QuitaZAP Hoje (Fase 4) ──────────────────────────────────────────── */
+.mc-hoje {
+  padding: 4px 2px 24px;
+}
+
+.mc-hoje-titulo {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.mc-hoje-timestamp {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--mc-ink-faint);
+}
+
+.mc-hoje-card {
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--mc-line);
+}
+
+.mc-hoje-card-mudanca {
+  background: var(--mc-accent-soft);
+  border-color: transparent;
+}
+
+.mc-hoje-card-neutro {
+  background: var(--card-tint);
+}
+
+.mc-hoje-card-falha {
+  background: rgba(226, 59, 92, 0.08);
+}
+
+.mc-hoje-card p {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.mc-hoje-card p:last-child {
+  margin-bottom: 0;
+}
+
+.mc-hoje-saldo {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+}
+
+.mc-hoje-subtitulo {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.mc-hoje-vazio {
+  font-size: 13px;
+  color: var(--mc-ink-faint);
+}
+
+.mc-hoje-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.mc-hoje-lista li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+}
+
+.mc-hoje-cta {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+}

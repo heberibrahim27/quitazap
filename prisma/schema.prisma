@@ -74,6 +74,7 @@ model Cliente {
   documentosImportados      DocumentoImportado[]
   eventosAnalytics          EventoAnalytics[]
   mensagensChat             MensagemChat[]
+  estadoDiario              EstadoDiarioCliente?
 }
 
 // ─────────────────────────────────────────
@@ -557,6 +558,32 @@ model LancamentoAuditoria {
 
   @@index([lancamentoId, criadoEm])
   @@index([clienteId])
+}
+
+// ─────────────────────────────────────────
+// ESTADO DIÁRIO DO CLIENTE ("QuitaZAP Hoje")
+// ─────────────────────────────────────────
+// Snapshot da última avaliação, pra comparar e decidir se houve mudança
+// relevante de verdade — nunca inventa novidade. Ver
+// docs/chat-nativo-arquitetura.md seção 6.1: falha ao avaliar (dado
+// insuficiente, erro técnico) NUNCA vira "sem novidade" silenciosamente —
+// são estados distintos, tratados em código, não só na UI.
+model EstadoDiarioCliente {
+  id                  String   @id @default(cuid())
+  clienteId           String   @unique
+  ultimaAvaliacaoEm   DateTime @default(now())
+  // null = não era calculável na última avaliação (sem renda, etc.)
+  saldoProjetado      Float?
+  situacaoApertada    Boolean? // true = saldoProjetado < 0 na última avaliação
+  // ids de Tarefa já alertadas "vence amanhã" — evita repetir o mesmo
+  // aviso todo dia até a tarefa ser paga/vencer de fato.
+  tarefasAlertadasIds Json     @default("[]")
+  // true se havia confirmacaoPendente (BotSessao) na última avaliação —
+  // detecta quando uma pendência nova aparece ou uma some (resolvida).
+  tinhaPendencia      Boolean  @default(false)
+  criadoEm            DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 }
 
 // ─────────────────────────────────────────
