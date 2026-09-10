@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type LancamentoCardDado = {
   id: string;
@@ -43,6 +43,60 @@ export function LancamentoCard({ dado }: { dado: LancamentoCardDado }) {
     { descricao: "", valor: "" },
     { descricao: "", valor: "" },
   ]);
+
+  // Revalida contra o estado atual ao montar — o `dado` recebido é o
+  // snapshot congelado no momento em que a mensagem foi criada (persistido
+  // em MensagemChat.dadosEstruturados) e nunca é atualizado sozinho depois
+  // disso. Sem isso, um lançamento editado/dividido/desfeito por QUALQUER
+  // canal depois de a mensagem já existir continuava aparecendo como se
+  // nada tivesse mudado ao recarregar a conversa (achado real do Ibrahim
+  // em produção, 2026-09-10 — o dado real sempre esteve certo, só essa
+  // renderização congelada mentia).
+  useEffect(() => {
+    let cancelado = false;
+    fetch(`/api/minha-conta/lancamento/${dado.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelado) return;
+        if (!d.existe) {
+          setRemovido(true);
+          return;
+        }
+        const atual = d.lancamento;
+        if (atual.substituidoPorDivisao) {
+          setRemovido(true);
+          return;
+        }
+        const mudou =
+          atual.descricao !== dado.descricao ||
+          atual.categoria !== dado.categoria ||
+          atual.valor !== dado.valor ||
+          atual.data !== dado.data;
+        if (mudou) {
+          setItem({
+            id: atual.id,
+            tipo: atual.tipo,
+            descricao: atual.descricao,
+            categoria: atual.categoria,
+            valor: atual.valor,
+            data: atual.data,
+            atualizadoEm: atual.atualizadoEm,
+          });
+          setDescricaoEdit(atual.descricao);
+          setCategoriaEdit(atual.categoria ?? "");
+          setValorEdit(String(atual.valor));
+          setEditado(true);
+        } else {
+          // Mesmo sem mudança visível, sincroniza atualizadoEm com o
+          // servidor — garante que a concorrência otimista da próxima
+          // edição compara contra o valor real, não contra o congelado.
+          setItem((atualItem) => ({ ...atualItem, atualizadoEm: atual.atualizadoEm }));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dado.id]);
 
   async function salvarEdicao() {
     setEnviando(true);
