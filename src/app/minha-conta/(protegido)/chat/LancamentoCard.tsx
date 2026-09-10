@@ -31,7 +31,7 @@ export function LancamentoCard({ dado }: { dado: LancamentoCardDado }) {
   const [item, setItem] = useState(dado);
   const [modo, setModo] = useState<Modo>("ver");
   const [editado, setEditado] = useState(false);
-  const [removido, setRemovido] = useState(false);
+  const [motivoRemocao, setMotivoRemocao] = useState<"desfeito" | "dividido" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -59,12 +59,12 @@ export function LancamentoCard({ dado }: { dado: LancamentoCardDado }) {
       .then((d) => {
         if (cancelado) return;
         if (!d.existe) {
-          setRemovido(true);
+          setMotivoRemocao("desfeito");
           return;
         }
         const atual = d.lancamento;
         if (atual.substituidoPorDivisao) {
-          setRemovido(true);
+          setMotivoRemocao("dividido");
           return;
         }
         const mudou =
@@ -151,7 +151,7 @@ export function LancamentoCard({ dado }: { dado: LancamentoCardDado }) {
         setErro(dados.erro ?? "Não consegui dividir esse lançamento.");
         return;
       }
-      setRemovido(true); // o original saiu das somas — mostra como "dividido"
+      setMotivoRemocao("dividido"); // o original saiu das somas
       setModo("ver");
     } catch {
       setErro("Sem conexão agora. Tenta de novo em instantes.");
@@ -171,7 +171,7 @@ export function LancamentoCard({ dado }: { dado: LancamentoCardDado }) {
         setModo("ver");
         return;
       }
-      setRemovido(true);
+      setMotivoRemocao("desfeito");
     } catch {
       setErro("Sem conexão agora. Tenta de novo em instantes.");
     } finally {
@@ -179,11 +179,11 @@ export function LancamentoCard({ dado }: { dado: LancamentoCardDado }) {
     }
   }
 
-  if (removido) {
+  if (motivoRemocao) {
     return (
       <div className="mc-lancamento-card mc-lancamento-card-removido">
         <span>{item.descricao} — {fmtValor(item.valor)}</span>
-        <span className="mc-lancamento-card-badge">removido/dividido</span>
+        <span className="mc-lancamento-card-badge">{motivoRemocao === "desfeito" ? "Desfeito" : "Dividido"}</span>
       </div>
     );
   }
