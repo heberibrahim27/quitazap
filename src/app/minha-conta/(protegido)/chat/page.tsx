@@ -24,9 +24,21 @@ export const viewport: Viewport = {
 // Chat nativo — Fase 1 (docs/chat-nativo-arquitetura.md). Mesma engine do
 // WhatsApp (rescue ladder do ai-bot.ts, canal-agnóstico), memória
 // compartilhada via BotSessao (ver controle-orquestrador.ts).
-export default async function ChatPage() {
+export default async function ChatPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
+
+  const params = await searchParams;
+  // Instrumentação do bug de teclado (ver DebugTeclado.tsx) — só liga atrás
+  // dessa query string, nunca em uso normal. VERCEL_GIT_COMMIT_SHA já vem
+  // pronto de todo deploy da Vercel, sem precisar configurar nada extra;
+  // "dev" localmente, onde essa env var não existe.
+  const debug = params.debug === "1";
+  const buildId = process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
 
   const mensagens = await prisma.mensagemChat.findMany({
     where: { clienteId: cliente.id },
@@ -36,6 +48,8 @@ export default async function ChatPage() {
 
   return (
     <ChatClient
+      debug={debug}
+      buildId={buildId}
       mensagensIniciais={mensagens.reverse().map((m) => ({
         id: m.id,
         direcao: m.direcao as "CLIENTE" | "BOT",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LancamentoCard, type LancamentoCardDado } from "./LancamentoCard";
 import { GraficoCategoriaCard, type GraficoCategoriaDado } from "./GraficoCategoriaCard";
+import { PainelDebugTeclado } from "./DebugTeclado";
 
 type DadosEstruturados =
   | { tipo: "lancamento_criado"; lancamentos: LancamentoCardDado[] }
@@ -17,8 +18,12 @@ const ALTURA_COMPOSER_MAX = 116; // ~4 linhas
 
 export function ChatClient({
   mensagensIniciais,
+  debug = false,
+  buildId = "dev",
 }: {
   mensagensIniciais: MensagemUI[];
+  debug?: boolean;
+  buildId?: string;
 }) {
   const [mensagens, setMensagens] = useState<MensagemUI[]>(mensagensIniciais);
   const [texto, setTexto] = useState("");
@@ -145,6 +150,8 @@ export function ChatClient({
         </Link>
         <span className="mc-chat-header-titulo">Chat</span>
       </div>
+
+      {debug && <PainelDebugTeclado buildId={buildId} />}
 
       <div className="mc-chat-lista">
         {mensagens.length === 0 && (
