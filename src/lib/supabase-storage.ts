@@ -6,6 +6,42 @@
 const SUPABASE_URL = "https://iubrlwngulknqacrnrce.supabase.co";
 const BUCKET = "avatars";
 
+// Bucket PRIVADO (public: false) pra foto de comprovante enviada pelo chat
+// nativo — ao contrário da foto de perfil, um recibo pode ter dado sensível
+// (últimos dígitos de cartão, endereço). Nunca gera URL pública: devolve só
+// o CAMINHO no Storage, que fica salvo em Lancamento.comprovanteUrl como
+// referência opaca — exibir a imagem de volta (quando essa tela existir)
+// precisa passar por uma rota autenticada que gera uma signed URL de vida
+// curta sob demanda, nunca uma permanente.
+const BUCKET_COMPROVANTES = "comprovantes";
+
+export async function subirComprovante(clienteId: string, imagemJpeg: Blob): Promise<string> {
+  const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!chave) {
+    console.error("[UPLOAD COMPROVANTE] SUPABASE_SERVICE_ROLE_KEY não configurada.");
+    throw new Error("Envio de foto indisponível no momento. Tente novamente mais tarde.");
+  }
+
+  const caminho = `${clienteId}/${Date.now()}-${crypto.randomUUID()}.jpg`;
+  const bytes = new Uint8Array(await imagemJpeg.arrayBuffer());
+
+  const resposta = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET_COMPROVANTES}/${caminho}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${chave}`,
+      apikey: chave,
+      "Content-Type": "image/jpeg",
+    },
+    body: bytes,
+  });
+
+  if (!resposta.ok) {
+    throw new Error(`Falha ao enviar a foto (${resposta.status}).`);
+  }
+
+  return caminho;
+}
+
 export async function subirFotoPerfil(clienteId: string, imagemJpeg: Blob): Promise<string> {
   const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!chave) {

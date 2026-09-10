@@ -201,11 +201,22 @@ export async function processarMensagemControle(input: {
   cliente: Pick<Cliente, "id" | "telefone" | "nome" | "gratuito">;
   sessao: BotSessao;
   mensagem: string;
+  // Usado pelo fluxo de "Comprovante Inteligente" do chat nativo (ver
+  // route.ts de /api/minha-conta/comprovante/confirmar): quando o cliente
+  // confirma um gasto extraído de foto, o texto normalizado ("Comprei em
+  // X, R$ Y") é reinjetado aqui como se tivesse sido digitado — mesmo
+  // padrão do webhook — mas com origem/comprovanteUrl corretos pra não
+  // perder a rastreabilidade da foto original. Sem isso (chamada normal de
+  // texto), cai no default "TEXTO" de sempre — nenhum comportamento
+  // existente muda.
+  origem?: OrigemLancamentoControle;
+  comprovanteUrl?: string;
 }): Promise<ResultadoOrquestrador> {
   const { cliente, sessao, mensagem } = input;
   const clienteId = cliente.id;
   const isGratuito = cliente.gratuito;
-  const origemLancamentoControle: OrigemLancamentoControle = "TEXTO";
+  const origemLancamentoControle: OrigemLancamentoControle = input.origem ?? "TEXTO";
+  const comprovanteUrlControle = input.comprovanteUrl;
 
   const historico: Mensagem[] = JSON.parse(sessao.dividasTemp || "[]");
 
@@ -320,7 +331,8 @@ export async function processarMensagemControle(input: {
     const criados = await persistirLancamentosControle(
       clienteId,
       gerenciamentoDespesasFixas.itensParaPersistir,
-      origemLancamentoControle
+      origemLancamentoControle,
+      comprovanteUrlControle
     );
     await persistirCartaoControle(clienteId, gerenciamentoDespesasFixas.cartaoParaPersistir);
     await persistirDividaConfirmadaIA(clienteId, cliente.telefone, gerenciamentoDespesasFixas.dividaParaPersistir);
@@ -346,7 +358,7 @@ export async function processarMensagemControle(input: {
   if (estadoAntesFluxosControle.confirmacaoPendente?.tipo === "aguardar_valor_gasto") {
     const resolvidoPendente = resolverValorGastoPendente(mensagem, estadoAntesFluxosControle, lancamentosRecentesControle);
     if (resolvidoPendente) {
-      const criados = await persistirLancamentosControle(clienteId, resolvidoPendente.itensParaPersistir, origemLancamentoControle);
+      const criados = await persistirLancamentosControle(clienteId, resolvidoPendente.itensParaPersistir, origemLancamentoControle, comprovanteUrlControle);
       return finalizar(resolvidoPendente.resposta, {
         estadoNovo: resolvidoPendente.estado,
         atualizouEstado: resolvidoPendente.atualizouEstado,
@@ -381,7 +393,7 @@ export async function processarMensagemControle(input: {
   // de "substituir fatura fechada").
   const gerenciamentoFaturaCartao = await gerenciarFaturaCartaoComFallbackIA(mensagem, estadoAntesFluxosControle);
   if (gerenciamentoFaturaCartao) {
-    const criados = await persistirLancamentosControle(clienteId, gerenciamentoFaturaCartao.itensParaPersistir, origemLancamentoControle);
+    const criados = await persistirLancamentosControle(clienteId, gerenciamentoFaturaCartao.itensParaPersistir, origemLancamentoControle, comprovanteUrlControle);
     return finalizar(gerenciamentoFaturaCartao.resposta, {
       estadoNovo: gerenciamentoFaturaCartao.estado,
       atualizouEstado: gerenciamentoFaturaCartao.atualizouEstado,
@@ -411,7 +423,7 @@ export async function processarMensagemControle(input: {
 
     if (intentConfirmavel && podeAutoRegistrarIntentFinanceiro(intentFinanceiro)) {
       const resultado = salvarItensConfirmadosIA(estadoAntesFluxosControle, intentFinanceiro);
-      const criados = await persistirLancamentosControle(clienteId, resultado.itensParaPersistir, origemLancamentoControle);
+      const criados = await persistirLancamentosControle(clienteId, resultado.itensParaPersistir, origemLancamentoControle, comprovanteUrlControle);
       await persistirCartaoControle(clienteId, resultado.cartaoParaPersistir);
       await persistirDividaConfirmadaIA(clienteId, cliente.telefone, resultado.dividaParaPersistir);
       await persistirPagamentoDividaConfirmadoIA(clienteId, cliente.telefone, resultado.pagamentoDividaParaPersistir);
@@ -447,7 +459,7 @@ export async function processarMensagemControle(input: {
   // dia ("gastei 45 no mercado"). Maior volume de uso do bot inteiro.
   const gastoRapido = registrarGastoControle(mensagem, estadoAntesFluxosControle, new Date(), lancamentosRecentesControle);
   if (gastoRapido) {
-    const criados = await persistirLancamentosControle(clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle);
+    const criados = await persistirLancamentosControle(clienteId, gastoRapido.itensParaPersistir, origemLancamentoControle, comprovanteUrlControle);
     return finalizar(gastoRapido.resposta, {
       estadoNovo: gastoRapido.estado,
       atualizouEstado: gastoRapido.atualizouEstado,
