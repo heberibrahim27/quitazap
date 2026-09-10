@@ -44,11 +44,25 @@ export function ChatClient({
     return () => document.body.classList.remove("mc-chat-tela");
   }, []);
 
+  // Fallback via JS puro pra travar o rodapé acima do teclado (achado
+  // real, Ibrahim 10/09/2026 — persistiu em iPhone real mesmo com
+  // interactive-widget=resizes-content na tag de viewport: esse recurso
+  // só tem suporte a partir de Safari 17.4/iOS 17.4, e mesmo onde tem
+  // suporte o comportamento varia). window.visualViewport funciona desde
+  // o iOS 13, então essa é a base mais confiável — nunca depende da tag
+  // de viewport ter efeito ou não: calcula a altura ocupada por
+  // teclado+qualquer scroll residual (window.innerHeight menos a altura
+  // e o offsetTop do visual viewport) e usa isso como var(--mc-teclado)
+  // pra ancorar o fundo do .mc-chat-shell exatamente ali (ver CSS) — sem
+  // teclado, dá 0 e nada muda; com resizes-content ativo nos dois lados
+  // encolhem juntos e a conta também fecha em 0, então convive bem com a
+  // tag em vez de competir com ela.
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
     if (!vv) return;
     function medir() {
-      document.documentElement.style.setProperty("--mc-vvh", `${vv!.height}px`);
+      const altura = Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop);
+      document.documentElement.style.setProperty("--mc-teclado", `${altura}px`);
     }
     medir();
     vv.addEventListener("resize", medir);
@@ -56,7 +70,7 @@ export function ChatClient({
     return () => {
       vv.removeEventListener("resize", medir);
       vv.removeEventListener("scroll", medir);
-      document.documentElement.style.removeProperty("--mc-vvh");
+      document.documentElement.style.removeProperty("--mc-teclado");
     };
   }, []);
 
