@@ -83,9 +83,16 @@ export async function simularParcela(
     let fecha: boolean | null = null;
 
     if (resumoPlano.calculavel && resumoPlano.rendaDisponivel > 0) {
-      percentualAtual = Math.min(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 1.5);
+      // Sem teto em 150% (só piso em 0, mesmo caso do saque de Meta que
+      // motor.ts já trata): achado do Ibrahim, mesma classe do bug do
+      // Dashboard (10/09/2026) — um Math.min(..., 1.5) aqui capava os
+      // dois lados da frase "seu comprometimento sobe de X% pra Y%", que
+      // pra alguém já acima de 150% podia aparecer como "de 150% pra
+      // 150%" mesmo quando o salto real era, por exemplo, de 200% pra
+      // 230% — escondendo exatamente a informação que a pergunta pedia.
+      percentualAtual = Math.max(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 0);
       const totalComNova = resumoPlano.totalComprometido + valorParcela;
-      percentualComNova = Math.min(totalComNova / resumoPlano.rendaDisponivel, 1.5);
+      percentualComNova = Math.max(totalComNova / resumoPlano.rendaDisponivel, 0);
       saldoProjetadoComNova = resumoPlano.saldoProjetado - valorParcela;
       fecha = saldoProjetadoComNova >= 0;
     }
