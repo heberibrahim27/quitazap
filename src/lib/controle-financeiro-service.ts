@@ -35,13 +35,19 @@ function esperar(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Devolve os lançamentos criados — usado pelo chat nativo pra renderizar o
+// card estruturado (editar/dividir/desfazer) sem precisar extrair valor de
+// texto solto. Chamadores que não precisam disso (ex: route.ts do WhatsApp)
+// simplesmente ignoram o retorno, como já faziam quando era Promise<void>.
 export async function persistirLancamentosControle(
   clienteId: string | null | undefined,
   itens: ItemParaPersistirControle[] | undefined,
   origem: OrigemLancamentoControle,
   comprovanteUrl?: string
-): Promise<void> {
-  if (!clienteId || !itens || itens.length === 0) return;
+): Promise<Awaited<ReturnType<typeof prisma.lancamento.create>>[]> {
+  if (!clienteId || !itens || itens.length === 0) return [];
+
+  const criados: Awaited<ReturnType<typeof prisma.lancamento.create>>[] = [];
 
   try {
     for (const item of itens) {
@@ -51,7 +57,7 @@ export async function persistirLancamentosControle(
       }
 
       const dataLancamento = item.data ?? new Date();
-      await prisma.lancamento.create({
+      const criado = await prisma.lancamento.create({
         data: {
           clienteId,
           tipo: item.tipo,
@@ -65,6 +71,7 @@ export async function persistirLancamentosControle(
           comprovanteUrl: comprovanteUrl ?? null,
         },
       });
+      criados.push(criado);
 
       if (TIPOS_GASTO.has(item.tipo)) {
         await verificarOrcamentoEAvisar(clienteId, item.categoria, item.valor, dataLancamento).catch((err) =>
@@ -80,6 +87,8 @@ export async function persistirLancamentosControle(
   } catch (err) {
     console.error("[CONTROLE-FINANCEIRO] Erro ao persistir lançamento(s) em Lancamento:", err);
   }
+
+  return criados;
 }
 
 // Espelha corrigirOrigemUltimoGastoControle: quando o cliente corrige um
