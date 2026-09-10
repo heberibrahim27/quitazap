@@ -8,8 +8,15 @@ export const dynamic = "force-dynamic";
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+// timeZone explícito: "Avaliado agora" é um horário real (quando o
+// cliente abriu a tela), precisa refletir o relógio dele — ao contrário
+// de datas de vencimento (fmtData abaixo), aqui não tem "dia armazenado"
+// pra preservar, é hora real. Sem isso, formata em UTC (fuso do servidor
+// na Vercel) e mostra 3h a mais do que o horário de Brasília/Bahia
+// (achado real, Ibrahim 10/09/2026: app mostrava 05:40 com o celular
+// dele em 02:40).
 function fmtDataHora(d: Date) {
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 }
 function fmtData(d: Date) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });

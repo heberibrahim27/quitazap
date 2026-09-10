@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularStatusLead, LABELS_STATUS_LEAD, COR_STATUS_LEAD } from "@/lib/lead-vendas-status";
 
 function fmtData(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(d));
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date(d));
 }
 
 const LABELS_ETAPA: Record<string, string> = {
