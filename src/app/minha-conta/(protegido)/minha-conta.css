@@ -201,7 +201,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .mc-main {
   max-width: 480px;
   margin: 0 auto;
-  padding: 4px 16px calc(116px + env(safe-area-inset-bottom));
+  /* Espaço reservado no fim da área rolável: barra de navegação (~68px de
+     conteúdo + área segura de baixo) + o "+" flutuante, que protrude
+     ~18px acima da barra. 140px dá folga de sobra em cima do que a barra
+     realmente ocupa hoje (achado real via print do Ibrahim — conteúdo do
+     último card ficando escondido atrás da navegação; revisão do
+     ChatGPT). Prefere sobrar espaço em branco no fim do scroll a
+     arriscar cortar conteúdo de novo. */
+  padding: 4px 16px calc(140px + env(safe-area-inset-bottom));
   position: relative;
   z-index: 1;
   overflow-x: hidden;
@@ -267,8 +274,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   color: var(--ink-dim); margin-bottom: 7px;
 }
 .hero-glass-bar-value { color: var(--blue); font-weight: 800; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0; }
-.hero-glass-bar-track { width: 100%; height: 6px; border-radius: 999px; background: rgba(30,99,233,0.12); overflow: hidden; }
+.hero-glass-bar-track { position: relative; width: 100%; height: 6px; border-radius: 999px; background: rgba(30,99,233,0.12); overflow: hidden; }
 .hero-glass-bar-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+/* Trecho acima de 100% da renda comprometida — cor de alerta separada do
+   resto da barra, nunca escondido atrás do cap visual em 100%. */
+.hero-glass-bar-fill-excesso {
+  position: absolute; top: 0; height: 100%;
+  background: linear-gradient(90deg, var(--orange), var(--red));
+}
+.hero-glass-bar-marcador {
+  position: absolute; top: -2px; bottom: -2px; width: 2px;
+  background: rgba(10, 42, 87, 0.55);
+}
+.hero-glass-bar-aviso { margin: 6px 0 0; font-size: 11.5px; font-weight: 700; color: var(--red); }
 .stat-icon {
   position: relative; overflow: hidden;
   width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
@@ -720,7 +738,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
   display: flex; align-items: center;
-  background: rgba(255,255,255,0.82);
+  /* Opaco o bastante pra nunca deixar texto do conteúdo rolando por trás
+     ficar legível através da barra (achado real via print do Ibrahim —
+     revisão do ChatGPT). Mantém um resquício de frosted-glass (blur +
+     leve transparência), só não o suficiente pra ler o que está atrás. */
+  background: rgba(255,255,255,0.97);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   border-top: 1px solid rgba(255,255,255,0.6);
@@ -1330,25 +1352,58 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
    montagem de ChatClient (classe no <body>, ver aí), não só quando o
    campo foca — a tela inteira já nasce nesse modo. Escondemos o
    Header/BottomNav globais em vez de alterar o layout compartilhado
-   (serve toda página do painel) pra não arriscar as outras telas. */
+   (serve toda página do painel) pra não arriscar as outras telas.
+
+   Estrutura de 3 regiões travada na viewport (achado real, Ibrahim
+   10/09/2026 — duas regressões do primeiro ajuste, mesma causa raiz): sem
+   isso, o <body> continua rolável/com rubber-band do iOS por trás do
+   chat, e o scroll nativo do Safari ("rolar o campo focado pra dentro da
+   área visível" ao focar) competia com o ajuste manual de altura,
+   empurrando cabeçalho+campo pro topo da tela com um vão vazio embaixo em
+   vez de ancorar o campo acima do teclado. Fix: trava o <body> inteiro
+   (position:fixed, sem overflow) e o próprio .mc-chat-shell vira
+   position:fixed do tamanho exato da viewport — cabeçalho e compositor
+   são só itens flex normais (não rolam, por construção, nunca competem
+   com scroll nenhum), e .mc-chat-lista é a ÚNICA região com overflow,
+   logo a única que o Safari tem pra rolar ao focar o campo. */
+body.mc-chat-tela {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  width: 100%;
+}
 body.mc-chat-tela .header,
 body.mc-chat-tela .header-spacer,
 body.mc-chat-tela .bottom-nav {
   display: none;
 }
 body.mc-chat-tela .mc-main {
-  padding-top: 0;
-  padding-bottom: 0;
+  padding: 0;
+  max-width: none;
 }
 body.mc-chat-tela .mc-chat-shell {
+  position: fixed;
+  top: 0; left: 0; right: 0;
   /* var(--mc-vvh) é a altura real medida por visualViewport (ver
      ChatClient.tsx) — já desconta teclado + input accessory view do
      Safari, ao contrário de 100dvh, que não reage ao teclado. Cai pra
-     100dvh se o JS não rodar (fallback idêntico ao modo não-dedicado). */
+     100dvh se o JS não rodar. */
   height: var(--mc-vvh, 100dvh);
   min-height: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg);
+  z-index: 30;
+}
+body.mc-chat-tela .mc-chat-lista {
+  padding-left: 16px;
+  padding-right: 16px;
 }
 body.mc-chat-tela .mc-chat-composer {
+  flex: 0 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+  background: var(--bg);
   /* Sem BottomNav nessa tela pra reservar a área segura de baixo (home
      indicator do iPhone) — o compositor assume isso sozinho. */
   padding-bottom: max(10px, env(safe-area-inset-bottom));

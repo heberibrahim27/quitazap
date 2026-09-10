@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 
-const TAMANHO_MINIMO = 20;
+const TAMANHO_MINIMO = 13;
 
 // Encolhe a fonte do valor até ele caber na largura real disponível no
 // elemento pai (medida de verdade no navegador, não estimativa) — sem
@@ -27,10 +27,18 @@ export function ValorAutoAjustavel({ texto, className }: { texto: string; classN
     function ajustar() {
       if (!el || !pai) return;
       el.style.fontSize = "";
+      el.style.whiteSpace = "nowrap";
       let atual = parseFloat(getComputedStyle(el).fontSize);
       while (el.scrollWidth > pai.clientWidth && atual > TAMANHO_MINIMO) {
         atual -= 1;
         el.style.fontSize = `${atual}px`;
+      }
+      // Mesmo no menor tamanho ainda não coube (valor com muitos dígitos
+      // numa tela muito estreita) — deixa quebrar linha em vez de cortar.
+      // Um valor financeiro nunca pode ficar escondido (achado real via
+      // print do Ibrahim, 10/09/2026: "-R$457," sem os centavos).
+      if (el.scrollWidth > pai.clientWidth) {
+        el.style.whiteSpace = "normal";
       }
     }
 

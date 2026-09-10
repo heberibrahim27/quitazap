@@ -308,17 +308,38 @@ export default async function MinhaContaPage({
               </span>
             </div>
           </div>
-          {percentualComprometido != null && (
-            <div className="hero-glass-bar">
-              <div className="hero-glass-bar-top">
-                <span>Da renda comprometida</span>
-                <span className="hero-glass-bar-value">{Math.round(percentualComprometido * 100)}%</span>
+          {percentualComprometido != null && (() => {
+            const pct = percentualComprometido * 100;
+            // Passou de 100%: a barra sozinha, capada visualmente em 100%,
+            // ficava idêntica a uma renda exatamente no limite — escondia
+            // justamente a informação mais importante (achado real via
+            // print do Ibrahim, revisão do ChatGPT). Reescala a barra
+            // inteira pro percentual real (nunca menor que 100), marca
+            // onde fica o limite de 100% e destaca o trecho excedente numa
+            // cor de alerta, além do texto explícito abaixo.
+            const acimaDoLimite = pct > 100;
+            const escala = Math.max(pct, 100);
+            const larguraBase = (Math.min(pct, 100) / escala) * 100;
+            const larguraExcesso = acimaDoLimite ? ((pct - 100) / escala) * 100 : 0;
+            return (
+              <div className="hero-glass-bar">
+                <div className="hero-glass-bar-top">
+                  <span>Da renda comprometida</span>
+                  <span className="hero-glass-bar-value" style={acimaDoLimite ? { color: "var(--red)" } : undefined}>{Math.round(pct)}%</span>
+                </div>
+                <div className="hero-glass-bar-track">
+                  <div className="hero-glass-bar-fill" style={{ width: `${larguraBase}%` }} />
+                  {acimaDoLimite && (
+                    <div className="hero-glass-bar-fill-excesso" style={{ left: `${larguraBase}%`, width: `${larguraExcesso}%` }} />
+                  )}
+                  {acimaDoLimite && <div className="hero-glass-bar-marcador" style={{ left: `${larguraBase}%` }} />}
+                </div>
+                {acimaDoLimite && (
+                  <p className="hero-glass-bar-aviso">{Math.round(pct - 100)}% acima da renda prevista</p>
+                )}
               </div>
-              <div className="hero-glass-bar-track">
-                <div className="hero-glass-bar-fill" style={{ width: `${Math.min(percentualComprometido * 100, 100)}%` }} />
-              </div>
-            </div>
-          )}
+            );
+          })()}
           {percentualMetas != null && (
             <div className="hero-glass-bar">
               <div className="hero-glass-bar-top">
