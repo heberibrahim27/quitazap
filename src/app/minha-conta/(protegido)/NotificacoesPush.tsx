@@ -56,6 +56,7 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
   const [testeMsg, setTesteMsg] = useState<string | null>(null);
   const [enviandoTeste, setEnviandoTeste] = useState(false);
   const [diagnostico, setDiagnostico] = useState<Diagnostico | null>(null);
+  const [diagnosticoErro, setDiagnosticoErro] = useState<string | null>(null);
   const [testeLocalMsg, setTesteLocalMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,7 +69,14 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
         setEstado("negado");
         return;
       }
-      const registro = await navigator.serviceWorker.ready;
+      // Mesmo cuidado do diagnóstico: serviceWorker.ready nunca resolve se
+      // o SW não chegar a "active" — sem timeout, a tela inteira (incluindo
+      // o painel de debug antes desta correção) ficava presa em
+      // "carregando" pra sempre num aparelho com o SW nesse estado.
+      const registro = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+      ]);
       const inscricaoAtual = await registro.pushManager.getSubscription();
       setEstado(inscricaoAtual ? "ativo" : "suportado");
     }
@@ -165,19 +173,40 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
 
   async function rodarDiagnostico() {
     setDiagnostico(null);
+    setDiagnosticoErro(null);
     const testId = crypto.randomUUID();
-    const ambiente = await coletarAmbiente();
-    const serviceWorker = await coletarServiceWorker();
 
+    let ambiente: Awaited<ReturnType<typeof coletarAmbiente>>;
+    let serviceWorker: Record<string, unknown> | null;
     let endpointLocal: string | null = null;
     let fingerprintLocalStr: string | null = null;
+
     try {
-      const registro = await navigator.serviceWorker.ready;
-      const inscricao = await registro.pushManager.getSubscription();
-      endpointLocal = inscricao?.endpoint ?? null;
-      if (endpointLocal) fingerprintLocalStr = await fingerprintLocal(endpointLocal);
-    } catch {
-      // segue sem inscrição local — o diagnóstico mostra isso como dado, não erro
+      ambiente = await coletarAmbiente();
+      serviceWorker = await coletarServiceWorker();
+
+      // navigator.serviceWorker.ready NUNCA resolve se o SW não chegar a
+      // "active" — num aparelho onde isso está travado (justamente o tipo
+      // de coisa que este diagnóstico existe pra achar), o botão pareceria
+      // "não fazer nada" pra sempre em vez de reportar isso. Timeout curto
+      // garante que o diagnóstico sempre termina e mostra o que encontrou,
+      // mesmo com o SW num estado ruim.
+      try {
+        const registro = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout esperando serviceWorker.ready (3s)")), 3000)),
+        ]);
+        const inscricao = await registro.pushManager.getSubscription();
+        endpointLocal = inscricao?.endpoint ?? null;
+        if (endpointLocal) fingerprintLocalStr = await fingerprintLocal(endpointLocal);
+      } catch (e) {
+        // segue sem inscrição local — o diagnóstico mostra isso como dado
+        // (inclusive o motivo do timeout/erro), não trava o resto do teste.
+        serviceWorker = { ...(serviceWorker ?? {}), erroAoLerInscricaoLocal: e instanceof Error ? e.message : String(e) };
+      }
+    } catch (e) {
+      setDiagnosticoErro(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      return;
     }
 
     setDiagnostico({
@@ -188,7 +217,14 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
       inscricaoLocal: { existe: endpointLocal != null, fingerprint: fingerprintLocalStr },
     });
 
-    const resultado = await enviarPushDiagnostico(testId, endpointLocal);
+    let resultado: Awaited<ReturnType<typeof enviarPushDiagnostico>>;
+    try {
+      resultado = await enviarPushDiagnostico(testId, endpointLocal);
+    } catch (e) {
+      setDiagnosticoErro(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      return;
+    }
+
     if ("erro" in resultado) {
       setDiagnostico((atual) => (atual ? { ...atual, estado: "falha-envio", swErro: resultado.erro } : atual));
       return;
@@ -226,7 +262,10 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
   async function testarExibicaoLocal() {
     setTesteLocalMsg(null);
     try {
-      const registro = await navigator.serviceWorker.ready;
+      const registro = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout esperando serviceWorker.ready (3s)")), 3000)),
+      ]);
       await registro.showNotification("Teste local (sem rede)", {
         body: "Se isso apareceu, a exibição local funciona — problema (se houver) está no transporte push.",
         icon: "/minha-conta/icons/icon-192.png",
@@ -252,7 +291,14 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
     }
   }
 
-  if (estado === "carregando" || estado === "nao-suportado") return null;
+  // Achado real, Ibrahim 10/09/2026: o painel de diagnóstico ficava
+  // aninhado dentro de `estado === "ativo"` (mais embaixo) — exatamente o
+  // estado que costuma estar errado/travado quando alguém PRECISA do
+  // diagnóstico. Fora do modo debug o comportamento de sempre continua
+  // intacto (esconde o card inteiro enquanto carrega ou se não suporta);
+  // com ?debug=1 o card sempre aparece, não suportado virando só mais um
+  // dado pra investigar em vez de silêncio total.
+  if (!debug && (estado === "carregando" || estado === "nao-suportado")) return null;
 
   const LABEL_DIAGNOSTICO: Record<EstadoDiagnostico, string> = {
     enviando: "Enviando teste...",
@@ -314,38 +360,47 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
               {testeMsg}
             </p>
           )}
+        </>
+      )}
 
-          {debug && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--mc-line)" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "var(--ink-dim)" }}>
-                DIAGNÓSTICO (build {buildId.slice(0, 7)})
-              </p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" className="mc-btn-secondary" onClick={rodarDiagnostico}>
-                  Rodar diagnóstico completo
-                </button>
-                <button type="button" className="mc-btn-secondary" onClick={testarExibicaoLocal}>
-                  Testar exibição local (sem rede)
-                </button>
-              </div>
-              {testeLocalMsg && <p style={{ margin: "8px 0 0", fontSize: 12 }}>{testeLocalMsg}</p>}
-              {diagnostico && (
-                <div style={{ marginTop: 10 }}>
-                  <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600 }}>{LABEL_DIAGNOSTICO[diagnostico.estado]}</p>
-                  <textarea
-                    readOnly
-                    value={JSON.stringify(diagnostico, null, 2)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    style={{
-                      width: "100%", minHeight: 260, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
-                      background: "#000", color: "#0f0", border: "1px solid var(--mc-line)", borderRadius: 8, padding: 8,
-                    }}
-                  />
-                </div>
-              )}
+      {/* Fora de `estado === "ativo"` de propósito (achado real, Ibrahim
+          10/09/2026): o diagnóstico precisa aparecer mesmo quando o
+          estado detectado é "negado"/"suportado"/etc — é exatamente
+          nesses casos que ele é mais necessário. */}
+      {debug && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--mc-line)" }}>
+          <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "var(--ink-dim)" }}>
+            DIAGNÓSTICO (build {buildId.slice(0, 7)}) — estado detectado: {estado}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="mc-btn-secondary" onClick={rodarDiagnostico}>
+              Rodar diagnóstico completo
+            </button>
+            <button type="button" className="mc-btn-secondary" onClick={testarExibicaoLocal}>
+              Testar exibição local (sem rede)
+            </button>
+          </div>
+          {testeLocalMsg && <p style={{ margin: "8px 0 0", fontSize: 12 }}>{testeLocalMsg}</p>}
+          {diagnostico && (
+            <div style={{ marginTop: 10 }}>
+              <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600 }}>{LABEL_DIAGNOSTICO[diagnostico.estado]}</p>
+              <textarea
+                readOnly
+                value={JSON.stringify(diagnostico, null, 2)}
+                onFocus={(e) => e.currentTarget.select()}
+                style={{
+                  width: "100%", minHeight: 260, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+                  background: "#000", color: "#0f0", border: "1px solid var(--mc-line)", borderRadius: 8, padding: 8,
+                }}
+              />
             </div>
           )}
-        </>
+          {diagnosticoErro && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--red)", lineHeight: 1.5 }}>
+              ⚠️ O diagnóstico não terminou: {diagnosticoErro}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
