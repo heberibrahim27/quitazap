@@ -500,9 +500,18 @@ export function ChatClient({
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               onKeyDown={aoTeclar}
-              placeholder="Digite ou envie um áudio…"
+              placeholder="Digite uma mensagem…"
               disabled={enviando}
             />
+            <button
+              type="button"
+              className="mc-chat-composer-acao"
+              aria-label="Abrir câmera"
+              onClick={abrirCamera}
+              disabled={envio !== null}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V6a1 1 0 0 1 1-1h2l1.5-2h7L17 5h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8z" /><circle cx="12" cy="13" r="3.5" /></svg>
+            </button>
             {texto.trim() ? (
               <button type="submit" className="mc-chat-composer-acao" aria-label="Enviar" disabled={enviando}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>

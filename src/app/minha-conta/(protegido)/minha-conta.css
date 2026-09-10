@@ -1432,6 +1432,12 @@ body.mc-chat-tela .mc-chat-shell {
      tentar rolar/pan a página por baixo. */
   top: 0; left: 0; right: 0;
   bottom: var(--mc-teclado, 0px);
+  /* A regra base de .mc-chat-shell declara height:calc(100dvh - 200px) e
+     min-height:420px. Sem cancelar as duas aqui, o height explícito vence
+     o bottom acima no algoritmo de position:fixed e o chat nasce 200px
+     menor, deixando exatamente o vão visto no iPhone. */
+  height: auto;
+  min-height: 0;
   max-width: 480px;
   margin: 0 auto;
   background: var(--bg);
