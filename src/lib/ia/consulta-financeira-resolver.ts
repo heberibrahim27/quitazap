@@ -47,7 +47,14 @@ function normalizar(texto: string): string {
 export function detectarConsultaFinanceira(mensagem: string): TipoConsultaFinanceira | null {
   const t = normalizar(mensagem);
   if (/\bposso\s+gastar\b/.test(t)) return "posso_gastar";
-  if (/\bonde\b[\s\S]{0,25}\bgast(?:ando|o)\s+mais\b/.test(t) || /\bonde\s+(?:eu\s+)?(?:estou\s+)?gastando\b/.test(t)) return "onde_gasto_mais";
+  if (
+    /\bonde\b[\s\S]{0,25}\bgast(?:ando|o)\s+mais\b/.test(t) ||
+    /\bonde\s+(?:eu\s+)?(?:estou\s+)?gastando\b/.test(t) ||
+    /\bquanto\b[\s\S]{0,25}\bcategoria/.test(t) ||
+    /\bgastos\s+por\s+categoria\b/.test(t) ||
+    /\bresumo\s+por\s+categoria\b/.test(t) ||
+    /\bcomo\b[\s\S]{0,20}\b(?:estao|esta|andam)\b[\s\S]{0,15}\bcategoria/.test(t)
+  ) return "onde_gasto_mais";
   if (/\bcomo\b[\s\S]{0,25}\beconomiz/.test(t)) return "como_economizar";
   return null;
 }
