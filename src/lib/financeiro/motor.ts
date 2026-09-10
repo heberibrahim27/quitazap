@@ -201,14 +201,21 @@ export async function calcularResumoFinanceiro(
   const resultadoAntesInvestimentos = base.receitas - totalSaidasOperacionais;
   const resultadoSemPlano = base.receitas - totalSaidasSemDividas;
 
-  // Clampa nos dois lados (0 a 1.5) — sem o Math.max(0, ...), um saque de
+  // Clampa só embaixo (mínimo 0) — sem o Math.max(0, ...), um saque de
   // Meta maior que o resto das despesas do mês somadas deixa
   // totalComprometido negativo, e o Dashboard mostrava "-24% da renda
   // comprometida" (achado em teste ao vivo, 09/09/2026). Negativo não faz
   // sentido pra este indicador — o mínimo é "nada comprometido" (0%).
+  // Sem teto em cima: achado real do Ibrahim (10/09/2026) — havia um
+  // Math.min(..., 1.5) aqui que capava o VALOR em 150% mesmo quando o
+  // comprometimento real era maior (ex.: 248% virava 150% na tela,
+  // escondendo a gravidade real). Fazia sentido antes da barra do
+  // Dashboard saber desenhar acima de 100% (ver page.tsx) — hoje ela já
+  // reescala e mostra o texto "X% acima da renda prevista" pra qualquer
+  // valor, então não precisa mais capar o número em si.
   const percentualComprometido =
     resumoPlano.calculavel && resumoPlano.rendaDisponivel > 0
-      ? Math.min(Math.max(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 0), 1.5)
+      ? Math.max(resumoPlano.totalComprometido / resumoPlano.rendaDisponivel, 0)
       : null;
 
   const resumo: ResumoFinanceiro = {
