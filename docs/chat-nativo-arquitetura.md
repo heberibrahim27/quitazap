@@ -166,14 +166,46 @@ Isso deixa cada parceria nova = 1 regra + 1 variante de card, não um componente
 
 Tom sempre de progresso/controle — **nunca culpa ou punição por ausência** (linha vermelha explícita do Ibrahim, mesma diretriz de tom do `ROTEIRO_BOT.md`).
 
-- **"QuitaZAP Hoje"** — briefing curto ao abrir: quanto pode gastar hoje com segurança (reaproveita a mesma lógica de `limite-seguro-resolver.ts`), próxima conta (`Tarefa` com vencimento próximo), uma vitória, uma pendência pra confirmar. Se nada mudou desde a última visita, dizer isso também — nunca inventar novidade.
-- **"Desde sua última visita"** — badge só aparece se houve mudança real (saldo, parcela, meta) — precisa de um "timestamp da última visita" por cliente, candidato natural: última linha de `MensagemChat` com `direcao: "CLIENTE"`, ou um campo dedicado se isso não for preciso o suficiente.
+### 6.1 Regra dura — nunca inventar dado (correção de 2026-09-10, aplica a todo item abaixo)
+
+Sem integração bancária, o QuitaZAP só sabe o que o cliente **registrou manualmente** — nunca sabe o que ele deixou de gastar. Duas consequências não-negociáveis, retroativas a qualquer implementação futura desta fase:
+
+1. **Ausência de lançamento nunca vira "você economizou"/"parabéns".** Não ter um registro de gasto numa categoria não prova que o cliente não gastou — pode só significar que ele parou de registrar. Toda "vitória" ou novidade mostrada tem que vir de uma **mudança verificável nos registros que o cliente de fato fez** (um lançamento novo comparável a um período anterior também registrado, uma meta com aporte de verdade, uma dívida com pagamento confirmado) — nunca de uma inferência sobre o que não está lá. Precisa de uma checagem de "dado suficiente pra comparar" antes de qualquer claim de melhora (mesmo espírito do campo `dadosInsuficientes` que já existe em `SaudeFinanceiraLog`) — sem dado comparável dos dois períodos, não afirma melhora nem piora.
+2. **Nunca chamar valor de "protegido"/"guardado" se for só previsto no planejamento.** Um número que sai de uma projeção (ex. "sobra estimada do mês", limite seguro pra gastar hoje) é uma **estimativa futura**, não uma reserva de fato — só vira "guardado" quando existe um `DepositoMeta` real feito pelo cliente. Misturar os dois na linguagem da UI é a mesma família de erro do item 1: apresentar projeção como se fosse fato consumado.
+3. **Sem mudança real, mostrar isso explicitamente** — algo como "nenhuma mudança relevante desde sua última visita" em vez de forçar uma novidade artificial só pra ter o que exibir.
+4. Toda vitória/novidade exibida deve trazer, ainda que implícito na frase, que está **baseada nos dados que o cliente registrou** — nunca apresentada como se o sistema "soubesse" algo que não foi de fato informado.
+
+### 6.2 Itens do MVP (já com a regra de 6.1 aplicada)
+
+- **"QuitaZAP Hoje"** — briefing curto ao abrir: quanto pode gastar hoje com segurança (reaproveita a mesma lógica de `limite-seguro-resolver.ts` — é uma **estimativa**, nunca apresentar como valor reservado/protegido), próxima conta (`Tarefa` com vencimento próximo), uma vitória (só se houver, ver 6.1), uma pendência pra confirmar. Se nada mudou desde a última visita, dizer isso também.
+- **"Desde sua última visita"** — badge só aparece se houve mudança real e verificável nos registros (novo lançamento, parcela paga, aporte em meta) — precisa de um "timestamp da última visita" por cliente, candidato natural: última linha de `MensagemChat` com `direcao: "CLIENTE"`, ou um campo dedicado se isso não for preciso o suficiente.
 - **Missão financeira de 1 toque por dia** — resolver uma pendência real (ex. confirmar uma dívida pendente, revisar um gasto sem categoria) — não uma tarefa inventada só pra gerar engajamento.
-- **Vitórias detectadas automaticamente** — mesmo motor de detecção de `InsightDetectado`/`deteccao-anomalia.ts` já existente (hoje só detecta anomalia pra cima; adicionar detecção de melhora, ex. "gastou X% menos com Y essa semana").
+- **Vitórias detectadas automaticamente** — mesmo motor de detecção de `InsightDetectado`/`deteccao-anomalia.ts` já existente (hoje só detecta anomalia pra cima; adicionar detecção de melhora, ex. "você registrou X% menos gasto com Y essa semana, comparado às últimas N semanas também registradas"). Frase precisa deixar claro que é comparação de **registros**, não de comportamento real — e só dispara com dado suficiente dos dois períodos (ver 6.1.1).
 
 ---
 
-## 7. Riscos e itens em aberto
+## 7. Próxima camada de produto (pós-MVP — Fase 5, registrado em 2026-09-10)
+
+Sem pressa — avaliar só depois que arquitetura + primeiro pacote (Fase 3) + MVP de hábito (Fase 4) estiverem prontos. Três itens priorizados quando chegar a vez:
+
+1. **"Acompanhe isso para mim"** — cliente marca uma simulação/decisão (ex. o card do simulador "posso comprar isso?") pra ser revisitada automaticamente quando os dados dele mudarem, sem precisar perguntar de novo. Precisa de: um registro do que foi marcado (tipo de simulação + parâmetros), um gatilho de reavaliação (rodar de novo quando `Lancamento`/`Divida`/`Meta` relevante mudar — provavelmente um job periódico, não em tempo real) e uma forma de notificar a mudança (ver item 3, push→chat, é o canal natural pra isso).
+2. **Radar de parcela terminando** — avisa quando uma parcela cadastrada (`Divida`/`Lancamento` parcelado) chega ao fim, sugerindo redirecionar o valor liberado pra uma meta. Dado já existe (`totalParcelas`, parcelas com status), é questão de detecção + card de sugestão, não infra nova.
+3. **Planos pessoais com nome/história** — ex. "Sair do cheque especial", "Viagem" — em vez de só um número abstrato de meta (`Meta.nome` já existe, é mais sobre a apresentação/narrativa desses planos na UI do que schema novo).
+
+### 7.1 Push → chat (confirmado por Ibrahim, sem ambiguidade)
+
+Notificação push do PWA **nunca** abre uma central de mensagens separada — abre direto na mensagem específica dentro do chat nativo, com botões de ação (ex. "Já paguei", "Ver detalhes").
+
+Desenho sugerido:
+- Salvar a mensagem em `MensagemChat` **antes** de disparar o push (vinculada ao `clienteId`) — o push carrega o `id` da mensagem + destino, nunca o conteúdo completo (evita duplicar dado e mantém o chat como fonte única da verdade).
+- Ao tocar na notificação: deep-link direto pra essa mensagem dentro do chat (preserva o destino mesmo que precise logar antes — redirect pós-login guardando o destino pretendido).
+- Marca como lida ao exibir; evita duplicar em reenvio (idempotência por `id` da mensagem, mesmo padrão de dedupe já usado no webhook do WhatsApp via `MensagemProcessada`).
+- Mensagem continua disponível no chat **mesmo sem permissão de notificação concedida** — push é só um atalho de entrega, nunca a única forma de ver a mensagem.
+- **Importante, não-negociável:** o botão "Já paguei" tem que dar baixa na cobrança/dívida **existente** — nunca criar um lançamento novo. Mesmo cuidado que já existe no fluxo de pagamento do WhatsApp hoje.
+
+---
+
+## 8. Riscos e itens em aberto
 
 - **Refactor do `route.ts` é o item de maior risco de todo o plano** — é o webhook ao vivo do bot que atende clientes pagantes hoje. A Fase 1 evita esse risco por completo (não toca nele); a Fase 2 precisa de disciplina de migrar ramo a ramo com validação, não big-bang.
 - **`dividasTemp` sem cap de tamanho** — achado colateral, não bloqueia este plano, mas vale um item futuro isolado (fora desta fila).
