@@ -152,20 +152,16 @@ export async function chatCompletion(opts: ChatCompletionOpts): Promise<ChatComp
   };
 }
 
-export async function transcreverAudio(audioUrl: string, telemetria: TelemetriaIA): Promise<string> {
+// Chamada crua ao Whisper — extraída de transcreverAudio (abaixo, único
+// chamador até agora) pro chat nativo poder transcrever um Blob já em mãos
+// (gravado no navegador via MediaRecorder) sem precisar de uma URL pra
+// baixar de volta, ver transcreverAudioBytes.
+async function transcreverAudioBlob(audioBlob: Blob, extensao: string, telemetria: TelemetriaIA): Promise<string> {
   const apiKey = apiKeyValida();
   if (!apiKey) throw new Error("OPENAI_API_KEY não configurada.");
 
-  const audioRes = await fetch(audioUrl);
-  if (!audioRes.ok) throw new Error(`Falha ao baixar áudio: ${audioRes.status}`);
-
-  const audioBuffer = await audioRes.arrayBuffer();
-  const contentType = audioRes.headers.get("content-type") || "audio/ogg";
-  const ext = contentType.includes("mp4") ? "mp4" : contentType.includes("mpeg") ? "mp3" : "ogg";
-  const audioBlob = new Blob([audioBuffer], { type: contentType });
-
   const formData = new FormData();
-  formData.append("file", audioBlob, `audio.${ext}`);
+  formData.append("file", audioBlob, `audio.${extensao}`);
   formData.append("model", "whisper-1");
   formData.append("language", "pt");
   // verbose_json devolve `duration` (segundos) além de `text` — é o único
@@ -197,6 +193,36 @@ export async function transcreverAudio(audioUrl: string, telemetria: TelemetriaI
   });
 
   return data.text?.trim() ?? "";
+}
+
+export async function transcreverAudio(audioUrl: string, telemetria: TelemetriaIA): Promise<string> {
+  const audioRes = await fetch(audioUrl);
+  if (!audioRes.ok) throw new Error(`Falha ao baixar áudio: ${audioRes.status}`);
+
+  const audioBuffer = await audioRes.arrayBuffer();
+  const contentType = audioRes.headers.get("content-type") || "audio/ogg";
+  const ext = contentType.includes("mp4") ? "mp4" : contentType.includes("mpeg") ? "mp3" : "ogg";
+  const audioBlob = new Blob([audioBuffer], { type: contentType });
+
+  return transcreverAudioBlob(audioBlob, ext, telemetria);
+}
+
+// Pro chat nativo (gravação via MediaRecorder no navegador) — o Blob já
+// está em mãos, nunca passa por uma URL pública/assinada nem é baixado de
+// volta. O mimeType real do Blob (escolhido no cliente via
+// MediaRecorder.isTypeSupported — nunca fixo) decide a extensão; cai pra
+// "webm" se não reconhecer nenhum dos formatos comuns.
+export async function transcreverAudioBytes(audioBlob: Blob, telemetria: TelemetriaIA): Promise<string> {
+  const contentType = audioBlob.type || "audio/webm";
+  const ext = contentType.includes("mp4")
+    ? "mp4"
+    : contentType.includes("mpeg")
+      ? "mp3"
+      : contentType.includes("ogg")
+        ? "ogg"
+        : "webm";
+
+  return transcreverAudioBlob(audioBlob, ext, telemetria);
 }
 
 export async function analisarImagem(imageUrl: string, prompt: string, telemetria: TelemetriaIA): Promise<string> {

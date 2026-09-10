@@ -42,6 +42,42 @@ export async function subirComprovante(clienteId: string, imagemJpeg: Blob): Pro
   return caminho;
 }
 
+// Bucket PRIVADO separado do de comprovante — mimeType de áudio gravado
+// no navegador varia por engine (webm/opus no Chrome/Android, mp4/aac no
+// Safari), então a política de tipos permitidos é mais larga que a de foto
+// (sempre JPEG fixo). Mesmo princípio de nunca gerar URL pública: devolve
+// só o caminho.
+const BUCKET_AUDIOS = "audios-chat";
+
+export async function subirAudioChat(clienteId: string, audio: Blob): Promise<string> {
+  const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!chave) {
+    console.error("[UPLOAD AUDIO] SUPABASE_SERVICE_ROLE_KEY não configurada.");
+    throw new Error("Envio de áudio indisponível no momento. Tente novamente mais tarde.");
+  }
+
+  const contentType = audio.type || "audio/webm";
+  const ext = contentType.includes("mp4") ? "mp4" : contentType.includes("mpeg") ? "mp3" : contentType.includes("ogg") ? "ogg" : "webm";
+  const caminho = `${clienteId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  const bytes = new Uint8Array(await audio.arrayBuffer());
+
+  const resposta = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET_AUDIOS}/${caminho}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${chave}`,
+      apikey: chave,
+      "Content-Type": contentType,
+    },
+    body: bytes,
+  });
+
+  if (!resposta.ok) {
+    throw new Error(`Falha ao enviar o áudio (${resposta.status}).`);
+  }
+
+  return caminho;
+}
+
 export async function subirFotoPerfil(clienteId: string, imagemJpeg: Blob): Promise<string> {
   const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!chave) {
