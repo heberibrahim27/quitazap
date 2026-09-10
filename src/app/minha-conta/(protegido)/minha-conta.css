@@ -309,7 +309,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 .stat-text { min-width: 0; flex: 1; }
 .stat-label { margin: 0; font-size: 11.5px; color: var(--ink-dim); line-height: 1.25; white-space: nowrap; }
-.stat-value { margin: 3px 0 0; font-size: 16px; font-weight: 800; color: var(--ink); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+/* Sem white-space:nowrap: um valor grande (ex: "R$ 123.456,78") não cabia
+   na coluna e vazava por cima do ícone do stat vizinho, escondendo os
+   últimos dígitos sem nenhum aviso — achado real via injeção de teste,
+   10/09/2026. Quebra de linha aqui é inofensiva (a coluna já é estreita e
+   empilhada) e nunca esconde parte do valor, mesma regra do hero-amount
+   (ver ValorAutoAjustavel.tsx). */
+.stat-value { margin: 3px 0 0; font-size: 16px; font-weight: 800; color: var(--ink); font-family: 'IBM Plex Mono', monospace; overflow-wrap: break-word; }
 
 
 /* ── Cards genéricos (novo design) ────────────────── */
