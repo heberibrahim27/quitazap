@@ -2,8 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LancamentoCard, type LancamentoCardDado } from "./LancamentoCard";
+import { GraficoCategoriaCard, type GraficoCategoriaDado } from "./GraficoCategoriaCard";
 
-type DadosEstruturados = { tipo: "lancamento_criado"; lancamentos: LancamentoCardDado[] } | null | undefined;
+type DadosEstruturados =
+  | { tipo: "lancamento_criado"; lancamentos: LancamentoCardDado[] }
+  | GraficoCategoriaDado
+  | null
+  | undefined;
 
 type MensagemUI = { id: string; direcao: "CLIENTE" | "BOT"; texto: string; dadosEstruturados?: DadosEstruturados };
 
@@ -67,10 +72,15 @@ export function ChatClient({
           </p>
         )}
         {mensagens.map((m) => (
-          <div key={m.id} className={`mc-chat-bolha mc-chat-bolha-${m.direcao === "CLIENTE" ? "cliente" : "bot"}`}>
-            {m.texto}
-            {m.dadosEstruturados?.tipo === "lancamento_criado" &&
-              m.dadosEstruturados.lancamentos.map((l) => <LancamentoCard key={l.id} dado={l} />)}
+          <div key={m.id} className="mc-chat-turno">
+            <div className={`mc-chat-bolha mc-chat-bolha-${m.direcao === "CLIENTE" ? "cliente" : "bot"}`}>
+              {m.texto}
+              {m.dadosEstruturados?.tipo === "lancamento_criado" &&
+                m.dadosEstruturados.lancamentos.map((l) => <LancamentoCard key={l.id} dado={l} />)}
+            </div>
+            {m.dadosEstruturados?.tipo === "grafico_categoria" && (
+              <GraficoCategoriaCard dado={m.dadosEstruturados} />
+            )}
           </div>
         ))}
         {enviando && <div className="mc-chat-bolha mc-chat-bolha-bot mc-chat-digitando">digitando…</div>}

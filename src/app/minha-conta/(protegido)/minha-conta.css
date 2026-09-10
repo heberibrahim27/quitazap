@@ -1333,6 +1333,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   padding: 4px 2px 12px;
 }
 
+.mc-chat-turno {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
 .mc-chat-vazio {
   margin: auto;
   text-align: center;
@@ -1551,4 +1558,220 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   display: block;
   text-align: center;
   margin-top: 8px;
+}
+
+/* ── Card de gráfico de categoria no chat (largura cheia, distinto do
+   card compacto de lançamento) ──────────────────────────────────────── */
+.mc-grafico-card {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 358px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--mc-line);
+  color: var(--mc-ink);
+  box-shadow: 0 2px 10px rgba(15, 30, 51, 0.06);
+}
+
+.mc-grafico-topo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.mc-grafico-titulo {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--mc-accent);
+}
+
+.mc-grafico-periodo {
+  font-size: 12px;
+  color: var(--mc-ink-dim);
+}
+
+.mc-grafico-total {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.mc-grafico-desatualizado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--mc-red);
+  background: rgba(226, 59, 92, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.mc-grafico-desatualizado button {
+  border: none;
+  background: var(--mc-red);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mc-grafico-lista {
+  display: grid;
+  gap: 10px;
+}
+
+.mc-grafico-linha {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.mc-grafico-linha-nome {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.mc-grafico-linha-valor {
+  font-size: 12.5px;
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--mc-ink-dim);
+  text-align: right;
+}
+
+.mc-grafico-barra-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--mc-line);
+  overflow: hidden;
+}
+
+.mc-grafico-barra-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mc-gradient);
+}
+
+.mc-grafico-barra-outros {
+  background: var(--mc-ink-faint);
+}
+
+.mc-grafico-acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mc-line);
+}
+
+.mc-grafico-acoes button,
+.mc-grafico-acoes a {
+  flex: 1;
+  text-align: center;
+  border: 1px solid var(--mc-line);
+  background: var(--card-tint);
+  color: var(--mc-accent);
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mc-grafico-painel {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--card-tint);
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.mc-grafico-painel-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.mc-grafico-painel-vazio {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--mc-ink-faint);
+}
+
+/* ── Busca (Fase 3) ──────────────────────────────────────────────────── */
+.mc-busca {
+  padding: 4px 2px 24px;
+}
+
+.mc-busca-titulo {
+  margin: 0 0 14px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.mc-busca-filtros {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mc-busca-periodo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mc-busca-resumo {
+  font-size: 12.5px;
+  color: var(--mc-ink-dim);
+  margin: 0 0 10px;
+}
+
+.mc-busca-lista {
+  display: grid;
+  gap: 8px;
+}
+
+.mc-busca-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--mc-line);
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+
+.mc-busca-valor-entrada {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: var(--mc-green);
+}
+
+.mc-busca-valor-saida {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  color: var(--mc-ink);
 }

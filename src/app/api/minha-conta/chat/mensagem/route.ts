@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     });
 
     const sessao = await obterOuCriarSessaoControle(cliente);
-    const { resposta, lancamentosCriados } = await processarMensagemControle({ cliente, sessao, mensagem });
+    const { resposta, lancamentosCriados, graficoCategoria } = await processarMensagemControle({ cliente, sessao, mensagem });
 
     const dadosEstruturados =
       lancamentosCriados && lancamentosCriados.length > 0
@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
               atualizadoEm: l.atualizadoEm,
             })),
           }
-        : undefined;
+        : graficoCategoria
+          ? graficoCategoria
+          : undefined;
 
     await prisma.mensagemChat.create({
       data: { clienteId, canal: "APP", direcao: "BOT", texto: resposta, dadosEstruturados },

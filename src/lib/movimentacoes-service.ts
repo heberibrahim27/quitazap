@@ -15,6 +15,9 @@ export type MovimentacaoUnificada = {
   data: Date;
   descricao: string;
   meta: string;
+  // Campo próprio (além de já embutida em `meta`) — usado pelo gráfico de
+  // categoria do chat nativo pra filtrar sem precisar re-parsear a string.
+  categoria: string | null;
   valor: number;
   sinal: "entrada" | "saida";
   editarUrl: string | null;
@@ -54,6 +57,7 @@ export async function listarMovimentacoes(params: {
     data: l.data,
     descricao: l.descricao,
     meta: [ROTULO_TIPO_LANCAMENTO[l.tipo] ?? l.tipo, l.cartao?.nome, l.categoria].filter(Boolean).join(" · "),
+    categoria: l.categoria,
     valor: l.valor,
     sinal: l.tipo === "RECEITA" ? "entrada" : "saida",
     editarUrl: `/minha-conta/lancamento/${l.id}/editar`,
@@ -65,6 +69,7 @@ export async function listarMovimentacoes(params: {
     data: p.data,
     descricao: `Pagamento — ${p.divida.credor}`,
     meta: "Baixa de dívida",
+    categoria: null,
     valor: p.valor,
     sinal: "saida",
     editarUrl: null,

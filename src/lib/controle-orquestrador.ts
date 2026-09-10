@@ -90,6 +90,7 @@ import {
 } from "@/lib/ia/financeiro-intent-resolver";
 import type { TipoItemFinanceiro } from "@/lib/ia/financeiro-intent-schema";
 import { parseMoneyBR } from "@/lib/money";
+import { calcularGraficoCategoria, type GraficoCategoriaDado } from "@/lib/grafico-categoria-service";
 
 type LancamentoCriado = Awaited<ReturnType<typeof persistirLancamentosControle>>[number];
 
@@ -98,6 +99,9 @@ export type ResultadoOrquestrador = {
   /** Presente quando a mensagem criou lançamento(s) — dado estruturado pro
    *  card do chat renderizar (editar/dividir/desfazer) sem parsear texto. */
   lancamentosCriados?: LancamentoCriado[];
+  /** Presente quando a mensagem foi uma consulta "onde gasto mais" — dado
+   *  estruturado pro card de gráfico de categoria renderizar. */
+  graficoCategoria?: GraficoCategoriaDado;
 };
 
 // ── Helpers locais duplicados do webhook (não exportados de lá — ver
@@ -207,7 +211,12 @@ export async function processarMensagemControle(input: {
 
   const finalizar = async (
     resposta: string,
-    opts?: { estadoNovo?: EstadoControleFinanceiro; atualizouEstado?: boolean; lancamentosCriados?: LancamentoCriado[] }
+    opts?: {
+      estadoNovo?: EstadoControleFinanceiro;
+      atualizouEstado?: boolean;
+      lancamentosCriados?: LancamentoCriado[];
+      graficoCategoria?: GraficoCategoriaDado;
+    }
   ): Promise<ResultadoOrquestrador> => {
     const historicoAtualizado: Mensagem[] = [
       ...historico,
@@ -219,7 +228,7 @@ export async function processarMensagemControle(input: {
       where: { id: sessao.id },
       data: { dividasTemp: JSON.stringify(historicoAtualizado) },
     });
-    return { resposta, lancamentosCriados: opts?.lancamentosCriados };
+    return { resposta, lancamentosCriados: opts?.lancamentosCriados, graficoCategoria: opts?.graficoCategoria };
   };
 
   // Sincroniza com o motor central (mesmo que o Dashboard usa) antes de
@@ -263,7 +272,12 @@ export async function processarMensagemControle(input: {
     const respostaConsulta = perguntaSemValorEspecifico
       ? await responderLimiteSeguro(clienteId, isGratuito)
       : await responderConsultaFinanceira(tipoConsulta, clienteId, mensagem, isGratuito);
-    return finalizar(respostaConsulta);
+    // "onde_gasto_mais" ganha também o card de gráfico estruturado — mesma
+    // fonte (calcularResumoFinanceiro) que o texto acima já usa por baixo,
+    // nunca um cálculo paralelo.
+    const graficoCategoria =
+      tipoConsulta === "onde_gasto_mais" ? (await calcularGraficoCategoria(clienteId)) ?? undefined : undefined;
+    return finalizar(respostaConsulta, { graficoCategoria });
   }
 
   const deteccaoSimulacao = detectarSimulacaoParcela(mensagem);
