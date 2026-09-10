@@ -1315,3 +1315,69 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
     font-size: 44px;
   }
 }
+
+/* ── Chat nativo (Fase 1 — docs/chat-nativo-arquitetura.md) ────────── */
+.mc-chat-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 200px);
+  min-height: 420px;
+}
+
+.mc-chat-lista {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px 12px;
+}
+
+.mc-chat-vazio {
+  margin: auto;
+  text-align: center;
+  color: var(--mc-ink-dim);
+  font-size: 14.5px;
+  padding: 24px;
+}
+
+.mc-chat-bolha {
+  max-width: 82%;
+  padding: 11px 14px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mc-chat-bolha-cliente {
+  align-self: flex-end;
+  background: var(--mc-gradient);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.mc-chat-bolha-bot {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--mc-line);
+  color: var(--mc-ink);
+  border-bottom-left-radius: 4px;
+}
+
+.mc-chat-digitando {
+  color: var(--mc-ink-faint);
+  font-style: italic;
+}
+
+.mc-chat-composer {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--mc-line);
+}
+
+.mc-chat-composer .mc-input {
+  flex: 1;
+}

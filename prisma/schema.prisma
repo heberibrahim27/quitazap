@@ -73,6 +73,7 @@ model Cliente {
   mensagensPendentesRevisao MensagemPendenteRevisao[]
   documentosImportados      DocumentoImportado[]
   eventosAnalytics          EventoAnalytics[]
+  mensagensChat             MensagemChat[]
 }
 
 // ─────────────────────────────────────────
@@ -826,4 +827,27 @@ model EventoAnalytics {
 
   @@index([tipo, caminho, criadoEm])
   @@index([clienteId])
+}
+
+// ─────────────────────────────────────────
+// MENSAGEM CHAT (transcript do Controle — WhatsApp + chat nativo)
+// ─────────────────────────────────────────
+// Uma linha por turno, nunca sobrescreve, só acrescenta — mesmo padrão de
+// MensagemLeadVendas (funil de vendas), mas pro Controle. Existe porque
+// BotSessao.dividasTemp é memória de trabalho (mutável, sem cap de
+// tamanho), não um log pensado pra exibir scrollback de conversa. Fase 1
+// (docs/chat-nativo-arquitetura.md) só escreve aqui pelo canal "APP"; o
+// webhook do WhatsApp passa a escrever também na Fase 2, unificando o
+// histórico entre os dois canais.
+model MensagemChat {
+  id        String   @id @default(cuid())
+  clienteId String
+  canal     String // "WHATSAPP" | "APP"
+  direcao   String // "CLIENTE" | "BOT"
+  texto     String
+  criadoEm  DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, criadoEm])
 }
