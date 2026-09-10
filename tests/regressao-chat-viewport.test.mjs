@@ -40,3 +40,11 @@ test("composer oferece câmera como ação direta ao lado do microfone", () => {
   assert.ok(camera < microfone, "a câmera deve aparecer imediatamente antes da ação de áudio");
   assert.match(chatClient, /ref=\{inputCameraRef\}[\s\S]*capture="environment"/);
 });
+
+test("campo do chat não dispara zoom de foco que corta a lateral no iOS", () => {
+  const campo = blocoCss(".mc-chat-composer-campo");
+  const tamanho = campo.match(/font-size:\s*([\d.]+)px/)?.[1];
+
+  assert.ok(tamanho, "font-size do campo não encontrado");
+  assert.ok(Number(tamanho) >= 16, "campo editável deve ter ao menos 16px no iOS");
+});

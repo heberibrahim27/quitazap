@@ -1658,7 +1658,10 @@ body.mc-chat-tela .mc-chat-composer {
   background: transparent;
   color: var(--mc-ink);
   font: inherit;
-  font-size: 15px;
+  /* No iOS, controles de texto abaixo de 16px podem disparar zoom ao
+     receber foco. A viewport visual fica mais estreita que o layout e
+     corta justamente a margem direita dos balões e do compositor. */
+  font-size: 16px;
   line-height: 1.4;
   padding: 8px 0;
 }
