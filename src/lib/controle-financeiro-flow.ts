@@ -200,8 +200,6 @@ export type ResultadoGastoControle = {
 };
 
 const DESPESAS_FIXAS_ANTERIORES = "Despesas fixas anteriores";
-const RESPOSTA_SEM_CONFIRMACAO_PENDENTE =
-  "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo.";
 
 const CARTOES_CONHECIDOS: Array<{ aliases: string[]; nome: string }> = [
   { aliases: ["mercado pago"], nome: "Mercado Pago" },
@@ -899,10 +897,6 @@ function detectarRespostaConfirmacaoDespesaFixa(mensagem: string): "confirmar" |
   return null;
 }
 
-function ehRespostaConfirmacaoSolta(mensagem: string): boolean {
-  return /^(1|2|sim|nao|confirmar|corrigir)$/.test(normalizarTexto(mensagem));
-}
-
 function respostaDespesaFixaAtualizada(
   descricao: string,
   valorAnterior: number,
@@ -1313,20 +1307,24 @@ export function salvarItensConfirmadosIA(
   };
 }
 
+// Igual em espírito a processarConfirmacaoPendenteGastoDuplicado: só resolve
+// quando existe uma pendência do tipo que esta função trata; ausência de
+// pendência (ou pendência de outro tipo) devolve null pra cair no resto do
+// pipeline — nunca responde "sem confirmação pendente" sozinha aqui. Achado
+// real do Ibrahim (10/09/2026): "SALARIO 4600" caía no menu do rescue ladder
+// (passo 13 do orquestrador — "1-gasto/2-renda/3-dívida/4-outro"), e a
+// resposta solta "2" era sequestrada por ESTA função no passo 4 (que roda
+// antes), porque bastava a mensagem "parecer" uma confirmação solta
+// (ehRespostaConfirmacaoSolta) pra responder "não tenho nada pendente" e
+// interromper o pipeline ali — o rescue, que de fato tinha a pergunta
+// pendente (por um mecanismo de estado totalmente separado, comparando a
+// última mensagem do assistente), nunca chegava a rodar.
 function processarConfirmacaoPendenteDespesaFixa(
   mensagem: string,
   estadoAtual: EstadoControleFinanceiro
 ): ResultadoGastoControle | null {
   const pendente = estadoAtual.confirmacaoPendente;
-  if (!pendente) {
-    if (!ehRespostaConfirmacaoSolta(mensagem)) return null;
-
-    return {
-      resposta: RESPOSTA_SEM_CONFIRMACAO_PENDENTE,
-      estado: estadoAtual,
-      atualizouEstado: false,
-    };
-  }
+  if (!pendente) return null;
 
   const resposta = detectarRespostaConfirmacaoDespesaFixa(mensagem);
   if (!resposta) return null;

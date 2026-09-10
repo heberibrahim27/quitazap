@@ -102,6 +102,10 @@ const {
 } = loadTsModule("src/lib/ia/financeiro-intent-resolver.ts");
 const { classificarConfirmacaoIA } = loadTsModule("src/lib/ia/confirmacao-resolver.ts");
 const { classificarLembreteLivreIA, devePularFallbackLembreteIA } = loadTsModule("src/lib/ia/tarefa-resolver.ts");
+const {
+  decidirRespostaRescue,
+  MENSAGEM_RESCUE_TENTATIVA_1,
+} = loadTsModule("src/lib/rescue-classificador.ts");
 
 const mensagemManual = `
 Salario liquido normal: 3812,68
@@ -996,13 +1000,11 @@ test("confirmacao de interpretacao financeira salva lote misto com seguranca", (
   assert.match(confirmado.resposta, /Despesas fixas mensais:/);
   assert.match(confirmado.resposta, /Despesas fixas adicionadas: R\$ 2\.010,00/);
   assert.match(confirmado.resposta, /Despesas variáveis registradas: R\$ 2,50/);
+  // Sem confirmação pendente, "1" solto não é mais sequestrado aqui — cai
+  // null pro resto do pipeline decidir (achado real, 10/09/2026: essa
+  // resposta eager hijackava o menu do rescue ladder).
   const confirmacaoSoltaAposSalvar = gerenciarDespesasFixasControle("1", confirmado.estado);
-  assert.ok(confirmacaoSoltaAposSalvar);
-  assert.equal(
-    confirmacaoSoltaAposSalvar.resposta,
-    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
-  );
-  assert.equal(confirmacaoSoltaAposSalvar.atualizouEstado, false);
+  assert.equal(confirmacaoSoltaAposSalvar, null);
 
   const estadoPendente2 = criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoSemDespesasFixasBase(), intent);
   const negado = gerenciarDespesasFixasControle("2", estadoPendente2);
@@ -1240,14 +1242,7 @@ test("confirmacao de interpretacao financeira cancela previa e libera fluxo", as
   assert.equal(listagem.estado.confirmacaoPendente, undefined);
 
   const confirmacaoSolta = gerenciarDespesasFixasControle("1", listagem.estado);
-  assert.ok(confirmacaoSolta);
-  assert.equal(
-    confirmacaoSolta.resposta,
-    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
-  );
-  assert.equal(confirmacaoSolta.atualizouEstado, false);
-  assert.equal(confirmacaoSolta.estado.confirmacaoPendente, undefined);
-  assert.deepEqual(confirmacaoSolta.estado.despesasFixas, []);
+  assert.equal(confirmacaoSolta, null);
 });
 
 test("confirmacao de interpretacao financeira salva netflix fixa e mercado variavel", async () => {
@@ -1884,22 +1879,10 @@ test("confirmar frase corrida cadastra itens e negar nao altera despesas fixas",
   assert.match(negado.resposta, /não cadastrei nada/i);
 
   const confirmacaoUmSolta = gerenciarDespesasFixasControle("1", estadoSemDespesasFixasBase());
-  assert.ok(confirmacaoUmSolta);
-  assert.equal(
-    confirmacaoUmSolta.resposta,
-    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
-  );
-  assert.equal(confirmacaoUmSolta.atualizouEstado, false);
-  assert.deepEqual(confirmacaoUmSolta.estado, estadoSemDespesasFixasBase());
+  assert.equal(confirmacaoUmSolta, null);
 
   const confirmacaoDoisSolta = gerenciarDespesasFixasControle("2", estadoSemDespesasFixasBase());
-  assert.ok(confirmacaoDoisSolta);
-  assert.equal(
-    confirmacaoDoisSolta.resposta,
-    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
-  );
-  assert.equal(confirmacaoDoisSolta.atualizouEstado, false);
-  assert.deepEqual(confirmacaoDoisSolta.estado, estadoSemDespesasFixasBase());
+  assert.equal(confirmacaoDoisSolta, null);
 });
 
 test("confirmacao multipla em estado limpo processa todos os itens pendentes", () => {
@@ -2139,20 +2122,41 @@ test("confirmacao pendente aceita sinonimos e resposta solta sem pendencia nao a
   }
 
   const confirmacaoUmSolta = gerenciarDespesasFixasControle("1", estadoChatGptClaudeBase(110));
-  assert.ok(confirmacaoUmSolta);
-  assert.equal(
-    confirmacaoUmSolta.resposta,
-    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
-  );
-  assert.equal(confirmacaoUmSolta.atualizouEstado, false);
+  assert.equal(confirmacaoUmSolta, null);
 
   const confirmacaoDoisSolta = gerenciarDespesasFixasControle("2", estadoChatGptClaudeBase(110));
-  assert.ok(confirmacaoDoisSolta);
-  assert.equal(
-    confirmacaoDoisSolta.resposta,
-    "Não tenho nenhuma confirmação pendente agora. Pode me mandar um gasto, receita, despesa fixa ou pedir um resumo."
-  );
-  assert.equal(confirmacaoDoisSolta.atualizouEstado, false);
+  assert.equal(confirmacaoDoisSolta, null);
+});
+
+// Achado real do Ibrahim (10/09/2026): "SALARIO 4600" caía no rescue ladder
+// (passo 13 do orquestrador, mensagem-menu 1-gasto/2-renda/3-dívida/4-outro).
+// Ele respondia "2" (renda) e o bot dizia "Não tenho nenhuma confirmação
+// pendente agora" em vez de avançar pra tentativa_2 do rescue — a resposta
+// solta "2" (sem nenhuma confirmacaoPendente de despesa fixa no estado) era
+// sequestrada no passo 4 (despesas fixas), que roda ANTES do passo 13 no
+// orquestrador, e nunca deixava a mensagem chegar no rescue de verdade.
+// Este teste cobre as duas metades do bug juntas: (1) sem confirmacaoPendente
+// de despesa fixa, "gerenciarDespesasFixasControle" — o que o orquestrador
+// chama no passo 4 — precisa devolver null (deixando o pipeline seguir, em
+// vez de responder sozinho e interromper tudo ali); (2) com esse null,
+// "decidirRespostaRescue" (o mecanismo real do passo 13, que compara a
+// última mensagem do assistente — nunca `confirmacaoPendente`) recebe a
+// mesma mensagem "2" e a interpreta corretamente como a opção RENDA do menu.
+test("resposta solta do menu do rescue ladder nao e sequestrada pelo gerenciamento de despesas fixas", () => {
+  const estadoSemPendencia = estadoSemDespesasFixasBase();
+  assert.equal(estadoSemPendencia.confirmacaoPendente, undefined);
+
+  // Passo 4 do orquestrador: sem confirmacaoPendente de despesa fixa, "2"
+  // precisa passar direto — nunca responder "sem confirmação pendente" aqui.
+  const resultadoPasso4 = gerenciarDespesasFixasControle("2", estadoSemPendencia);
+  assert.equal(resultadoPasso4, null);
+
+  // Passo 13 do orquestrador (rescue ladder): com o menu como última
+  // mensagem do assistente, "2" precisa virar tentativa_2 com o exemplo de
+  // RENDA — nunca ficar preso no passo 4.
+  const decisaoRescue = decidirRespostaRescue(MENSAGEM_RESCUE_TENTATIVA_1, "2");
+  assert.equal(decisaoRescue.tipo, "tentativa_2");
+  assert.match(decisaoRescue.resposta, /recebi R\$3\.000 de salário|caiu um pix/i);
 });
 
 test("gerenciamento preserva total legado sem lista detalhada ao adicionar nova despesa fixa", () => {
