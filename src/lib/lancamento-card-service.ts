@@ -117,7 +117,16 @@ export async function dividirLancamentoCard(params: {
   }
 
   const divisoes = await prisma.$transaction(async (tx) => {
-    await tx.lancamento.update({ where: { id: original.id }, data: { substituidoPorDivisao: true } });
+    // valor: 0 é o que garante "pai+filhos nunca somam juntos" em QUALQUER
+    // consumidor existente (saldo, gráfico, orçamento, busca, exportação —
+    // 14 pontos diferentes no app que somam Lancamento hoje, nenhum deles
+    // sabe da divisão) sem precisar tocar em nenhum deles: um valor zero
+    // é matematicamente inerte em toda soma, por construção, não por
+    // disciplina de cada consumidor lembrar de filtrar um flag.
+    // substituidoPorDivisao continua servindo de marcador semântico (pra
+    // quem quiser distinguir "isso foi dividido" na exibição), mas a
+    // correção da soma não depende de ninguém checar esse flag.
+    await tx.lancamento.update({ where: { id: original.id }, data: { substituidoPorDivisao: true, valor: 0 } });
 
     const filhos: Lancamento[] = [];
     for (const parte of partes) {
