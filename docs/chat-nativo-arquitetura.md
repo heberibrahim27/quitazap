@@ -278,6 +278,30 @@ Ibrahim gostou pessoalmente da ideia de ter um modo dele com sermão em áudio �
 - Botão "Pega mais leve" sempre disponível.
 - Áudio só toca quando o cliente aperta — **nunca expõe finanças em voz alta automaticamente** (privacidade em ambiente compartilhado/público).
 
+### 8.9 Modo Linha Dura — 8 mecanismos de personalidade concretos (complemento final, 2026-09-10, fecha a ideação desta camada)
+
+1. **"Eu te avisei"** só aparece **com autorização prévia do cliente** pra ativar humor/cobrança mais firme — nunca automático.
+2. **Botão "Me convença a não comprar"** — cliente pede de propósito um contraponto antes de comprar; o chat responde com `[Esperar 24h]` `[Simular compra]` `[É uma necessidade]`.
+3. **Lista "Vou pensar melhor"** — guarda produto/valor/motivo, revisita no prazo escolhido ("ainda quer aquele fone ou a vontade passou?"). Se o cliente desistir, registra **"compra evitada"** — **nunca "dinheiro economizado" automaticamente**; só vira reserva de fato se o cliente realmente separar o valor (mesma regra de dado real da seção 6.1, mesma família do item 3 da seção 8.5).
+4. **Áudio curto também pra reconhecer vitória**, não só pra cobrar (ex.: parcela quitada) — o Linha Dura não é só cobrança.
+5. **Botão "Hoje não quero bronca"** sempre disponível — muda o tom só naquele dia, sem desligar o modo inteiro.
+6. **Antes de julgar um gasto diferente, a IA pergunta se foi planejado/emergência/impulso** — a resposta muda a abordagem (nunca assume a pior interpretação por padrão).
+7. **Cobrança só sobre um combinado com DATA que o próprio cliente definiu** (ex.: "sexta me cobra pra revisar assinaturas") — nunca um prazo que a IA inventou, e só promete o retorno se o agendamento realmente existir (mesmo cuidado da seção 8.4/6.1: nunca prometer algo que o sistema não vai de fato cumprir).
+8. **Na configuração, o cliente ouve/vê uma demonstração dos 4 tons antes de escolher**, e pode ativar humor / uso do nome / áudio **separadamente** — não é um pacote fechado tudo-ou-nada.
+
+### 8.10 Mensagens de incentivo/acolhimento (pedido pessoal do Ibrahim, atravessa TODOS os tons — inclusive Linha Dura)
+
+Fórmula fixa pra qualquer mensagem de acolhimento: **reconhecer a dificuldade real** + **valorizar o esforço genuíno** (mesmo pequeno) + **oferecer um próximo passo pequeno e concreto**. Cobre 4 cenários:
+
+- Mês difícil.
+- Progresso real.
+- Plano não cumprido — sem culpa.
+- Retorno após ausência — acolhe, **não** cobra sumiço (mesma diretriz de tom já registrada pra reengajamento no `ROTEIRO_BOT.md`, agora explícita pro chat nativo também).
+
+**Regra importante:** essa camada de acolhimento atravessa todos os tons/personalidades, **inclusive o Modo Linha Dura** — nenhum modo fica sem reconhecimento de dificuldade. E a IA precisa entender a **causa** da dificuldade (falta de renda? emergência? despesa essencial?) antes de sugerir qualquer corte de gasto — nunca cortar às cegas num mês ruim.
+
+Com isso fecha a ideação da camada "IA proativa"/Coach Financeiro por enquanto.
+
 ---
 
 ## 9. Riscos e itens em aberto
