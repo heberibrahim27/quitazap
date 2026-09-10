@@ -72,6 +72,7 @@ model Cliente {
   saudeFinanceiraLogs       SaudeFinanceiraLog[]
   mensagensPendentesRevisao MensagemPendenteRevisao[]
   documentosImportados      DocumentoImportado[]
+  eventosAnalytics          EventoAnalytics[]
 }
 
 // ─────────────────────────────────────────
@@ -802,4 +803,27 @@ model MensagemPendenteRevisao {
   @@index([resolvida, criadoEm])
   @@index([clienteId])
   @@index([criticidade, resolvida, criadoEm])
+}
+
+// ─────────────────────────────────────────
+// EVENTO ANALYTICS (pageview/clique — área /minha-conta)
+// ─────────────────────────────────────────
+// Rastreio leve de uso da área logada do assinante, pro admin ver "páginas
+// mais acessadas" e "cliques mais comuns" em /acessos. Só a área do
+// assinante (/minha-conta/**) — nunca as rotas do admin. clienteId sempre
+// resolvido pelo cookie de sessão (qz_cliente_auth) no servidor, nunca
+// aceito vindo do corpo da requisição (ver /api/analytics/evento).
+// tipo:    "pageview" | "click"
+// caminho: rota (pageview) ou data-track do elemento clicado (click)
+model EventoAnalytics {
+  id       String   @id @default(cuid())
+  clienteId String
+  tipo     String
+  caminho  String
+  criadoEm DateTime @default(now())
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([tipo, caminho, criadoEm])
+  @@index([clienteId])
 }
