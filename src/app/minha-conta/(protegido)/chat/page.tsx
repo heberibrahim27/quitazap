@@ -20,7 +20,6 @@ export default async function ChatPage() {
 
   return (
     <ChatClient
-      nome={cliente.nome.split(" ")[0]}
       mensagensIniciais={mensagens.reverse().map((m) => ({
         id: m.id,
         direcao: m.direcao as "CLIENTE" | "BOT",

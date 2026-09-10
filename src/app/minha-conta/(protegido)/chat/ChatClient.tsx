@@ -13,11 +13,11 @@ type DadosEstruturados =
 
 type MensagemUI = { id: string; direcao: "CLIENTE" | "BOT"; texto: string; dadosEstruturados?: DadosEstruturados };
 
+const ALTURA_COMPOSER_MAX = 116; // ~4 linhas
+
 export function ChatClient({
-  nome,
   mensagensIniciais,
 }: {
-  nome: string;
   mensagensIniciais: MensagemUI[];
 }) {
   const [mensagens, setMensagens] = useState<MensagemUI[]>(mensagensIniciais);
@@ -60,9 +60,19 @@ export function ChatClient({
     };
   }, []);
 
-  async function enviar(e: React.FormEvent) {
-    e.preventDefault();
-    const conteudo = texto.trim();
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // Cresce junto com o texto (1 a ~4 linhas) em vez de altura fixa — mede
+  // o conteúdo real via scrollHeight (só funciona com altura resetada
+  // antes, senão o navegador nunca reporta encolhimento ao apagar texto).
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, ALTURA_COMPOSER_MAX)}px`;
+  }, [texto]);
+
+  async function enviarMensagem(conteudo: string) {
     if (!conteudo || enviando) return;
 
     setTexto("");
@@ -95,6 +105,24 @@ export function ChatClient({
     }
   }
 
+  function aoSubmeter(e: React.FormEvent) {
+    e.preventDefault();
+    enviarMensagem(texto.trim());
+  }
+
+  function aoTeclar(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter envia, Shift+Enter quebra linha (padrão de app de chat).
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      enviarMensagem(texto.trim());
+    }
+  }
+
+  function focarComposer(prefill?: string) {
+    if (prefill != null) setTexto(prefill);
+    composerRef.current?.focus();
+  }
+
   return (
     <div className="mc-chat-shell">
       <div className="mc-chat-header">
@@ -106,9 +134,20 @@ export function ChatClient({
 
       <div className="mc-chat-lista">
         {mensagens.length === 0 && (
-          <p className="mc-chat-vazio">
-            Oi, {nome}! Me conta um gasto, uma receita, uma dívida, um cartão... eu já entendo e registro pra você.
-          </p>
+          <div className="mc-chat-intro">
+            <p className="mc-chat-intro-texto">Vamos organizar seu dinheiro? Conte o que aconteceu ou escolha por onde começar.</p>
+            <div className="mc-chat-intro-opcoes">
+              <button type="button" className="mc-chat-intro-opcao" onClick={() => focarComposer()}>
+                Registrar uma movimentação
+              </button>
+              <button type="button" className="mc-chat-intro-opcao" onClick={() => enviarMensagem("onde eu gasto mais")}>
+                Ver gastos por categoria
+              </button>
+              <button type="button" className="mc-chat-intro-opcao" onClick={() => focarComposer("Simular compra de R$ ")}>
+                Simular uma compra
+              </button>
+            </div>
+          </div>
         )}
         {mensagens.map((m) => (
           <div key={m.id} className="mc-chat-turno">
@@ -126,17 +165,28 @@ export function ChatClient({
         <div ref={fimRef} />
       </div>
 
-      <form className="mc-chat-composer" onSubmit={enviar}>
-        <input
-          className="mc-input"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder="Escreva aqui..."
-          disabled={enviando}
-        />
-        <button type="submit" className="mc-btn-primary" disabled={enviando || !texto.trim()}>
-          Enviar
-        </button>
+      <form className="mc-chat-composer" onSubmit={aoSubmeter}>
+        <div className="mc-chat-composer-superficie">
+          <textarea
+            ref={composerRef}
+            className="mc-chat-composer-campo"
+            rows={1}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={aoTeclar}
+            placeholder="Digite ou envie um áudio…"
+            disabled={enviando}
+          />
+          {texto.trim() ? (
+            <button type="submit" className="mc-chat-composer-acao" aria-label="Enviar" disabled={enviando}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+            </button>
+          ) : (
+            <button type="button" className="mc-chat-composer-acao" aria-label="Gravar áudio" disabled={enviando}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z" /><path d="M19 11a7 7 0 0 1-14 0" /><path d="M12 19v3" /></svg>
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );

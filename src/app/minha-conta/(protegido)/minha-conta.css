@@ -804,6 +804,28 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 .bn-fab svg { position: relative; z-index: 1; width: 30px; height: 30px; }
 
+/* ── Atalho direto pro chat (pedido do Ibrahim, 10/09/2026) ─────────
+   Canto inferior direito, acima da barra — nunca no meio (ali é território
+   do "+"), sem pulsar/chamar atenção demais. */
+.bn-chat-atalho {
+  position: fixed;
+  right: 16px;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  z-index: 39;
+  width: 96px; height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.97);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 20px -8px rgba(7,27,61,0.28);
+  color: var(--blue);
+  font-size: 13px; font-weight: 700;
+  text-decoration: none;
+}
+.bn-chat-atalho svg { width: 18px; height: 18px; flex-shrink: 0; }
+
 /* ── Sheet do botão "+" (Novo lançamento) ────────── */
 .fab-backdrop {
   position: fixed; inset: 0; z-index: 50;
@@ -1450,12 +1472,43 @@ body.mc-chat-tela .mc-chat-composer {
   width: 100%;
 }
 
-.mc-chat-vazio {
-  margin: auto;
+/* Estado vazio (pedido do Ibrahim, 10/09/2026): introdução curta no
+   terço superior + atalhos discretos em vez de um bloco de texto solto
+   no centro — some assim que a primeira mensagem é enviada (mensagens
+   deixa de ter length 0). Nunca gráfico fictício só pra preencher. */
+.mc-chat-intro {
+  padding: 10vh 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.mc-chat-intro-texto {
   text-align: center;
-  color: var(--mc-ink-dim);
+  color: var(--mc-ink);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+.mc-chat-intro-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mc-chat-intro-opcao {
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--mc-line);
+  color: var(--mc-ink);
   font-size: 14.5px;
-  padding: 24px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mc-chat-intro-opcao:active {
+  background: var(--mc-line);
 }
 
 .mc-chat-bolha {
@@ -1489,15 +1542,54 @@ body.mc-chat-tela .mc-chat-composer {
 }
 
 .mc-chat-composer {
-  display: flex;
-  gap: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--mc-line);
 }
 
-.mc-chat-composer .mc-input {
-  flex: 1;
+/* Superfície branca única (pedido do Ibrahim, 10/09/2026) em vez de
+   campo + botão "Enviar" separados brigando por espaço horizontal no
+   celular — o botão à direita alterna mic/enviar conforme o campo tem
+   texto ou não (ver ChatClient.tsx). */
+.mc-chat-composer-superficie {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 56px;
+  padding: 10px 8px 10px 18px;
+  border-radius: 28px;
+  background: var(--card);
+  border: 1px solid var(--mc-line);
+  box-shadow: 0 2px 10px -6px rgba(7,27,61,0.15);
 }
+
+.mc-chat-composer-campo {
+  flex: 1;
+  min-width: 0;
+  max-height: 116px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--mc-ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 8px 0;
+}
+.mc-chat-composer-campo::placeholder {
+  color: var(--mc-ink-faint);
+}
+
+.mc-chat-composer-acao {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--mc-gradient);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+.mc-chat-composer-acao svg { width: 18px; height: 18px; }
+.mc-chat-composer-acao:disabled { opacity: 0.6; }
 
 /* ── Card de lançamento no chat (Fase 3) ────────────────────────────── */
 .mc-lancamento-card {

@@ -147,6 +147,18 @@ export function BottomNav({
         </div>
       </nav>
 
+      {/* Acesso direto ao chat (pedido do Ibrahim, 10/09/2026) — hoje só dava
+          pra chegar lá enterrado no menu "Mais". Some quando algum sheet
+          está aberto (não compete visualmente com o "+") — na própria tela
+          do chat isso nem se aplica, já que ela é full-screen dedicada e
+          esse nav global some por completo lá (ver ChatClient.tsx). */}
+      {!fabAberto && !maisAberto && (
+        <Link href="/minha-conta/chat" className="bn-chat-atalho" aria-label="Abrir chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v12H7l-3 3z" /></svg>
+          Chat
+        </Link>
+      )}
+
       <div className={`fab-backdrop ${fabAberto || maisAberto ? "open" : ""}`} onClick={fecharTudo} />
 
       <div className={`fab-sheet ${fabAberto ? "open" : ""}`} style={{ maxHeight: "85vh", overflowY: "auto" }}>
