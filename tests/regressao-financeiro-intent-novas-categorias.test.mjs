@@ -52,6 +52,7 @@ const {
   resolverConfigCartao,
   intentFinanceiroConfirmavel,
   formatarPreviaIntentFinanceiro,
+  SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO,
 } = loadTsModule("src/lib/ia/financeiro-intent-resolver.ts");
 
 const { salvarItensConfirmadosIA } = loadTsModule("src/lib/controle-financeiro-flow.ts");
@@ -156,6 +157,27 @@ test("resolverConfigCartao: fechamento e vencimento juntos", () => {
 
 test("resolverConfigCartao: sem 'fecha'/'vence' retorna null", () => {
   assert.equal(resolverConfigCartao("gastei 45 no cartão nubank"), null);
+});
+
+// ── SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO: receita "categoria+valor sem verbo" ──
+// Achado do Ibrahim (10/09/2026): "Salário 4600" não caía como receita porque o
+// prompt só tinha a regra "categoria+valor sem verbo" pra despesa (ex: "Mercado
+// 50,00"), sem equivalente pra receita — a IA nunca foi instruída a tratar isso
+// como lançamento direto de receita e a mensagem caía no rescue ladder. Este
+// teste garante que a regra e os exemplos de receita continuam no prompt.
+
+test("prompt do interpretador financeiro reconhece receita no formato 'categoria+valor sem verbo' (mesma regra que já existe pra despesa)", () => {
+  assert.match(SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO, /vale pra RECEITA/);
+  assert.match(SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO, /"Salário 4600"/);
+  assert.match(SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO, /"Freela 800"/);
+  assert.match(
+    SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO,
+    /"Salário 4600" → \[\{tipo:"receita", descricaoNormalizada:"Salário", categoria:"Salário", valor:4600\}\]/
+  );
+  assert.match(
+    SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO,
+    /"Freela 800" → \[\{tipo:"receita", descricaoNormalizada:"Freela", categoria:"Bico\/Freelance", valor:800\}\]/
+  );
 });
 
 // ── formatarPreviaIntentFinanceiro (confirmação antes de salvar) ──
