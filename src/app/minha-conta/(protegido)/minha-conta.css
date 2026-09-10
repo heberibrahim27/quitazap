@@ -1396,7 +1396,8 @@ body.mc-chat-tela {
 }
 body.mc-chat-tela .header,
 body.mc-chat-tela .header-spacer,
-body.mc-chat-tela .bottom-nav {
+body.mc-chat-tela .bottom-nav,
+body.mc-chat-tela .bn-chat-atalho {
   display: none;
 }
 body.mc-chat-tela .mc-main {
