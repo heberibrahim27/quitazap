@@ -144,9 +144,13 @@ export async function avaliarQuitaZapHoje(clienteId: string): Promise<AvaliacaoH
       },
     });
 
-    if (!calculavel && anterior == null) {
-      // Nunca foi possível calcular e nunca tinha dado antes — dado
-      // insuficiente, não "sem novidade" (não dá pra saber se mudou algo).
+    if (!calculavel) {
+      // Achado no teste manual (2026-09-10): checar isso só "na primeira
+      // vez" (quando `anterior` ainda não existia) deixava a segunda
+      // visita cair silenciosamente em "sem_novidade" mesmo com dado
+      // insuficiente permanecendo insuficiente — exatamente o que a regra
+      // proíbe. "Dados insuficientes" precisa continuar sendo "falha" em
+      // TODA avaliação enquanto não for calculável, não só na estreia.
       return {
         estado: "falha",
         avaliadoEm,
