@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+
+// Páginas que não se beneficiam de refresh quase-em-tempo-real (não são
+// "saldo ao vivo") e cujo carregamento é caro o suficiente pra não valer
+// repetir a cada intervalMs — achado ao vivo (Ibrahim, 10/09/2026):
+// "QuitaZAP Hoje" ficando "muito lenta" era o auto-refresh de 4s se
+// empilhando em cima da própria avaliação da página (força
+// force-dynamic, várias queries sequenciais + um upsert de escrita a
+// cada chamada) sempre que uma rodada demorava mais que os 4s seguintes
+// — o refresh nunca espera o anterior terminar. "Hoje" é uma tela de
+// briefing pra ser avaliada uma vez por visita, não um ticker.
+const ROTAS_SEM_AUTO_REFRESH = ["/minha-conta/hoje"];
 
 /**
  * Mantém o dashboard do cliente atualizado sozinho enquanto a aba estiver
@@ -37,8 +48,11 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
+  const pathname = usePathname();
+  const desativado = ROTAS_SEM_AUTO_REFRESH.some((rota) => pathname === rota || pathname.startsWith(rota + "/"));
 
   useEffect(() => {
+    if (desativado) return;
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     function tick() {
@@ -89,7 +103,7 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
       document.removeEventListener("visibilitychange", aoTrocarVisibilidade);
       document.removeEventListener("click", reiniciarContagem, { capture: true });
     };
-  }, [intervalMs]);
+  }, [intervalMs, desativado]);
 
   return null;
 }

@@ -59,7 +59,18 @@ export async function avaliarQuitaZapHoje(clienteId: string): Promise<AvaliacaoH
     .map((t) => ({ id: t.id, descricao: t.descricao, valor: t.valor, vencimento: t.vencimento }));
 
   try {
-    const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
+    // cliente, sessão e o snapshot anterior não dependem uns dos outros —
+    // buscados em paralelo em vez de 3 idas e voltas sequenciais ao banco
+    // (achado ao vivo, 10/09/2026: essa cadeia sequencial + um upsert a
+    // cada chamada era a causa raiz de "Hoje" parecer lenta quando o
+    // auto-refresh de 4s da página batia em cima dela — ver
+    // AutoRefreshDashboard.tsx). Só `resumo` depende de `cliente`, então
+    // continua depois, sozinho.
+    const [cliente, sessao, anterior] = await Promise.all([
+      prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } }),
+      prisma.botSessao.findFirst({ where: { clienteId } }),
+      prisma.estadoDiarioCliente.findUnique({ where: { clienteId } }),
+    ]);
     if (!cliente) return { estado: "falha", avaliadoEm, motivo: "Cliente não encontrado.", compromissos };
 
     const { ano, mes } = anoMesAtualBrasil(avaliadoEm);
@@ -75,12 +86,10 @@ export async function avaliarQuitaZapHoje(clienteId: string): Promise<AvaliacaoH
 
     // Pendência de confirmação (BotSessao.dividasTemp) — mesma fonte que
     // o chat/webhook já usam, nunca recalculada aqui.
-    const sessao = await prisma.botSessao.findFirst({ where: { clienteId } });
     const historico: Mensagem[] = sessao ? JSON.parse(sessao.dividasTemp || "[]") : [];
     const estadoControle = carregarEstadoControle(historico, sessao?.renda);
     const tinhaPendenciaAgora = Boolean(estadoControle.confirmacaoPendente);
 
-    const anterior = await prisma.estadoDiarioCliente.findUnique({ where: { clienteId } });
     const tarefasAlertadasAntes: string[] = Array.isArray(anterior?.tarefasAlertadasIds)
       ? (anterior!.tarefasAlertadasIds as string[])
       : [];
