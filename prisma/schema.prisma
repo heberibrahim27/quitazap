@@ -487,6 +487,20 @@ model Cartao {
 // categoria: mesmas categorias de src/lib/gasto-flow.ts (Mercado, Alimentação,
 //            Transporte, Moradia, Contas da casa, ...), quando aplicável
 // origem:    TEXTO | AUDIO | FOTO
+// atualizadoEm também funciona como token de concorrência otimista pro
+// card do chat (Fase 3, docs/chat-nativo-arquitetura.md seção "editar
+// lançamento antigo"): quem edita manda de volta o atualizadoEm que viu
+// no card; se não bater mais com o valor atual no banco, a edição é
+// recusada (outro canal/aba editou primeiro) em vez de sobrescrever.
+//
+// lancamentoOrigemId/substituidoPorDivisao: suporte a "dividir
+// lançamento". O registro original NUNCA é apagado (fica no histórico,
+// marcado substituidoPorDivisao=true) — os filhos (divisoes) são os que
+// entram nas somas de saldo/gráfico dali em diante. Isso garante que
+// pai+filhos nunca são contados juntos em soma nenhuma sem precisar de
+// lógica especial em toda query — basta filtrar substituidoPorDivisao:
+// false (ou usar o Cliente todo, já que o pai nunca soma sozinho de
+// qualquer forma quando tem filhos).
 model Lancamento {
   id             String   @id @default(cuid())
   clienteId      String
@@ -499,15 +513,50 @@ model Lancamento {
   cartaoId       String?
   origem         String   @default("TEXTO")
   comprovanteUrl String?
+  substituidoPorDivisao Boolean @default(false)
+  lancamentoOrigemId    String?
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
-  cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  cartao       Cartao?       @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
-  depositoMeta DepositoMeta?
+  cliente         Cliente        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cartao          Cartao?        @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
+  depositoMeta    DepositoMeta?
+  lancamentoOrigem Lancamento?   @relation("DivisaoLancamento", fields: [lancamentoOrigemId], references: [id], onDelete: SetNull)
+  divisoes        Lancamento[]   @relation("DivisaoLancamento")
+  auditoria       LancamentoAuditoria[]
 
   @@index([clienteId, data])
   @@index([clienteId, tipo])
+  @@index([lancamentoOrigemId])
+}
+
+// ─────────────────────────────────────────
+// AUDITORIA DE LANÇAMENTO (edição/divisão/desfazer via card do chat)
+// ─────────────────────────────────────────
+// Toda edição/divisão/desfazer feita pelo card do chat (WhatsApp não edita
+// lançamento passado hoje, só o chat nativo) grava uma linha aqui, na
+// MESMA transação da mudança em si — nunca a mudança sem o registro.
+// Mesmo padrão de antes/depois de AuditoriaAssistente, mas por lançamento
+// em vez de por ação de admin.
+model LancamentoAuditoria {
+  id           String   @id @default(cuid())
+  // Nullable de propósito: "desfazer" apaga o Lancamento de verdade (mesmo
+  // comportamento que o comando de texto DESFAZER_LANCAMENTO do WhatsApp já
+  // tinha) — onDelete SetNull garante que o registro de auditoria
+  // SOBREVIVE à exclusão do lançamento que ele documenta (só perde o link,
+  // não o conteúdo — antes/depois já guardam os dados completos).
+  lancamentoId String?
+  clienteId    String
+  acao         String // "EDICAO" | "DIVISAO" | "DESFAZER"
+  canal        String // "WHATSAPP" | "APP"
+  antes        Json?
+  depois       Json?
+  criadoEm     DateTime @default(now())
+
+  lancamento Lancamento? @relation(fields: [lancamentoId], references: [id], onDelete: SetNull)
+
+  @@index([lancamentoId, criadoEm])
+  @@index([clienteId])
 }
 
 // ─────────────────────────────────────────
@@ -845,6 +894,11 @@ model MensagemChat {
   canal     String // "WHATSAPP" | "APP"
   direcao   String // "CLIENTE" | "BOT"
   texto     String
+  // Dado estruturado pro card do chat renderizar sem parsear texto (ex.:
+  // { tipo: "lancamento_criado", lancamentos: [...] } ou, mais adiante,
+  // { tipo: "grafico", geradoEm, dados } — a "fotografia" congelada de um
+  // gráfico enviado na conversa, ver docs/chat-nativo-arquitetura.md.
+  dadosEstruturados Json?
   criadoEm  DateTime @default(now())
 
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)

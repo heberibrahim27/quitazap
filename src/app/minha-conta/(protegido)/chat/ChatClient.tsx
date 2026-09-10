@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LancamentoCard, type LancamentoCardDado } from "./LancamentoCard";
 
-type MensagemUI = { id: string; direcao: "CLIENTE" | "BOT"; texto: string };
+type DadosEstruturados = { tipo: "lancamento_criado"; lancamentos: LancamentoCardDado[] } | null | undefined;
+
+type MensagemUI = { id: string; direcao: "CLIENTE" | "BOT"; texto: string; dadosEstruturados?: DadosEstruturados };
 
 export function ChatClient({
   nome,
@@ -42,6 +45,7 @@ export function ChatClient({
           id: `resp-${Date.now()}`,
           direcao: "BOT",
           texto: res.ok ? dados.resposta : "Não consegui processar agora. Tenta de novo em instantes.",
+          dadosEstruturados: res.ok ? dados.dadosEstruturados : undefined,
         },
       ]);
     } catch {
@@ -65,6 +69,8 @@ export function ChatClient({
         {mensagens.map((m) => (
           <div key={m.id} className={`mc-chat-bolha mc-chat-bolha-${m.direcao === "CLIENTE" ? "cliente" : "bot"}`}>
             {m.texto}
+            {m.dadosEstruturados?.tipo === "lancamento_criado" &&
+              m.dadosEstruturados.lancamentos.map((l) => <LancamentoCard key={l.id} dado={l} />)}
           </div>
         ))}
         {enviando && <div className="mc-chat-bolha mc-chat-bolha-bot mc-chat-digitando">digitando…</div>}

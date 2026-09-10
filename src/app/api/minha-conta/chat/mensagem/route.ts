@@ -49,13 +49,29 @@ export async function POST(req: NextRequest) {
     });
 
     const sessao = await obterOuCriarSessaoControle(cliente);
-    const { resposta } = await processarMensagemControle({ cliente, sessao, mensagem });
+    const { resposta, lancamentosCriados } = await processarMensagemControle({ cliente, sessao, mensagem });
+
+    const dadosEstruturados =
+      lancamentosCriados && lancamentosCriados.length > 0
+        ? {
+            tipo: "lancamento_criado" as const,
+            lancamentos: lancamentosCriados.map((l) => ({
+              id: l.id,
+              tipo: l.tipo,
+              descricao: l.descricao,
+              categoria: l.categoria,
+              valor: l.valor,
+              data: l.data,
+              atualizadoEm: l.atualizadoEm,
+            })),
+          }
+        : undefined;
 
     await prisma.mensagemChat.create({
-      data: { clienteId, canal: "APP", direcao: "BOT", texto: resposta },
+      data: { clienteId, canal: "APP", direcao: "BOT", texto: resposta, dadosEstruturados },
     });
 
-    return NextResponse.json({ resposta });
+    return NextResponse.json({ resposta, dadosEstruturados });
   } catch (err) {
     console.error("[CHAT] Erro ao processar mensagem:", err);
     return NextResponse.json({ error: "Não consegui processar agora. Tenta de novo em instantes." }, { status: 500 });

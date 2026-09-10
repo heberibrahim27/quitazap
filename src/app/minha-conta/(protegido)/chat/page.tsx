@@ -25,6 +25,8 @@ export default async function ChatPage() {
         id: m.id,
         direcao: m.direcao as "CLIENTE" | "BOT",
         texto: m.texto,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dadosEstruturados: m.dadosEstruturados as any,
       }))}
     />
   );
