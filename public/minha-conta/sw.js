@@ -36,9 +36,20 @@ self.addEventListener("fetch", (event) => {
 });
 
 // ── Push notifications ──────────────────────
-// Payload sempre é um JSON simples { titulo, corpo, url } (ver
+// Payload sempre é um JSON simples { titulo, corpo, url, testId? } (ver
 // src/lib/push-service.ts) — nunca dado financeiro sensível na notificação
 // em si, só o aviso ("categoria X estourou o orçamento", por exemplo).
+//
+// testId (só presente na notificação de teste do diagnóstico, ver
+// NotificacoesPush.tsx) — instrumentação temporária pra achado real do
+// Ibrahim (10/09/2026): a tela achava que "o provedor aceitou o envio"
+// já provava que a notificação apareceu, e não prova — o service worker
+// pode rodar, mas showNotification() falhar (permissão revogada depois
+// da inscrição, navegador matando o SW etc.). Com testId, confirma de
+// volta pro servidor se REALMENTE exibiu, numa chamada que roda DEPOIS da
+// exibição já ter sido tentada e nunca atrasa nem condiciona ela — uma
+// falha de rede aqui (offline, API fora) nunca vira "notificação não
+// apareceu" pro cliente.
 self.addEventListener("push", (event) => {
   let dados = { titulo: "QuitaZAP", corpo: "Você tem uma novidade no app." };
   try {
@@ -47,15 +58,38 @@ self.addEventListener("push", (event) => {
     // payload não veio em JSON — usa o texto puro como corpo
     if (event.data) dados.corpo = event.data.text();
   }
+  const testId = dados.testId;
 
-  event.waitUntil(
-    self.registration.showNotification(dados.titulo, {
-      body: dados.corpo,
-      icon: "/minha-conta/icons/icon-192.png",
-      badge: "/minha-conta/icons/icon-192.png",
-      data: { url: dados.url || "/minha-conta" },
-    })
-  );
+  async function processar() {
+    let exibiu = false;
+    let erro = null;
+    try {
+      await self.registration.showNotification(dados.titulo, {
+        body: dados.corpo,
+        icon: "/minha-conta/icons/icon-192.png",
+        badge: "/minha-conta/icons/icon-192.png",
+        data: { url: dados.url || "/minha-conta" },
+      });
+      exibiu = true;
+    } catch (e) {
+      erro = String((e && e.message) || e).slice(0, 200);
+    }
+
+    if (testId) {
+      try {
+        await fetch("/api/minha-conta/push/recibo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ testId, exibiu, erro }),
+        });
+      } catch {
+        // Falha de rede no recibo não é falha de exibição — só fica sem
+        // confirmação (a UI trata isso como estado próprio, não como erro).
+      }
+    }
+  }
+
+  event.waitUntil(processar());
 });
 
 self.addEventListener("notificationclick", (event) => {

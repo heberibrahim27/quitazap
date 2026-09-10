@@ -14,11 +14,13 @@ import { HORAS_TRABALHO_MENSAL_PADRAO } from "@/lib/financeiro/horas-trabalho";
 export default async function PerfilPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; erro?: string }>;
+  searchParams: Promise<{ ok?: string; erro?: string; debug?: string }>;
 }) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
-  const { ok, erro } = await searchParams;
+  const { ok, erro, debug } = await searchParams;
+  const modoDebug = debug === "1";
+  const buildId = process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
 
   async function salvarFotoPerfil(formData: FormData) {
     "use server";
@@ -146,7 +148,7 @@ export default async function PerfilPage({
         </p>
       </div>
 
-      <NotificacoesPush />
+      <NotificacoesPush debug={modoDebug} buildId={buildId} />
       <MensagensProativas aceitaProativasInicial={cliente.aceitaProativas} />
 
       <div className="card-head">

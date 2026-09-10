@@ -156,6 +156,31 @@ model PushSubscription {
 }
 
 // ─────────────────────────────────────────
+// Diagnóstico temporário de push (achado real, Ibrahim 10/09/2026: tela
+// mostrava "Ativadas" e ao mesmo tempo "desativadas" no teste — permissão
+// concedida, subscription configurada e notificação de fato exibida são 3
+// coisas diferentes que a UI antiga misturava num booleano só). Uma linha
+// por clique em "Enviar notificação de teste", correlacionada pelo testId
+// entre o envio (server) e a confirmação de exibição (service worker,
+// numa invocação serverless separada — só um registro em banco liga as
+// duas pontas). Tabela pensada pra ser efêmera: nada aqui precisa
+// sobreviver além da sessão de diagnóstico.
+model PushTesteDiagnostico {
+  id                String    @id @default(cuid())
+  testId            String    @unique
+  clienteId         String
+  criadoEm          DateTime  @default(now())
+  // [{ fingerprint, statusCode, categoria }] — nunca endpoint/auth/p256dh
+  // completos, só o suficiente pra saber QUAL inscrição respondeu o quê.
+  provedorResultado Json?
+  recebidoPeloSw    Boolean   @default(false)
+  recebidoEm        DateTime?
+  swErro            String?
+
+  @@index([clienteId])
+}
+
+// ─────────────────────────────────────────
 // DÍVIDA
 // ─────────────────────────────────────────
 // tipo:      CARTAO | EMPRESTIMO | BOLETO | ACORDO | OUTRO
