@@ -623,6 +623,27 @@ test("aposta curta passa pelo escopo e segue para gasto rapido", async () => {
   assert.equal(await resolverIntencaoFinanceiraIA("100,00 em apostas", { forcarLocal: true }), null);
 });
 
+// Achado real do Ibrahim (10/09/2026): "Salário 4600" caia no rescue
+// ladder. Causa raiz completa (achada ao verificar ao vivo contra
+// produção, não só lendo o código): não bastava ensinar o prompt da IA a
+// reconhecer receita no formato "categoria+valor sem verbo" — a mensagem
+// nem chegava a ser mandada pra IA, porque:
+// 1) "Freela 800" nem passava no guardião de escopo (avaliarEscopoFinanceiro)
+//    — PADROES_ESCOPO tinha "salario" mas não "freela"/"bico"/etc.
+// 2) mesmo "Salário 4600" (que já passa no escopo) era barrado por
+//    deveChamarInterpretadorFinanceiroIA — que só deixava passar valor
+//    inteiro sem decimal/R$ quando havia um VERBO financeiro forte junto
+//    (ex.: "recebi 200"), e "Salário 4600"/"Freela 800" não tem verbo.
+// Mesma classe de bug já corrigida antes só pro lado da despesa (ver
+// PALAVRAS_GASTO em gasto-flow.ts, ex.: "uber 25"), nunca replicada pro
+// lado da receita.
+test("categoria de receita sem verbo (Salário/Freela + valor solto) passa pelo guardião de escopo e chega na IA", () => {
+  for (const mensagem of ["Salário 4600", "Freela 800", "recebi 200 de freela"]) {
+    assert.equal(avaliarEscopoFinanceiro(mensagem).emEscopo, true, mensagem);
+    assert.equal(deveChamarInterpretadorFinanceiroIA(mensagem), true, mensagem);
+  }
+});
+
 test("mensagem de gasto unico sem palavra-gatilho conhecida ainda entra em escopo por ter valor com cara de dinheiro", () => {
   assert.equal(avaliarEscopoFinanceiro("desembolsei 45,00 na padaria de manha").emEscopo, true);
   assert.equal(avaliarEscopoFinanceiro("dei 30 reais pro pedreiro").emEscopo, true);

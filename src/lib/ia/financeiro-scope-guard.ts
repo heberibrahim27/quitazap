@@ -61,6 +61,19 @@ const PADROES_ESCOPO = [
   /\bcasa\s+de\s+aposta\b/,
   /\brenda\b/,
   /\bsalario\b/,
+  // Categorias de receita inequívocas que faltavam aqui (achado real,
+  // 10/09/2026: "Freela 800" caía em fora de escopo por nenhuma delas
+  // estar na lista, mesmo "salario" já estando — mesmo padrão do "uber"/
+  // "farmacia" abaixo, mas do lado da receita).
+  /\bfreela\b/,
+  /\bfrila\b/,
+  /\bfreelance\b/,
+  /\bbico\b/,
+  /\bdividendos?\b/,
+  /\bbeneficio\b/,
+  /\bauxilio\b/,
+  /\bpremio\b/,
+  /\breembolso\b/,
   /\brecebi\b/,
   /\bcliente pagou\b/,
   /\bcaiu pix\b/,
@@ -343,6 +356,17 @@ export function deveChamarInterpretadorFinanceiroIA(mensagem: string): boolean {
   // (bot financeiro — não tem outro sentido plausível pra essa palavra
   // aqui) pra valer a chamada de IA mesmo sem número na mesma frase.
   if (/\bmetas?\b/.test(texto)) return true;
+  // "Salário 4600"/"Freela 800" (achado real, 10/09/2026): categoria de
+  // receita inequívoca + valor solto, sem verbo, sem decimal — mesma
+  // classe de bug já corrigida pro lado da despesa (PALAVRAS_GASTO em
+  // gasto-flow.ts, ex.: "uber 25"), mas não existe um resolvedor
+  // determinístico equivalente pra receita — só a IA reconhece esse
+  // formato pra receita, e sem essa checagem a mensagem nunca chegava
+  // até ela, mesmo já estando em escopo (PADROES_ESCOPO reconhece
+  // "salario"/"freela"/etc., mas essa função é um filtro separado).
+  if (/\b(salario|freela|frila|freelance|bico|dividendos?|beneficio|auxilio|premio|reembolso)\b/.test(texto) && /\b\d[\d.,]*\b/.test(texto)) {
+    return true;
+  }
   // Mensagem de um único gasto, sem nenhuma das palavras acima — ainda
   // assim vale chamar a IA se tiver um valor com cara de dinheiro de
   // verdade. Isso só é alcançado depois que resolverLocal() já tentou e
