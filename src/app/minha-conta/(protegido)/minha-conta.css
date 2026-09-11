@@ -832,6 +832,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 .bn-chat-atalho svg { width: 18px; height: 18px; flex-shrink: 0; }
 
+/* No iOS, elementos fixed acompanham o visual viewport quando o teclado abre.
+   A navegação global não participa da edição: escondê-la enquanto um campo está
+   focado evita que ela suba sobre o formulário e a restaura no focusout. */
+@media (max-width: 768px) {
+  body:has(input:focus, textarea:focus, select:focus, [contenteditable="true"]:focus) .bottom-nav,
+  body:has(input:focus, textarea:focus, select:focus, [contenteditable="true"]:focus) .bn-chat-atalho {
+    display: none;
+  }
+}
+
 /* ── Sheet do botão "+" (Novo lançamento) ────────── */
 .fab-backdrop {
   position: fixed; inset: 0; z-index: 50;
