@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
+import { deslocarMes, mesFaturaDaCompra } from "@/lib/financeiro/fatura-cartao";
 import { CartaoCarrossel, type CartaoCarrosselItem } from "./CartaoCarrossel";
 import { MesFiltro } from "../MesFiltro";
 
@@ -20,16 +21,6 @@ function fmtDataComAno(d: Date) {
 }
 
 const NOMES_MES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-// Chave ordenável (ano-mês) pra agrupar/filtrar parcelas futuras por mês
-// no client, e um rótulo pra exibir ("Out/2026").
-function mesChave(d: Date): string {
-  const data = new Date(d);
-  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
-}
-function mesLabel(d: Date): string {
-  const data = new Date(d);
-  return `${NOMES_MES_ABREV[data.getMonth()]}/${data.getFullYear()}`;
-}
 
 // Mesma âncora em Brasília usada no resto do Controle — ver page.tsx da home.
 function anoMesAtualBrasil(agora: Date): { ano: number; mes: number; dia: number } {
@@ -84,14 +75,7 @@ export default async function CartoesPage({
   const mesAnterior = mesSel === 1 ? { ano: anoSel - 1, mes: 12 } : { ano: anoSel, mes: mesSel - 1 };
   const mesSeguinte = mesSel === 12 ? { ano: anoSel + 1, mes: 1 } : { ano: anoSel, mes: mesSel + 1 };
 
-  const { inicio: inicioMes, fim: fimMes } = limitesDoMes(anoAtual, mesAtual);
-  const { inicio: inicioMesSel, fim: fimMesSel } = limitesDoMes(anoSel, mesSel);
-  // A fatura do mês selecionado já fechou? Qualquer mês antes do atual
-  // sempre fechou; o mês atual só fecha quando o dia de hoje alcança o dia
-  // de fechamento cadastrado no cartão (sem essa data, nunca consideramos
-  // fechada — fica sempre "em aberto").
-  const mesSelEhAnterior = anoSel < anoAtual || (anoSel === anoAtual && mesSel < mesAtual);
-  const mesSelEhAtual = anoSel === anoAtual && mesSel === mesAtual;
+  const { inicio: inicioMes } = limitesDoMes(anoAtual, mesAtual);
 
   const cartoes = await prisma.cartao.findMany({ where: { clienteId: cliente.id }, orderBy: { nome: "asc" } });
 
@@ -119,29 +103,45 @@ export default async function CartoesPage({
   // Antes disparava até 4 queries POR CARTÃO em paralelo (uma pra cada
   // grupo abaixo) — com o pool de conexões do Postgres limitado (5 no
   // plano atual), um cliente com vários cartões estourava o pool e caía em
-  // "Timed out fetching a new connection" (P2024). Trocado por 4 queries
+  // "Timed out fetching a new connection" (P2024). Trocado por queries
   // FIXAS no total (uma por grupo, todos os cartões de uma vez via
   // `cartaoId: { in: [...] }` ou `groupBy`), sem crescer com a quantidade
   // de cartões do cliente.
   const cartaoIds = cartoes.map((c) => c.id);
+  const diaFechamentoPorCartao = new Map(cartoes.map((c) => [c.id, c.diaFechamento]));
+  const diaVencimentoPorCartao = new Map(cartoes.map((c) => [c.id, c.diaVencimento]));
 
-  const [comprasTodas, proximasParcelasTodas, comprometidoPorCartaoRaw, faturaSelPorCartaoRaw] = await Promise.all([
-    // A lista de compras é o detalhamento da fatura do MÊS SELECIONADO no
-    // filtro (mesma janela usada no total de faturaSelPorCartao) — antes
-    // ficava sempre presa em "até hoje" independente do mês escolhido, e
-    // o cliente via o total de um mês em cima com compras de outro mês
-    // embaixo. Sem `take` por cartão (agora é uma query só) — a lista é
-    // fatiada por cartão depois, em memória.
+  // Achado real (Ibrahim, 14/09/2026): a fatura de cada compra é calculada
+  // em memória por mesFaturaDaCompra (cada cartão pode ter um dia de
+  // fechamento diferente, então o banco não sabe fazer essa conta por
+  // cartão numa query só) — não mais pelo mês calendário puro da data. Uma
+  // compra pode ir parar em até 2 meses depois do seu mês calendário (1
+  // pelo fechamento + 1 pelo vencimento), então a janela buscada no banco
+  // é alargada 2 meses pra cada lado do mês selecionado, generosa o
+  // bastante pra cobrir qualquer combinação de fechamento/vencimento.
+  const janelaIni = deslocarMes(anoSel, mesSel, -2);
+  const janelaFim = deslocarMes(anoSel, mesSel, 2);
+  const inicioJanela = limitesDoMes(janelaIni.ano, janelaIni.mes).inicio;
+  const fimJanela = limitesDoMes(janelaFim.ano, janelaFim.mes).fim;
+  const mesAnteriorAoAtual = deslocarMes(anoAtual, mesAtual, -1);
+  const inicioJanelaParcelas = limitesDoMes(mesAnteriorAoAtual.ano, mesAnteriorAoAtual.mes).inicio;
+
+  const [comprasJanela, proximasParcelasTodas, comprometidoPorCartaoRaw] = await Promise.all([
+    // Substitui a antiga query estreita [inicioMesSel, fimMesSel) — ver
+    // comentário da janela acima. A fatura de cada linha é decidida logo
+    // abaixo, não pelo filtro do banco.
     prisma.lancamento.findMany({
-      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMesSel, lt: fimMesSel } },
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioJanela, lt: fimJanela } },
       orderBy: { data: "desc" },
     }),
     // Parcelas já agendadas pros próximos meses — pra dar visibilidade de
     // onde o limite comprometido (calculado abaixo) está "preso", já que
     // elas não aparecem em "Últimas compras" (só histórico do que já
-    // aconteceu).
+    // aconteceu). Início alargado em 1 mês (mesmo motivo da janela acima)
+    // — a fatura de cada uma é recalculada abaixo, e só entram as que
+    // caem numa fatura de verdade futura em relação a hoje.
     prisma.lancamento.findMany({
-      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: fimMes } },
+      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioJanelaParcelas } },
       orderBy: { data: "asc" },
     }),
     // "Disponível" precisa descontar o valor TOTAL comprometido no limite,
@@ -149,48 +149,68 @@ export default async function CartoesPage({
     // inteiro no limite assim que é feita (mesmo comportamento do cartão de
     // verdade), não só a parcela que cai na fatura atual. Por isso soma
     // tudo a partir do início do mês atual (mês atual + parcelas futuras já
-    // agendadas); meses anteriores já viraram fatura paga.
+    // agendadas); meses anteriores já viraram fatura paga. Continua por
+    // mês CALENDÁRIO de propósito — é sobre limite consumido, não sobre em
+    // qual fatura a compra vai aparecer.
     prisma.lancamento.groupBy({
       by: ["cartaoId"],
       where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMes } },
       _sum: { valor: true },
     }),
-    // Total da fatura do mês escolhido no filtro (independente do mês
-    // atual) — o que o cliente navega pra conferir meses passados/futuros.
-    prisma.lancamento.groupBy({
-      by: ["cartaoId"],
-      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMesSel, lt: fimMesSel } },
-      _sum: { valor: true },
-    }),
   ]);
 
   const comprometidoPorCartao = new Map(comprometidoPorCartaoRaw.map((g) => [g.cartaoId, g._sum.valor ?? 0]));
-  const faturaSelPorCartao = new Map(faturaSelPorCartaoRaw.map((g) => [g.cartaoId, g._sum.valor ?? 0]));
-  const comprasPorCartao = new Map<string, typeof comprasTodas>();
-  for (const l of comprasTodas) {
+
+  const faturaSelPorCartao = new Map<string, number>();
+  const comprasPorCartao = new Map<string, typeof comprasJanela>();
+  for (const l of comprasJanela) {
     if (!l.cartaoId) continue;
+    const fatura = mesFaturaDaCompra(l.data, diaFechamentoPorCartao.get(l.cartaoId) ?? null, diaVencimentoPorCartao.get(l.cartaoId) ?? null);
+    if (fatura.ano !== anoSel || fatura.mes !== mesSel) continue;
+
+    faturaSelPorCartao.set(l.cartaoId, (faturaSelPorCartao.get(l.cartaoId) ?? 0) + l.valor);
     const lista = comprasPorCartao.get(l.cartaoId) ?? [];
     if (lista.length < 15) lista.push(l);
     comprasPorCartao.set(l.cartaoId, lista);
   }
-  const proximasParcelasPorCartao = new Map<string, typeof proximasParcelasTodas>();
+
+  // Só entram parcelas cuja fatura calculada é estritamente depois do mês
+  // atual DE VERDADE (não do mês navegado no filtro) — esta lista é
+  // sempre "o que vem pela frente a partir de hoje".
+  const proximasParcelasPorCartao = new Map<string, { l: (typeof proximasParcelasTodas)[number]; fatura: { ano: number; mes: number } }[]>();
   for (const l of proximasParcelasTodas) {
     if (!l.cartaoId) continue;
+    const fatura = mesFaturaDaCompra(l.data, diaFechamentoPorCartao.get(l.cartaoId) ?? null, diaVencimentoPorCartao.get(l.cartaoId) ?? null);
+    if (fatura.ano * 12 + fatura.mes <= anoAtual * 12 + mesAtual) continue;
+
     const lista = proximasParcelasPorCartao.get(l.cartaoId) ?? [];
-    if (lista.length < 24) lista.push(l);
+    if (lista.length < 24) lista.push({ l, fatura });
     proximasParcelasPorCartao.set(l.cartaoId, lista);
   }
-
-  const comprasLabel = mesSelEhAtual ? "Últimas compras" : `Compras de ${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}`;
-  const comprasVazioLabel = mesSelEhAtual
-    ? "Nenhuma compra registrada nesse cartão ainda."
-    : `Nenhuma compra em ${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}.`;
 
   const itens: CartaoCarrosselItem[] = cartoes.map((c) => {
     const comprometido = comprometidoPorCartao.get(c.id) ?? 0;
     const disponivel = c.limite != null ? c.limite - comprometido : null;
     const faturaSelValor = faturaSelPorCartao.get(c.id) ?? 0;
-    const faturaSelFechadaCartao = mesSelEhAnterior || (mesSelEhAtual && c.diaFechamento != null && diaAtual >= c.diaFechamento);
+
+    // Fatura atual do cartão = a que uma compra feita agora mesmo cairia
+    // — a partir dela dá pra saber se a fatura selecionada no filtro está
+    // aberta (é a atual ou uma futura, ainda nem começou) ou já fechou
+    // (é anterior à atual), sem precisar refazer a conta de fechamento ao
+    // contrário. Mesmo achado do Ibrahim (14/09/2026): antes essa
+    // comparação usava o mês CALENDÁRIO do filtro contra o mês calendário
+    // de hoje, o que dava errado sempre que o rótulo da fatura (mês de
+    // vencimento) diverge do mês em que ela fechou.
+    const faturaAtualDoCartao = c.diaFechamento != null ? mesFaturaDaCompra(new Date(), c.diaFechamento, c.diaVencimento) : null;
+    const faturaSelFechadaCartao =
+      faturaAtualDoCartao != null && anoSel * 12 + mesSel < faturaAtualDoCartao.ano * 12 + faturaAtualDoCartao.mes;
+
+    const mesSelEhFaturaAtual = faturaAtualDoCartao != null && anoSel === faturaAtualDoCartao.ano && mesSel === faturaAtualDoCartao.mes;
+    const comprasLabel = mesSelEhFaturaAtual ? "Últimas compras" : `Compras de ${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}`;
+    const comprasVazioLabel = mesSelEhFaturaAtual
+      ? "Nenhuma compra registrada nesse cartão ainda."
+      : `Nenhuma compra em ${NOMES_MES_ABREV[mesSel - 1]}/${anoSel}.`;
+
     return {
       id: c.id,
       nome: c.nome,
@@ -210,17 +230,17 @@ export default async function CartoesPage({
         valor: l.valor,
         dataFmt: fmtData(l.data),
       })),
-      proximasParcelas: (proximasParcelasPorCartao.get(c.id) ?? []).map((l) => ({
+      proximasParcelas: (proximasParcelasPorCartao.get(c.id) ?? []).map(({ l, fatura }) => ({
         id: l.id,
         descricao: l.descricao,
         categoria: l.categoria,
         valor: l.valor,
         dataFmt: fmtDataComAno(l.data),
-        mesChave: mesChave(l.data),
-        mesLabel: mesLabel(l.data),
+        mesChave: `${fatura.ano}-${String(fatura.mes).padStart(2, "0")}`,
+        mesLabel: `${NOMES_MES_ABREV[fatura.mes - 1]}/${fatura.ano}`,
       })),
       proximasParcelasTotalFmt: fmtValor(
-        (proximasParcelasPorCartao.get(c.id) ?? []).reduce((soma, l) => soma + l.valor, 0)
+        (proximasParcelasPorCartao.get(c.id) ?? []).reduce((soma, { l }) => soma + l.valor, 0)
       ),
     };
   });
