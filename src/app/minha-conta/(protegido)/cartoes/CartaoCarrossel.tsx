@@ -87,7 +87,12 @@ function ProximasParcelas({ parcelas, totalFmt }: { parcelas: ParcelaFuturaView[
             </div>
             <div className="mc-list-body">
               <div className="mc-list-desc">{parcela.descricao}</div>
-              <div className="mc-list-meta">{parcela.categoria ?? "Sem categoria"}</div>
+              <div className="mc-list-meta">
+                {parcela.categoria ?? "Sem categoria"} ·{" "}
+                <Link href={`/minha-conta/lancamento/${parcela.id}/editar`} style={{ color: "var(--blue)", fontWeight: 700 }}>
+                  editar
+                </Link>
+              </div>
             </div>
             <div className="mc-list-side">
               <ValorLista valor={parcela.valor} sinal="-" />
@@ -255,7 +260,12 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
                     </div>
                     <div className="mc-list-body">
                       <div className="mc-list-desc">{compra.descricao}</div>
-                      <div className="mc-list-meta">{compra.categoria ?? "Sem categoria"}</div>
+                      <div className="mc-list-meta">
+                        {compra.categoria ?? "Sem categoria"} ·{" "}
+                        <Link href={`/minha-conta/lancamento/${compra.id}/editar`} style={{ color: "var(--blue)", fontWeight: 700 }}>
+                          editar
+                        </Link>
+                      </div>
                     </div>
                     <div className="mc-list-side">
                       <ValorLista valor={compra.valor} sinal="-" />
