@@ -1008,11 +1008,13 @@ test("confirmacao de interpretacao financeira salva lote misto com seguranca", (
   assert.equal(confirmado.estado.confirmacaoPendente, undefined);
   assert.equal(confirmado.estado.totalGastosSaldo, 2.5);
   assert.equal(confirmado.estado.totalDespesasFixas, 2010);
+  // A categoria passou a ser gravada junto da despesa fixa (aparece no
+  // estado e no extrato) — o teste antigo só esperava descricao/valor.
   assert.deepEqual(confirmado.estado.despesasFixas, [
-    { descricao: "ChatGPT", valor: 110 },
-    { descricao: "Energia", valor: 200 },
-    { descricao: "Aluguel", valor: 800 },
-    { descricao: "Pensão", valor: 900 },
+    { descricao: "ChatGPT", valor: 110, categoria: "Assinaturas" },
+    { descricao: "Energia", valor: 200, categoria: "Contas da casa" },
+    { descricao: "Aluguel", valor: 800, categoria: "Moradia" },
+    { descricao: "Pensão", valor: 900, categoria: "Obrigações familiares" },
   ]);
   assert.equal(calcularSaldoDisponivelControle(confirmado.estado), 987.5);
   assert.match(confirmado.resposta, /Lançamentos registrados/);
@@ -1287,7 +1289,7 @@ test("confirmacao de interpretacao financeira salva netflix fixa e mercado varia
   assert.equal(confirmado.estado.confirmacaoPendente, undefined);
   assert.equal(confirmado.estado.totalDespesasFixas, 39.9);
   assert.equal(confirmado.estado.totalGastosSaldo, 25);
-  assert.deepEqual(confirmado.estado.despesasFixas, [{ descricao: "Netflix", valor: 39.9 }]);
+  assert.deepEqual(confirmado.estado.despesasFixas, [{ descricao: "Netflix", valor: 39.9, categoria: "Assinaturas" }]);
   assert.equal(confirmado.estado.ultimoGasto?.descricao, "Mercado");
   assert.equal(confirmado.estado.ultimoGasto?.categoria, "Mercado");
   assert.match(confirmado.resposta, /Lan.amentos registrados/);
@@ -1328,8 +1330,11 @@ test("reset usa onboarding do QuitaZAP Controle em duas mensagens", () => {
   );
   assert.match(mensagem2, /^Olá, Maria! 👋/);
   assert.match(mensagem2, /QuitaZAP Controle/);
-  assert.match(mensagem2, /Para começar, me diga quanto entra por mês\./);
-  assert.match(mensagem2, /minha renda é 3800/);
+  // Onboarding guiado foi removido de propósito (commit 3ac618d): o cliente
+  // pode mandar qualquer coisa, sem roteiro nem etapa de renda obrigatória.
+  assert.match(mensagem2, /Pode me mandar qualquer coisa/);
+  assert.match(mensagem2, /recebi 3800 de salário/);
+  assert.doesNotMatch(mensagem2, /Para começar, me diga quanto entra por mês/);
   assert.doesNotMatch(mensagem2, /```text/);
   assert.doesNotMatch(mensagem2, /^text$/im);
 
@@ -1343,7 +1348,7 @@ test("boas-vindas de ativacao nao usa onboarding antigo por perfil profissional"
 
   assert.match(mensagem, /Seu acesso ao \*QuitaZAP Controle\* foi ativado/);
   assert.match(mensagem, /Sua assinatura do \*Plano Mensal\* está confirmada ✅/);
-  assert.match(mensagem, /renda, despesas, gastos, cartões, dívidas, vencimentos e limites por categoria/);
+  assert.match(mensagem, /Pode me mandar qualquer coisa: um gasto, uma receita, uma dívida, um cartão, uma meta/);
   assert.doesNotMatch(mensagem, /```text/);
   assert.doesNotMatch(mensagem, /^text$/im);
   assert.doesNotMatch(mensagem, /Como você trabalha hoje\?/i);
@@ -1562,9 +1567,11 @@ test("apos registrar despesas fixas estado libera gasto variavel", () => {
   const historicoAguardando = [
     { role: "assistant", content: "Agora me diga suas despesas fixas." },
   ];
+  // Sem gate de despesas fixas desde 3ac618d (onboarding guiado removido):
+  // nenhuma etapa trava o cliente esperando essa resposta.
   assert.equal(
     deveAguardarDespesasFixasControle(ETAPA_AGUARDANDO_DESPESAS_FIXAS, historicoAguardando),
-    true
+    false
   );
 
   const historicoDepois = [
@@ -2752,8 +2759,8 @@ test("pagamento de fatura ainda nao implementado nao vira gasto comum", () => {
   assert.ok(pagamento);
   assert.equal(pagamento.atualizouEstado, false);
   assert.deepEqual(pagamento.estado, estado);
-  assert.match(pagamento.resposta, /pagamento de fatura/);
-  assert.match(pagamento.resposta, /ainda ser. conectado/);
+  assert.match(pagamento.resposta, /pagamento de uma fatura/);
+  assert.match(pagamento.resposta, /ainda est. sendo constru.do/);
   assert.equal(registrarGastoControle("paguei fatura nubank 70", estado), null);
 });
 
