@@ -259,9 +259,9 @@ test("disjuntor por agente: pausa só o agente com taxa alta de errado/silenciad
 
 test("todo tipo de alerta tem agente e assunto definidos", () => {
   const tipos = Object.keys(AGENTE_DO_TIPO);
-  assert.equal(tipos.length, 13);
+  assert.equal(tipos.length, 15);
   for (const t of tipos) assert.ok(TOPICO_DO_TIPO[t], `tipo ${t} sem tópico`);
-  assert.deepEqual([...new Set(Object.values(AGENTE_DO_TIPO))].sort(), ["cartoes", "compromissos", "dividas", "fechamento", "lancamentos", "metas", "sentinela"]);
+  assert.deepEqual([...new Set(Object.values(AGENTE_DO_TIPO))].sort(), ["cartoes", "compromissos", "dividas", "fechamento", "lancamentos", "metas", "orientador", "sentinela"]);
 });
 
 test("semana começa na segunda-feira (identidade semanal dos alertas)", () => {

@@ -98,6 +98,15 @@ export const AGENTES: DefinicaoAgente[] = [
     versao: "1.1",
   },
   {
+    chave: "orientador",
+    nome: "Orientador de Quitação",
+    descricao: "Ajuda a quitar dívidas e ter respiro: plano do mês (AGORA / DEPOIS / PRÓXIMO ALVO) nos dias 1 a 3 e comemoração de dívida quitada e marcos de 25/50/75/100% pagos. No modo crítico não manda aviso automático.",
+    modo: "periodico",
+    intervaloEsperadoHoras: 36,
+    agenda: "todo dia às 08:30 (Brasília); plano do mês nos dias 1 a 3",
+    versao: "1.0",
+  },
+  {
     chave: "documentos",
     nome: "Documentos",
     descricao: "Interpreta comprovantes (foto) e contracheques enviados pelo cliente; cada execução registra sucesso ou erro.",
@@ -195,5 +204,7 @@ export const ROTULO_TIPO_ALERTA: Record<string, string> = {
   NEGATIVE_PROJECTION: "Mês no vermelho",
   MONTH_CLOSING: "Fechamento do mês",
   SPENDING_ANOMALY: "Gasto fora do padrão",
+  QUIT_PLAN: "Plano de quitação",
+  DEBT_MILESTONE: "Comemoração de dívida paga",
   TODOS: "Todos (desligou geral)",
 };

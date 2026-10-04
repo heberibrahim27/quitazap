@@ -3,7 +3,7 @@
 import { getClienteAtual } from "@/lib/get-cliente";
 import { definirAlertaLigado } from "@/lib/agentes/alertas-store";
 
-const TIPOS_VALIDOS = ["CATEGORY_BUDGET", "CARD_CLOSING", "NEGATIVE_PROJECTION", "MONTH_CLOSING", "SPENDING_ANOMALY", "TODOS"];
+const TIPOS_VALIDOS = ["CATEGORY_BUDGET", "CARD_CLOSING", "NEGATIVE_PROJECTION", "MONTH_CLOSING", "SPENDING_ANOMALY", "QUIT_PLAN", "DEBT_MILESTONE", "TODOS"];
 
 /** Liga/desliga um tipo de alerta do Sentinela (ou todos). Mesmo efeito dos comandos de texto. */
 export async function atualizarAlertaTipo(tipo: string, ligado: boolean): Promise<void> {

@@ -21,6 +21,9 @@ import {
   type AgenteId,
   type CandidatoAlerta,
 } from "./alertas";
+import { carregarEntradaOrientacao, carregarProgressoDividas } from "@/lib/orientador-quitacao/service";
+import { montarOrientacao } from "@/lib/orientador-quitacao/motor";
+import { detectarMarcosQuitacao, detectarPlanoQuitacao } from "@/lib/orientador-quitacao/proativo";
 import {
   detectarCompromissosDaSemana,
   detectarDividasAtrasadas,
@@ -270,6 +273,21 @@ async function coletarFechamento(c: Contexto): Promise<CandidatoAlerta[]> {
   );
 }
 
+// ── Orientador de Quitação: plano do mês (dias 1-3) e comemorações ───────
+
+async function coletarOrientador(c: Contexto): Promise<CandidatoAlerta[]> {
+  // Quem não tem dívida nenhuma não gasta consulta pesada: sai logo.
+  const temDivida = await prisma.divida.count({ where: { clienteId: c.clienteId, status: { in: ["ATIVA", "QUITADA"] } } });
+  if (temDivida === 0) return [];
+  const out: CandidatoAlerta[] = [];
+  out.push(...detectarMarcosQuitacao(await carregarProgressoDividas(c.clienteId, c.agora)));
+  if (c.diaHoje <= 3) {
+    const orientacao = montarOrientacao(await carregarEntradaOrientacao(c.clienteId, c.agora));
+    out.push(...detectarPlanoQuitacao(orientacao, { periodKey: c.periodKey, diaHoje: c.diaHoje }));
+  }
+  return out;
+}
+
 // ── Orquestração com isolamento ──────────────────────────────────────────
 
 export const COLETORES: Record<AgenteId, (c: Contexto) => Promise<CandidatoAlerta[]>> = {
@@ -280,6 +298,7 @@ export const COLETORES: Record<AgenteId, (c: Contexto) => Promise<CandidatoAlert
   dividas: coletarDividas,
   lancamentos: coletarLancamentos,
   fechamento: coletarFechamento,
+  orientador: coletarOrientador,
 };
 
 export interface ColetaDoCliente {

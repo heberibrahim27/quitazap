@@ -37,7 +37,7 @@ import {
 } from "./alertas-store";
 
 const AGENTE_CICLO = "sentinela"; // dono da cobertura/checkpoint do ciclo
-const AGENTES_PROPONENTES: AgenteId[] = ["sentinela", "cartoes", "compromissos", "metas", "dividas", "lancamentos", "fechamento"];
+const AGENTES_PROPONENTES: AgenteId[] = ["sentinela", "cartoes", "compromissos", "metas", "dividas", "lancamentos", "fechamento", "orientador"];
 const RODAPE_FEEDBACK = "\n\n_Foi útil? Responda *útil*, *errado* ou *parar esse alerta*._";
 /** Tempo da função serverless: ao estourar, o lote para e o checkpoint segue dali. */
 const ORCAMENTO_DE_TEMPO_MS = 50_000;

@@ -23,13 +23,15 @@ export type TipoAlerta =
   | "GOAL_STALLED"
   | "DEBT_OVERDUE"
   | "LOGGING_GAP"
-  | "OUTROS_HIGH";
+  | "OUTROS_HIGH"
+  | "QUIT_PLAN"
+  | "DEBT_MILESTONE";
 
 /** Quem PROPÕE cada tipo de alerta. Os agentes propõem; o portão único (politica.ts) decide. */
-export type AgenteId = "sentinela" | "cartoes" | "compromissos" | "metas" | "dividas" | "lancamentos" | "fechamento";
+export type AgenteId = "sentinela" | "cartoes" | "compromissos" | "metas" | "dividas" | "lancamentos" | "fechamento" | "orientador";
 
 /** Assunto do alerta: o portão evita duas mensagens do MESMO assunto em dias seguidos (exceto crítico). */
-export type TopicoAlerta = "CASHFLOW_RISK" | "CARD_RISK" | "BUDGET_RISK" | "DEBT_RISK" | "GOALS" | "AGENDA" | "REVIEW" | "DATA_HYGIENE" | "ANOMALY";
+export type TopicoAlerta = "CASHFLOW_RISK" | "CARD_RISK" | "BUDGET_RISK" | "DEBT_RISK" | "GOALS" | "AGENDA" | "REVIEW" | "DATA_HYGIENE" | "ANOMALY" | "DEBT_PLAN";
 
 export const TOPICO_DO_TIPO: Record<TipoAlerta, TopicoAlerta> = {
   NEGATIVE_PROJECTION: "CASHFLOW_RISK",
@@ -45,6 +47,8 @@ export const TOPICO_DO_TIPO: Record<TipoAlerta, TopicoAlerta> = {
   LOGGING_GAP: "DATA_HYGIENE",
   OUTROS_HIGH: "DATA_HYGIENE",
   SPENDING_ANOMALY: "ANOMALY",
+  QUIT_PLAN: "DEBT_PLAN",
+  DEBT_MILESTONE: "DEBT_PLAN",
 };
 
 export const AGENTE_DO_TIPO: Record<TipoAlerta, AgenteId> = {
@@ -61,6 +65,8 @@ export const AGENTE_DO_TIPO: Record<TipoAlerta, AgenteId> = {
   LOGGING_GAP: "lancamentos",
   OUTROS_HIGH: "lancamentos",
   MONTH_CLOSING: "fechamento",
+  QUIT_PLAN: "orientador",
+  DEBT_MILESTONE: "orientador",
 };
 
 export interface CandidatoAlerta {
@@ -101,6 +107,8 @@ const ORDEM_DESEMPATE: Record<TipoAlerta, number> = {
   GOAL_STALLED: 10,
   LOGGING_GAP: 11,
   OUTROS_HIGH: 12,
+  DEBT_MILESTONE: 8.5,
+  QUIT_PLAN: 6.5,
 };
 
 /** Mais prioritário primeiro; empate resolvido pelo tipo (ordem fixa) e pela chave. */

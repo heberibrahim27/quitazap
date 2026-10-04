@@ -33,6 +33,8 @@ export default async function PerfilPage({
     { tipo: "CARD_CLOSING", titulo: "Fechamento da fatura", descricao: "2 dias antes do fechamento do cartão, com o valor da fatura aberta." },
     { tipo: "NEGATIVE_PROJECTION", titulo: "Mês no vermelho", descricao: "Quando a projeção do mês aponta que vai faltar dinheiro." },
     { tipo: "MONTH_CLOSING", titulo: "Fechamento do mês", descricao: "Resumo do mês que passou, nos primeiros dias do mês." },
+    { tipo: "QUIT_PLAN", titulo: "Plano de quitação", descricao: "No começo do mês: por qual dívida começar e quanto sobra para atacar." },
+    { tipo: "DEBT_MILESTONE", titulo: "Dívida paga", descricao: "Comemora quando você quita uma dívida ou chega a 25%, 50% e 75% do total pago." },
     ...(process.env.SENTINELA_ANOMALIA_ATIVA === "true"
       ? [{ tipo: "SPENDING_ANOMALY", titulo: "Gasto fora do padrão", descricao: "Quando uma categoria gasta bem acima da sua média." }]
       : []),

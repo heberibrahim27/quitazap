@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { anoMesAtualBrasil, calcularResumoFinanceiro, limitesDoMes } from "@/lib/financeiro/motor";
 import { diasCalendarioBrasil } from "@/lib/financeiro/dias-brasil";
 import { riscoCritico } from "@/lib/financeiro/risco-tipo-divida";
+import type { ProgressoDividas } from "./proativo";
 import {
   formatarOrientacao,
   formatarSimulacaoExtra,
@@ -21,23 +22,12 @@ import {
 /** Meta usada como colchão ("Respiro"): achada pelo nome, sem coluna nova no banco. */
 export const NOME_META_RESPIRO = "Respiro";
 
-export async function carregarEntradaOrientacao(clienteId: string, agora: Date = new Date()): Promise<EntradaOrientacao & { dividasCompletas: DividaEntrada[] }> {
-  const { ano, mes } = anoMesAtualBrasil(agora);
-  const periodo = limitesDoMes(ano, mes);
-
-  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
-  const resumo = await calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
-
-  const [dividas, metas] = await Promise.all([
-    prisma.divida.findMany({
-      where: { clienteId, status: { in: ["ATIVA", "QUITADA"] } },
-      include: { parcelas: { where: { status: { not: "PAGA" } }, orderBy: { vencimento: "asc" } } },
-    }),
-    prisma.meta.findMany({
-      where: { clienteId, nome: { contains: "respiro", mode: "insensitive" } },
-      include: { depositos: { select: { valor: true } } },
-    }),
-  ]);
+/** Dívidas do cliente prontas pro motor (leitura leve: não calcula o resumo financeiro). */
+export async function carregarDividasParaOrientacao(clienteId: string, agora: Date = new Date()) {
+  const dividas = await prisma.divida.findMany({
+    where: { clienteId, status: { in: ["ATIVA", "QUITADA"] } },
+    include: { parcelas: { where: { status: { not: "PAGA" } }, orderBy: { vencimento: "asc" } } },
+  });
 
   const entradas: DividaEntrada[] = dividas
     .filter((d) => d.status === "ATIVA")
@@ -59,9 +49,44 @@ export async function carregarEntradaOrientacao(clienteId: string, agora: Date =
       };
     });
 
-  const respiroAtual = metas.reduce((s, m) => s + m.depositos.reduce((a, d) => a + d.valor, 0), 0);
-  const totalContratado = dividas.reduce((s, d) => s + d.valorTotal, 0);
-  const totalPago = dividas.reduce((s, d) => s + d.valorPago, 0);
+  const limiteRecente = agora.getTime() - 7 * 86_400_000;
+  return {
+    entradas,
+    quitadas: dividas.filter((d) => d.status === "QUITADA").length,
+    quitadasRecentes: dividas.filter((d) => d.status === "QUITADA" && d.atualizadoEm.getTime() >= limiteRecente).map((d) => ({ id: d.id, credor: d.credor })),
+    totalContratado: dividas.reduce((s, d) => s + d.valorTotal, 0),
+    totalPago: dividas.reduce((s, d) => s + d.valorPago, 0),
+  };
+}
+
+/** Progresso de quitação pro agente proativo (marcos e dívida quitada). Leve: só dívidas. */
+export async function carregarProgressoDividas(clienteId: string, agora: Date = new Date()): Promise<ProgressoDividas> {
+  const d = await carregarDividasParaOrientacao(clienteId, agora);
+  const alvo = montarFila(d.entradas)[0] ?? null;
+  return {
+    totalContratado: d.totalContratado,
+    totalPago: d.totalPago,
+    quitadasRecentes: d.quitadasRecentes,
+    faltaPagar: Math.max(d.totalContratado - d.totalPago, 0),
+    proximoAlvo: alvo ? { credor: alvo.credor, saldoDevedor: alvo.saldoDevedor } : null,
+  };
+}
+
+export async function carregarEntradaOrientacao(clienteId: string, agora: Date = new Date()): Promise<EntradaOrientacao & { dividasCompletas: DividaEntrada[] }> {
+  const { ano, mes } = anoMesAtualBrasil(agora);
+  const periodo = limitesDoMes(ano, mes);
+
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
+  const resumo = await calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
+
+  const [d, metas] = await Promise.all([
+    carregarDividasParaOrientacao(clienteId, agora),
+    prisma.meta.findMany({
+      where: { clienteId, nome: { contains: "respiro", mode: "insensitive" } },
+      include: { depositos: { select: { valor: true } } },
+    }),
+  ]);
+  const respiroAtual = metas.reduce((s, m) => s + m.depositos.reduce((a, dep) => a + dep.valor, 0), 0);
 
   return {
     rendaEfetiva: resumo.comprometimento.rendaEfetiva ?? null,
@@ -70,11 +95,11 @@ export async function carregarEntradaOrientacao(clienteId: string, agora: Date =
     custoDeVidaMensal: resumo.totais.despesasFixas + resumo.totais.despesasVariaveis,
     respiroAtual: Math.max(respiroAtual, 0),
     respiroMetaExiste: metas.length > 0,
-    dividas: entradas,
-    dividasCompletas: entradas,
-    quitadas: dividas.filter((d) => d.status === "QUITADA").length,
-    totalContratado,
-    totalPago,
+    dividas: d.entradas,
+    dividasCompletas: d.entradas,
+    quitadas: d.quitadas,
+    totalContratado: d.totalContratado,
+    totalPago: d.totalPago,
   };
 }
 

@@ -6,6 +6,15 @@ import test from "node:test";
 import ts from "typescript";
 
 const root = path.resolve(import.meta.dirname, "..");
+
+// Permite que um módulo .ts importe outro por caminho relativo sem extensão.
+Module._extensions[".ts"] = function carregarTypeScript(module, filename) {
+  const output = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    fileName: filename,
+  }).outputText;
+  module._compile(output, filename);
+};
 const ler = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
 
 function loadTsModule(relativePath) {
@@ -23,6 +32,7 @@ function loadTsModule(relativePath) {
   return mod.exports;
 }
 
+const proativo = loadTsModule("src/lib/orientador-quitacao/proativo.ts");
 const { nivelComprometimento, montarFila, montarOrientacao, formatarOrientacao, simularExtraMensal, formatarSimulacaoExtra, calcularRespiro, FRASES_PROIBIDAS } =
   loadTsModule("src/lib/orientador-quitacao/motor.ts");
 
@@ -187,4 +197,66 @@ test("o Quita expõe o Orientador só como LEITURA e o prompt carrega a filosofi
   const prompt = ler("src/lib/agentes/quita/loop.ts");
   assert.match(prompt, /QUITAR DÍVIDAS/);
   assert.match(prompt, /NUNCA sugira novo empréstimo/);
+});
+
+// ── Aviso proativo (agente propõe; o portão único decide) ────────────────────
+
+test("plano do mês só nos dias 1 a 3, fora do modo crítico e com dívida na fila", () => {
+  const o = montarOrientacao(entrada());
+  const dia2 = proativo.detectarPlanoQuitacao(o, { periodKey: "2026-10", diaHoje: 2 });
+  assert.equal(dia2.length, 1);
+  assert.equal(dia2[0].tipo, "QUIT_PLAN");
+  assert.equal(dia2[0].periodKey, "2026-10");
+  assert.equal(dia2[0].qualifier, "ALTO");
+  assert.equal(dia2[0].prioridade, 58);
+  assert.match(dia2[0].mensagem, /AGORA:/);
+  assert.equal(proativo.detectarPlanoQuitacao(o, { periodKey: "2026-10", diaHoje: 4 }).length, 0);
+
+  const critico = montarOrientacao(entrada({ percentualComprometido: 1.4, saldoProjetado: -900 }));
+  assert.equal(proativo.detectarPlanoQuitacao(critico, { periodKey: "2026-10", diaHoje: 1 }).length, 0, "modo crítico não manda aviso automático");
+  const semDivida = montarOrientacao(entrada({ dividas: [] }));
+  assert.equal(proativo.detectarPlanoQuitacao(semDivida, { periodKey: "2026-10", diaHoje: 1 }).length, 0);
+  const semRenda = montarOrientacao(entrada({ percentualComprometido: null, rendaEfetiva: null }));
+  assert.equal(proativo.detectarPlanoQuitacao(semRenda, { periodKey: "2026-10", diaHoje: 1 }).length, 0);
+});
+
+test("comemora dívida quitada recente (uma vez na vida) e o marco mais alto de total pago", () => {
+  const c = proativo.detectarMarcosQuitacao({
+    totalContratado: 10000,
+    totalPago: 5200,
+    quitadasRecentes: [{ id: "d1", credor: "Banco X" }],
+    faltaPagar: 4800,
+    proximoAlvo: { credor: "Loja Y", saldoDevedor: 640 },
+  });
+  const quitada = c.find((x) => x.qualifier === "QUITADA");
+  const marco = c.find((x) => x.qualifier === "PAGO_50");
+  assert.ok(quitada && marco);
+  assert.equal(quitada.entityId, "d1");
+  assert.equal(quitada.periodKey, "VIDA");
+  assert.match(quitada.mensagem, /quitou Banco X/);
+  assert.match(quitada.mensagem, /Próximo alvo: Loja Y/);
+  assert.equal(marco.periodKey, "VIDA");
+  assert.match(marco.mensagem, /50%/);
+  assert.equal(c.filter((x) => x.qualifier.startsWith("PAGO_")).length, 1, "só o marco mais alto");
+
+  assert.equal(proativo.detectarMarcosQuitacao({ totalContratado: 10000, totalPago: 1000, quitadasRecentes: [], faltaPagar: 9000, proximoAlvo: null }).length, 0);
+  assert.equal(proativo.detectarMarcosQuitacao({ totalContratado: 0, totalPago: 0, quitadasRecentes: [], faltaPagar: 0, proximoAlvo: null }).length, 0);
+});
+
+test("o Orientador entra no ciclo do Sentinela como agente proponente, com coletor isolado e cuidado de consulta", () => {
+  const coletores = ler("src/lib/agentes/coletores.ts");
+  assert.ok(coletores.includes("  orientador: coletarOrientador"), "agente orientador sem coletor");
+  const trecho = coletores.slice(coletores.indexOf("async function coletarOrientador"), coletores.indexOf("// ── Orquestração com isolamento"));
+  assert.match(trecho, /status: \{ in: \["ATIVA", "QUITADA"\] \}/, "deve sair logo quando o cliente não tem dívida");
+  assert.match(trecho, /c\.diaHoje <= 3/, "consulta pesada só nos dias 1 a 3");
+  assert.ok(ler("src/lib/agentes/sentinela-service.ts").includes('"fechamento", "orientador"]'), "orientador fora da lista de proponentes");
+  assert.ok(ler("src/lib/agentes/status.ts").includes('chave: "orientador"'), "orientador fora da tela de agentes");
+});
+
+test("textos proativos também respeitam os guardrails (nada de dívida nova, investimento ou produto)", () => {
+  const textos = [
+    proativo.detectarPlanoQuitacao(montarOrientacao(entrada()), { periodKey: "2026-10", diaHoje: 1 })[0].mensagem,
+    ...proativo.detectarMarcosQuitacao({ totalContratado: 1000, totalPago: 1000, quitadasRecentes: [{ id: "x", credor: "Banco" }], faltaPagar: 0, proximoAlvo: null }).map((c) => c.mensagem),
+  ].join("\n").toLowerCase();
+  for (const proibida of FRASES_PROIBIDAS) assert.ok(!textos.includes(proibida.toLowerCase()), `sugeriu "${proibida}"`);
 });
