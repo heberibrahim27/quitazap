@@ -81,7 +81,7 @@ export default async function GastosPage({
   const nomeMes = NOMES_MES[mes - 1];
   const ehMesAtual = ano === anoAtual && mes === mesAtualNum;
 
-  const [gastos, orcamentos, vazamentos] = await Promise.all([
+  const [gastosBrutos, orcamentos, vazamentos] = await Promise.all([
     prisma.lancamento.findMany({
       where: {
         clienteId: cliente.id,
@@ -98,6 +98,8 @@ export default async function GastosPage({
     // repetir a mesma análise em toda página do histórico.
     ehMesAtual ? detectarVazamentosSalario(cliente.id) : Promise.resolve([]),
   ]);
+  // Depósito em meta (categoria "Metas") é dinheiro guardado, não gasto.
+  const gastos = gastosBrutos.filter((g) => g.categoria !== "Metas");
   const limitePorCategoria = new Map(orcamentos.map((o) => [o.categoria, o.limiteMensal]));
 
   const totalGeral = gastos.reduce((soma, g) => soma + g.valor, 0);

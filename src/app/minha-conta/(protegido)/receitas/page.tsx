@@ -70,10 +70,15 @@ export default async function ReceitasPage({
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
   const nomeMes = NOMES_MES[mes - 1];
 
-  const receitas = await prisma.lancamento.findMany({
-    where: { clienteId: cliente.id, tipo: "RECEITA", data: { gte: inicioMes, lt: fimMes } },
-    orderBy: { data: "desc" },
-  });
+  // Saque de meta (categoria "Metas") é dinheiro voltando pro disponível, não
+  // renda — o motor já o exclui de receitas (calcularTotaisBase); esta lista
+  // precisa bater com ele.
+  const receitas = (
+    await prisma.lancamento.findMany({
+      where: { clienteId: cliente.id, tipo: "RECEITA", data: { gte: inicioMes, lt: fimMes } },
+      orderBy: { data: "desc" },
+    })
+  ).filter((r) => r.categoria !== "Metas");
   const total = receitas.reduce((soma, r) => soma + r.valor, 0);
 
   return (

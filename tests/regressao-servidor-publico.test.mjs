@@ -2391,7 +2391,9 @@ test("gasto sem cartao sai do saldo do mes e nao entra em fatura", () => {
   assert.match(resultado.resposta, /🏷️ \*Categoria:\* Lazer/);
   assert.match(resultado.resposta, /💳 \*Origem:\* Saldo do mês/);
   assert.match(resultado.resposta, /💰 \*Saldo disponível:\* R\$ 1\.895,00/);
-  assert.match(resultado.resposta, /💳 \*Faturas em aberto:\* R\$ 0,00/);
+  // Sem nenhuma fatura registrada, não mostra "Faturas em aberto R$ 0,00"
+  // (achado em QA, 04/10/2026: era ruído e sugeria uma fatura separada).
+  assert.doesNotMatch(resultado.resposta, /Faturas em aberto/);
   assert.doesNotMatch(resultado.resposta, /\b(undefined|null|NaN)\b|R\$ undefined|R\$ NaN/);
 });
 

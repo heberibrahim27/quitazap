@@ -78,10 +78,14 @@ export default async function DespesasPage({
 
   const tipos = aba === "fixas" ? ["DESPESA_FIXA"] : aba === "variaveis" ? ["DESPESA_VARIAVEL"] : ["DESPESA_FIXA", "DESPESA_VARIAVEL"];
 
-  const despesas = await prisma.lancamento.findMany({
-    where: { clienteId: cliente.id, tipo: { in: tipos }, data: { gte: inicioMes, lt: fimMes } },
-    orderBy: { data: "desc" },
-  });
+  // Depósito em meta (categoria "Metas") não é despesa — o motor o trata como
+  // dinheiro guardado (investimentos); esta lista precisa bater com ele.
+  const despesas = (
+    await prisma.lancamento.findMany({
+      where: { clienteId: cliente.id, tipo: { in: tipos }, data: { gte: inicioMes, lt: fimMes } },
+      orderBy: { data: "desc" },
+    })
+  ).filter((d) => d.categoria !== "Metas");
   const total = despesas.reduce((soma, d) => soma + d.valor, 0);
 
   const sufixoMes = `mes=${paramMes(ano, mes)}`;

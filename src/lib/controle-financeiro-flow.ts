@@ -934,13 +934,21 @@ function linhasItensFinanceiros(
   );
 }
 
+// Linhas de fatura só aparecem quando existe fatura registrada no estado (em
+// produção as faturas "manuais" são zeradas — compra no cartão já entra em
+// "Gastos do mês"); evita "Faturas em aberto R$ 0,00" sem sentido.
+function temFaturaControle(estado: EstadoControleFinanceiro): boolean {
+  return totalFaturasFechadasControle(estado) > 0 || totalFaturasAbertasControle(estado) > 0;
+}
+
 function resumoAtualizadoMes(estado: EstadoControleFinanceiro): string {
   return (
     "📊 *Resumo atualizado do mês*\n\n" +
     `💰 *Saldo disponível:* ${formatarValorBR(calcularSaldoDisponivelAgoraControle(estado))}\n` +
-    `📌 *Despesas fixas:* ${formatarValorBR(estado.totalDespesasFixas)}\n` +
-    `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}\n` +
-    `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`
+    `📌 *Despesas fixas:* ${formatarValorBR(estado.totalDespesasFixas)}` +
+    (temFaturaControle(estado)
+      ? `\n💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}\n💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`
+      : "")
   );
 }
 
@@ -2045,15 +2053,16 @@ export function consultarSaldoControle(
     "🏠 Despesas fixas",
     formatarValorBR(estadoAtual.totalDespesasFixas),
     "",
+    // Compra no cartão já entra aqui (vem somada dos lançamentos). As faturas
+    // "manuais" do estado são zeradas de propósito — achado em QA
+    // (04/10/2026): mostrar "Faturas em aberto R$ 0,00" e dizer que o saldo
+    // as separava enganava. Só mostra linhas de fatura quando há valor.
     "🧾 Gastos do mês",
     formatarValorBR(estadoAtual.totalGastosSaldo ?? 0),
     "",
-    "💳 Faturas fechadas",
-    formatarValorBR(faturasFechadas),
-    "",
-    "💳 Faturas em aberto",
-    formatarValorBR(faturasAbertas),
-    "",
+    ...(faturasFechadas > 0 || faturasAbertas > 0
+      ? ["💳 Faturas fechadas", formatarValorBR(faturasFechadas), "", "💳 Faturas em aberto", formatarValorBR(faturasAbertas), ""]
+      : []),
     "💰 Saldo disponível agora",
     formatarValorBR(saldoDisponivelAgora),
     "",
@@ -2061,7 +2070,9 @@ export function consultarSaldoControle(
     formatarValorBR(saldoSeguroMes),
     "```",
     "",
-    "O saldo seguro já separa o valor das faturas em aberto para evitar surpresa no cartão.",
+    faturasFechadas > 0 || faturasAbertas > 0
+      ? "O saldo seguro já separa o valor das faturas em aberto para evitar surpresa no cartão."
+      : "As compras no cartão deste mês já estão descontadas. Pra ver cada fatura pelo fechamento do cartão, pergunte \"minha fatura\".",
   ];
 
   return {
@@ -2446,10 +2457,12 @@ function subtrairFatura(
 
 function linhasFaturas(estado: EstadoControleFinanceiro): string[] {
   const faturas = estado.faturas ?? [];
-  const linhas = [
-    `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}`,
-    `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`,
-  ];
+  const linhas = temFaturaControle(estado)
+    ? [
+        `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}`,
+        `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`,
+      ]
+    : [];
   if (faturas.length === 0) {
     return linhas;
   }
@@ -2467,10 +2480,12 @@ function linhasFaturasComCartoes(estado: EstadoControleFinanceiro, cartoes: stri
     if (cartao && !nomes.includes(cartao)) nomes.push(cartao);
   }
 
-  const linhas = [
-    `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}`,
-    `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`,
-  ];
+  const linhas = temFaturaControle(estado)
+    ? [
+        `💳 *Faturas fechadas:* ${formatarValorBR(totalFaturasFechadasControle(estado))}`,
+        `💳 *Faturas em aberto:* ${formatarValorBR(totalFaturasAbertasControle(estado))}`,
+      ]
+    : [];
 
   if (nomes.length === 0) return linhas;
 
