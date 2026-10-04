@@ -21,8 +21,10 @@ export async function criarDespesaRapida(formData: FormData): Promise<{ erro?: s
   const valorTexto = String(formData.get("valor") || "").replace(",", ".").trim();
   const valor = Number(valorTexto);
   const dataTexto = String(formData.get("data") || "");
-  const recorrente = formData.get("recorrente") === "on";
   const tipoSelecionado = String(formData.get("tipo") || "DESPESA_VARIAVEL");
+  // "Despesa fixa (repete todo mês)" promete repetir mesmo sem marcar o
+  // checkbox; o cron de recorrências (recorrencia-service.ts) usa este flag.
+  const recorrente = formData.get("recorrente") === "on" || tipoSelecionado === "DESPESA_FIXA";
   const cartaoIdTexto = String(formData.get("cartaoId") || "").trim();
   const parcelasTexto = String(formData.get("parcelas") || "1").trim();
   const parcelas = Math.round(Number(parcelasTexto)) || 1;
