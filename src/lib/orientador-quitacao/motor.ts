@@ -174,6 +174,14 @@ export function calcularRespiro(custoDeVidaMensal: number, atual: number, temMet
   return { alvo, atual: arred(atual), falta, diasCobertos, temMeta };
 }
 
+/** Texto do passo Respiro: se a meta ainda não existe, ensina o comando que a cria (é a confirmação). */
+function textoRespiro(valor: number, temMeta: boolean): string {
+  if (!temMeta) {
+    return `Quer separar ${brl(valor)} para o seu Respiro (${DIAS_RESPIRO_INICIAL} dias do dia a dia)? Responda *criar respiro* e eu crio a meta para você. Assim um imprevisto não vira cartão de novo.`;
+  }
+  return `Guarde ${brl(valor)} na meta Respiro (${DIAS_RESPIRO_INICIAL} dias do dia a dia): mande *guardei ${Math.round(valor)} na meta respiro*. Assim um imprevisto não vira cartão de novo.`;
+}
+
 export function montarOrientacao(entrada: EntradaOrientacao): Orientacao {
   const ativas = entrada.dividas.filter((d) => d.saldoDevedor > 0.005);
   const totalDevido = arred(ativas.reduce((s, d) => s + d.saldoDevedor, 0));
@@ -202,7 +210,7 @@ export function montarOrientacao(entrada: EntradaOrientacao): Orientacao {
       passos.push({
         quando: "DEPOIS",
         tipo: "RESPIRO",
-        texto: `Separe ${brl(Math.min(sobraAlocavel, respiro.falta))} para o seu Respiro (${DIAS_RESPIRO_INICIAL} dias do dia a dia), para um imprevisto não virar dívida de novo.`,
+        texto: textoRespiro(Math.min(sobraAlocavel, respiro.falta), respiro.temMeta),
         valor: arred(Math.min(sobraAlocavel, respiro.falta)),
       });
     }
@@ -251,7 +259,7 @@ export function montarOrientacao(entrada: EntradaOrientacao): Orientacao {
         passos.push({
           quando: passos.length === 0 ? "AGORA" : "DEPOIS",
           tipo: "RESPIRO",
-          texto: `Antes de acelerar, separe ${brl(valorRespiro)} para o seu Respiro (${DIAS_RESPIRO_INICIAL} dias do dia a dia). Assim um imprevisto não vira cartão de novo.`,
+          texto: `Antes de acelerar: ${textoRespiro(valorRespiro, respiro.temMeta)}`,
           valor: valorRespiro,
         });
         sobra = arred(sobra - valorRespiro);

@@ -59,6 +59,7 @@ import {
 } from "@/lib/controle-financeiro-flow";
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
 import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
+import { detectarCriarRespiro } from "@/lib/orientador-quitacao/respiro";
 import { detectarFeedbackAlerta } from "@/lib/agentes/feedback";
 import { aplicarFeedbackAlerta, registrarUsoCoach } from "@/lib/agentes/alertas-store";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
@@ -313,6 +314,13 @@ export async function processarMensagemControle(input: {
   if (!comandoTarefa && pedidoExplicitoDeLembrete(mensagem)) {
     const r = await skillRegistry.run<{ texto: string }>("criar_lembrete", ctxSkill, { texto: mensagem, origem: "TEXTO" });
     if (r.ok) return finalizar(r.data.texto);
+  }
+
+  // "criar respiro": o Orientador de Quitação ensina esse comando — é a confirmação do cliente
+  // pra criar a meta Respiro (colchão de 7 dias). Mesma skill do WhatsApp.
+  if (detectarCriarRespiro(mensagem)) {
+    const r = await skillRegistry.run<{ texto: string }>("criar_meta_respiro", ctxSkill, {});
+    return finalizar(r.ok ? r.data.texto : r.userMessage ?? "Não consegui criar o Respiro agora. Tenta de novo em instantes.");
   }
 
   // 2) Consulta de cartões / faturas / saldo — leitura pura.

@@ -33,7 +33,7 @@ const WHATSAPP = "src/app/api/webhook/zapi/route.ts";
 // registro de skills nos dois — este teste falha se alguém reintroduzir uma
 // cópia direta num canal.
 
-const CAPACIDADES_COMPARTILHADAS = ["desfazer_ultimo_lancamento", "consultar_fatura", "criar_lembrete"];
+const CAPACIDADES_COMPARTILHADAS = ["desfazer_ultimo_lancamento", "consultar_fatura", "criar_lembrete", "criar_meta_respiro"];
 
 test("os dois canais chamam as mesmas skills do registro", () => {
   for (const arquivo of [CHAT, WHATSAPP]) {

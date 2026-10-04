@@ -33,6 +33,7 @@ function loadTsModule(relativePath) {
 }
 
 const proativo = loadTsModule("src/lib/orientador-quitacao/proativo.ts");
+const respiroMod = loadTsModule("src/lib/orientador-quitacao/respiro.ts");
 const { nivelComprometimento, montarFila, montarOrientacao, formatarOrientacao, simularExtraMensal, formatarSimulacaoExtra, calcularRespiro, FRASES_PROIBIDAS } =
   loadTsModule("src/lib/orientador-quitacao/motor.ts");
 
@@ -189,7 +190,7 @@ test("o Quita expõe o Orientador só como LEITURA e o prompt carrega a filosofi
   for (const nome of ["orientar_quitacao", "simular_pagamento_extra"]) {
     assert.ok(skills.includes(`"${nome}"`), `skill ${nome} não registrada`);
   }
-  const trecho = skills.slice(skills.indexOf("const orientarQuitacaoSkill"), skills.indexOf("export const skillRegistry"));
+  const trecho = skills.slice(skills.indexOf("const orientarQuitacaoSkill"), skills.indexOf("const criarMetaRespiroSkill"));
   assert.doesNotMatch(trecho, /modo: "WRITE"/);
   const ferramentas = ler("src/lib/agentes/quita/ferramentas.ts");
   assert.match(ferramentas, /def\("orientar_quitacao"/);
@@ -259,4 +260,49 @@ test("textos proativos também respeitam os guardrails (nada de dívida nova, in
     ...proativo.detectarMarcosQuitacao({ totalContratado: 1000, totalPago: 1000, quitadasRecentes: [{ id: "x", credor: "Banco" }], faltaPagar: 0, proximoAlvo: null }).map((c) => c.mensagem),
   ].join("\n").toLowerCase();
   for (const proibida of FRASES_PROIBIDAS) assert.ok(!textos.includes(proibida.toLowerCase()), `sugeriu "${proibida}"`);
+});
+
+// ── Meta Respiro (criada só a pedido do cliente, mesma skill nos dois canais) ─────
+
+test("o comando 'criar respiro' é reconhecido nas formas naturais e não confunde outras frases", () => {
+  for (const ok of ["criar respiro", "Criar respiro", "criar meta respiro", "quero criar meu respiro", "sim, criar respiro", "criar o respiro agora", "montar meu colchão", "criar a meta de respiro!"]) {
+    assert.ok(respiroMod.detectarCriarRespiro(ok), `deveria reconhecer: ${ok}`);
+  }
+  for (const nao of ["guardar 100 no respiro", "guardei 100 na meta respiro", "como está meu respiro", "preciso de respiro no mês", "criar meta viagem 3000", "respiro"]) {
+    assert.ok(!respiroMod.detectarCriarRespiro(nao), `não deveria reconhecer: ${nao}`);
+  }
+});
+
+test("alvo do Respiro arredonda pra cima de 10 em 10", () => {
+  assert.equal(respiroMod.arredondarAlvoRespiro(350), 350);
+  assert.equal(respiroMod.arredondarAlvoRespiro(351.4), 360);
+  assert.equal(respiroMod.arredondarAlvoRespiro(0.5), 10);
+});
+
+test("o passo RESPIRO ensina o comando quando a meta não existe e o depósito quando existe", () => {
+  const semMeta = montarOrientacao(entrada({ respiroMetaExiste: false }));
+  const passoSem = semMeta.passos.find((p) => p.tipo === "RESPIRO");
+  assert.ok(passoSem);
+  assert.match(passoSem.texto, /criar respiro/);
+  const comMeta = montarOrientacao(entrada({ respiroMetaExiste: true, respiroAtual: 100 }));
+  const passoCom = comMeta.passos.find((p) => p.tipo === "RESPIRO");
+  assert.ok(passoCom);
+  assert.match(passoCom.texto, /guardei \d+ na meta respiro/);
+  assert.doesNotMatch(passoCom.texto, /criar respiro/);
+});
+
+test("criar a meta Respiro é escrita determinística: skill WRITE usada pelos dois canais, nunca exposta ao Quita", () => {
+  const skills = ler("src/lib/agentes/skills/index.ts");
+  const trecho = skills.slice(skills.indexOf("const criarMetaRespiroSkill"), skills.indexOf("export const skillRegistry"));
+  assert.match(trecho, /name: "criar_meta_respiro"/);
+  assert.match(trecho, /modo: "WRITE"/);
+  assert.doesNotMatch(ler("src/lib/agentes/quita/ferramentas.ts"), /criar_meta_respiro/);
+  for (const canal of ["src/lib/controle-orquestrador.ts", "src/app/api/webhook/zapi/route.ts"]) {
+    const src = ler(canal);
+    assert.ok(src.includes("detectarCriarRespiro(mensagem)"), `${canal} não trata o comando`);
+    assert.match(src, /skillRegistry\.run[^(]*\(\s*"criar_meta_respiro"/, `${canal} não usa a skill`);
+  }
+  const servico = ler("src/lib/orientador-quitacao/respiro-service.ts");
+  assert.match(servico, /contains: "respiro"/, "tem que checar se a meta já existe (idempotente)");
+  assert.doesNotMatch(servico, /lancamento/i, "criar a meta não pode gerar lançamento");
 });

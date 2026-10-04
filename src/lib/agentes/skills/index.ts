@@ -11,6 +11,7 @@ import { detectarComandoTarefa } from "@/lib/tarefa-flow";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import { criarDepositoTyped, encontrarMetaPorNome } from "@/lib/meta-service";
 import { orientarQuitacao, simularPagamentoExtra } from "@/lib/orientador-quitacao/service";
+import { criarMetaRespiro } from "@/lib/orientador-quitacao/respiro-service";
 import { RegistroDeSkills, type Skill } from "./contrato";
 import { compromissosProximos, dicaDeEconomia, metasDoCliente, orcamentoPorCategoria, resumoDoMes } from "./leituras";
 
@@ -127,6 +128,18 @@ const simularPagamentoExtraSkill: Skill<{ valor: number; agora: Date }, { texto:
   },
 };
 
+const criarMetaRespiroSkill: Skill<Record<string, never>, { texto: string }> = {
+  name: "criar_meta_respiro",
+  description: "Cria a meta Respiro (colchão de 7 dias do dia a dia) a pedido do cliente; se já existir, só informa.",
+  modo: "WRITE",
+  validate: () => ({}),
+  async execute(ctx) {
+    const r = await criarMetaRespiro(ctx.userId);
+    if (!r.ok) return { ok: false, code: r.code, userMessage: r.userMessage };
+    return { ok: true, data: { texto: r.texto } };
+  },
+};
+
 export const skillRegistry = new RegistroDeSkills();
 skillRegistry.register(consultarResumoMes);
 skillRegistry.register(consultarOrcamento);
@@ -139,3 +152,4 @@ skillRegistry.register(consultarFatura);
 skillRegistry.register(desfazerUltimoLancamento);
 skillRegistry.register(criarLembrete);
 skillRegistry.register(depositarMeta);
+skillRegistry.register(criarMetaRespiroSkill);

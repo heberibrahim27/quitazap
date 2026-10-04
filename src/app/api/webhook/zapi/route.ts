@@ -88,6 +88,7 @@ import {
 } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
+import { detectarCriarRespiro } from "@/lib/orientador-quitacao/respiro";
 import { detectarFeedbackAlerta } from "@/lib/agentes/feedback";
 import { aplicarFeedbackAlerta, registrarUsoCoach } from "@/lib/agentes/alertas-store";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
@@ -1506,6 +1507,18 @@ export async function POST(req: NextRequest) {
         await sendWhatsApp(telefone, r.data.texto);
         return NextResponse.json({ ok: true });
       }
+    }
+
+    // "criar respiro": o Orientador de Quitação ensina esse comando — é a confirmação do cliente
+    // pra criar a meta Respiro (colchão de 7 dias). Mesma skill do chat nativo.
+    if (sessao.clienteId && detectarCriarRespiro(mensagem)) {
+      const r = await skillRegistry.run<{ texto: string }>(
+        "criar_meta_respiro",
+        { userId: sessao.clienteId, timezone: "America/Sao_Paulo", channel: "whatsapp", gratuito: isGratuito },
+        {}
+      );
+      await sendWhatsApp(telefone, r.ok ? r.data.texto : r.userMessage ?? "Não consegui criar o Respiro agora. Tenta de novo em instantes.");
+      return NextResponse.json({ ok: true });
     }
 
     // ── Fluxo fixo: Servidor público / contracheque ───────────────────────
