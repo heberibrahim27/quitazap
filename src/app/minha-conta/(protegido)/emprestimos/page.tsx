@@ -118,6 +118,7 @@ export default async function EmprestimosPage() {
                       {parcelasPagas}/{e.totalParcelas ?? e.parcelas.length} parcelas
                       {proximaParcela ? ` · vence ${proximaParcela.vencimento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : " · quitado"}
                       {ultimaParcela ? ` · termina ${ultimaParcela.vencimento.toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" })}` : ""}
+                      {e.descontadoEmFolha ? " · consignado" : ""}
                     </div>
                   </div>
                   <div className="mc-list-side">

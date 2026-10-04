@@ -152,6 +152,23 @@ export default async function DetalheEmprestimoPage({
     redirect(`/minha-conta/emprestimos/${id}?parcelasAbertas=1`);
   }
 
+  // Consignado = desconto direto na folha: o valor já está fora do salário líquido, então o
+  // plano de pagamento e a sobra do mês não contam essa parcela de novo. Dá pra ligar/desligar
+  // depois de cadastrado (contratos antigos foram criados sem essa marcação).
+  async function definirConsignado(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const atual = await prisma.divida.findUnique({ where: { id } });
+    if (!atual || atual.clienteId !== clienteAtual.id || atual.tipo !== "EMPRESTIMO") notFound();
+
+    await prisma.divida.update({ where: { id }, data: { descontadoEmFolha: String(formData.get("consignado")) === "1" } });
+
+    revalidatePath("/minha-conta", "layout");
+    redirect(`/minha-conta/emprestimos/${id}`);
+  }
+
   async function desfazerPagamento(formData: FormData) {
     "use server";
     const clienteAtual = await getClienteAtual();
@@ -277,6 +294,25 @@ export default async function DetalheEmprestimoPage({
           </div>
         )}
       </div>
+
+      <section className="emp-consignado">
+        <div>
+          <p className="emp-consignado-titulo">
+            {emprestimo.descontadoEmFolha ? "Consignado (desconto em folha)" : "Pago por fora da folha"}
+          </p>
+          <p className="emp-consignado-texto">
+            {emprestimo.descontadoEmFolha
+              ? "A parcela já sai do seu salário, então não é contada de novo na sua sobra do mês."
+              : "A parcela é contada no seu plano de pagamento e na sobra do mês. Se ela é descontada direto no contracheque, marque como consignado."}
+          </p>
+        </div>
+        <form action={definirConsignado}>
+          <input type="hidden" name="consignado" value={emprestimo.descontadoEmFolha ? "0" : "1"} />
+          <button type="submit" className="mc-btn-secondary" style={{ whiteSpace: "nowrap" }}>
+            {emprestimo.descontadoEmFolha ? "Desmarcar" : "Marcar consignado"}
+          </button>
+        </form>
+      </section>
 
       <div className="card-head">
         <p className="card-title" style={{ fontSize: 14 }}>
