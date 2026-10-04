@@ -53,6 +53,23 @@ export function calcularStatusAssinatura(cliente: { gratuito: boolean; assinatur
  * "ativa" no cadastro. Não filtra em CANCELADO/INATIVO — um cadastro de
  * teste ainda aparece no histórico quando alguém filtra por esses status,
  * só nunca conta como PAGO. */
+/**
+ * Quem TEM ACESSO ao produto (cláusula `where` do Prisma): cortesia
+ * (`gratuito`, ex.: fundador/equipe — acesso total sem cobrança) OU
+ * assinatura vigente. Nunca conta cadastro de teste. É a regra dos agentes
+ * proativos — `whereStatusAssinatura("PAGO")` não serve aqui porque exclui
+ * cortesia, que tem tudo liberado.
+ */
+export function whereTemAcesso(agora: Date = new Date()) {
+  return {
+    isTeste: false,
+    OR: [
+      { gratuito: true },
+      { gratuito: false, OR: [{ assinaturaVenceEm: null }, { assinaturaVenceEm: { gte: agora } }] },
+    ],
+  };
+}
+
 export function whereStatusAssinatura(status: StatusAssinatura) {
   const hoje = new Date();
   if (status === "INATIVO") return { gratuito: true };

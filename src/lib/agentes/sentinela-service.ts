@@ -21,7 +21,7 @@
 import { prisma } from "@/lib/prisma";
 import { deliverReminder } from "@/lib/reminder-delivery";
 import { enviarPush } from "@/lib/push-service";
-import { whereStatusAssinatura } from "@/lib/status-assinatura";
+import { whereTemAcesso } from "@/lib/status-assinatura";
 import { AGENTE_DO_TIPO, type AgenteId, type CandidatoAlerta } from "./alertas";
 import { coletarPorAgente } from "./coletores";
 import { atualizarCobertura, selecionarLote, TAMANHO_LOTE_PADRAO } from "./lotes";
@@ -164,7 +164,7 @@ export async function executarSentinela(opcoes: OpcoesSentinela = {}): Promise<R
 
   const filtro = {
     aceitaProativas: true,
-    ...(opcoes.clienteId ? { id: opcoes.clienteId } : opcoes.incluirTestes ? { gratuito: false } : whereStatusAssinatura("PAGO")),
+    ...(opcoes.clienteId ? { id: opcoes.clienteId } : opcoes.incluirTestes ? { gratuito: false } : whereTemAcesso(agora)),
   };
   const todosIds = (await prisma.cliente.findMany({ where: filtro, select: { id: true }, orderBy: { id: "asc" } })).map((c) => c.id);
 

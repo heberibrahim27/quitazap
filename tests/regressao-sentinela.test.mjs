@@ -309,3 +309,14 @@ test("métricas por tipo: enviados, úteis, errados, silenciados e utilidade com
   assert.equal(todos.utilidade, null); // sem feedback: nada a concluir
   assert.equal(m[0].tipo, "CATEGORY_BUDGET"); // ordenado por enviados
 });
+
+test("elegibilidade dos agentes: cortesia (gratuito) tem acesso total; teste e assinatura vencida ficam de fora", () => {
+  const { whereTemAcesso } = loadTsModule("src/lib/status-assinatura.ts");
+  const agora = new Date("2026-10-05T11:30:00Z");
+  const w = whereTemAcesso(agora);
+  assert.equal(w.isTeste, false); // cadastro de teste nunca recebe alerta real
+  const [cortesia, pago] = w.OR;
+  assert.deepEqual(cortesia, { gratuito: true }); // cortesia/fundador: tudo liberado, sem relógio de cobrança
+  assert.equal(pago.gratuito, false);
+  assert.deepEqual(pago.OR, [{ assinaturaVenceEm: null }, { assinaturaVenceEm: { gte: agora } }]); // vencida não entra
+});
