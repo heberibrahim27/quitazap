@@ -41,6 +41,7 @@ const GRUPOS = [
     rotulo: "Sistema",
     itens: [
       { href: "/assistente", label: "Assistente", Icone: IconBot },
+      { href: "/agentes", label: "Agentes", Icone: IconBot },
       { href: "/insights-sombra", label: "Insights (sombra)", Icone: IconTrendUp },
       { href: "/acessos", label: "Acessos", Icone: IconArrowUpRight },
       { href: "/revisao-pendente", label: "Revisão pendente", Icone: IconAlertTriangle },

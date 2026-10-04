@@ -1,8 +1,9 @@
 import { prisma } from "./prisma";
 import { enviarPush } from "./push-service";
-import { sendWhatsApp } from "./zapi";
 import { calcularLimiteSeguro } from "./financeiro/limite-seguro";
-import { responderLimiteSeguro } from "./ia/limite-seguro-resolver";
+import { detectarOrcamento, detectarProjecaoNegativa } from "./agentes/alertas";
+import { registrarAlertaEnviado } from "./agentes/alertas-store";
+import { enviarAlertaAgora } from "./agentes/sentinela-service";
 
 const TIPOS_GASTO = ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"] as const;
 
@@ -75,24 +76,30 @@ export async function verificarOrcamentoEAvisar(
   const totalAntes = totalDepois - valorLancamento;
   const limite = orcamento.limiteMensal;
 
+  // O push imediato continua (é no app, no momento em que a faixa foi
+  // cruzada). Além de enviar, registra o alerta no mesmo histórico do agente
+  // Sentinela — assim o ciclo das 08:30 não repete o MESMO aviso (mesma
+  // categoria, faixa e mês) por WhatsApp no dia seguinte.
+  const { ano, mes } = anoMesBrasil(dataLancamento);
+  const registrar = async (corpo: string) => {
+    const [candidato] = detectarOrcamento([{ categoria, limite, gasto: totalDepois }], { periodKey: `${ano}-${String(mes).padStart(2, "0")}`, diasRestantes: 0 });
+    if (candidato) await registrarAlertaEnviado(clienteId, candidato, corpo, { agente: "orcamento", canal: "APP" }).catch(() => undefined);
+  };
+
   const acabouDeEstourar = totalAntes <= limite && totalDepois > limite;
   if (acabouDeEstourar) {
-    await enviarPush(clienteId, {
-      titulo: "Orçamento estourado",
-      corpo: `Você passou do limite de ${fmtValor(limite)} em ${categoria} este mês (já gastou ${fmtValor(totalDepois)}).`,
-      url: "/minha-conta/gastos",
-    });
+    const corpo = `Você passou do limite de ${fmtValor(limite)} em ${categoria} este mês (já gastou ${fmtValor(totalDepois)}).`;
+    await enviarPush(clienteId, { titulo: "Orçamento estourado", corpo, url: "/minha-conta/gastos" });
+    await registrar(corpo);
     return;
   }
 
   const limitePreventivo = limite * PERCENTUAL_AVISO_PREVENTIVO;
   const acabouDeCruzarPreventivo = totalAntes <= limitePreventivo && totalDepois > limitePreventivo && totalDepois <= limite;
   if (acabouDeCruzarPreventivo) {
-    await enviarPush(clienteId, {
-      titulo: "Orçamento quase no limite",
-      corpo: `Você já usou ${Math.round((totalDepois / limite) * 100)}% do limite de ${fmtValor(limite)} em ${categoria} este mês (gastou ${fmtValor(totalDepois)}).`,
-      url: "/minha-conta/gastos",
-    });
+    const corpo = `Você já usou ${Math.round((totalDepois / limite) * 100)}% do limite de ${fmtValor(limite)} em ${categoria} este mês (gastou ${fmtValor(totalDepois)}).`;
+    await enviarPush(clienteId, { titulo: "Orçamento quase no limite", corpo, url: "/minha-conta/gastos" });
+    await registrar(corpo);
   }
 }
 
@@ -114,16 +121,19 @@ export async function verificarApertoEAvisar(clienteId: string | null | undefine
     const fatos = await calcularLimiteSeguro(clienteId);
     if (fatos.semDadosSuficientes || fatos.saldoLivre >= 0) return;
 
-    const cliente = await prisma.cliente.findUnique({
-      where: { id: clienteId },
-      select: { telefone: true, gratuito: true, aceitaProativas: true },
-    });
-    // Mensagem proativa (não é resposta direta a algo que o cliente acabou
-    // de perguntar) — respeita o consentimento, igual lembrete de tarefa.
-    if (!cliente || !cliente.aceitaProativas) return;
-
-    const dica = await responderLimiteSeguro(clienteId, cliente.gratuito);
-    await sendWhatsApp(cliente.telefone, `⚠️ ${dica}`);
+    // Antes mandava um WhatsApp a CADA lançamento no vermelho (sem dedupe,
+    // sem limite, inclusive de madrugada). Agora é um candidato do agente
+    // Sentinela: passa pela política única (cota diária/semanal, silêncio,
+    // opt-out por tipo, dedupe por faixa de severidade no mês). Se bloqueado,
+    // o ciclo das 08:30 reavalia. Cliente com proativas desligadas continua
+    // sem receber (a política checa aceitaProativas).
+    const agora = new Date();
+    const { ano, mes } = anoMesBrasil(agora);
+    const [candidato] = detectarProjecaoNegativa(
+      { saldoLivre: fatos.saldoLivre, semDadosSuficientes: fatos.semDadosSuficientes, diasRestantes: fatos.diasRestantes },
+      { periodKey: `${ano}-${String(mes).padStart(2, "0")}` }
+    );
+    if (candidato) await enviarAlertaAgora(clienteId, candidato, { agora });
   } catch (err) {
     console.error("[Aperto] Erro ao verificar/avisar:", err);
   }

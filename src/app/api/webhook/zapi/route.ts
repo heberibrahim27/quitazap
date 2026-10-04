@@ -36,7 +36,7 @@ import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import { detectarComandoModoLembrete, deliverReminder } from "@/lib/reminder-delivery";
 import { pareceEsqueciSenha, urlPrimeiroAcesso } from "@/lib/primeiro-acesso";
 import { detectarConsultaFatura } from "@/lib/financeiro/fatura-cartao";
-import { responderConsultaFatura } from "@/lib/financeiro/fatura-cartao-consulta";
+import { skillRegistry } from "@/lib/agentes/skills";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
 import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
@@ -87,6 +87,8 @@ import {
 } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
 import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
+import { detectarFeedbackAlerta } from "@/lib/agentes/feedback";
+import { aplicarFeedbackAlerta } from "@/lib/agentes/alertas-store";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import {
   gerarResumoMensal,
@@ -1435,44 +1437,16 @@ export async function POST(req: NextRequest) {
         }
       })();
 
-      const ultimoLancamento = await prisma.lancamento.findFirst({
-        where: { clienteId: sessao.clienteId },
-        orderBy: { criadoEm: "desc" },
-      });
-
-      if (!ultimoLancamento) {
-        const respostaNada = "Não achei nenhum lançamento recente pra desfazer.";
-        await sendWhatsApp(telefone, respostaNada);
-        await prisma.botSessao.updateMany({
-          where: { id: sessao.id },
-          data: {
-            dividasTemp: JSON.stringify([
-              ...historicoParaDesfazer,
-              { role: "user", content: mensagem },
-              { role: "assistant", content: respostaNada },
-            ]),
-          },
-        });
-        return NextResponse.json({ ok: true });
-      }
-
-      await prisma.lancamento.delete({ where: { id: ultimoLancamento.id } });
-
-      const rotuloTipo =
-        ultimoLancamento.tipo === "RECEITA"
-          ? "Receita"
-          : ultimoLancamento.tipo === "DESPESA_FIXA"
-            ? "Despesa fixa"
-            : ultimoLancamento.tipo === "COMPRA_CARTAO"
-              ? "Gasto no cartão"
-              : ultimoLancamento.tipo === "FATURA_FECHADA"
-                ? "Fatura"
-                : "Despesa";
-      const respostaDesfeito =
-        `↩️ *Desfeito.*\n\n` +
-        `${rotuloTipo} removida:\n` +
-        `${ultimoLancamento.descricao} — ${formatarValorBR(ultimoLancamento.valor)}\n\n` +
-        `Se não era esse, me avisa que eu confiro. Pode mandar o lançamento certo agora.`;
+      // Mesma skill do chat nativo (agentes/skills): o efeito no banco e o
+      // texto são idênticos nos dois canais — antes eram duas cópias.
+      const resultadoDesfazer = await skillRegistry.run<{ texto: string }>(
+        "desfazer_ultimo_lancamento",
+        { userId: sessao.clienteId, timezone: "America/Sao_Paulo", channel: "whatsapp", gratuito: isGratuito },
+        {}
+      );
+      const respostaDesfeito = resultadoDesfazer.ok
+        ? resultadoDesfazer.data.texto
+        : (resultadoDesfazer.userMessage ?? "Não consegui desfazer agora. Tenta de novo em instantes.");
 
       await sendWhatsApp(telefone, respostaDesfeito);
       await prisma.botSessao.updateMany({
@@ -1506,21 +1480,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Feedback sobre alerta proativo do Sentinela ("útil", "errado", "parar
+    // esse alerta", "parar alertas", "ativar alertas") — mesmo passo do chat
+    // nativo (controle-orquestrador.ts); sem alerta recente segue o fluxo.
+    const feedbackAlerta = detectarFeedbackAlerta(mensagem);
+    if (feedbackAlerta && sessao.clienteId) {
+      const respostaFeedback = await aplicarFeedbackAlerta(sessao.clienteId, feedbackAlerta);
+      if (respostaFeedback) {
+        await sendWhatsApp(telefone, respostaFeedback);
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     // Pedido explícito em linguagem natural ("me lembra de pagar o IPVA dia
     // 28") — antes das demais etapas, que engoliam a frase (ver
     // pedidoExplicitoDeLembrete). Sempre cria como "lembrete:".
-    if (!comandoTarefa && pedidoExplicitoDeLembrete(mensagem)) {
-      const comandoNatural = detectarComandoTarefa(`lembrete: ${mensagem}`);
-      if (comandoNatural) {
-        const respostaNatural = await processarComandoTarefa(
-          sessao.clienteId,
-          comandoNatural,
-          tipoEntrada === "audio" ? "AUDIO" : "TEXTO"
-        );
-        if (respostaNatural) {
-          await sendWhatsApp(telefone, respostaNatural);
-          return NextResponse.json({ ok: true });
-        }
+    if (!comandoTarefa && sessao.clienteId && pedidoExplicitoDeLembrete(mensagem)) {
+      const r = await skillRegistry.run<{ texto: string }>(
+        "criar_lembrete",
+        { userId: sessao.clienteId, timezone: "America/Sao_Paulo", channel: "whatsapp", gratuito: isGratuito },
+        { texto: mensagem, origem: tipoEntrada === "audio" ? "AUDIO" : "TEXTO" }
+      );
+      if (r.ok) {
+        await sendWhatsApp(telefone, r.data.texto);
+        return NextResponse.json({ ok: true });
       }
     }
 
@@ -1693,7 +1676,14 @@ Pode mandar tudo em uma mensagem só.`;
     // chat nativo (controle-orquestrador.ts). Achado em QA, 04/10/2026.
     const resultadoConsultaCartoesControle = consultarCartoesControle(mensagem, estadoAntesFluxosControle);
     if (sessao.clienteId && (resultadoConsultaCartoesControle || detectarConsultaFatura(mensagem))) {
-      const respostaFaturas = await responderConsultaFatura(sessao.clienteId, mensagem);
+      const resultadoFaturas = await skillRegistry.run<{ texto: string }>(
+        "consultar_fatura",
+        { userId: sessao.clienteId, timezone: "America/Sao_Paulo", channel: "whatsapp", gratuito: isGratuito },
+        { mensagem }
+      );
+      const respostaFaturas = resultadoFaturas.ok
+        ? resultadoFaturas.data.texto
+        : "Não consegui consultar suas faturas agora. Tenta de novo em instantes.";
       await sendWhatsApp(telefone, respostaFaturas);
 
       await prisma.botSessao.updateMany({

@@ -59,12 +59,13 @@ import {
 } from "@/lib/controle-financeiro-flow";
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
 import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
+import { detectarFeedbackAlerta } from "@/lib/agentes/feedback";
+import { aplicarFeedbackAlerta } from "@/lib/agentes/alertas-store";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import { pedidoDesfazerLancamento } from "@/lib/comandos-texto";
-import { desfazerUltimoLancamento } from "@/lib/desfazer-lancamento";
+import { skillRegistry, type SkillContext } from "@/lib/agentes/skills";
 import { detectarConsultaFatura } from "@/lib/financeiro/fatura-cartao";
-import { responderConsultaFatura } from "@/lib/financeiro/fatura-cartao-consulta";
 import {
   persistirLancamentosControle,
   persistirCartaoControle,
@@ -280,8 +281,12 @@ export async function processarMensagemControle(input: {
   // financeiro..."). Desfazer só vale sem pendência de confirmação — um
   // "desfazer" no meio de uma prévia 1/2 é cancelar a prévia, não apagar o
   // último lançamento.
+  // Skills compartilhadas com o WhatsApp (agentes/skills): mesma capacidade
+  // nos dois canais, o canal só muda a entrada e a forma de responder.
+  const ctxSkill: SkillContext = { userId: clienteId, timezone: "America/Sao_Paulo", channel: "app", gratuito: isGratuito };
   if (!estadoAntesFluxosControle.confirmacaoPendente && pedidoDesfazerLancamento(mensagem)) {
-    return finalizar(await desfazerUltimoLancamento(clienteId));
+    const r = await skillRegistry.run<{ texto: string }>("desfazer_ultimo_lancamento", ctxSkill, {});
+    return finalizar(r.ok ? r.data.texto : (r.userMessage ?? "Não consegui desfazer agora."));
   }
 
   const comandoTarefa = detectarComandoTarefa(mensagem);
@@ -292,15 +297,22 @@ export async function processarMensagemControle(input: {
     if (respostaTarefa) return finalizar(respostaTarefa);
   }
 
+  // Feedback sobre alerta proativo do Sentinela ("útil", "errado", "parar esse
+  // alerta", "parar alertas", "ativar alertas") — antes de qualquer IA, senão
+  // "errado" cairia na interpretação de intenção. Sem alerta recente, devolve
+  // null e a mensagem segue o pipeline normal.
+  const feedbackAlerta = detectarFeedbackAlerta(mensagem);
+  if (feedbackAlerta) {
+    const respostaFeedback = await aplicarFeedbackAlerta(clienteId, feedbackAlerta);
+    if (respostaFeedback) return finalizar(respostaFeedback);
+  }
+
   // Pedido explícito em linguagem natural ("me lembra de pagar o IPVA dia 28")
   // — ver pedidoExplicitoDeLembrete. Sempre cria como "lembrete:", que lê a
   // data e o valor da própria frase.
   if (!comandoTarefa && pedidoExplicitoDeLembrete(mensagem)) {
-    const comandoNatural = detectarComandoTarefa(`lembrete: ${mensagem}`);
-    if (comandoNatural) {
-      const respostaNatural = await processarComandoTarefa(clienteId, comandoNatural, "TEXTO");
-      if (respostaNatural) return finalizar(respostaNatural);
-    }
+    const r = await skillRegistry.run<{ texto: string }>("criar_lembrete", ctxSkill, { texto: mensagem, origem: "TEXTO" });
+    if (r.ok) return finalizar(r.data.texto);
   }
 
   // 2) Consulta de cartões / faturas / saldo — leitura pura.
@@ -310,7 +322,8 @@ export async function processarMensagemControle(input: {
   // mostrava fatura R$ 0,00. Achado em QA do Ibrahim (04/10/2026).
   const resultadoConsultaCartoes = consultarCartoesControle(mensagem, estadoAntesFluxosControle);
   if (resultadoConsultaCartoes || detectarConsultaFatura(mensagem)) {
-    return finalizar(await responderConsultaFatura(clienteId, mensagem));
+    const r = await skillRegistry.run<{ texto: string }>("consultar_fatura", ctxSkill, { mensagem });
+    return finalizar(r.ok ? r.data.texto : "Não consegui consultar suas faturas agora. Tenta de novo em instantes.");
   }
 
   const resultadoConsultaSaldo = consultarSaldoControle(mensagem, estadoAntesFluxosControle);

@@ -69,6 +69,7 @@
 // aqui — seguem intactas pro resolverIntencaoFinanceiraIA logo depois.
 
 import { chatCompletion } from "@/lib/ai/openai-client";
+import { tentarResponderComQuita } from "@/lib/agentes/quita/agente";
 import { responderConsultaFinanceira, type TipoConsultaFinanceira } from "./consulta-financeira-resolver";
 import { responderLimiteSeguro } from "./limite-seguro-resolver";
 import { responderRotaDividas } from "./rota-dividas-resolver";
@@ -215,6 +216,13 @@ export async function tentarResponderConsultaLivre(
   gratuito: boolean,
 ): Promise<string | null> {
   if (!pareceConsultaLivre(mensagem)) return null;
+
+  // Agente Quita (function calling sobre ferramentas de LEITURA, com guarda
+  // numérica) tem a primeira chance; se não responder (flag desligada, erro,
+  // timeout, mensagem que não é consulta), o classificador de intenção única
+  // abaixo roda exatamente como antes.
+  const respostaQuita = await tentarResponderComQuita(mensagem, clienteId, gratuito);
+  if (respostaQuita) return respostaQuita;
 
   const intent = await classificarIntentLivre(mensagem, clienteId, gratuito);
   logDecisao(mensagem, intent);
