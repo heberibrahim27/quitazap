@@ -22,6 +22,18 @@ export default async function EmprestimosPage() {
   const quitados = emprestimos.filter((e) => e.status !== "ATIVA");
   const totalDevedor = ativos.reduce((soma, e) => soma + (e.valorTotal - e.valorPago), 0);
 
+  // Somatório do que pesa todo mês: a próxima parcela em aberto de cada contrato ativo.
+  const proximaDe = (e: (typeof ativos)[number]) =>
+    e.parcelas.filter((p) => p.status !== "PAGA").sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())[0];
+  const mensalDe = (e: (typeof ativos)[number]) => proximaDe(e)?.valor ?? 0;
+  const totalMensal = ativos.reduce((soma, e) => soma + mensalDe(e), 0);
+  const mensalEmFolha = ativos.filter((e) => e.descontadoEmFolha).reduce((soma, e) => soma + mensalDe(e), 0);
+  const mensalFora = totalMensal - mensalEmFolha;
+  const totalJaPago = ativos.reduce((soma, e) => soma + e.valorPago, 0);
+  const ultimoVencimento = ativos
+    .flatMap((e) => e.parcelas.map((p) => p.vencimento))
+    .reduce<Date | null>((mt, v) => (mt == null || v > mt ? v : mt), null);
+
   return (
     <div>
       <div className="card-head">
@@ -37,12 +49,46 @@ export default async function EmprestimosPage() {
       </div>
 
       {ativos.length > 0 && (
-        <div className="mc-card" style={{ marginBottom: 16 }}>
-          <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>Saldo devedor total</p>
-          <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--red)" }}>
-            {fmtValor(totalDevedor)}
-          </p>
-        </div>
+        <section className="card aba-destaque vermelho" style={{ marginBottom: 16 }}>
+          <div className="aba-destaque-topo">
+            <div>
+              <p className="aba-destaque-rot">Você paga por mês</p>
+              <p className="aba-destaque-valor">{fmtValor(totalMensal)}</p>
+            </div>
+            <span className="aba-destaque-chip">{ativos.length} contrato{ativos.length === 1 ? "" : "s"}</span>
+          </div>
+
+          {mensalEmFolha > 0 && mensalFora > 0 && (
+            <>
+              <div className="rsm-pilha" role="img" aria-label="Divisão da parcela mensal entre consignados e outros">
+                <span className="rsm-seg" style={{ flexGrow: mensalEmFolha, background: "#1E63E9", "--i": 0 } as React.CSSProperties} />
+                <span className="rsm-seg" style={{ flexGrow: mensalFora, background: "#F08A00", "--i": 1 } as React.CSSProperties} />
+              </div>
+              <ul className="aba-legenda">
+                <li><i style={{ background: "#1E63E9" }} /><span>Consignados (folha)</span><strong>{fmtValor(mensalEmFolha)}</strong></li>
+                <li><i style={{ background: "#F08A00" }} /><span>Outros</span><strong>{fmtValor(mensalFora)}</strong></li>
+              </ul>
+            </>
+          )}
+          {mensalEmFolha > 0 && mensalFora === 0 && (
+            <p className="aba-delta bom" style={{ color: "#1E63E9", background: "rgba(30,99,233,0.12)" }}>Tudo descontado em folha</p>
+          )}
+
+          <div className="emp-stats">
+            <div>
+              <span>Falta pagar</span>
+              <strong>{fmtValor(totalDevedor)}</strong>
+            </div>
+            <div>
+              <span>Já pagou</span>
+              <strong>{fmtValor(totalJaPago)}</strong>
+            </div>
+            <div>
+              <span>Livre em</span>
+              <strong>{ultimoVencimento ? ultimoVencimento.toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" }) : "—"}</strong>
+            </div>
+          </div>
+        </section>
       )}
 
       <div className="mc-card">
