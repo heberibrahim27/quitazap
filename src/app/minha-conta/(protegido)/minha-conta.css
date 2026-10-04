@@ -227,7 +227,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   padding: calc(max(14px, env(safe-area-inset-top)) + 66px) 12px 0;
   background: linear-gradient(180deg, #0A2FA8 0%, #0E3FCB 48%, #1553E3 100%);
   border-radius: 0;
-  box-shadow: 0 22px 44px -26px rgba(8, 28, 110, 0.5);
+  box-shadow: none;
+}
+/* Névoa clara logo abaixo da faixa azul: a aba ativa (mesma cor) vira parte da
+   página sem emenda, como na referência. Fica atrás do conteúdo (z-index -1). */
+.hero::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 150px;
+  background: linear-gradient(180deg, #F1F6FC 0%, rgba(241,246,252,0.7) 40%, rgba(241,246,252,0) 100%);
+  pointer-events: none; z-index: -1;
 }
 .hero-shell {
   position: relative; overflow: hidden;
@@ -297,7 +304,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .hero-tabs { display: flex; margin: 10px -12px 0; padding: 0 12px; align-items: flex-end; }
 .hero-tab {
   flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  padding: 10px 4px 12px; min-height: 62px;
+  padding: 8px 4px 12px; min-height: 58px; position: relative;
   text-decoration: none; font-size: 12.5px; font-weight: 700;
   -webkit-tap-highlight-color: transparent;
 }
@@ -305,13 +312,49 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .hero-tab svg { width: 22px; height: 22px; }
 .hero-tab:active { background: rgba(255,255,255,0.12); }
 /* Aba ativa: branca, encaixada na base da faixa azul (como na referência). */
-.mc-shell .hero-tab.ativa { color: #1148E0; }
-.hero-tab.ativa {
-  flex: 1.35 1 0; flex-direction: row; gap: 8px; font-size: 14px;
-  background: #F4F8FF; border-radius: 22px 22px 0 0;
-  box-shadow: 0 -6px 18px -8px rgba(4, 18, 90, 0.35);
+.mc-shell .hero-tab.ativa {
+  color: #1148E0;
+  flex: 1.35 1 0; flex-direction: row; gap: 8px; font-size: 14.5px;
+  background: #F1F6FC; border-radius: 26px 26px 0 0;
+  min-height: 62px; padding-bottom: 12px;
 }
+/* Encaixe côncavo nas duas laterais da base da aba (o "raccord" da referência)
+   e um esmaecido por baixo, pra aba virar o fundo da página sem emenda. */
+.hero-tab.ativa::before, .hero-tab.ativa::after {
+  content: ""; position: absolute; bottom: 0; width: 18px; height: 18px; pointer-events: none;
+}
+.hero-tab.ativa::before { left: -18px; background: radial-gradient(circle at 0 0, transparent 17.5px, #F1F6FC 18px); }
+.hero-tab.ativa::after  { right: -18px; background: radial-gradient(circle at 100% 0, transparent 17.5px, #F1F6FC 18px); }
 .hero-tab.ativa svg { color: #12A150; }
+
+/* Painel de resumo que troca embaixo da hero (Despesas / Cartões / Metas). */
+.aba-panel { animation: abaEntra 0.2s ease-out both; min-height: 380px; }
+@keyframes abaEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .aba-panel { animation: none; } }
+.aba-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.aba-stat {
+  min-width: 0; padding: 10px 11px; border-radius: 16px;
+  background: rgba(255,255,255,0.88); border: 1px solid rgba(30,99,233,0.12);
+  box-shadow: 0 8px 18px -12px rgba(10,47,168,0.4);
+}
+.aba-stat-label { margin: 0; font-size: 11px; font-weight: 600; color: var(--ink-dim); }
+.aba-stat-value { margin: 4px 0 0; font-size: clamp(12px, 3.4vw, 15px); font-weight: 800; color: var(--ink); letter-spacing: -0.02em; white-space: nowrap; }
+.mc-shell .aba-cta {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 14px 0 6px; padding: 13px 18px; border-radius: 999px;
+  background: linear-gradient(135deg, #1F63F2, #0E3FCB); color: #fff;
+  font-size: 14px; font-weight: 700; text-decoration: none;
+  box-shadow: 0 12px 24px -12px rgba(14,63,203,0.7), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.aba-cta svg { width: 16px; height: 16px; }
+.aba-meta-row { padding: 12px 0; border-bottom: 1px solid rgba(30,99,233,0.08); }
+.aba-meta-row:last-child { border-bottom: none; }
+.aba-meta-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.aba-meta-nome { font-size: 14px; font-weight: 700; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aba-meta-pct { font-size: 13px; font-weight: 800; color: #12A150; }
+.aba-meta-track { display: block; height: 7px; margin-top: 8px; border-radius: 999px; background: rgba(30,99,233,0.12); overflow: hidden; }
+.aba-meta-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #35D388, #12A150); }
+.aba-meta-valores { margin: 6px 0 0; font-size: 12px; color: var(--ink-dim); }
 
 .stat-icon {
   position: relative; overflow: hidden;

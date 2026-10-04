@@ -14,6 +14,7 @@ import { ValorAutoAjustavel } from "./ValorAutoAjustavel";
 import { MesSwipe } from "./MesSwipe";
 import { MesFiltro } from "./MesFiltro";
 import { AnimarAoAparecer } from "./AnimarAoAparecer";
+import { AbaResumo } from "./AbaResumo";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -70,15 +71,23 @@ function diasAte(data: Date, hoje: Date): number {
   return diasCalendarioBrasil(data, hoje);
 }
 
+// Abas da hero: a hero fica fixa e só o conteúdo de baixo troca. "receita" é a
+// home completa (padrão, sem ?aba=); as outras mostram um resumo da seção com
+// atalho pra página inteira.
+const ABAS_HERO = ["receita", "despesas", "cartoes", "metas"] as const;
+type AbaHero = (typeof ABAS_HERO)[number];
+
 export default async function MinhaContaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string | string[] }>;
+  searchParams: Promise<{ mes?: string | string[]; aba?: string | string[] }>;
 }) {
   const cliente = await getClienteAtual();
   if (!cliente) redirect("/minha-conta/entrar");
 
-  const { mes: mesParamBruto } = await searchParams;
+  const { mes: mesParamBruto, aba: abaParamBruto } = await searchParams;
+  const abaParam = Array.isArray(abaParamBruto) ? abaParamBruto[0] : abaParamBruto;
+  const abaAtiva: AbaHero = ABAS_HERO.includes(abaParam as AbaHero) ? (abaParam as AbaHero) : "receita";
   // Next.js entrega string[] se a query tiver "?mes=" repetido — usa só o
   // primeiro valor nesse caso, em vez de deixar o .match() quebrar a página.
   const mesParam = Array.isArray(mesParamBruto) ? mesParamBruto[0] : mesParamBruto;
@@ -144,6 +153,31 @@ export default async function MinhaContaPage({
   // request — essa duplicação era uma das causas da demora ao trocar de
   // mês.
   const limiteSeguro = ehMesAtual ? await calcularLimiteSeguro(cliente.id, new Date(), resumoFinanceiro) : null;
+
+  // Só a aba aberta busca os itens do seu resumo.
+  const maioresDespesas =
+    abaAtiva === "despesas"
+      ? await prisma.lancamento.findMany({
+          where: {
+            clienteId: cliente.id,
+            tipo: { in: ["DESPESA_FIXA", "DESPESA_VARIAVEL"] },
+            data: { gte: inicioMes, lt: fimMes },
+            // Depósito em meta (categoria "Metas") não é despesa — mesmo corte da página de despesas.
+            OR: [{ categoria: null }, { categoria: { not: "Metas" } }],
+          },
+          orderBy: { valor: "desc" },
+          take: 5,
+        })
+      : [];
+  const metasResumo =
+    abaAtiva === "metas"
+      ? await prisma.meta.findMany({
+          where: { clienteId: cliente.id },
+          include: { depositos: { select: { valor: true } } },
+          orderBy: { criadoEm: "asc" },
+          take: 6,
+        })
+      : [];
 
   // Aliases 1:1 com os nomes que o JSX abaixo já usava antes da extração
   // pro motor — mantidos de propósito pra essa primeira extração não
@@ -266,11 +300,31 @@ export default async function MinhaContaPage({
   const pctComprometida = percentualComprometido != null ? percentualComprometido * 100 : null;
   const acimaDoLimite = pctComprometida != null && pctComprometida > 100;
 
+  // Links da home preservam a aba e o mês que estão abertos.
+  const hrefHome = (aba: AbaHero, m: { ano: number; mes: number } | null) => {
+    const q = [aba !== "receita" ? `aba=${aba}` : "", m ? `mes=${paramMes(m.ano, m.mes)}` : ""].filter(Boolean).join("&");
+    return q ? `/minha-conta?${q}` : "/minha-conta";
+  };
+  const mesDaUrl = ehMesAtual ? null : { ano, mes };
+  // Próximo vencimento de fatura: o menor "dia N" que ainda não passou neste mês
+  // (em Brasília); se todos já passaram, o primeiro do mês seguinte.
+  const diaHojeBrasil = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(8, 10));
+  const diasVencimento = cartoes.map((c) => c.diaVencimento).filter((d): d is number => d != null).sort((a, b) => a - b);
+  const proximoVencimento = diasVencimento.find((d) => d >= diaHojeBrasil) ?? diasVencimento[0] ?? null;
+  const sufixoMesPagina = `?mes=${paramMes(ano, mes)}`;
+  const ICONES_ABA: Record<AbaHero, React.ReactNode> = {
+    receita: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>,
+    despesas: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>,
+    cartoes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3" /><path d="M2.5 10h19" /><path d="M6.5 15h4" /></svg>,
+    metas: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>,
+  };
+  const ROTULO_ABA_HERO: Record<AbaHero, string> = { receita: "Receita", despesas: "Despesas", cartoes: "Cartões", metas: "Metas" };
+
   return (
     <div>
       <MesSwipe
-        hrefAnterior={`/minha-conta?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
-        hrefSeguinte={ehMesAtual ? null : `/minha-conta?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        hrefAnterior={hrefHome(abaAtiva, mesAnterior)}
+        hrefSeguinte={ehMesAtual ? null : hrefHome(abaAtiva, mesSeguinte)}
       >
       <div className="hero">
         <div className="hero-shell">
@@ -358,280 +412,83 @@ export default async function MinhaContaPage({
           </div>
         </div>
 
-        <nav className="hero-tabs" aria-label="Atalhos do resumo">
-          <Link href="/minha-conta/receitas" className="hero-tab ativa">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>
-            Receita
-          </Link>
-          <Link href="/minha-conta/despesas" className="hero-tab">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>
-            Despesas
-          </Link>
-          <Link href="/minha-conta/cartoes" className="hero-tab">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3" /><path d="M2.5 10h19" /><path d="M6.5 15h4" /></svg>
-            Cartões
-          </Link>
-          <Link href="/minha-conta/metas" className="hero-tab">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
-            Metas
-          </Link>
+        <nav className="hero-tabs" aria-label="Resumo por seção">
+          {ABAS_HERO.map((a) => (
+            <Link
+              key={a}
+              href={hrefHome(a, mesDaUrl)}
+              scroll={false}
+              className={`hero-tab${a === abaAtiva ? " ativa" : ""}`}
+              aria-current={a === abaAtiva ? "page" : undefined}
+            >
+              {ICONES_ABA[a]}
+              {ROTULO_ABA_HERO[a]}
+            </Link>
+          ))}
         </nav>
       </div>
       </MesSwipe>
 
       <MesFiltro
-        hrefAnterior={`/minha-conta?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
-        hrefSeguinte={ehMesAtual ? null : `/minha-conta?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
+        hrefAnterior={hrefHome(abaAtiva, mesAnterior)}
+        hrefSeguinte={ehMesAtual ? null : hrefHome(abaAtiva, mesSeguinte)}
         label={`${nomeMes}/${ano}`}
       />
 
-      {resumoPlano.calculavel && (
-        <>
-          <p className="section-eyebrow">
-            <span className="title-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M13 7l-4.5 6.2H12l-1 4L15.5 11H12l1-4z" /></svg>
-            </span>
-            PLANO DE PAGAMENTO
-          </p>
-          <Link href="/minha-conta/plano" className="plano-card">
-            <div className="plano-top">
-              <div>
-                {/* "Saúde financeira" como veredito é só do card dedicado
-                    abaixo (SaudeFinanceiraCard) — esse aqui fala só do
-                    plano de pagamento deste mês, pra nunca contradizer o
-                    outro (ex: saldo positivo aqui + dívida em atraso lá). */}
-                <p className={`plano-headline ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
-                  {resumoPlano.saldoProjetado >= 0 ? "Seu plano de pagamento está em dia" : "Suas contas estão no vermelho"}
-                </p>
-                <p className="plano-caption">
-                  {resumoPlano.saldoProjetado >= 0
-                    ? `Saldo previsto de ${fmtValor(resumoPlano.saldoProjetado)} este mês`
-                    : `Faltam ${fmtValor(Math.abs(resumoPlano.saldoProjetado))} pra fechar ${nomeMes.toLowerCase()} — veja seu plano de pagamento`}
-                </p>
-              </div>
-              <span className={`plano-icon ${resumoPlano.saldoProjetado >= 0 ? "pos" : ""}`}>
-                {resumoPlano.saldoProjetado >= 0 ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>
-                )}
-              </span>
-            </div>
-            <span className="plano-cta">
-              Ver meu plano
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-            </span>
-          </Link>
-        </>
-      )}
-
-      {saude && <SaudeFinanceiraCard saude={saude} />}
-      {limiteSeguro && <LimiteSeguroCard limite={limiteSeguro} />}
-
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V10M12 20V4M20 20v-7" /></svg>
-          </span>
-          <span className="title-label">Resumo</span>
-        </p>
-        <Link href="/minha-conta/movimentacoes" className="card-link">
-          Ver detalhes
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-        </Link>
-      </div>
-      <AnimarAoAparecer>
-      <section className="card" id="resumo" style={{ paddingBottom: 0 }}>
-        {quantidadeLancamentos === 0 ? (
-          <p className="mc-empty">Nenhum gasto ou receita registrado em {nomeMes}/{ano}.</p>
-        ) : (
-          <>
-            {resumoDoMes.map((linha, indice) => (
-              <Fragment key={linha.rotulo}>
-                <div className="resumo-row">
-                  <span className={`resumo-icon ${linha.classe}`}>
-                    {linha.icone === "receita" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>}
-                    {linha.icone === "fixa" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>}
-                    {linha.icone === "variavel" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>}
-                    {linha.icone === "cartao" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>}
-                    {linha.icone === "divida" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>}
-                  </span>
-                  <span className="resumo-label">{linha.rotulo}</span>
-                  <span className="resumo-bar-track">
-                    <span
-                      className="resumo-bar-fill"
-                      style={{ "--to": Math.min(linha.valor / linha.base, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
-                    />
-                  </span>
-                  <span className="resumo-value">
-                    <span className="resumo-value-cifrao">R$</span>
-                    <span className="resumo-value-numero">{fmtNumero(linha.valor)}</span>
-                  </span>
-                </div>
-                {/* Separa a Receita (entrada) do resto (saídas) — mesma
-                    lógica visual de uma DRE: receita bruta em cima, uma
-                    linha, depois cada dedução até o resultado final. */}
-                {linha.rotulo === "Receitas" && <div className="resumo-divisor" />}
-              </Fragment>
-            ))}
-            {totalSaidasOperacionais > 0 && (
-              <div className="resumo-subtotal">
-                <span className="resumo-subtotal-label">Resultado antes de investimentos</span>
-                <span className="resumo-subtotal-value">{fmtValor(resultadoAntesInvestimentos)}</span>
-              </div>
-            )}
-            {temInvestimentosNoMes && (
-              <>
-                <div className="resumo-divisor" />
-                <div className="resumo-row">
-                  <span className="resumo-icon green">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
-                  </span>
-                  <span className="resumo-label">Investimentos</span>
-                  <span className="resumo-bar-track">
-                    <span
-                      className="resumo-bar-fill"
-                      style={{ "--to": Math.min(Math.abs(totalMetasMes) / baseInvestimentos, 1), "--i": resumoDoMes.length, background: "var(--green)" } as React.CSSProperties}
-                    />
-                  </span>
-                  <span className="resumo-value">
-                    <span className="resumo-value-cifrao">{totalMetasMes < 0 ? "+ R$" : "R$"}</span>
-                    <span className="resumo-value-numero">{fmtNumero(Math.abs(totalMetasMes))}</span>
-                  </span>
-                </div>
-              </>
-            )}
-            <div className={`resumo-footer ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
-              <span className="resumo-footer-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M7.5 10h9M7.5 14h9" /></svg>
-                <span>
-                  {resumoPlano.saldoProjetado >= 0 ? "Sobra livre do mês" : "Déficit do mês"}
-                  <span className="resumo-footer-sub">Resultado previsto de {nomeMes.toLowerCase()}</span>
-                </span>
-              </span>
-              <span className="resumo-footer-value">
-                {resumoPlano.saldoProjetado >= 0 ? "" : "− "}{fmtValor(Math.abs(resumoPlano.saldoProjetado))}
-              </span>
-            </div>
-          </>
-        )}
-      </section>
-      </AnimarAoAparecer>
-
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
-          </span>
-          <span className="title-label">Últimos lançamentos</span>
-        </p>
-        <Link href="/minha-conta/movimentacoes" className="card-link">
-          Ver tudo
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-        </Link>
-      </div>
-      <section className="card" id="lancamentos">
-        {ultimosLancamentos.length === 0 ? (
-          <p className="mc-empty">Nenhum lançamento registrado ainda.</p>
-        ) : (
-          ultimosLancamentos.map((l) => (
-            <div key={l.id} className="lanc-row">
-              <span className={`lanc-icon ${l.tipo === "RECEITA" ? "pos" : ""}`}>
-                {l.tipo === "RECEITA" ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
-                ) : l.tipo === "DESPESA_FIXA" ? (
+      {abaAtiva === "despesas" && (
+        <AbaResumo
+          titulo={`Despesas — ${nomeMes}/${ano}`}
+          stats={[
+            { rotulo: "Total", valor: fmtValor(totalFixasMes + totalVariaveisMes) },
+            { rotulo: "Fixas", valor: fmtValor(totalFixasMes) },
+            { rotulo: "Variáveis", valor: fmtValor(totalVariaveisMes) },
+          ]}
+          temItens={maioresDespesas.length > 0}
+          vazio={`Nenhuma despesa registrada em ${nomeMes.toLowerCase()}.`}
+          href={`/minha-conta/despesas${sufixoMesPagina}`}
+          rotuloLink="Ver página completa"
+        >
+          {maioresDespesas.map((d) => (
+            <div key={d.id} className="lanc-row">
+              <span className="lanc-icon">
+                {d.tipo === "DESPESA_FIXA" ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
-                ) : l.tipo === "COMPRA_CARTAO" || l.tipo === "FATURA_FECHADA" ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
                 ) : (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>
                 )}
               </span>
               <span className="lanc-body">
-                <p className="lanc-desc">{l.descricao}</p>
+                <p className="lanc-desc">{d.descricao}</p>
                 <p className="lanc-meta">
-                  {ROTULO_TIPO_LANCAMENTO[l.tipo] ?? l.tipo}
-                  {l.cartao ? ` · ${l.cartao.nome}` : ""}
-                  {l.recorrente && (
-                    <svg className="lanc-recorrente" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></svg>
-                  )}
+                  {ROTULO_TIPO_LANCAMENTO[d.tipo] ?? d.tipo}
+                  {d.categoria ? ` · ${d.categoria}` : ""}
                 </p>
               </span>
               <span className="lanc-side">
-                <p className={`lanc-value ${l.tipo === "RECEITA" ? "pos" : ""}`}>
-                  {l.tipo === "RECEITA" ? "+" : l.tipo === "FATURA_FECHADA" ? "" : "-"}{fmtValor(l.valor)}
-                </p>
-                <p className="lanc-date">{fmtData(l.data)}</p>
+                <p className="lanc-value">-{fmtValor(d.valor)}</p>
+                <p className="lanc-date">{fmtData(d.data)}</p>
               </span>
             </div>
-          ))
-        )}
-      </section>
-
-      {dividasEmAtraso.length > 0 && (
-        <>
-          <div className="card-head">
-            <p className="alerta-title">
-              <span className="title-icon red">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>
-              </span>
-              Atenção financeira
-            </p>
-          </div>
-          <div className="alerta-card" id="atencao">
-            {dividasEmAtraso.map((d) => (
-              <div key={d.id} className="alerta-row">
-                <span className="alerta-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
-                </span>
-                <span className="alerta-body">
-                  <p className="alerta-desc">{d.credor} — parcela em atraso</p>
-                  <p className="alerta-meta">{d.diasAtraso != null ? `${d.diasAtraso} dias em atraso` : "Em atraso"}</p>
-                </span>
-                <span className="alerta-side">
-                  <p className="alerta-value">{fmtValor(d.valorTotal - d.valorPago)}</p>
-                </span>
-              </div>
-            ))}
-            <Link href="/minha-conta/plano" className="alerta-cta">
-              Resolver agora
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-            </Link>
-          </div>
-        </>
+          ))}
+        </AbaResumo>
       )}
 
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
-          </span>
-          <span className="title-label">Cartões</span>
-        </p>
-        <Link href="/minha-conta/cartoes" className="card-link">
-          Ver cartões
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-        </Link>
-      </div>
-      <section className="card" id="cartoes">
-        {cartoes.length === 0 ? (
-          <p className="mc-empty">Nenhum cartão cadastrado ainda.</p>
-        ) : (
-          <>
-            <div className="cartoes-total">
-              <div className="cartoes-total-top">
-                <span>
-                  <p className="cartoes-total-label">Compras no cartão este mês</p>
-                  <p className="cartoes-total-value">{fmtValor(totalCartaoMes)}</p>
-                </span>
-                <span className="cartoes-total-icon">
-                  <span className="cartoes-total-icon-chip" />
-                </span>
-              </div>
-            </div>
-            {cartoes.map((c) => {
-              const [cor1, cor2] = gradienteDoCartao(c.nome);
-              return (
+      {abaAtiva === "cartoes" && (
+        <AbaResumo
+          titulo={`Cartões — ${nomeMes}/${ano}`}
+          stats={[
+            { rotulo: "Compras no mês", valor: fmtValor(totalCartaoMes) },
+            { rotulo: "Cartões", valor: String(cartoes.length) },
+            { rotulo: "Próx. vencimento", valor: proximoVencimento != null ? `Dia ${proximoVencimento}` : "—" },
+          ]}
+          temItens={cartoes.length > 0}
+          vazio="Nenhum cartão cadastrado ainda."
+          href="/minha-conta/cartoes"
+          rotuloLink="Ver página completa"
+        >
+          {cartoes.map((c) => {
+            const [cor1, cor2] = gradienteDoCartao(c.nome);
+            return (
               <div key={c.id} className="cartao-row">
                 <span className="cartao-mark" style={{ background: `linear-gradient(160deg, ${cor1}, ${cor2})` }}>
                   <span className="cartao-chip" />
@@ -649,49 +506,352 @@ export default async function MinhaContaPage({
                   <p className="cartao-value">{fmtValor(gastoCartaoMes.get(c.nome) ?? 0)}</p>
                 </span>
               </div>
-              );
-            })}
-          </>
-        )}
-      </section>
+            );
+          })}
+        </AbaResumo>
+      )}
 
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="4" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /><circle cx="9" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="15" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="9" cy="18" r="1.15" fill="currentColor" stroke="none" /></svg>
-          </span>
-          <span className="title-label">Compromissos</span>
-        </p>
-        <Link href="/minha-conta/agenda" className="card-link">
-          Ver agenda
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-        </Link>
-      </div>
-      <section className="card" id="tarefas">
-        {proximosCompromissos.length === 0 ? (
-          <p className="mc-empty">Nenhum compromisso com vencimento marcado.</p>
-        ) : (
-          proximosCompromissos.map((t) => {
-            const dias = diasAte(t.vencimento as Date, hoje);
-            const prazo = dias < 0 ? "atrasado" : dias === 0 ? "vence hoje" : dias === 1 ? "vence amanhã" : `vence em ${dias} dias`;
+      {abaAtiva === "metas" && (
+        <AbaResumo
+          titulo="Metas"
+          stats={[
+            { rotulo: "Guardado", valor: fmtValor(totalGuardadoMetas) },
+            { rotulo: "Falta", valor: fmtValor(Math.max(totalAlvoMetas - totalGuardadoMetas, 0)) },
+            { rotulo: "Progresso", valor: percentualMetas != null ? `${Math.round(percentualMetas * 100)}%` : "—" },
+          ]}
+          temItens={metasResumo.length > 0}
+          vazio="Nenhuma meta ainda. Crie um cofrinho na página completa."
+          href="/minha-conta/metas"
+          rotuloLink="Ver página completa"
+        >
+          {metasResumo.map((m) => {
+            const guardado = m.depositos.reduce((soma, d) => soma + d.valor, 0);
+            const pct = m.valorAlvo > 0 ? Math.max(0, Math.min(guardado / m.valorAlvo, 1)) : 0;
             return (
-              <div key={t.id} className="compromisso-row">
-                <span className="compromisso-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a5 5 0 0 0-5 5v3.2c0 .8-.3 1.6-.9 2.1L5 15h14l-1.1-1.7a3 3 0 0 1-.9-2.1V8a5 5 0 0 0-5-5z" /><path d="M9.5 18a2.5 2.5 0 0 0 5 0" /></svg>
-                </span>
-                <span className="compromisso-body">
-                  <p className="compromisso-desc">{t.descricao}</p>
-                  <p className="compromisso-meta">Vencimento {fmtData(t.vencimento as Date)}</p>
-                </span>
-                <span className="compromisso-side">
-                  <p className="compromisso-value">{t.valor != null ? fmtValor(t.valor) : ""}</p>
-                  <p className="compromisso-prazo">{prazo}</p>
-                </span>
+              <div key={m.id} className="aba-meta-row">
+                <div className="aba-meta-top">
+                  <span className="aba-meta-nome">{m.nome}</span>
+                  <span className="aba-meta-pct">{Math.round(pct * 100)}%</span>
+                </div>
+                <span className="aba-meta-track"><span className="aba-meta-fill" style={{ width: `${pct * 100}%` }} /></span>
+                <p className="aba-meta-valores">{fmtValor(guardado)} de {fmtValor(m.valorAlvo)}</p>
               </div>
             );
-          })
-        )}
-      </section>
+          })}
+        </AbaResumo>
+      )}
+
+      {abaAtiva === "receita" && (
+        <>
+          {resumoPlano.calculavel && (
+            <>
+              <p className="section-eyebrow">
+                <span className="title-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M13 7l-4.5 6.2H12l-1 4L15.5 11H12l1-4z" /></svg>
+                </span>
+                PLANO DE PAGAMENTO
+              </p>
+              <Link href="/minha-conta/plano" className="plano-card">
+                <div className="plano-top">
+                  <div>
+                    {/* "Saúde financeira" como veredito é só do card dedicado
+                        abaixo (SaudeFinanceiraCard) — esse aqui fala só do
+                        plano de pagamento deste mês, pra nunca contradizer o
+                        outro (ex: saldo positivo aqui + dívida em atraso lá). */}
+                    <p className={`plano-headline ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
+                      {resumoPlano.saldoProjetado >= 0 ? "Seu plano de pagamento está em dia" : "Suas contas estão no vermelho"}
+                    </p>
+                    <p className="plano-caption">
+                      {resumoPlano.saldoProjetado >= 0
+                        ? `Saldo previsto de ${fmtValor(resumoPlano.saldoProjetado)} este mês`
+                        : `Faltam ${fmtValor(Math.abs(resumoPlano.saldoProjetado))} pra fechar ${nomeMes.toLowerCase()} — veja seu plano de pagamento`}
+                    </p>
+                  </div>
+                  <span className={`plano-icon ${resumoPlano.saldoProjetado >= 0 ? "pos" : ""}`}>
+                    {resumoPlano.saldoProjetado >= 0 ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>
+                    )}
+                  </span>
+                </div>
+                <span className="plano-cta">
+                  Ver meu plano
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+                </span>
+              </Link>
+            </>
+          )}
+
+          {saude && <SaudeFinanceiraCard saude={saude} />}
+          {limiteSeguro && <LimiteSeguroCard limite={limiteSeguro} />}
+
+          <div className="card-head">
+            <p className="card-title">
+              <span className="title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V10M12 20V4M20 20v-7" /></svg>
+              </span>
+              <span className="title-label">Resumo</span>
+            </p>
+            <Link href="/minha-conta/movimentacoes" className="card-link">
+              Ver detalhes
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </Link>
+          </div>
+          <AnimarAoAparecer>
+          <section className="card" id="resumo" style={{ paddingBottom: 0 }}>
+            {quantidadeLancamentos === 0 ? (
+              <p className="mc-empty">Nenhum gasto ou receita registrado em {nomeMes}/{ano}.</p>
+            ) : (
+              <>
+                {resumoDoMes.map((linha, indice) => (
+                  <Fragment key={linha.rotulo}>
+                    <div className="resumo-row">
+                      <span className={`resumo-icon ${linha.classe}`}>
+                        {linha.icone === "receita" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>}
+                        {linha.icone === "fixa" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>}
+                        {linha.icone === "variavel" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>}
+                        {linha.icone === "cartao" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>}
+                        {linha.icone === "divida" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>}
+                      </span>
+                      <span className="resumo-label">{linha.rotulo}</span>
+                      <span className="resumo-bar-track">
+                        <span
+                          className="resumo-bar-fill"
+                          style={{ "--to": Math.min(linha.valor / linha.base, 1), "--i": indice, background: `var(--${linha.classe})` } as React.CSSProperties}
+                        />
+                      </span>
+                      <span className="resumo-value">
+                        <span className="resumo-value-cifrao">R$</span>
+                        <span className="resumo-value-numero">{fmtNumero(linha.valor)}</span>
+                      </span>
+                    </div>
+                    {/* Separa a Receita (entrada) do resto (saídas) — mesma
+                        lógica visual de uma DRE: receita bruta em cima, uma
+                        linha, depois cada dedução até o resultado final. */}
+                    {linha.rotulo === "Receitas" && <div className="resumo-divisor" />}
+                  </Fragment>
+                ))}
+                {totalSaidasOperacionais > 0 && (
+                  <div className="resumo-subtotal">
+                    <span className="resumo-subtotal-label">Resultado antes de investimentos</span>
+                    <span className="resumo-subtotal-value">{fmtValor(resultadoAntesInvestimentos)}</span>
+                  </div>
+                )}
+                {temInvestimentosNoMes && (
+                  <>
+                    <div className="resumo-divisor" />
+                    <div className="resumo-row">
+                      <span className="resumo-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
+                      </span>
+                      <span className="resumo-label">Investimentos</span>
+                      <span className="resumo-bar-track">
+                        <span
+                          className="resumo-bar-fill"
+                          style={{ "--to": Math.min(Math.abs(totalMetasMes) / baseInvestimentos, 1), "--i": resumoDoMes.length, background: "var(--green)" } as React.CSSProperties}
+                        />
+                      </span>
+                      <span className="resumo-value">
+                        <span className="resumo-value-cifrao">{totalMetasMes < 0 ? "+ R$" : "R$"}</span>
+                        <span className="resumo-value-numero">{fmtNumero(Math.abs(totalMetasMes))}</span>
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div className={`resumo-footer ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
+                  <span className="resumo-footer-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M7.5 10h9M7.5 14h9" /></svg>
+                    <span>
+                      {resumoPlano.saldoProjetado >= 0 ? "Sobra livre do mês" : "Déficit do mês"}
+                      <span className="resumo-footer-sub">Resultado previsto de {nomeMes.toLowerCase()}</span>
+                    </span>
+                  </span>
+                  <span className="resumo-footer-value">
+                    {resumoPlano.saldoProjetado >= 0 ? "" : "− "}{fmtValor(Math.abs(resumoPlano.saldoProjetado))}
+                  </span>
+                </div>
+              </>
+            )}
+          </section>
+          </AnimarAoAparecer>
+
+          <div className="card-head">
+            <p className="card-title">
+              <span className="title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+              </span>
+              <span className="title-label">Últimos lançamentos</span>
+            </p>
+            <Link href="/minha-conta/movimentacoes" className="card-link">
+              Ver tudo
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </Link>
+          </div>
+          <section className="card" id="lancamentos">
+            {ultimosLancamentos.length === 0 ? (
+              <p className="mc-empty">Nenhum lançamento registrado ainda.</p>
+            ) : (
+              ultimosLancamentos.map((l) => (
+                <div key={l.id} className="lanc-row">
+                  <span className={`lanc-icon ${l.tipo === "RECEITA" ? "pos" : ""}`}>
+                    {l.tipo === "RECEITA" ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
+                    ) : l.tipo === "DESPESA_FIXA" ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
+                    ) : l.tipo === "COMPRA_CARTAO" || l.tipo === "FATURA_FECHADA" ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>
+                    )}
+                  </span>
+                  <span className="lanc-body">
+                    <p className="lanc-desc">{l.descricao}</p>
+                    <p className="lanc-meta">
+                      {ROTULO_TIPO_LANCAMENTO[l.tipo] ?? l.tipo}
+                      {l.cartao ? ` · ${l.cartao.nome}` : ""}
+                      {l.recorrente && (
+                        <svg className="lanc-recorrente" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></svg>
+                      )}
+                    </p>
+                  </span>
+                  <span className="lanc-side">
+                    <p className={`lanc-value ${l.tipo === "RECEITA" ? "pos" : ""}`}>
+                      {l.tipo === "RECEITA" ? "+" : l.tipo === "FATURA_FECHADA" ? "" : "-"}{fmtValor(l.valor)}
+                    </p>
+                    <p className="lanc-date">{fmtData(l.data)}</p>
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+
+          {dividasEmAtraso.length > 0 && (
+            <>
+              <div className="card-head">
+                <p className="alerta-title">
+                  <span className="title-icon red">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4" /><path d="M12 16.5h.01" /><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" /></svg>
+                  </span>
+                  Atenção financeira
+                </p>
+              </div>
+              <div className="alerta-card" id="atencao">
+                {dividasEmAtraso.map((d) => (
+                  <div key={d.id} className="alerta-row">
+                    <span className="alerta-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
+                    </span>
+                    <span className="alerta-body">
+                      <p className="alerta-desc">{d.credor} — parcela em atraso</p>
+                      <p className="alerta-meta">{d.diasAtraso != null ? `${d.diasAtraso} dias em atraso` : "Em atraso"}</p>
+                    </span>
+                    <span className="alerta-side">
+                      <p className="alerta-value">{fmtValor(d.valorTotal - d.valorPago)}</p>
+                    </span>
+                  </div>
+                ))}
+                <Link href="/minha-conta/plano" className="alerta-cta">
+                  Resolver agora
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+                </Link>
+              </div>
+            </>
+          )}
+
+          <div className="card-head">
+            <p className="card-title">
+              <span className="title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2.5" width="15" height="9.5" rx="2.2" opacity="0.5" /><rect x="2.5" y="7.5" width="17.5" height="13" rx="2.5" /><path d="M2.5 12.5h17.5" /><rect x="5" y="16" width="4" height="3" rx="0.8" /></svg>
+              </span>
+              <span className="title-label">Cartões</span>
+            </p>
+            <Link href="/minha-conta/cartoes" className="card-link">
+              Ver cartões
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </Link>
+          </div>
+          <section className="card" id="cartoes">
+            {cartoes.length === 0 ? (
+              <p className="mc-empty">Nenhum cartão cadastrado ainda.</p>
+            ) : (
+              <>
+                <div className="cartoes-total">
+                  <div className="cartoes-total-top">
+                    <span>
+                      <p className="cartoes-total-label">Compras no cartão este mês</p>
+                      <p className="cartoes-total-value">{fmtValor(totalCartaoMes)}</p>
+                    </span>
+                    <span className="cartoes-total-icon">
+                      <span className="cartoes-total-icon-chip" />
+                    </span>
+                  </div>
+                </div>
+                {cartoes.map((c) => {
+                  const [cor1, cor2] = gradienteDoCartao(c.nome);
+                  return (
+                  <div key={c.id} className="cartao-row">
+                    <span className="cartao-mark" style={{ background: `linear-gradient(160deg, ${cor1}, ${cor2})` }}>
+                      <span className="cartao-chip" />
+                      <span className="cartao-initial">{c.nome.charAt(0).toUpperCase()}</span>
+                    </span>
+                    <span className="cartao-body">
+                      <p className="cartao-nome">{c.nome}</p>
+                      <p className="cartao-meta">
+                        {c.diaFechamento ? `Fecha dia ${c.diaFechamento}` : ""}
+                        {c.diaFechamento && c.diaVencimento ? " · " : ""}
+                        {c.diaVencimento ? `Vence dia ${c.diaVencimento}` : ""}
+                      </p>
+                    </span>
+                    <span className="cartao-side">
+                      <p className="cartao-value">{fmtValor(gastoCartaoMes.get(c.nome) ?? 0)}</p>
+                    </span>
+                  </div>
+                  );
+                })}
+              </>
+            )}
+          </section>
+
+          <div className="card-head">
+            <p className="card-title">
+              <span className="title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="4" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /><circle cx="9" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="15" cy="14" r="1.15" fill="currentColor" stroke="none" /><circle cx="9" cy="18" r="1.15" fill="currentColor" stroke="none" /></svg>
+              </span>
+              <span className="title-label">Compromissos</span>
+            </p>
+            <Link href="/minha-conta/agenda" className="card-link">
+              Ver agenda
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </Link>
+          </div>
+          <section className="card" id="tarefas">
+            {proximosCompromissos.length === 0 ? (
+              <p className="mc-empty">Nenhum compromisso com vencimento marcado.</p>
+            ) : (
+              proximosCompromissos.map((t) => {
+                const dias = diasAte(t.vencimento as Date, hoje);
+                const prazo = dias < 0 ? "atrasado" : dias === 0 ? "vence hoje" : dias === 1 ? "vence amanhã" : `vence em ${dias} dias`;
+                return (
+                  <div key={t.id} className="compromisso-row">
+                    <span className="compromisso-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a5 5 0 0 0-5 5v3.2c0 .8-.3 1.6-.9 2.1L5 15h14l-1.1-1.7a3 3 0 0 1-.9-2.1V8a5 5 0 0 0-5-5z" /><path d="M9.5 18a2.5 2.5 0 0 0 5 0" /></svg>
+                    </span>
+                    <span className="compromisso-body">
+                      <p className="compromisso-desc">{t.descricao}</p>
+                      <p className="compromisso-meta">Vencimento {fmtData(t.vencimento as Date)}</p>
+                    </span>
+                    <span className="compromisso-side">
+                      <p className="compromisso-value">{t.valor != null ? fmtValor(t.valor) : ""}</p>
+                      <p className="compromisso-prazo">{prazo}</p>
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
