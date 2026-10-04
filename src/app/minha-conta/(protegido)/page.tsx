@@ -166,6 +166,7 @@ export default async function MinhaContaPage({
   // resultado já projetado com parcelas de dívida do mês; sem renda
   // cadastrada, cai pro simples entradas−saídas (sem o anel de %).
   const heroDisponivel = resumoPlano.calculavel ? resumoPlano.saldoProjetado : resultadoMes;
+  const semDadosNoMes = !resumoPlano.calculavel && quantidadeLancamentos === 0;
   const heroComprometido = resumoPlano.calculavel ? resumoPlano.totalComprometido : totalSaidasMes;
 
   const totalAlvoMetas = agregadoMetas._sum.valorAlvo ?? 0;
@@ -276,11 +277,22 @@ export default async function MinhaContaPage({
           <div className="hero-body">
             <div className="hero-main">
               <div className="hero-label-row">
-                <p className="hero-label">Disponível no mês</p>
+                <p className="hero-label">{resumoPlano.calculavel ? "Disponível no mês" : "Resultado do mês"}</p>
               </div>
-              <ValorAutoAjustavel texto={fmtValor(heroDisponivel)} className="hero-amount" />
+              {/* Conta nova (sem renda e sem nenhum lançamento): "R$ 0,00 disponível"
+                  parecia saldo zerado de verdade na primeira tela de quem acabou de
+                  comprar. O número em si não muda (continua entradas − saídas) — só
+                  deixa de aparecer como se fosse um saldo quando ainda não há dado. */}
+              <ValorAutoAjustavel
+                texto={semDadosNoMes ? "A calcular" : fmtValor(heroDisponivel)}
+                className="hero-amount"
+              />
               <p className="hero-caption">
-                {resumoPlano.calculavel ? "Após despesas, dívidas e compras no cartão" : "Após despesas e compras no cartão"}
+                {semDadosNoMes
+                  ? "Registre sua primeira receita ou gasto pra começar"
+                  : resumoPlano.calculavel
+                    ? "Após despesas, dívidas e compras no cartão"
+                    : "Entradas menos saídas já registradas"}
               </p>
             </div>
           </div>
