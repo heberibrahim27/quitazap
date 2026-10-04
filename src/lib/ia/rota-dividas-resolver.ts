@@ -8,10 +8,11 @@
 
 import { calcularRotaLivreDividas } from "@/lib/financeiro/rota-livre-dividas";
 import { chatCompletion } from "@/lib/ai/openai-client";
+import { orientarQuitacao } from "@/lib/orientador-quitacao/service";
 import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 
 const REGEX_ROTA_DIVIDAS =
-  /\b(?:qual\s+d[ií]vida\s+(?:eu\s+|devo\s+)?(?:pag[oaer]*|quit[oaer]*)\s+primeiro|por\s+onde\s+(?:eu\s+)?come[cç]o\s+a\s+pagar|como\s+(?:eu\s+)?fic(?:o|ar)\s+livre\s+d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|como\s+(?:eu\s+)?sa(?:io|ir)\s+(?:livre\s+)?d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|rota\s+(?:pra|para)\s+(?:ficar\s+livre|sair)\s+d(?:e|as)\s+d[ií]vidas)\b/i;
+  /\b(?:qual\s+d[ií]vida\s+(?:eu\s+|devo\s+)?(?:pag[oaer]*|quit[oaer]*)\s+primeiro|por\s+onde\s+(?:eu\s+)?come[cç]o\s+a\s+pagar|como\s+(?:eu\s+)?fic(?:o|ar)\s+livre\s+d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|como\s+(?:eu\s+)?sa(?:io|ir)\s+(?:livre\s+)?d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|rota\s+(?:pra|para)\s+(?:ficar\s+livre|sair)\s+d(?:e|as)\s+d[ií]vidas|o\s+que\s+(?:eu\s+)?fa[cç]o\s+com\s+(?:a|minha)\s+sobra|como\s+(?:eu\s+)?quito\s+(?:minhas\s+|as\s+)?d[ií]vidas|(?:me\s+ajuda|quero\s+ajuda)\s+(?:a|pra|para)\s+(?:sair|quitar)|qual\s+d[ií]vida\s+(?:eu\s+|devo\s+)?ataco|quero\s+(?:sair|quitar)\s+(?:das|minhas)\s+d[ií]vidas)\b/i;
 
 export function detectarRotaDividas(mensagem: string): boolean {
   return REGEX_ROTA_DIVIDAS.test(mensagem);
@@ -73,8 +74,21 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
   }
 }
 
-export async function responderRotaDividas(clienteId: string, gratuito: boolean): Promise<string> {
+async function responderRotaDividasClassica(clienteId: string, gratuito: boolean): Promise<string> {
   const fatos = await fatosRotaDividas(clienteId);
   const resposta = await frasearComIA(fatos, clienteId, gratuito, () => fallbackRotaDividas(fatos));
   return `${resposta}\n\n_Análise baseada nas informações registradas no QuitaZap._`;
+}
+
+// Resposta oficial (os dois canais chamam esta): Orientador de Quitação — diagnóstico, AGORA /
+// DEPOIS / PRÓXIMO ALVO, tudo calculado no backend (src/lib/orientador-quitacao). Se algo falhar,
+// cai na rota clássica (menor saldo x maior juros) em vez de ficar sem resposta.
+export async function responderRotaDividas(clienteId: string, gratuito: boolean): Promise<string> {
+  try {
+    const { texto } = await orientarQuitacao(clienteId);
+    if (texto.trim()) return texto;
+  } catch (e) {
+    console.error("[Orientador] falhou, usando a rota clássica:", e);
+  }
+  return responderRotaDividasClassica(clienteId, gratuito);
 }

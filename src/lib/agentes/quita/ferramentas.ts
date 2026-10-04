@@ -39,6 +39,12 @@ export const DEFINICOES_FERRAMENTAS = [
   def("plano_pagamento", "Plano de quais contas pagar neste mês e em que ordem."),
   def("dica_de_economia", "Uma dica de economia calculada pelo sistema (maior categoria do mês e quanto 10% dela libera). Use quando o cliente pedir pra economizar ou cortar gastos."),
   def("assinaturas_recorrentes", "Assinaturas e gastos recorrentes que o cliente paga."),
+  def("orientar_quitacao", "Orientador de Quitação. Use quando o cliente perguntar como sair das dívidas, o que fazer com a sobra, qual dívida pagar primeiro ou como organizar o pagamento. Devolve o diagnóstico e o que fazer AGORA / DEPOIS / PRÓXIMO ALVO."),
+  def(
+    "simular_pagamento_extra",
+    "Simula 'e se eu pagar R$ X a mais por mês?' na dívida que está na frente da fila: em quantos meses ela termina.",
+    { type: "object", properties: { valor: { type: "number", description: "Valor extra por mês, em reais." } }, required: ["valor"], additionalProperties: false }
+  ),
 ];
 
 export const NOMES_FERRAMENTAS = DEFINICOES_FERRAMENTAS.map((d) => d.function.name);
@@ -91,6 +97,16 @@ export function criarExecutorFerramentas(clienteId: string, gratuito: boolean, a
       case "plano_pagamento":
         texto = await responderPlanoPagamento(clienteId, gratuito);
         break;
+      case "orientar_quitacao":
+        texto = await viaRegistro("orientar_quitacao");
+        break;
+      case "simular_pagamento_extra": {
+        const valor = Number(args.valor);
+        if (!Number.isFinite(valor) || valor <= 0) return "Informe o valor extra por mês (maior que zero).";
+        const r = await skillRegistry.run<{ texto: string }>("simular_pagamento_extra", ctx, { valor, agora: agora.toISOString() });
+        texto = r.ok ? r.data.texto : "Não consegui simular isso agora.";
+        break;
+      }
       case "assinaturas_recorrentes":
         texto = await responderConsultaVazamentos(clienteId, gratuito);
         break;

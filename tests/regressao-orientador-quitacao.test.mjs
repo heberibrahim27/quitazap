@@ -1,0 +1,190 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import Module from "node:module";
+import path from "node:path";
+import test from "node:test";
+import ts from "typescript";
+
+const root = path.resolve(import.meta.dirname, "..");
+const ler = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
+
+function loadTsModule(relativePath) {
+  const filename = path.join(root, relativePath);
+  const mod = new Module(filename);
+  mod.filename = filename;
+  mod.paths = Module._nodeModulePaths(path.dirname(filename));
+  mod._compile(
+    ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+      fileName: filename,
+    }).outputText,
+    filename
+  );
+  return mod.exports;
+}
+
+const { nivelComprometimento, montarFila, montarOrientacao, formatarOrientacao, simularExtraMensal, formatarSimulacaoExtra, calcularRespiro, FRASES_PROIBIDAS } =
+  loadTsModule("src/lib/orientador-quitacao/motor.ts");
+
+const divida = (over = {}) => ({
+  id: "d" + Math.random().toString(36).slice(2, 7),
+  credor: "Credor",
+  tipo: "OUTRO",
+  saldoDevedor: 1000,
+  valorTotal: 1200,
+  valorPago: 200,
+  emAtraso: false,
+  diasAtraso: 0,
+  venceEmDias: 20,
+  risco: false,
+  consignado: false,
+  parcelasPendentes: [100, 100, 100],
+  ...over,
+});
+
+const entrada = (over = {}) => ({
+  rendaEfetiva: 3000,
+  percentualComprometido: 0.6,
+  saldoProjetado: 800,
+  custoDeVidaMensal: 1500,
+  respiroAtual: 0,
+  respiroMetaExiste: false,
+  dividas: [divida({ credor: "A", saldoDevedor: 900 }), divida({ credor: "B", saldoDevedor: 400 })],
+  quitadas: 0,
+  totalContratado: 5000,
+  totalPago: 500,
+  ...over,
+});
+
+test("níveis de comprometimento: até 50% normal, 50-70 alto, 70-100 crítico, acima de 100 insustentável", () => {
+  assert.equal(nivelComprometimento(0.4), "NORMAL");
+  assert.equal(nivelComprometimento(0.5), "NORMAL");
+  assert.equal(nivelComprometimento(0.6), "ALTO");
+  assert.equal(nivelComprometimento(0.9), "CRITICO");
+  assert.equal(nivelComprometimento(1), "CRITICO");
+  assert.equal(nivelComprometimento(1.38), "INSUSTENTAVEL");
+  assert.equal(nivelComprometimento(null), null);
+});
+
+test("fila: atraso com risco > atraso > vence perto > menor saldo; consignado fica de fora", () => {
+  const fila = montarFila([
+    divida({ credor: "Maior", saldoDevedor: 5000 }),
+    divida({ credor: "Menor", saldoDevedor: 300 }),
+    divida({ credor: "VencePerto", saldoDevedor: 2000, venceEmDias: 3 }),
+    divida({ credor: "Atrasada", saldoDevedor: 4000, emAtraso: true, diasAtraso: 10 }),
+    divida({ credor: "AtrasadaRisco", saldoDevedor: 6000, emAtraso: true, diasAtraso: 2, risco: true }),
+    divida({ credor: "Consignado", saldoDevedor: 100, consignado: true }),
+    divida({ credor: "Quitada", saldoDevedor: 0 }),
+  ]);
+  assert.deepEqual(fila.map((f) => f.credor), ["AtrasadaRisco", "Atrasada", "VencePerto", "Menor", "Maior"]);
+});
+
+test("com sobra e sem Respiro: primeiro separa o Respiro (7 dias), o resto ataca a menor dívida", () => {
+  const o = montarOrientacao(entrada());
+  assert.equal(o.nivel, "ALTO");
+  assert.equal(o.modoCritico, false);
+  // buffer = 5% de 3000 = 150 → sobra alocável 650; respiro alvo = 1500/30*7 = 350
+  assert.equal(o.sobraAlocavel, 650);
+  assert.equal(o.respiro.alvo, 350);
+  const tipos = o.passos.map((p) => p.tipo);
+  assert.deepEqual(tipos.slice(0, 2), ["RESPIRO", "ATACAR"]);
+  assert.equal(o.passos[0].valor, 350);
+  assert.equal(o.passos[1].valor, 300); // resto da sobra (300), limitado ao saldo da menor dívida (400)
+  assert.equal(o.alvo.credor, "B");
+});
+
+test("Respiro já formado: toda a sobra vai pra dívida-alvo, limitada ao saldo dela", () => {
+  const o = montarOrientacao(entrada({ respiroAtual: 400, respiroMetaExiste: true, saldoProjetado: 2000 }));
+  const atacar = o.passos.find((p) => p.tipo === "ATACAR" && p.quando === "AGORA");
+  assert.ok(atacar);
+  assert.equal(atacar.valor, 400); // saldo da menor dívida (B), não a sobra inteira
+  assert.equal(o.passos.at(-1).quando, "PROXIMO");
+});
+
+test("dívida em atraso vem primeiro (REGULARIZAR) e a sobra continua útil", () => {
+  const o = montarOrientacao(
+    entrada({ dividas: [divida({ credor: "Atrasada", saldoDevedor: 800, emAtraso: true, diasAtraso: 15, parcelasPendentes: [200] }), divida({ credor: "Outra", saldoDevedor: 300 })] })
+  );
+  assert.equal(o.passos[0].tipo, "REGULARIZAR");
+  assert.equal(o.passos[0].quando, "AGORA");
+  assert.equal(o.passos[0].valor, 200);
+  assert.equal(o.atrasadas, 1);
+});
+
+test("sem sobra: não inventa dinheiro, manda pagar em dia e pedir dica de economia", () => {
+  const o = montarOrientacao(entrada({ saldoProjetado: 100 }));
+  assert.equal(o.sobraAlocavel, 0);
+  assert.ok(o.passos.some((p) => p.tipo === "SEM_SOBRA"));
+  assert.ok(!o.passos.some((p) => p.tipo === "ATACAR" && p.quando === "AGORA"));
+});
+
+test("insustentável (>100% da renda): modo crítico preserva o essencial e NÃO fala em acelerar quitação", () => {
+  const o = montarOrientacao(entrada({ percentualComprometido: 1.38, saldoProjetado: -1500 }));
+  assert.equal(o.modoCritico, true);
+  assert.deepEqual(o.passos.map((p) => p.tipo), ["PRESERVAR", "MAPEAR", "NEGOCIAR"]);
+  const texto = formatarOrientacao(o);
+  assert.doesNotMatch(texto, /Dinheiro livre para atacar/);
+  assert.doesNotMatch(texto, /ATACAR|a mais em/);
+  assert.match(texto, /renegociar/);
+});
+
+test("sem dívidas: parabeniza e, se der, sugere o Respiro", () => {
+  const o = montarOrientacao(entrada({ dividas: [], quitadas: 2 }));
+  assert.equal(o.passos[0].tipo, "SEM_DIVIDAS");
+  assert.ok(o.passos.some((p) => p.tipo === "RESPIRO"));
+  assert.match(formatarOrientacao(o), /quitou 2 dívidas/);
+});
+
+test("sem renda calculável: pede os dados em vez de recomendar", () => {
+  const o = montarOrientacao(entrada({ percentualComprometido: null, rendaEfetiva: null }));
+  assert.equal(o.passos[0].tipo, "COMPLETAR_DADOS");
+});
+
+test("simulador: extra por mês abate as últimas parcelas pelo cronograma (sem prometer desconto de juros)", () => {
+  const r = simularExtraMensal(Array(10).fill(100), 100);
+  assert.deepEqual(r, { prazoAtualMeses: 10, novoPrazoMeses: 5, mesesAntes: 5 });
+  assert.equal(simularExtraMensal([], 100), null);
+  assert.equal(simularExtraMensal([100, 100], 0), null);
+  const texto = formatarSimulacaoExtra("Banco X", 100, Array(10).fill(100));
+  assert.match(texto, /5 meses antes/);
+  assert.doesNotMatch(texto, /economiza/i);
+  assert.match(texto, /valor de quitação/);
+});
+
+test("Respiro: 7 dias do custo de vida do dia a dia", () => {
+  const r = calcularRespiro(3000, 100, true);
+  assert.equal(r.alvo, 700);
+  assert.equal(r.falta, 600);
+  assert.equal(r.diasCobertos, 1);
+});
+
+test("guardrail: nenhum texto do Orientador sugere dívida nova, investimento ou produto financeiro", () => {
+  const cenarios = [
+    entrada(),
+    entrada({ percentualComprometido: 1.4, saldoProjetado: -900 }),
+    entrada({ saldoProjetado: 50 }),
+    entrada({ dividas: [] }),
+    entrada({ respiroAtual: 900, respiroMetaExiste: true, saldoProjetado: 3000, quitadas: 1, totalPago: 3000 }),
+    entrada({ dividas: [divida({ credor: "Luz", tipo: "ENERGIA", emAtraso: true, diasAtraso: 5, risco: true })] }),
+  ];
+  for (const c of cenarios) {
+    const texto = formatarOrientacao(montarOrientacao(c)).toLowerCase();
+    for (const proibida of FRASES_PROIBIDAS) assert.ok(!texto.includes(proibida.toLowerCase()), `texto sugeriu "${proibida}": ${texto}`);
+  }
+  assert.ok(FRASES_PROIBIDAS.includes("cheque especial") && FRASES_PROIBIDAS.includes("investimento"));
+});
+
+test("o Quita expõe o Orientador só como LEITURA e o prompt carrega a filosofia e os guardrails", () => {
+  const skills = ler("src/lib/agentes/skills/index.ts");
+  for (const nome of ["orientar_quitacao", "simular_pagamento_extra"]) {
+    assert.ok(skills.includes(`"${nome}"`), `skill ${nome} não registrada`);
+  }
+  const trecho = skills.slice(skills.indexOf("const orientarQuitacaoSkill"), skills.indexOf("export const skillRegistry"));
+  assert.doesNotMatch(trecho, /modo: "WRITE"/);
+  const ferramentas = ler("src/lib/agentes/quita/ferramentas.ts");
+  assert.match(ferramentas, /def\("orientar_quitacao"/);
+  assert.doesNotMatch(ferramentas, /prisma\./);
+  const prompt = ler("src/lib/agentes/quita/loop.ts");
+  assert.match(prompt, /QUITAR DÍVIDAS/);
+  assert.match(prompt, /NUNCA sugira novo empréstimo/);
+});

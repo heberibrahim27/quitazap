@@ -10,6 +10,7 @@ import { desfazerUltimoLancamentoDetalhado } from "@/lib/desfazer-lancamento";
 import { detectarComandoTarefa } from "@/lib/tarefa-flow";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import { criarDepositoTyped, encontrarMetaPorNome } from "@/lib/meta-service";
+import { orientarQuitacao, simularPagamentoExtra } from "@/lib/orientador-quitacao/service";
 import { RegistroDeSkills, type Skill } from "./contrato";
 import { compromissosProximos, dicaDeEconomia, metasDoCliente, orcamentoPorCategoria, resumoDoMes } from "./leituras";
 
@@ -104,12 +105,36 @@ const consultarMetas = leitura("consultar_metas", "Metas (cofrinhos) e quanto j�
 
 const consultarDicaEconomia = leitura("consultar_dica_economia", "Uma dica de economia calculada pelo sistema (maior categoria do mês e quanto 10% libera).", dicaDeEconomia);
 
+const orientarQuitacaoSkill = leitura(
+  "orientar_quitacao",
+  "Orientador de Quitação: diagnóstico das dívidas, o que fazer AGORA / DEPOIS e o próximo alvo, com a sobra do mês.",
+  async (id, agora) => (await orientarQuitacao(id, agora)).texto
+);
+
+const simularPagamentoExtraSkill: Skill<{ valor: number; agora: Date }, { texto: string }> = {
+  name: "simular_pagamento_extra",
+  description: "E se eu pagar R$ X a mais por mês? Calcula em quantos meses a dívida-alvo termina pelo cronograma das parcelas.",
+  modo: "READ",
+  validate: (i) => {
+    const valor = Number((i as { valor?: unknown } | null)?.valor);
+    if (!Number.isFinite(valor) || valor <= 0) throw new Error("Informe o valor extra por mês (maior que zero).");
+    const v = (i as { agora?: unknown } | null)?.agora;
+    const d = typeof v === "string" || v instanceof Date ? new Date(v) : new Date();
+    return { valor, agora: Number.isNaN(d.getTime()) ? new Date() : d };
+  },
+  async execute(ctx, { valor, agora }) {
+    return { ok: true, data: { texto: await simularPagamentoExtra(ctx.userId, valor, agora) } };
+  },
+};
+
 export const skillRegistry = new RegistroDeSkills();
 skillRegistry.register(consultarResumoMes);
 skillRegistry.register(consultarOrcamento);
 skillRegistry.register(consultarCompromissos);
 skillRegistry.register(consultarMetas);
 skillRegistry.register(consultarDicaEconomia);
+skillRegistry.register(orientarQuitacaoSkill);
+skillRegistry.register(simularPagamentoExtraSkill);
 skillRegistry.register(consultarFatura);
 skillRegistry.register(desfazerUltimoLancamento);
 skillRegistry.register(criarLembrete);
