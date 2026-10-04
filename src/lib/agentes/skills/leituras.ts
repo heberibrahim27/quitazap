@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { anoMesAtualBrasil, calcularResumoFinanceiro, limitesDoMes } from "@/lib/financeiro/motor";
+import { dicaDoCoach } from "@/lib/agentes/alertas";
 
 const FUSO = "America/Sao_Paulo";
 const TIPOS_GASTO = ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"];
@@ -37,6 +38,21 @@ export async function resumoDoMes(clienteId: string, agora: Date): Promise<strin
   if (t.investimentos !== 0) linhas.push(`Guardado em metas no mês: ${brl(t.investimentos)}`);
   if (r.previsao) linhas.push(`Dias restantes no mês: ${r.previsao.diasRestantes}`);
   return linhas.join("\n");
+}
+
+/**
+ * Coach: UMA dica determinística de economia (maior categoria do mês e quanto
+ * 10% dela libera). Todo número vem do backend; o texto é template.
+ */
+export async function dicaDeEconomia(clienteId: string, agora: Date): Promise<string> {
+  const { ano, mes } = anoMesAtualBrasil(agora);
+  const periodo = limitesDoMes(ano, mes);
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { rendaMensal: true } });
+  const r = await calcularResumoFinanceiro({ clienteId, periodo, rendaMensalDeclarada: cliente?.rendaMensal ?? null });
+  if (r.quantidadeLancamentos === 0 || r.porCategoria.length === 0) return "Ainda não há gastos suficientes neste mês pra eu sugerir uma economia.";
+  const top = [...r.porCategoria].sort((a, b) => b.total - a.total)[0];
+  const dica = dicaDoCoach(top, r.totais.totalSaidasOperacionais);
+  return dica ?? `Seus gastos de ${new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: FUSO }).format(agora)} estão bem distribuídos: a maior categoria é ${top.categoria} (${brl(top.total)}) e não pesa demais no total.`;
 }
 
 export async function orcamentoPorCategoria(clienteId: string, agora: Date): Promise<string> {

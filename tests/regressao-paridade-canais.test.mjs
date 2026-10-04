@@ -134,3 +134,16 @@ test("as leituras do Quita passam pelo registro de skills (fonte única) e todas
   // nenhuma query direta de leitura duplicada dentro das ferramentas do Quita
   assert.doesNotMatch(ferramentas, /prisma\./);
 });
+
+test("os dois canais registram o agente Coach quando respondem 'como economizar' e todos os agentes do ciclo têm coletor isolado", () => {
+  for (const arquivo of [CHAT, WHATSAPP]) {
+    assert.ok(ler(arquivo).includes('tipoConsulta === "como_economizar"'), `${arquivo}: falta registrar o Coach`);
+    assert.ok(ler(arquivo).includes("registrarUsoCoach("), `${arquivo}: não chama registrarUsoCoach`);
+  }
+  const coletores = ler("src/lib/agentes/coletores.ts");
+  for (const agente of ["sentinela", "cartoes", "compromissos", "metas", "dividas", "lancamentos", "fechamento"]) {
+    assert.ok(coletores.includes(`  ${agente}: coletar`), `agente ${agente} sem coletor`);
+  }
+  // isolamento: cada coletor roda dentro de try/catch próprio
+  assert.match(coletores, /try \{[\s\S]*COLETORES\[agente\]\(ctx\)[\s\S]*\} catch/);
+});

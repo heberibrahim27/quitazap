@@ -23,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import { deliverReminder } from "@/lib/reminder-delivery";
 import { calcularProximaOcorrencia } from "@/lib/tarefa-flow";
 import { enviarPush } from "@/lib/push-service";
+import { registrarExecucaoAgente } from "@/lib/agentes/alertas-store";
 
 const FUSO = "America/Sao_Paulo";
 
@@ -187,5 +188,15 @@ export async function GET(req: NextRequest) {
   };
 
   console.log("[CRON TAREFAS]", resumo);
+  // Lembrete de tarefa/pagamento (D-1/D0) e recorrência de tarefa: agente Compromissos.
+  await registrarExecucaoAgente({
+    agente: "compromissos",
+    iniciadoEm: agora,
+    terminadoEm: new Date(),
+    clientesAvaliados: lembretesEnviados + avancadas,
+    acoes: lembretesEnviados,
+    erros,
+    detalhes: { origem: "lembretes de tarefa (D-1/D0)", avancadas, versao: "1.1" },
+  });
   return NextResponse.json(resumo);
 }

@@ -225,7 +225,42 @@ export async function transcreverAudioBytes(audioBlob: Blob, telemetria: Telemet
   return transcreverAudioBlob(audioBlob, ext, telemetria);
 }
 
+/**
+ * Análise de imagem (comprovante, contracheque…) — porta única dos dois canais.
+ * É o trabalho do agente Documentos: cada execução (sucesso ou erro) vai pro
+ * log de agentes, visível em /agentes.
+ */
 export async function analisarImagem(imageUrl: string, prompt: string, telemetria: TelemetriaIA): Promise<string> {
+  const iniciadoEm = new Date();
+  try {
+    const texto = await analisarImagemBruta(imageUrl, prompt, telemetria);
+    void registrarExecucaoDocumento(iniciadoEm, telemetria, texto.trim().length > 0 ? null : "imagem sem texto extraído");
+    return texto;
+  } catch (err) {
+    void registrarExecucaoDocumento(iniciadoEm, telemetria, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
+async function registrarExecucaoDocumento(iniciadoEm: Date, telemetria: TelemetriaIA, erro: string | null): Promise<void> {
+  try {
+    // import dinâmico: openai-client não pode depender do repositório de agentes na carga do módulo
+    const { registrarExecucaoAgente } = await import("@/lib/agentes/alertas-store");
+    await registrarExecucaoAgente({
+      agente: "documentos",
+      iniciadoEm,
+      terminadoEm: new Date(),
+      clientesAvaliados: 1,
+      acoes: erro ? 0 : 1,
+      erros: erro ? [erro.slice(0, 200)] : [],
+      detalhes: { origem: telemetria.skill, versao: "1.0" },
+    });
+  } catch {
+    // log de agente nunca pode quebrar a leitura do documento
+  }
+}
+
+async function analisarImagemBruta(imageUrl: string, prompt: string, telemetria: TelemetriaIA): Promise<string> {
   const apiKey = apiKeyValida();
   if (!apiKey) throw new Error("OPENAI_API_KEY não configurada.");
 

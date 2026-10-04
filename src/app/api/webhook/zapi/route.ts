@@ -89,7 +89,7 @@ import {
 import { processarLeadVendas } from "@/lib/sales-bot";
 import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
 import { detectarFeedbackAlerta } from "@/lib/agentes/feedback";
-import { aplicarFeedbackAlerta } from "@/lib/agentes/alertas-store";
+import { aplicarFeedbackAlerta, registrarUsoCoach } from "@/lib/agentes/alertas-store";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import {
   gerarResumoMensal,
@@ -1739,6 +1739,7 @@ Pode mandar tudo em uma mensagem só.`;
         const respostaConsulta = perguntaSemValorEspecifico
           ? await responderLimiteSeguro(sessao.clienteId, isGratuito)
           : await responderConsultaFinanceira(tipoConsulta, sessao.clienteId, mensagem, isGratuito);
+        if (tipoConsulta === "como_economizar") registrarUsoCoach("pedido do cliente no WhatsApp");
         await sendWhatsApp(telefone, respostaConsulta);
 
         await prisma.botSessao.updateMany({

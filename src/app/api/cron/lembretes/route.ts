@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deliverReminder } from "@/lib/reminder-delivery";
+import { registrarExecucaoAgente } from "@/lib/agentes/alertas-store";
 
 // ── Handler principal ─────────────────────
 
@@ -92,5 +93,15 @@ export async function GET(req: NextRequest) {
   };
 
   console.log("[LEMBRETES]", resumo);
+  // Aviso de vencimento de dívida (D-3/D-1/D0) é trabalho do agente Compromissos.
+  await registrarExecucaoAgente({
+    agente: "compromissos",
+    iniciadoEm: agora,
+    terminadoEm: new Date(),
+    clientesAvaliados: legadoEnviados + legadoErros.length,
+    acoes: legadoEnviados,
+    erros: legadoErros,
+    detalhes: { origem: "lembretes de dívida (D-3/D-1/D0)", versao: "1.1" },
+  });
   return NextResponse.json(resumo);
 }

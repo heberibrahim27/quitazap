@@ -37,6 +37,7 @@ export const DEFINICOES_FERRAMENTAS = [
   ),
   def("rota_dividas", "Qual dívida pagar primeiro e como sair das dívidas."),
   def("plano_pagamento", "Plano de quais contas pagar neste mês e em que ordem."),
+  def("dica_de_economia", "Uma dica de economia calculada pelo sistema (maior categoria do mês e quanto 10% dela libera). Use quando o cliente pedir pra economizar ou cortar gastos."),
   def("assinaturas_recorrentes", "Assinaturas e gastos recorrentes que o cliente paga."),
 ];
 
@@ -74,6 +75,9 @@ export function criarExecutorFerramentas(clienteId: string, gratuito: boolean, a
         break;
       case "metas":
         texto = await viaRegistro("consultar_metas");
+        break;
+      case "dica_de_economia":
+        texto = await viaRegistro("consultar_dica_economia");
         break;
       case "posso_gastar": {
         const valor = Number(args.valor);

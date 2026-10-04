@@ -120,6 +120,13 @@ export async function tentarResponderComQuita(
         },
       });
     }
+    // Coach: a dica de economia é trabalho do agente Coach (sob demanda).
+    if (resultado.ferramentasUsadas.includes("dica_de_economia")) {
+      await registrarExecucaoAgente({
+        agente: "coach", iniciadoEm, terminadoEm: new Date(), clientesAvaliados: 1, acoes: 1, erros: [],
+        detalhes: { origem: "pedido do cliente via Quita", versao: "1.0" },
+      });
+    }
     return resultado.resposta;
   } catch (err) {
     console.error("[QUITA] Erro no agente, caindo no fluxo antigo:", err);

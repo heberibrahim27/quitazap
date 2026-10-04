@@ -18,6 +18,8 @@ import { chaveDedupe } from "./alertas";
 import type { HistoricoAlerta } from "./politica";
 import type { FeedbackAlerta } from "./feedback";
 import type { Cobertura } from "./lotes";
+import type { SaudeTipo } from "./politica";
+import { agregarMetricasPorTipo } from "./status";
 
 const TIPO_MENSAGEM = "alerta_proativo";
 const EVENTO_FEEDBACK = "alerta_feedback";
@@ -166,6 +168,31 @@ export async function definirAlertaLigado(clienteId: string, tipo: string, ligad
 async function silenciar(clienteId: string, tipo: string): Promise<void> {
   const ja = await prisma.eventoAnalytics.findFirst({ where: { clienteId, tipo: EVENTO_MUTE, caminho: tipo }, select: { id: true } });
   if (!ja) await prisma.eventoAnalytics.create({ data: { clienteId, tipo: EVENTO_MUTE, caminho: tipo } });
+}
+
+/** Coach respondeu um pedido de economia (fluxo determinístico dos dois canais): registra a execução do agente. */
+export function registrarUsoCoach(origem: string): void {
+  const agora = new Date();
+  void registrarExecucaoAgente({ agente: "coach", iniciadoEm: agora, terminadoEm: agora, clientesAvaliados: 1, acoes: 1, erros: [], detalhes: { origem, versao: "1.0" } });
+}
+
+/** Saúde por TIPO de alerta nos últimos 7 dias (base do disjuntor por agente). */
+export async function carregarSaudePorTipo(agora: Date): Promise<SaudeTipo[]> {
+  const desde = new Date(agora.getTime() - 7 * 86_400_000);
+  const [alertas, feedbacks, mutes] = await Promise.all([
+    prisma.mensagemChat.findMany({
+      where: { direcao: "BOT", criadoEm: { gte: desde }, dadosEstruturados: { path: ["tipo"], equals: TIPO_MENSAGEM } },
+      select: { dadosEstruturados: true },
+    }),
+    prisma.eventoAnalytics.findMany({ where: { tipo: EVENTO_FEEDBACK, criadoEm: { gte: desde } }, select: { caminho: true } }),
+    prisma.eventoAnalytics.findMany({ where: { tipo: EVENTO_MUTE, criadoEm: { gte: desde } }, select: { caminho: true } }),
+  ]);
+  const metricas = agregarMetricasPorTipo(
+    alertas.map((a) => (a.dadosEstruturados as { alerta?: { tipo?: string } } | null)?.alerta?.tipo ?? "DESCONHECIDO"),
+    feedbacks.map((e) => e.caminho),
+    mutes.map((e) => e.caminho)
+  );
+  return metricas.map((m) => ({ tipo: m.tipo, enviados: m.enviados, errados: m.errados, silenciados: m.silenciados }));
 }
 
 /** Cobertura (checkpoint) do dia gravada na última execução do agente, se houver. */

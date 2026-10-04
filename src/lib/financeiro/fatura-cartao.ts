@@ -191,6 +191,29 @@ export function resumirFaturasDoCartao(cartao: CartaoParaFatura, compras: Compra
   };
 }
 
+/**
+ * Limite comprometido de um cartão: tudo que está numa fatura que ainda NÃO
+ * venceu (vencimento hoje ou depois) mais as faturas futuras. Fatura já
+ * vencida é tratada como paga — o app não tem "marcar fatura como paga".
+ * Mesma conta da tela de Cartões e do agente Cartões (fonte única).
+ */
+export function comprometidoDoCartao(
+  compras: CompraParaFatura[],
+  cartao: { diaFechamento: number | null; diaVencimento: number | null },
+  agora: Date
+): number {
+  const hoje = anoMesDiaBrasil(agora);
+  const atualIdx = hoje.ano * 12 + hoje.mes;
+  let total = 0;
+  for (const c of compras) {
+    const f = mesFaturaDaCompra(c.data, cartao.diaFechamento, cartao.diaVencimento);
+    const idx = f.ano * 12 + f.mes;
+    const jaVenceu = idx < atualIdx || (idx === atualIdx && cartao.diaVencimento != null && cartao.diaVencimento < hoje.dia);
+    if (!jaVenceu) total += c.valor;
+  }
+  return Math.round(total * 100) / 100;
+}
+
 function brl(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }).replace(/\u00a0/g, " ");
 }

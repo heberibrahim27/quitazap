@@ -15,7 +15,53 @@ export type TipoAlerta =
   | "NEGATIVE_PROJECTION"
   | "CARD_CLOSING"
   | "SPENDING_ANOMALY"
-  | "MONTH_CLOSING";
+  | "MONTH_CLOSING"
+  | "CARD_LIMIT_HIGH"
+  | "CARD_NEXT_INVOICE_HEAVY"
+  | "COMMITMENTS_WEEK"
+  | "GOAL_MILESTONE"
+  | "GOAL_STALLED"
+  | "DEBT_OVERDUE"
+  | "LOGGING_GAP"
+  | "OUTROS_HIGH";
+
+/** Quem PROPÕE cada tipo de alerta. Os agentes propõem; o portão único (politica.ts) decide. */
+export type AgenteId = "sentinela" | "cartoes" | "compromissos" | "metas" | "dividas" | "lancamentos" | "fechamento";
+
+/** Assunto do alerta: o portão evita duas mensagens do MESMO assunto em dias seguidos (exceto crítico). */
+export type TopicoAlerta = "CASHFLOW_RISK" | "CARD_RISK" | "BUDGET_RISK" | "DEBT_RISK" | "GOALS" | "AGENDA" | "REVIEW" | "DATA_HYGIENE" | "ANOMALY";
+
+export const TOPICO_DO_TIPO: Record<TipoAlerta, TopicoAlerta> = {
+  NEGATIVE_PROJECTION: "CASHFLOW_RISK",
+  CARD_NEXT_INVOICE_HEAVY: "CASHFLOW_RISK",
+  CARD_LIMIT_HIGH: "CARD_RISK",
+  CARD_CLOSING: "CARD_RISK",
+  CATEGORY_BUDGET: "BUDGET_RISK",
+  DEBT_OVERDUE: "DEBT_RISK",
+  GOAL_MILESTONE: "GOALS",
+  GOAL_STALLED: "GOALS",
+  COMMITMENTS_WEEK: "AGENDA",
+  MONTH_CLOSING: "REVIEW",
+  LOGGING_GAP: "DATA_HYGIENE",
+  OUTROS_HIGH: "DATA_HYGIENE",
+  SPENDING_ANOMALY: "ANOMALY",
+};
+
+export const AGENTE_DO_TIPO: Record<TipoAlerta, AgenteId> = {
+  CATEGORY_BUDGET: "sentinela",
+  NEGATIVE_PROJECTION: "sentinela",
+  SPENDING_ANOMALY: "sentinela",
+  CARD_CLOSING: "cartoes",
+  CARD_LIMIT_HIGH: "cartoes",
+  CARD_NEXT_INVOICE_HEAVY: "cartoes",
+  COMMITMENTS_WEEK: "compromissos",
+  GOAL_MILESTONE: "metas",
+  GOAL_STALLED: "metas",
+  DEBT_OVERDUE: "dividas",
+  LOGGING_GAP: "lancamentos",
+  OUTROS_HIGH: "lancamentos",
+  MONTH_CLOSING: "fechamento",
+};
 
 export interface CandidatoAlerta {
   tipo: TipoAlerta;
@@ -29,6 +75,8 @@ export interface CandidatoAlerta {
   prioridade: number;
   mensagem: string;
   payload?: Record<string, unknown>;
+  /** Instante lógico do ciclo em que os dados foram lidos (todos os candidatos de um ciclo compartilham). */
+  asOf?: Date;
 }
 
 export function chaveDedupe(c: Pick<CandidatoAlerta, "tipo" | "entityId" | "qualifier" | "periodKey">): string {
@@ -40,11 +88,19 @@ export function brl(v: number): string {
 }
 
 const ORDEM_DESEMPATE: Record<TipoAlerta, number> = {
-  NEGATIVE_PROJECTION: 0,
-  CATEGORY_BUDGET: 1,
-  CARD_CLOSING: 2,
-  SPENDING_ANOMALY: 3,
-  MONTH_CLOSING: 4,
+  DEBT_OVERDUE: 0,
+  NEGATIVE_PROJECTION: 1,
+  CATEGORY_BUDGET: 2,
+  CARD_LIMIT_HIGH: 3,
+  CARD_CLOSING: 4,
+  MONTH_CLOSING: 5,
+  COMMITMENTS_WEEK: 6,
+  CARD_NEXT_INVOICE_HEAVY: 7,
+  GOAL_MILESTONE: 8,
+  SPENDING_ANOMALY: 9,
+  GOAL_STALLED: 10,
+  LOGGING_GAP: 11,
+  OUTROS_HIGH: 12,
 };
 
 /** Mais prioritário primeiro; empate resolvido pelo tipo (ordem fixa) e pela chave. */
@@ -80,9 +136,8 @@ export function detectarOrcamento(
 
     const restante = Math.max(c.limite - c.gasto, 0);
     const dias = Math.max(contexto.diasRestantes, 0);
-    const base = faixa === 100 ? 75 : faixa === 90 ? 60 : 45;
-    // Sobra mês pela frente = mais espaço pra reagir = mais vale avisar.
-    const prioridade = base + (dias >= 10 ? 5 : 0);
+    // Prioridades por EVENTO (tabela acordada com o ChatGPT): 100% = 94, 90% = 88, 80% = 78.
+    const prioridade = faixa === 100 ? 94 : faixa === 90 ? 88 : 78;
 
     const mensagem =
       faixa === 100
@@ -120,7 +175,8 @@ export function detectarProjecaoNegativa(
       entityId: "GLOBAL",
       qualifier: faixa,
       periodKey: contexto.periodKey,
-      prioridade: faixa === "BELOW_1000" ? 90 : 85,
+      // severa (>= R$ 1.000 no vermelho) 96; moderada 90
+      prioridade: faixa === "BELOW_1000" ? 96 : 90,
       mensagem:
         `⚠️ *Atenção ao mês:* pelo que está registrado (renda, contas e dívidas), a projeção fecha em *${brl(falta)} no vermelho*` +
         (dias > 0 ? ` — ainda faltam ${dias} ${dias === 1 ? "dia" : "dias"}.` : ".") +
@@ -188,7 +244,7 @@ export function detectarFechamentoFatura(cartoes: CartaoParaAlerta[], agora: Dat
       entityId: c.id,
       qualifier: "D-2",
       periodKey: iso,
-      prioridade: 55,
+      prioridade: 82,
       mensagem:
         `💳 *Fatura do ${c.nome}:* fecha em 2 dias (${dd}).` +
         (c.valorFaturaAberta != null && c.valorFaturaAberta > 0 ? ` Até agora a fatura aberta soma ${brl(c.valorFaturaAberta)}.` : "") +
@@ -216,6 +272,17 @@ export interface FechamentoMes {
   quantidadeLancamentos: number;
 }
 
+/**
+ * Coach: UMA dica determinística calculada pelo backend (nada de LLM). Só
+ * aparece quando a categoria pesa de verdade no mês (>= 20% das saídas).
+ */
+export function dicaDoCoach(topCategoria: { categoria: string; total: number } | null, saidas: number): string | null {
+  if (!topCategoria || !(saidas > 0)) return null;
+  if (topCategoria.total / saidas < 0.2) return null;
+  const economia = Math.round(topCategoria.total * 0.1 * 100) / 100;
+  return `💡 *Dica do Coach:* sua maior categoria foi ${topCategoria.categoria} (${brl(topCategoria.total)}). Reduzir 10% libera ${brl(economia)} por mês.`;
+}
+
 /** O resumo só é oferecido nos 3 primeiros dias do mês (se a cota do dia 1
  * estiver ocupada, tenta no 2 e no 3); depois disso o mês "já passou". */
 export function detectarFechamentoMes(f: FechamentoMes | null, diaDoMes: number): CandidatoAlerta[] {
@@ -230,6 +297,8 @@ export function detectarFechamentoMes(f: FechamentoMes | null, diaDoMes: number)
   ];
   if (f.guardadoEmMetas > 0) linhas.push(`🎯 Guardado em metas: ${brl(f.guardadoEmMetas)}`);
   if (f.topCategoria) linhas.push(`🏷️ Onde mais gastou: ${f.topCategoria.categoria} (${brl(f.topCategoria.total)})`);
+  const dica = dicaDoCoach(f.topCategoria, f.saidas);
+  if (dica) linhas.push(``, dica);
   linhas.push(``, `_Considera só o que foi registrado no QuitaZAP._`);
   return [
     {
@@ -239,7 +308,7 @@ export function detectarFechamentoMes(f: FechamentoMes | null, diaDoMes: number)
       periodKey: f.periodKey,
       prioridade: 70,
       mensagem: linhas.join("\n"),
-      payload: { receitas: f.receitas, saidas: f.saidas, resultado: f.resultado },
+      payload: { receitas: f.receitas, saidas: f.saidas, resultado: f.resultado, coach: dica != null },
     },
   ];
 }
@@ -262,7 +331,8 @@ export function detectarAnomalias(insights: InsightParaAlerta[]): CandidatoAlert
     entityId: i.id,
     qualifier: "ANOMALY",
     periodKey: i.mes,
-    prioridade: 50,
+    // variável: leve 55, moderada 70, forte 85 (segue desligada enquanto em modo sombra)
+    prioridade: i.multiplicador >= 2.5 ? 85 : i.multiplicador >= 1.5 ? 70 : 55,
     mensagem: `🔎 ${i.textoGerado}`,
     payload: { categoria: i.categoria, totalMesAtual: i.totalMesAtual, mediaUltimosMeses: i.mediaUltimosMeses, multiplicador: i.multiplicador },
   }));

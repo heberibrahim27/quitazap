@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { gradienteDoCartao } from "@/lib/cartoes-conhecidos";
-import { deslocarMes, mesFaturaDaCompra } from "@/lib/financeiro/fatura-cartao";
+import { comprometidoDoCartao, deslocarMes, mesFaturaDaCompra } from "@/lib/financeiro/fatura-cartao";
 import { CartaoCarrossel, type CartaoCarrosselItem } from "./CartaoCarrossel";
 import { MesFiltro } from "../MesFiltro";
 
@@ -154,16 +154,18 @@ export default async function CartoesPage({
   // paga — o app não tem "marcar fatura como paga". Achado em QA
   // (04/10/2026): antes somava por mês CALENDÁRIO e a fatura de 15/09, que só
   // vencia em 09/10, saía do limite um mês cedo.
+  // A conta mora em comprometidoDoCartao (fatura-cartao.ts) e é a mesma que o
+  // agente Cartões usa pro alerta de limite — fonte única.
   const comprometidoPorCartao = new Map<string, number>();
-  for (const l of proximasParcelasTodas) {
-    if (!l.cartaoId) continue;
-    const fatura = mesFaturaDaCompra(l.data, diaFechamentoPorCartao.get(l.cartaoId) ?? null, diaVencimentoPorCartao.get(l.cartaoId) ?? null);
-    const faturaIdx = fatura.ano * 12 + fatura.mes;
-    const atualIdx = anoAtual * 12 + mesAtual;
-    const diaVenc = diaVencimentoPorCartao.get(l.cartaoId) ?? null;
-    const jaVenceu = faturaIdx < atualIdx || (faturaIdx === atualIdx && diaVenc != null && diaVenc < diaAtual);
-    if (jaVenceu) continue;
-    comprometidoPorCartao.set(l.cartaoId, (comprometidoPorCartao.get(l.cartaoId) ?? 0) + l.valor);
+  for (const c of cartoes) {
+    comprometidoPorCartao.set(
+      c.id,
+      comprometidoDoCartao(
+        proximasParcelasTodas.filter((l) => l.cartaoId === c.id),
+        { diaFechamento: c.diaFechamento, diaVencimento: c.diaVencimento },
+        new Date()
+      )
+    );
   }
 
   const faturaSelPorCartao = new Map<string, number>();

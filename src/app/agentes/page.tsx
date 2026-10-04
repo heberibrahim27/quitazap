@@ -117,6 +117,12 @@ export default async function AgentesPage() {
                 {def.agenda && <span>Próxima execução: {def.agenda}</span>}
                 <span>Configuração: {desligados.includes(def.chave) ? "desligado (AGENTES_DESLIGADOS)" : "habilitado"}</span>
               </div>
+              {typeof dados.propostos === "number" && (
+                <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--qa-gray-400)" }}>
+                  Última execução — brutos {String(dados.brutos ?? 0)} · propostos {String(dados.propostos)} · selecionados {String(dados.selecionados ?? 0)} · enviados{" "}
+                  {String(dados.enviados ?? 0)} · suprimidos por política {String(dados.suprimidosPolitica ?? 0)} · por prioridade {String(dados.suprimidosPrioridade ?? 0)}
+                </p>
+              )}
               {typeof dados.pausado === "string" && (
                 <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#fcd34d" }}>Pausado na última execução: {dados.pausado}</p>
               )}

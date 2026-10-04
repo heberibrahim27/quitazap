@@ -60,7 +60,7 @@ import {
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
 import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
 import { detectarFeedbackAlerta } from "@/lib/agentes/feedback";
-import { aplicarFeedbackAlerta } from "@/lib/agentes/alertas-store";
+import { aplicarFeedbackAlerta, registrarUsoCoach } from "@/lib/agentes/alertas-store";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import { pedidoDesfazerLancamento } from "@/lib/comandos-texto";
@@ -337,6 +337,7 @@ export async function processarMensagemControle(input: {
     const respostaConsulta = perguntaSemValorEspecifico
       ? await responderLimiteSeguro(clienteId, isGratuito)
       : await responderConsultaFinanceira(tipoConsulta, clienteId, mensagem, isGratuito);
+    if (tipoConsulta === "como_economizar") registrarUsoCoach("pedido do cliente no chat");
     // "onde_gasto_mais" ganha também o card de gráfico estruturado — mesma
     // fonte (calcularResumoFinanceiro) que o texto acima já usa por baixo,
     // nunca um cálculo paralelo.

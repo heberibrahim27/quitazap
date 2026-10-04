@@ -11,7 +11,7 @@ import { detectarComandoTarefa } from "@/lib/tarefa-flow";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import { criarDepositoTyped, encontrarMetaPorNome } from "@/lib/meta-service";
 import { RegistroDeSkills, type Skill } from "./contrato";
-import { compromissosProximos, metasDoCliente, orcamentoPorCategoria, resumoDoMes } from "./leituras";
+import { compromissosProximos, dicaDeEconomia, metasDoCliente, orcamentoPorCategoria, resumoDoMes } from "./leituras";
 
 export * from "./contrato";
 
@@ -102,11 +102,14 @@ const consultarOrcamento = leitura("consultar_orcamento", "Quanto já gastou do 
 const consultarCompromissos = leitura("consultar_compromissos", "Contas, lembretes e parcelas que vencem nos próximos 30 dias.", compromissosProximos);
 const consultarMetas = leitura("consultar_metas", "Metas (cofrinhos) e quanto já foi guardado em cada.", (id) => metasDoCliente(id));
 
+const consultarDicaEconomia = leitura("consultar_dica_economia", "Uma dica de economia calculada pelo sistema (maior categoria do mês e quanto 10% libera).", dicaDeEconomia);
+
 export const skillRegistry = new RegistroDeSkills();
 skillRegistry.register(consultarResumoMes);
 skillRegistry.register(consultarOrcamento);
 skillRegistry.register(consultarCompromissos);
 skillRegistry.register(consultarMetas);
+skillRegistry.register(consultarDicaEconomia);
 skillRegistry.register(consultarFatura);
 skillRegistry.register(desfazerUltimoLancamento);
 skillRegistry.register(criarLembrete);
