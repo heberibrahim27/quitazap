@@ -75,7 +75,7 @@ export function MetaCard({ meta }: { meta: MetaView }) {
         />
       </div>
 
-      <p style={{ margin: "14px 0 0", fontSize: 24, fontWeight: 800, fontFamily: "'IBM Plex Mono', monospace" }}>
+      <p style={{ margin: "14px 0 0", fontSize: 24, fontWeight: 800 }}>
         {fmtValor(meta.guardado)}
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-faint)" }}> de {fmtValor(meta.valorAlvo)}</span>
       </p>
@@ -83,7 +83,7 @@ export function MetaCard({ meta }: { meta: MetaView }) {
       <div className="cartoes-total-bar-track" style={{ marginTop: 10 }}>
         <span
           className="cartoes-total-bar-fill"
-          style={{ width: `${percentual}%`, background: atingida ? "var(--green)" : undefined }}
+          style={{ width: `${percentual}%`, background: "linear-gradient(90deg, #5BE09A, #12A150)" }}
         />
       </div>
       <p style={{ margin: "6px 0 0", fontSize: 11.5, fontWeight: 700, color: "var(--ink-dim)" }}>
@@ -164,7 +164,7 @@ export function MetaCard({ meta }: { meta: MetaView }) {
                     <div className="mc-list-side">
                       <span
                         style={{
-                          fontSize: 13.5, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace",
+                          fontSize: 13.5, fontWeight: 700,
                           color: saque ? "var(--red)" : "var(--green)",
                         }}
                       >

@@ -139,7 +139,7 @@ export default async function GastosPage({
           <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>
             Total gasto em {nomeMes.toLowerCase()}
           </p>
-          <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--ink)" }}>
             {fmtValor(totalGeral)}
           </p>
         </div>

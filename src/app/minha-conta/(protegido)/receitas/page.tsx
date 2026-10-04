@@ -101,12 +101,15 @@ export default async function ReceitasPage({
         label={`${nomeMes}/${ano}`}
       />
 
-      <div className="mc-card" style={{ marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>Total recebido em {nomeMes.toLowerCase()}</p>
-        <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--green)", fontFamily: "'IBM Plex Mono', monospace" }}>
-          {fmtValor(total)}
-        </p>
-      </div>
+      <section className="card aba-destaque verde" style={{ marginBottom: 16 }}>
+        <div className="aba-destaque-topo">
+          <div>
+            <p className="aba-destaque-rot">Total recebido em {nomeMes.toLowerCase()}</p>
+            <p className="aba-destaque-valor">{fmtValor(total)}</p>
+          </div>
+          <span className="aba-destaque-chip">{receitas.length} entrada{receitas.length === 1 ? "" : "s"}</span>
+        </div>
+      </section>
 
       <div className="mc-card">
         {receitas.length === 0 ? (

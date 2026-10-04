@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { ExcluirForm } from "@/components/ExcluirForm";
 import { ParcelasAccordion } from "./ParcelasAccordion";
 import { ParcelasLista } from "./ParcelasLista";
+import { marcarParcelasPagasAte } from "@/lib/divida-service";
+import { diasCalendarioBrasil } from "@/lib/financeiro/dias-brasil";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -130,6 +132,26 @@ export default async function DetalheEmprestimoPage({
     redirect(`/minha-conta/emprestimos/${dividaId}?parcelasAbertas=1`);
   }
 
+  // "Já paguei até a parcela N": marca 1..N de uma vez (empréstimo cadastrado depois
+  // de andar um tempo, ou parcelas que o cliente pagou fora do app).
+  async function pagarAteParcela(formData: FormData) {
+    "use server";
+    const clienteAtual = await getClienteAtual();
+    if (!clienteAtual) redirect("/minha-conta/entrar");
+
+    const resultado = await marcarParcelasPagasAte({
+      clienteId: clienteAtual.id,
+      dividaId: id,
+      ate: Number(String(formData.get("ate") || "").trim()),
+    });
+    if (!resultado.ok) {
+      redirect(`/minha-conta/emprestimos/${id}?parcelasAbertas=1&erro=${encodeURIComponent(resultado.erro)}`);
+    }
+
+    revalidatePath("/minha-conta", "layout");
+    redirect(`/minha-conta/emprestimos/${id}?parcelasAbertas=1`);
+  }
+
   async function desfazerPagamento(formData: FormData) {
     "use server";
     const clienteAtual = await getClienteAtual();
@@ -176,6 +198,11 @@ export default async function DetalheEmprestimoPage({
     .filter((p) => p.status === "PENDENTE")
     .sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())[0];
 
+  // Parcelas em aberto cujo vencimento já passou: provavelmente já foram pagas, só não foram marcadas.
+  const hojeRef = new Date();
+  const vencidasAbertas = emprestimo.parcelas.filter((p) => p.status !== "PAGA" && diasCalendarioBrasil(p.vencimento, hojeRef) < 0);
+  const ultimaVencida = vencidasAbertas[vencidasAbertas.length - 1];
+
   return (
     <div>
       <div style={{ marginBottom: 4 }}>
@@ -198,11 +225,30 @@ export default async function DetalheEmprestimoPage({
         </div>
       )}
 
+      {vencidasAbertas.length > 0 && ultimaVencida && (
+        <section className="emp-vencidas">
+          <p className="emp-vencidas-titulo">
+            {vencidasAbertas.length} parcela{vencidasAbertas.length === 1 ? "" : "s"} já venceu{vencidasAbertas.length === 1 ? "" : "ram"} e {vencidasAbertas.length === 1 ? "está" : "estão"} em aberto
+          </p>
+          <p className="emp-vencidas-texto">
+            De {fmtData(vencidasAbertas[0].vencimento)} a {fmtData(ultimaVencida.vencimento)}. Se você já pagou essas parcelas, marque todas de uma vez em vez de uma por uma.
+          </p>
+          <form action={pagarAteParcela} className="emp-vencidas-form">
+            <label>
+              Já paguei até a parcela
+              <input name="ate" type="number" min={1} max={emprestimo.parcelas.length} defaultValue={ultimaVencida.numero} className="mc-input" />
+            </label>
+            <button type="submit" className="mc-btn-primary" style={{ border: "none" }}>Marcar como pagas</button>
+          </form>
+          <p className="emp-vencidas-nota">Se alguma ainda está em atraso, deixe em aberto — dá para marcar uma por uma na lista de parcelas.</p>
+        </section>
+      )}
+
       <div className="mc-card" style={{ marginBottom: 16, display: "flex", gap: 24, flexWrap: "wrap" }}>
         {proximaParcela && (
           <div>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Parcela mensal</p>
-            <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--blue)", fontFamily: "'IBM Plex Mono', monospace" }}>
+            <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--blue)" }}>
               {fmtValor(proximaParcela.valor)}
             </p>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--ink-faint)" }}>
@@ -212,20 +258,20 @@ export default async function DetalheEmprestimoPage({
         )}
         <div>
           <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Falta pagar</p>
-          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: saldoDevedor > 0 ? "var(--red)" : "var(--green)", fontFamily: "'IBM Plex Mono', monospace" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: saldoDevedor > 0 ? "var(--red)" : "var(--green)" }}>
             {fmtValor(saldoDevedor)}
           </p>
         </div>
         <div>
           <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Total do empréstimo</p>
-          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--ink)" }}>
             {fmtValor(emprestimo.valorTotal)}
           </p>
         </div>
         {jurosTotal > 0.01 && (
           <div>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Juros total</p>
-            <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--orange)", fontFamily: "'IBM Plex Mono', monospace" }}>
+            <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--orange)" }}>
               {fmtValor(jurosTotal)}
             </p>
           </div>

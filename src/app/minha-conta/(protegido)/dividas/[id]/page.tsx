@@ -62,13 +62,13 @@ export default async function DetalheDividaPage({ params }: { params: Promise<{ 
       <div className="mc-card" style={{ marginBottom: 16, display: "flex", gap: 24 }}>
         <div>
           <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Saldo devedor</p>
-          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--red)", fontFamily: "'IBM Plex Mono', monospace" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--red)" }}>
             {fmtValor(saldoDevedor)}
           </p>
         </div>
         <div>
           <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Total da dívida</p>
-          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 800, color: "var(--ink)" }}>
             {fmtValor(divida.valorTotal)}
           </p>
         </div>

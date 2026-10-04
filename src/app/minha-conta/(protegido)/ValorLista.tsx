@@ -16,7 +16,7 @@ export function ValorLista({
 
   return (
     <div className={`mc-list-value${classeCor}`}>
-      <span className="mc-list-value-cifrao">{sinal}R$</span>
+      <span className="mc-list-value-cifrao">{sinal === "-" ? "−" : sinal}R$</span>
       <span className="mc-list-value-numero">{numero}</span>
     </div>
   );

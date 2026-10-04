@@ -88,18 +88,14 @@ export default async function MovimentacoesPage({
         </p>
       </div>
 
-      <div className="mc-card" style={{ marginBottom: 16, display: "flex", gap: 24 }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Entradas</p>
-          <p style={{ margin: "6px 0 0", fontSize: 20, fontWeight: 800, color: "var(--green)", fontFamily: "'IBM Plex Mono', monospace" }}>
-            {fmtValor(entradas)}
-          </p>
+      <div className="rsm-duo" style={{ marginBottom: 16 }}>
+        <div className="rsm-tile entra">
+          <span className="rsm-tile-rot">Entradas</span>
+          <strong>{fmtValor(entradas)}</strong>
         </div>
-        <div>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--ink-dim)" }}>Saídas</p>
-          <p style={{ margin: "6px 0 0", fontSize: 20, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
-            {fmtValor(saidas)}
-          </p>
+        <div className="rsm-tile sai">
+          <span className="rsm-tile-rot">Saídas</span>
+          <strong>{fmtValor(saidas)}</strong>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { getClienteAtual } from "@/lib/get-cliente";
 import { calcularPlanoPagamento, type ItemPlano } from "@/lib/plano-pagamento-motor";
 import { marcarDividaComoPaga } from "@/lib/pagamento-divida-service";
 import { ValorLista } from "../ValorLista";
+import { ValorAutoAjustavel } from "../ValorAutoAjustavel";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -51,26 +52,70 @@ export default async function PlanoPage({
 
   return (
     <div>
-      <div className="mc-hero">
-        <div className="mc-hero-top">
-          <div>
-            <p className="mc-hero-greeting">Plano de pagamento</p>
-          </div>
-        </div>
+      {/* Mesma identidade da hero da home: faixa azul, card emoldurado, valor grande,
+          gráfico decorativo e faixa de métricas em vidro. */}
+      <div className="hero hero-interna">
+        <div className="hero-shell">
+          <span className="hero-ring" aria-hidden="true" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="hero-decor" src="/hero-chart.webp" alt="" width={640} height={413} aria-hidden="true" decoding="async" />
 
-        <div className="mc-hero-body">
-          <div>
-            <p className="mc-hero-label">{!plano.calculavel || plano.orcamentoParaDividas >= 0 ? "Disponível pra dívidas este mês" : "Déficit já nas despesas fixas, antes das dívidas"}</p>
-            <p className="mc-hero-amount" style={{ color: !plano.calculavel || plano.orcamentoParaDividas >= 0 ? "#fff" : "#fca5a5" }}>
-              {!plano.calculavel && "— "}
-              {plano.calculavel ? fmtValor(Math.abs(plano.orcamentoParaDividas)) : "cadastre sua renda mensal"}
-            </p>
-            <p className="mc-hero-caption">
-              {plano.calculavel
-                ? `${fmtValor(plano.rendaDisponivel)} de renda − ${fmtValor(plano.totalDespesasNaoDivida)} em despesas fixas e variáveis`
-                : "Sem renda mensal cadastrada não dá pra calcular sobra ou déficit."}
-            </p>
+          <div className="hero-top">
+            <p className="hero-eyebrow">Plano de pagamento</p>
           </div>
+
+          <div className="hero-body">
+            <div className="hero-main">
+              <div className="hero-label-row">
+                <p className="hero-label">{!plano.calculavel || plano.orcamentoParaDividas >= 0 ? "Disponível pra dívidas este mês" : "Déficit já nas despesas fixas, antes das dívidas"}</p>
+              </div>
+              <ValorAutoAjustavel
+                texto={plano.calculavel ? fmtValor(Math.abs(plano.orcamentoParaDividas)) : "Cadastre sua renda"}
+                className="hero-amount"
+              />
+              <p className="hero-caption">
+                {plano.calculavel
+                  ? "Renda menos despesas fixas e variáveis do mês"
+                  : "Sem renda mensal cadastrada não dá pra calcular sobra ou déficit."}
+              </p>
+            </div>
+          </div>
+
+          {plano.calculavel && (
+            <div className="hero-glass">
+              <div className="hero-glass-stats">
+                <div className="hero-glass-item">
+                  <span className="stat-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
+                  </span>
+                  <span className="stat-text">
+                    <p className="stat-label">Renda do mês</p>
+                    <p className="stat-value">{fmtValor(plano.rendaDisponivel)}</p>
+                  </span>
+                </div>
+                <div className="hero-glass-divider" />
+                <div className="hero-glass-item">
+                  <span className="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6 3" /></svg>
+                  </span>
+                  <span className="stat-text">
+                    <p className="stat-label">Despesas</p>
+                    <p className="stat-value">{fmtValor(plano.totalDespesasNaoDivida)}</p>
+                  </span>
+                </div>
+                <div className="hero-glass-divider" />
+                <div className="hero-glass-item">
+                  <span className="stat-icon violet">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12A9 9 0 1 1 12 3" /><path d="M12 3a9 9 0 0 1 9 9h-9z" /></svg>
+                  </span>
+                  <span className="stat-text">
+                    <p className="stat-label">A pagar agora</p>
+                    <p className="stat-value">{fmtValor(totalPagarAgora)}</p>
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

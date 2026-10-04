@@ -53,7 +53,7 @@ export default async function DividasPage() {
       {ativas.length > 0 && (
         <div className="mc-card" style={{ marginBottom: 16 }}>
           <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>Saldo devedor total</p>
-          <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--red)", fontFamily: "'IBM Plex Mono', monospace" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--red)" }}>
             {fmtValor(totalDevedor)}
           </p>
         </div>

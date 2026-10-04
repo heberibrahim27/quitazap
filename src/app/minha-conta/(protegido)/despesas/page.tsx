@@ -112,14 +112,15 @@ export default async function DespesasPage({
         ))}
       </div>
 
-      <div className="mc-card" style={{ marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: "var(--ink-dim)" }}>
-          Total em {ROTULO_ABA[aba].toLowerCase()} — {nomeMes.toLowerCase()}
-        </p>
-        <p style={{ margin: "6px 0 0", fontSize: 26, fontWeight: 800, color: "var(--ink)", fontFamily: "'IBM Plex Mono', monospace" }}>
-          {fmtValor(total)}
-        </p>
-      </div>
+      <section className="card aba-destaque vermelho" style={{ marginBottom: 16 }}>
+        <div className="aba-destaque-topo">
+          <div>
+            <p className="aba-destaque-rot">Total em {ROTULO_ABA[aba].toLowerCase()} — {nomeMes.toLowerCase()}</p>
+            <p className="aba-destaque-valor">{fmtValor(total)}</p>
+          </div>
+          <span className="aba-destaque-chip">{despesas.length} lançamento{despesas.length === 1 ? "" : "s"}</span>
+        </div>
+      </section>
 
       <MesFiltro
         hrefAnterior={`/minha-conta/despesas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}&aba=${aba}`}

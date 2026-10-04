@@ -21,6 +21,9 @@ export interface CriarDividaParcelaParams {
   valorParcela?: number | null;
   descontadoEmFolha?: boolean;
   tipo?: TipoDividaService;
+  /** Parcelas (as N primeiras) que já nascem pagas — empréstimo antigo cadastrado
+   * no meio do caminho. Só mexe em Parcela/valorPago, nunca gera Lancamento. */
+  parcelasJaPagas?: number;
 }
 
 export type ResultadoCriarDivida = { ok: true; dividaId: string } | { ok: false; erro: string };
@@ -39,6 +42,7 @@ export async function criarDividaComParcelas(params: CriarDividaParcelaParams): 
     valorParcela: valorParcelaInformado,
     descontadoEmFolha = false,
     tipo = "EMPRESTIMO",
+    parcelasJaPagas = 0,
   } = params;
 
   if (!credor.trim()) return { ok: false, erro: "Digite quem emprestou." };
@@ -46,6 +50,9 @@ export async function criarDividaComParcelas(params: CriarDividaParcelaParams): 
     return { ok: false, erro: "Quantidade de parcelas inválida." };
   }
   if (Number.isNaN(primeiraData.getTime())) return { ok: false, erro: "Data da primeira parcela inválida." };
+  if (!Number.isInteger(parcelasJaPagas) || parcelasJaPagas < 0 || parcelasJaPagas >= totalParcelas) {
+    return { ok: false, erro: "Parcelas já pagas deve ser um número de 0 até uma a menos que o total." };
+  }
   if (valorTotalInformado != null && (!Number.isFinite(valorTotalInformado) || valorTotalInformado <= 0)) {
     return { ok: false, erro: "O valor total tomado emprestado é inválido." };
   }
@@ -69,6 +76,10 @@ export async function criarDividaComParcelas(params: CriarDividaParcelaParams): 
   const restoUltimaParcela =
     valorParcelaInformado != null ? 0 : Math.round((valorTotalFinal - valorPorParcela * totalParcelas) * 100) / 100;
 
+  const valorDaParcela = (i: number) =>
+    i === totalParcelas - 1 ? Math.round((valorPorParcela + restoUltimaParcela) * 100) / 100 : valorPorParcela;
+  const valorJaPago = Math.round(Array.from({ length: parcelasJaPagas }, (_, i) => valorDaParcela(i)).reduce((s, v) => s + v, 0) * 100) / 100;
+
   try {
     const divida = await prisma.divida.create({
       data: {
@@ -77,6 +88,7 @@ export async function criarDividaComParcelas(params: CriarDividaParcelaParams): 
         tipo,
         status: "ATIVA",
         valorTotal: valorTotalFinal,
+        valorPago: valorJaPago,
         totalParcelas,
         diaVencimento: primeiraData.getDate(),
         descontadoEmFolha,
@@ -89,13 +101,12 @@ export async function criarDividaComParcelas(params: CriarDividaParcelaParams): 
       // primeiraData cai em 29/30/31 e o mês alvo tem menos dias, gerando
       // duas parcelas no mesmo mês e pulando um mês inteiro sem nenhuma.
       const vencimento = adicionarMeses(primeiraData, i);
-      const ehUltima = i === totalParcelas - 1;
       return {
         dividaId: divida.id,
         numero: i + 1,
-        valor: ehUltima ? Math.round((valorPorParcela + restoUltimaParcela) * 100) / 100 : valorPorParcela,
+        valor: valorDaParcela(i),
         vencimento,
-        status: "PENDENTE",
+        status: i < parcelasJaPagas ? "PAGA" : "PENDENTE",
       };
     });
     await prisma.parcela.createMany({ data: parcelasData });
@@ -119,4 +130,37 @@ export async function encontrarDividaAtivaPorCredor(clienteId: string, credorApr
   const alvo = normalizar(credorAproximado);
   const encontradas = dividas.filter((d) => normalizar(d.credor).includes(alvo) || alvo.includes(normalizar(d.credor)));
   return encontradas.length === 1 ? encontradas[0] : null;
+}
+
+/** Marca como pagas, de uma vez, as parcelas 1..`ate` ainda em aberto de um
+ * empréstimo do cliente (cada uma pelo valor agendado). Mesmo padrão race-safe
+ * do "marcar paga" individual: o updateMany filtra por status, então um toque
+ * duplo não soma duas vezes no valorPago. Só mexe em Parcela/Divida — não gera
+ * lançamento, porque são pagamentos do passado. */
+export async function marcarParcelasPagasAte(params: {
+  clienteId: string;
+  dividaId: string;
+  ate: number;
+}): Promise<{ ok: true; marcadas: number } | { ok: false; erro: string }> {
+  const { clienteId, dividaId, ate } = params;
+  if (!Number.isInteger(ate) || ate < 1) return { ok: false, erro: "Informe até qual parcela você já pagou." };
+
+  const divida = await prisma.divida.findUnique({ where: { id: dividaId }, include: { parcelas: true } });
+  if (!divida || divida.clienteId !== clienteId) return { ok: false, erro: "Empréstimo não encontrado." };
+  if (ate > divida.parcelas.length) return { ok: false, erro: `Esse empréstimo tem ${divida.parcelas.length} parcelas.` };
+
+  const alvo = divida.parcelas.filter((p) => p.numero <= ate && p.status !== "PAGA");
+  let marcadas = 0;
+  await prisma.$transaction(async (tx) => {
+    for (const p of alvo) {
+      const r = await tx.parcela.updateMany({ where: { id: p.id, status: { not: "PAGA" } }, data: { status: "PAGA" } });
+      if (r.count === 0) continue;
+      await tx.divida.update({ where: { id: dividaId }, data: { valorPago: { increment: p.valor } } });
+      marcadas++;
+    }
+  });
+
+  const restantes = await prisma.parcela.count({ where: { dividaId, status: { not: "PAGA" } } });
+  if (restantes === 0) await prisma.divida.update({ where: { id: dividaId }, data: { status: "QUITADA" } });
+  return { ok: true, marcadas };
 }

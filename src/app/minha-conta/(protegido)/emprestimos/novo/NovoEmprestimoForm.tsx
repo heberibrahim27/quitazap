@@ -15,6 +15,8 @@ export function NovoEmprestimoForm({ criarEmprestimo }: { criarEmprestimo: (fd: 
   const [valorTotalTexto, setValorTotalTexto] = useState("");
   const [valorParcelaTexto, setValorParcelaTexto] = useState("");
   const [parcelasTexto, setParcelasTexto] = useState("");
+  const [pagasTexto, setPagasTexto] = useState("");
+  const jaPagas = Number(pagasTexto) > 0 ? Math.floor(Number(pagasTexto)) : 0;
 
   // Juros total = quanto a mais você vai pagar no total (parcela × qtd)
   // em relação ao valor que pegou emprestado. Só dá pra calcular quando
@@ -73,7 +75,24 @@ export function NovoEmprestimoForm({ criarEmprestimo }: { criarEmprestimo: (fd: 
         />
       </label>
       <label className="mc-label">
-        Data da primeira parcela *
+        Quantas parcelas você já pagou?
+        <input
+          name="parcelasPagas"
+          type="number"
+          min={0}
+          max={359}
+          placeholder="0 se acabou de pegar. Ex: 30"
+          className="mc-input"
+          value={pagasTexto}
+          onChange={(e) => setPagasTexto(e.target.value)}
+        />
+      </label>
+      <p style={{ margin: "-6px 0 0", fontSize: 11.5, color: "var(--ink-faint)", lineHeight: 1.4 }}>
+        Não lembra quando pegou? Sem problema: diga quantas já pagou e quando vence a próxima. A gente calcula o resto
+        e já deixa as anteriores como pagas.
+      </p>
+      <label className="mc-label">
+        {jaPagas > 0 ? `Vencimento da próxima parcela (nº ${jaPagas + 1}) *` : "Data da primeira parcela *"}
         <input name="primeiraData" required type="date" className="mc-input" />
       </label>
 

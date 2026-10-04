@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { criarDividaComParcelas } from "@/lib/divida-service";
+import { primeiraDataPelaProxima } from "@/lib/financeiro/parcelas-passadas";
 import { NovoEmprestimoForm } from "./NovoEmprestimoForm";
 
 export default async function NovoEmprestimoPage({
@@ -24,20 +25,27 @@ export default async function NovoEmprestimoPage({
     const valorParcelaTexto = String(formData.get("valorParcela") || "").replace(",", ".").trim();
     const totalParcelas = Number(String(formData.get("parcelas") || "").trim());
     const primeiraDataTexto = String(formData.get("primeiraData") || "");
+    const parcelasJaPagas = Number(String(formData.get("parcelasPagas") || "0").trim() || "0");
     const descontadoEmFolha = formData.get("descontadoEmFolha") === "on";
 
     const valorTotalInformado = valorTotalTexto ? Number(valorTotalTexto) : null;
     const valorParcelaInformado = valorParcelaTexto ? Number(valorParcelaTexto) : null;
 
     if (!primeiraDataTexto) {
-      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent("Escolha a data da primeira parcela.")}`);
+      redirect(`/minha-conta/emprestimos/novo?erro=${encodeURIComponent(parcelasJaPagas > 0 ? "Escolha a data de vencimento da próxima parcela." : "Escolha a data da primeira parcela.")}`);
     }
+
+    // Com parcelas já pagas, a data informada é a da PRÓXIMA a pagar; a da primeira
+    // sai dela (quem pegou o empréstimo há anos raramente lembra a data original).
+    const dataInformada = new Date(`${primeiraDataTexto}T12:00:00`);
+    const primeiraData = Number.isInteger(parcelasJaPagas) && parcelasJaPagas > 0 ? primeiraDataPelaProxima(dataInformada, parcelasJaPagas) : dataInformada;
 
     const resultado = await criarDividaComParcelas({
       clienteId: clienteAtual.id,
       credor,
       totalParcelas,
-      primeiraData: new Date(`${primeiraDataTexto}T12:00:00`),
+      primeiraData,
+      parcelasJaPagas,
       valorTotal: valorTotalTexto ? valorTotalInformado : null,
       valorParcela: valorParcelaTexto ? valorParcelaInformado : null,
       descontadoEmFolha,
