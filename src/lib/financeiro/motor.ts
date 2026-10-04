@@ -10,6 +10,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
+import { calcularMediaDeMeses } from "./media-mensal";
 import type {
   EntradaMotorFinanceiro,
   MediaMensal,
@@ -306,26 +307,14 @@ export async function calcularMediaMensal(
 
   const resultadosPorMes = await Promise.all(periodos.map((periodo) => calcularTotaisBase(clienteId, periodo)));
 
-  let somaFixas = 0;
-  let somaVariaveis = 0;
-  let somaCartoes = 0;
-  const somaPorCategoria = new Map<string, number>();
-
-  for (const { totais, porCategoria } of resultadosPorMes) {
-    somaFixas += totais.despesasFixas;
-    somaVariaveis += totais.despesasVariaveis;
-    somaCartoes += totais.cartoes;
-    for (const { categoria, total } of porCategoria) {
-      somaPorCategoria.set(categoria, (somaPorCategoria.get(categoria) ?? 0) + total);
-    }
-  }
-
-  const n = Math.max(quantidadeMeses, 1);
-  return {
-    quantidadeMeses,
-    despesasFixas: somaFixas / n,
-    despesasVariaveis: somaVariaveis / n,
-    cartoes: somaCartoes / n,
-    porCategoria: Array.from(somaPorCategoria.entries()).map(([categoria, total]) => ({ categoria, total: total / n })),
-  };
+  // Só meses com despesa entram na média, e só com pelo menos 2 deles — ver
+  // media-mensal.ts (achado em QA: 1 mês de histórico virava "580% acima").
+  return calcularMediaDeMeses(
+    resultadosPorMes.map(({ totais, porCategoria }) => ({
+      despesasFixas: totais.despesasFixas,
+      despesasVariaveis: totais.despesasVariaveis,
+      cartoes: totais.cartoes,
+      porCategoria,
+    }))
+  );
 }

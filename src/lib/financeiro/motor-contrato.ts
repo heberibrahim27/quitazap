@@ -116,6 +116,8 @@ export interface OpcoesMotorFinanceiro {
  * Mesmas fórmulas/allowlist do resto do motor, só que com N chamadas
  * internas em vez de uma. */
 export interface MediaMensal {
+  /** Quantos meses COM despesa entraram na média (não a quantidade pedida).
+   * Abaixo de 2, a média vem zerada = "sem histórico suficiente". */
   quantidadeMeses: number;
   despesasFixas: number;
   despesasVariaveis: number;

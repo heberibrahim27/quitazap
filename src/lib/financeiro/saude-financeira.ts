@@ -47,8 +47,8 @@ function pontuarRitmo(entrada: EntradaSaudeFinanceira): { pontos: number; razao:
   const razaoMultiplicador = despesasVariaveis / mediaDespesasVariaveis;
   const percentualAcima = Math.round((razaoMultiplicador - 1) * 100);
   if (razaoMultiplicador <= 1.1) return { pontos: 20, razao: { tipo: "positiva", texto: "✓ Despesas variáveis dentro do ritmo normal" } };
-  if (razaoMultiplicador <= 1.3) return { pontos: 10, razao: { tipo: "atencao", texto: `⚠ Despesas variáveis ${percentualAcima}% acima da média dos últimos 3 meses` } };
-  return { pontos: 0, razao: { tipo: "negativa", texto: `✗ Despesas variáveis ${percentualAcima}% acima da média dos últimos 3 meses` } };
+  if (razaoMultiplicador <= 1.3) return { pontos: 10, razao: { tipo: "atencao", texto: `⚠ Despesas variáveis ${percentualAcima}% acima da sua média dos meses anteriores` } };
+  return { pontos: 0, razao: { tipo: "negativa", texto: `✗ Despesas variáveis ${percentualAcima}% acima da sua média dos meses anteriores` } };
 }
 
 function pontuarAtraso(entrada: EntradaSaudeFinanceira): { pontos: number; razao: RazaoSaude } {
