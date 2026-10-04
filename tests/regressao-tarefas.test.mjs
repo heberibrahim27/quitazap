@@ -527,3 +527,16 @@ test("pedidoDesfazerLancamento pega 'desfazer/errei' e ignora frases que só con
     assert.equal(pedidoDesfazerLancamento(f), false, f);
   }
 });
+
+// ── dias de calendário em Brasília (QA 04/10/2026) ───────────────────────
+
+const { diasCalendarioBrasil } = loadTsModule("src/lib/financeiro/dias-brasil.ts");
+
+test("diasCalendarioBrasil conta dias de calendário, não horas arredondadas", () => {
+  const venc = new Date("2026-10-04T03:00:00Z"); // 04/10 00:00 em Brasília
+  assert.equal(diasCalendarioBrasil(venc, new Date("2026-10-03T14:00:00Z")), 1); // 03/10 11:00 BRT
+  assert.equal(diasCalendarioBrasil(venc, new Date("2026-10-04T02:28:00Z")), 1); // 03/10 23:28 BRT — antes dava "hoje"
+  assert.equal(diasCalendarioBrasil(venc, new Date("2026-10-04T03:05:00Z")), 0); // 04/10 00:05 BRT
+  assert.equal(diasCalendarioBrasil(venc, new Date("2026-10-05T10:00:00Z")), -1);
+  assert.equal(diasCalendarioBrasil(new Date("2026-10-28T15:00:00Z"), new Date("2026-10-03T23:00:00Z")), 25);
+});

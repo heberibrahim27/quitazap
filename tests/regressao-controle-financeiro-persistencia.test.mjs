@@ -349,3 +349,19 @@ test("gerenciarFaturaCartaoControle: substituir fatura fechada (após confirmar)
   assert.equal(confirmacao.itensParaPersistir[0].tipo, "FATURA_FECHADA");
   assert.equal(confirmacao.itensParaPersistir[0].valor, 900);
 });
+
+// ── "fechou dia N" é dia de fechamento, não valor (QA 04/10/2026) ─────────
+
+test("'fatura do nubank fechou dia 15': não cria fatura de R$ 15; a configuração de cartão grava o fechamento", () => {
+  const msg = "minha fatura do nubank fechou dia 15";
+  assert.equal(gerenciarFaturaCartaoControle(msg, estadoBase()), null);
+  const resultado = configurarCartaoControle(msg, estadoBase());
+  assert.ok(resultado, "deveria configurar o cartão");
+  assert.equal(resultado.cartaoParaPersistir.nome, "Nubank");
+  assert.equal(resultado.cartaoParaPersistir.fechamento, 15);
+});
+
+test("gerenciarFaturaCartaoControle: 'fechou dia 15' com valor registra o valor, não o dia", () => {
+  const resultado = gerenciarFaturaCartaoControle("fatura do nubank fechou dia 15 em R$ 1.200", estadoBase());
+  assert.equal(resultado.itensParaPersistir[0].valor, 1200);
+});

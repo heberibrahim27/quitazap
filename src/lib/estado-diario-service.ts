@@ -10,6 +10,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { calcularResumoFinanceiro, limitesDoMes, anoMesAtualBrasil } from "@/lib/financeiro/motor";
+import { diasCalendarioBrasil } from "@/lib/financeiro/dias-brasil";
 import { carregarEstadoControle } from "@/lib/controle-financeiro-flow";
 import type { Mensagem } from "@/lib/ai-bot";
 
@@ -115,7 +116,7 @@ export async function avaliarQuitaZapHoje(clienteId: string): Promise<AvaliacaoH
 
     const mensagens: string[] = [];
     for (const t of entrandoNaJanela) {
-      const dias = Math.round((t.vencimento!.getTime() - avaliadoEm.getTime()) / 86_400_000);
+      const dias = diasCalendarioBrasil(t.vencimento!, avaliadoEm);
       mensagens.push(
         dias <= 0
           ? `"${t.descricao}" vence hoje.`

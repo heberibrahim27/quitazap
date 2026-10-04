@@ -1868,7 +1868,7 @@ export function normalizarNomeCartaoControle(mensagem: string): string | null {
 function extrairDiaCartaoControle(mensagem: string, tipo: "fechamento" | "vencimento"): number | null {
   const texto = normalizarTexto(mensagem);
   const regex = tipo === "fechamento"
-    ? /\bfecha(?:mento)?(?:\s+dia)?\s+(\d{1,2})\b/
+    ? /\b(?:fecha(?:mento)?(?:\s+dia)?|(?:fechou|fechada)\s+(?:no\s+)?dia)\s+(\d{1,2})\b/
     : /\b(?:vence|vencimento)(?:\s+dia)?\s+(\d{1,2})\b/;
   const match = texto.match(regex);
   return match ? Number(match[1]) : null;
@@ -1876,7 +1876,7 @@ function extrairDiaCartaoControle(mensagem: string, tipo: "fechamento" | "vencim
 
 function contemPedidoConfiguracaoCartao(mensagem: string): boolean {
   const texto = normalizarTexto(mensagem);
-  return /\b(?:fecha|fechamento|vence|vencimento)\b/.test(texto);
+  return /\b(?:fecha|fechamento|vence|vencimento|(?:fechou|fechada)\s+(?:no\s+)?dia)\b/.test(texto);
 }
 
 function diaValido(dia: number | null): boolean {
@@ -2227,8 +2227,15 @@ export function gerenciarFaturaCartaoControle(
   if (!detectarFechamentoFaturaCartao(mensagem)) return null;
 
   const cartao = normalizarNomeCartaoControle(mensagem);
-  const valor = parseMoneyBR(mensagem);
-  if (!cartao || !valor) return null;
+  // "dia 15" é data, não valor — achado em QA (04/10/2026): "fatura do nubank
+  // fechou dia 15" virava uma fatura fechada de R$ 15,00.
+  const valor = parseMoneyBR(mensagem.replace(/\b(?:no\s+)?dia\s+\d{1,2}\b/gi, " "));
+  if (!cartao) return null;
+
+  // Sem valor, "fechou dia N" informa o DIA DE FECHAMENTO do cartão — quem
+  // trata é configurarCartaoControle (passo seguinte, que também persiste o
+  // cartão; este passo só persiste lançamentos).
+  if (!valor) return null;
 
   const faturasFechadasAtuais = estadoAtual.faturasFechadas ?? [];
   const existente = faturasFechadasAtuais.find((fatura) => fatura.cartao === cartao);

@@ -118,6 +118,8 @@ export interface ResumoFaturaCartao {
   anterior: { rotulo: string; valor: number; vencimento: string | null } | null;
   proxima: { rotulo: string; valor: number } | null;
   gastoMesCalendario: number;
+  /** Último valor de fatura fechada que o usuário informou ("fechou em R$ X"). */
+  faturaFechadaInformada?: { valor: number; data: string };
 }
 
 function dd(dia: number, mes: number): string {
@@ -212,6 +214,9 @@ export function formatarRespostaFaturas(resumos: ResumoFaturaCartao[], nomeMesAt
         linhas.push(`• Fatura anterior (${r.anterior.rotulo}): ${brl(r.anterior.valor)}${r.anterior.vencimento ? ` — vencimento ${r.anterior.vencimento}` : ""}`);
       }
       if (r.proxima) linhas.push(`• Próxima fatura (${r.proxima.rotulo}): ${brl(r.proxima.valor)}`);
+    }
+    if (r.faturaFechadaInformada) {
+      linhas.push(`• Fatura fechada que você informou: ${brl(r.faturaFechadaInformada.valor)} (em ${r.faturaFechadaInformada.data})`);
     }
     return linhas.join("\n");
   });

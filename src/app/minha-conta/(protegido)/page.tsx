@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { calcularResumoFinanceiro, calcularMediaMensal } from "@/lib/financeiro/motor";
+import { diasCalendarioBrasil } from "@/lib/financeiro/dias-brasil";
 import { calcularSaudeFinanceira } from "@/lib/financeiro/saude-financeira";
 import { SaudeFinanceiraCard } from "./SaudeFinanceiraCard";
 import { calcularLimiteSeguro } from "@/lib/financeiro/limite-seguro";
@@ -66,8 +67,7 @@ function paramMes(ano: number, mes: number): string {
 }
 
 function diasAte(data: Date, hoje: Date): number {
-  const ms = new Date(data).setHours(0, 0, 0, 0) - new Date(hoje).setHours(0, 0, 0, 0);
-  return Math.round(ms / 86_400_000);
+  return diasCalendarioBrasil(data, hoje);
 }
 
 export default async function MinhaContaPage({

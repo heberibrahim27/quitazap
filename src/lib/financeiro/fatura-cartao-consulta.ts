@@ -44,13 +44,33 @@ export async function responderConsultaFatura(clienteId: string, mensagem: strin
       })
     : [];
 
-  const resumos = cartoes.map((c) =>
-    resumirFaturasDoCartao(
+  // Fatura fechada que o usuário informou ("fechou em R$ 1.200"): a mais
+  // recente de cada cartão, só se for dos últimos 45 dias.
+  const fechadas = cartoes.length
+    ? await prisma.lancamento.findMany({
+        where: {
+          clienteId,
+          tipo: "FATURA_FECHADA",
+          cartaoId: { in: cartoes.map((c) => c.id) },
+          criadoEm: { gte: new Date(agora.getTime() - 45 * 86_400_000) },
+        },
+        orderBy: { criadoEm: "desc" },
+        select: { cartaoId: true, valor: true, criadoEm: true },
+      })
+    : [];
+  const dataCurta = (d: Date) =>
+    new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }).format(d);
+
+  const resumos = cartoes.map((c) => {
+    const resumo = resumirFaturasDoCartao(
       { nome: c.nome, diaFechamento: c.diaFechamento, diaVencimento: c.diaVencimento },
       compras.filter((l) => l.cartaoId === c.id),
       agora
-    )
-  );
+    );
+    const fechada = fechadas.find((l) => l.cartaoId === c.id);
+    if (fechada) resumo.faturaFechadaInformada = { valor: fechada.valor, data: dataCurta(fechada.criadoEm) };
+    return resumo;
+  });
 
   const nomeMes = new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "America/Sao_Paulo" }).format(agora);
   return formatarRespostaFaturas(resumos, nomeMes);

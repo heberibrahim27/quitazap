@@ -75,8 +75,6 @@ export default async function CartoesPage({
   const mesAnterior = mesSel === 1 ? { ano: anoSel - 1, mes: 12 } : { ano: anoSel, mes: mesSel - 1 };
   const mesSeguinte = mesSel === 12 ? { ano: anoSel + 1, mes: 1 } : { ano: anoSel, mes: mesSel + 1 };
 
-  const { inicio: inicioMes } = limitesDoMes(anoAtual, mesAtual);
-
   const cartoes = await prisma.cartao.findMany({ where: { clienteId: cliente.id }, orderBy: { nome: "asc" } });
 
   if (cartoes.length === 0) {
@@ -123,10 +121,12 @@ export default async function CartoesPage({
   const janelaFim = deslocarMes(anoSel, mesSel, 2);
   const inicioJanela = limitesDoMes(janelaIni.ano, janelaIni.mes).inicio;
   const fimJanela = limitesDoMes(janelaFim.ano, janelaFim.mes).fim;
-  const mesAnteriorAoAtual = deslocarMes(anoAtual, mesAtual, -1);
-  const inicioJanelaParcelas = limitesDoMes(mesAnteriorAoAtual.ano, mesAnteriorAoAtual.mes).inicio;
+  // 2 meses pra trás: com fechamento dia 25 e vencimento dia 1, uma compra de
+  // 26/08 só vence em 01/10 — ainda consome limite no início de outubro.
+  const doisMesesAntesDoAtual = deslocarMes(anoAtual, mesAtual, -2);
+  const inicioJanelaParcelas = limitesDoMes(doisMesesAntesDoAtual.ano, doisMesesAntesDoAtual.mes).inicio;
 
-  const [comprasJanela, proximasParcelasTodas, comprometidoPorCartaoRaw] = await Promise.all([
+  const [comprasJanela, proximasParcelasTodas] = await Promise.all([
     // Substitui a antiga query estreita [inicioMesSel, fimMesSel) — ver
     // comentário da janela acima. A fatura de cada linha é decidida logo
     // abaixo, não pelo filtro do banco.
@@ -144,22 +144,27 @@ export default async function CartoesPage({
       where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioJanelaParcelas } },
       orderBy: { data: "asc" },
     }),
-    // "Disponível" precisa descontar o valor TOTAL comprometido no limite,
-    // não só a fatura deste mês — uma compra parcelada reserva o valor
-    // inteiro no limite assim que é feita (mesmo comportamento do cartão de
-    // verdade), não só a parcela que cai na fatura atual. Por isso soma
-    // tudo a partir do início do mês atual (mês atual + parcelas futuras já
-    // agendadas); meses anteriores já viraram fatura paga. Continua por
-    // mês CALENDÁRIO de propósito — é sobre limite consumido, não sobre em
-    // qual fatura a compra vai aparecer.
-    prisma.lancamento.groupBy({
-      by: ["cartaoId"],
-      where: { clienteId: cliente.id, tipo: "COMPRA_CARTAO", cartaoId: { in: cartaoIds }, data: { gte: inicioMes } },
-      _sum: { valor: true },
-    }),
   ]);
 
-  const comprometidoPorCartao = new Map(comprometidoPorCartaoRaw.map((g) => [g.cartaoId, g._sum.valor ?? 0]));
+  // "Disponível" precisa descontar o valor TOTAL comprometido no limite, não
+  // só a fatura deste mês — uma compra parcelada reserva o valor inteiro no
+  // limite assim que é feita (mesmo comportamento do cartão de verdade).
+  // Comprometido = tudo que está numa fatura que ainda NÃO venceu (vencimento
+  // hoje ou depois) + as faturas futuras. Fatura já vencida é tratada como
+  // paga — o app não tem "marcar fatura como paga". Achado em QA
+  // (04/10/2026): antes somava por mês CALENDÁRIO e a fatura de 15/09, que só
+  // vencia em 09/10, saía do limite um mês cedo.
+  const comprometidoPorCartao = new Map<string, number>();
+  for (const l of proximasParcelasTodas) {
+    if (!l.cartaoId) continue;
+    const fatura = mesFaturaDaCompra(l.data, diaFechamentoPorCartao.get(l.cartaoId) ?? null, diaVencimentoPorCartao.get(l.cartaoId) ?? null);
+    const faturaIdx = fatura.ano * 12 + fatura.mes;
+    const atualIdx = anoAtual * 12 + mesAtual;
+    const diaVenc = diaVencimentoPorCartao.get(l.cartaoId) ?? null;
+    const jaVenceu = faturaIdx < atualIdx || (faturaIdx === atualIdx && diaVenc != null && diaVenc < diaAtual);
+    if (jaVenceu) continue;
+    comprometidoPorCartao.set(l.cartaoId, (comprometidoPorCartao.get(l.cartaoId) ?? 0) + l.valor);
+  }
 
   const faturaSelPorCartao = new Map<string, number>();
   const comprasPorCartao = new Map<string, typeof comprasJanela>();
