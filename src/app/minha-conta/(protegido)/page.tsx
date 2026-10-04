@@ -262,6 +262,10 @@ export default async function MinhaContaPage({
     .filter((t) => t.vencimento != null)
     .slice(0, 2);
 
+  // % da renda comprometida (hero): acima de 100% vira alerta (cor + aviso).
+  const pctComprometida = percentualComprometido != null ? percentualComprometido * 100 : null;
+  const acimaDoLimite = pctComprometida != null && pctComprometida > 100;
+
   return (
     <div>
       <MesSwipe
@@ -270,6 +274,11 @@ export default async function MinhaContaPage({
       >
       <div className="hero">
         <div className="hero-shell">
+          <span className="hero-ring" aria-hidden="true" />
+          {/* Ilustração decorativa (não é dado real): dá identidade ao card. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="hero-decor" src="/hero-chart.webp" alt="" width={640} height={413} aria-hidden="true" decoding="async" />
+
           <div className="hero-top">
             <p className="hero-eyebrow">{ehMesAtual ? "Resumo do mês" : `Resumo de ${nomeMes}/${ano}`}</p>
           </div>
@@ -296,74 +305,77 @@ export default async function MinhaContaPage({
               </p>
             </div>
           </div>
-        </div>
 
-        <div className="hero-glass">
-          <div className="hero-glass-stats">
-            <div className="hero-glass-item">
-              <span className="stat-icon green">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
-              </span>
-              <span className="stat-text">
-                <p className="stat-label">Renda mensal</p>
-                <p className="stat-value">{rendaEfetiva != null ? fmtValor(rendaEfetiva) : "—"}</p>
-              </span>
+          <div className="hero-glass">
+            <div className="hero-glass-stats">
+              <div className="hero-glass-item">
+                <span className="stat-icon green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
+                </span>
+                <span className="stat-text">
+                  <p className="stat-label">Renda mensal</p>
+                  <p className="stat-value">{rendaEfetiva != null ? fmtValor(rendaEfetiva) : "—"}</p>
+                </span>
+              </div>
+              <div className="hero-glass-divider" />
+              <div className="hero-glass-item">
+                <span className="stat-icon blue">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6 3" /></svg>
+                </span>
+                <span className="stat-text">
+                  <p className="stat-label">Comprometido</p>
+                  <p className="stat-value">{fmtValor(heroComprometido)}</p>
+                </span>
+              </div>
+              <div className="hero-glass-divider" />
+              <div className="hero-glass-item">
+                <span className="stat-icon violet">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12A9 9 0 1 1 12 3" /><path d="M12 3a9 9 0 0 1 9 9h-9z" /></svg>
+                </span>
+                <span className="stat-text">
+                  <p className="stat-label">% da renda comprometida</p>
+                  <p className="stat-value" style={acimaDoLimite ? { color: "#FFB4C0" } : undefined}>{pctComprometida != null ? `${Math.round(pctComprometida)}%` : "—"}</p>
+                </span>
+              </div>
             </div>
-            <div className="hero-glass-divider" />
-            <div className="hero-glass-item">
-              <span className="stat-icon blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3v9l6 3" /></svg>
-              </span>
-              <span className="stat-text">
-                <p className="stat-label">Comprometido</p>
-                <p className="stat-value">{fmtValor(heroComprometido)}</p>
-              </span>
-            </div>
-          </div>
-          {percentualComprometido != null && (() => {
-            const pct = percentualComprometido * 100;
-            // Passou de 100%: a barra sozinha, capada visualmente em 100%,
-            // ficava idêntica a uma renda exatamente no limite — escondia
-            // justamente a informação mais importante (achado real via
-            // print do Ibrahim, revisão do ChatGPT). Reescala a barra
-            // inteira pro percentual real (nunca menor que 100), marca
-            // onde fica o limite de 100% e destaca o trecho excedente numa
-            // cor de alerta, além do texto explícito abaixo.
-            const acimaDoLimite = pct > 100;
-            const escala = Math.max(pct, 100);
-            const larguraBase = (Math.min(pct, 100) / escala) * 100;
-            const larguraExcesso = acimaDoLimite ? ((pct - 100) / escala) * 100 : 0;
-            return (
+            {/* Passou de 100%: o número sozinho não mostra o tamanho do estouro
+                (achado real via print do Ibrahim, revisão do ChatGPT) — por isso o
+                aviso explícito continua aqui, além do % em destaque. */}
+            {acimaDoLimite && pctComprometida != null && (
+              <p className="hero-glass-aviso">{Math.round(pctComprometida - 100)}% acima da renda prevista</p>
+            )}
+            {percentualMetas != null && (
               <div className="hero-glass-bar">
                 <div className="hero-glass-bar-top">
-                  <span>Da renda comprometida</span>
-                  <span className="hero-glass-bar-value" style={acimaDoLimite ? { color: "var(--red)" } : undefined}>{Math.round(pct)}%</span>
+                  <span>Guardado nas metas</span>
+                  <span className="hero-glass-bar-value">{Math.round(percentualMetas * 100)}%</span>
                 </div>
                 <div className="hero-glass-bar-track">
-                  <div className="hero-glass-bar-fill" style={{ width: `${larguraBase}%` }} />
-                  {acimaDoLimite && (
-                    <div className="hero-glass-bar-fill-excesso" style={{ left: `${larguraBase}%`, width: `${larguraExcesso}%` }} />
-                  )}
-                  {acimaDoLimite && <div className="hero-glass-bar-marcador" style={{ left: `${larguraBase}%` }} />}
+                  <div className="hero-glass-bar-fill" style={{ width: `${percentualMetas * 100}%` }} />
                 </div>
-                {acimaDoLimite && (
-                  <p className="hero-glass-bar-aviso">{Math.round(pct - 100)}% acima da renda prevista</p>
-                )}
               </div>
-            );
-          })()}
-          {percentualMetas != null && (
-            <div className="hero-glass-bar">
-              <div className="hero-glass-bar-top">
-                <span>Guardado nas metas</span>
-                <span className="hero-glass-bar-value" style={{ color: "var(--green)" }}>{Math.round(percentualMetas * 100)}%</span>
-              </div>
-              <div className="hero-glass-bar-track">
-                <div className="hero-glass-bar-fill" style={{ width: `${percentualMetas * 100}%`, background: "var(--green)" }} />
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        <nav className="hero-tabs" aria-label="Atalhos do resumo">
+          <Link href="/minha-conta/receitas" className="hero-tab ativa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>
+            Receita
+          </Link>
+          <Link href="/minha-conta/despesas" className="hero-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>
+            Despesas
+          </Link>
+          <Link href="/minha-conta/cartoes" className="hero-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3" /><path d="M2.5 10h19" /><path d="M6.5 15h4" /></svg>
+            Cartões
+          </Link>
+          <Link href="/minha-conta/metas" className="hero-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>
+            Metas
+          </Link>
+        </nav>
       </div>
       </MesSwipe>
 
