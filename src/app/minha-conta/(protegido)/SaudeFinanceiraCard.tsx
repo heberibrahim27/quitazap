@@ -7,10 +7,11 @@ const COR_CLASSIFICACAO: Record<SaudeFinanceira["classificacao"], string> = {
   Crítica: "var(--red)",
 };
 
-const COR_RAZAO: Record<"positiva" | "atencao" | "negativa", string> = {
-  positiva: "var(--green)",
-  atencao: "var(--orange)",
-  negativa: "var(--red)",
+const ROTULO_CURTO: Record<string, string> = {
+  "Comprometimento da renda": "Renda",
+  "Resultado do período": "Resultado",
+  "Ritmo de despesas variáveis": "Ritmo",
+  "Dívidas em atraso": "Atrasos",
 };
 
 const ICONE_CORACAO = (
@@ -53,39 +54,63 @@ export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
 
   const cor = COR_CLASSIFICACAO[saude.classificacao];
 
+  // Razões neutras sem dado ("— Ainda sem histórico…") não agregam: o gráfico
+  // já mostra o componente. O símbolo ✓/✗/⚠ do texto vira ícone próprio.
+  const razoes = saude.razoes
+    .filter((r) => !r.texto.startsWith("—"))
+    .map((r) => ({ tipo: r.tipo, texto: r.texto.replace(/^[✓✗⚠]s*/, "") }));
+
   return (
     <>
       {CABECALHO}
-      <div className="card" style={{ paddingBottom: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 18px 14px" }}>
-          <div
-            style={{
-              width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: `conic-gradient(${cor} ${saude.score * 3.6}deg, var(--card-tint) 0deg)`,
-            }}
-          >
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <strong style={{ fontSize: 17, fontWeight: 800, color: "var(--mc-ink)" }}>{saude.score}</strong>
+      <div className="card saude-card">
+        <div className="saude-topo">
+          <div className="saude-anel" style={{ "--p": `${saude.score * 3.6}deg`, "--cor": cor } as React.CSSProperties}>
+            <div className="saude-anel-miolo">
+              <strong>{saude.score}</strong>
+              <span>de 100</span>
             </div>
           </div>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: cor }}>{saude.classificacao}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--mc-ink-dim)" }}>{saude.score}/100 pontos</p>
+          <div className="saude-resumo">
+            <p className="saude-classe" style={{ color: cor }}>{saude.classificacao}</p>
+            <p className="saude-sub">Sua saúde financeira em {saude.score} pontos</p>
           </div>
         </div>
 
-        <div style={{ display: "grid", gap: 8, padding: "0 18px 4px" }}>
-          {saude.razoes.map((razao, i) => (
-            <p key={i} style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: COR_RAZAO[razao.tipo] }}>
-              {razao.texto}
-            </p>
-          ))}
+        <div className="saude-grafico" role="img" aria-label={`Pontuação por critério: ${saude.componentes.map((c) => `${c.nome} ${Math.round(c.pontos)} de ${c.pontosMaximos}`).join(", ")}`}>
+          {saude.componentes.map((comp, i) => {
+            const pct = comp.pontosMaximos > 0 ? Math.max(0, Math.min(comp.pontos / comp.pontosMaximos, 1)) : 0;
+            const tom = pct >= 0.7 ? "bom" : pct >= 0.4 ? "medio" : "ruim";
+            return (
+              <div key={comp.nome} className="saude-col">
+                <span className="saude-val">{Math.round(comp.pontos)}<small>/{comp.pontosMaximos}</small></span>
+                <span className="saude-trilho">
+                  <span className={`saude-barra ${tom}`} style={{ "--h": `${Math.max(pct * 100, 5)}%`, "--i": i } as React.CSSProperties} />
+                </span>
+                <span className="saude-rot">{comp.nome === "Dívidas em atraso" && pct === 1 ? "Sem atrasos" : (ROTULO_CURTO[comp.nome] ?? comp.nome)}</span>
+              </div>
+            );
+          })}
         </div>
 
-        <p style={{ margin: "10px 18px 0", fontSize: 10.5, color: "var(--mc-ink-faint, var(--mc-ink-dim))" }}>
-          Análise baseada nas informações registradas no QuitaZap.
-        </p>
+        {razoes.length > 0 && (
+          <ul className="saude-razoes">
+            {razoes.map((razao, i) => (
+              <li key={i} className={`saude-razao ${razao.tipo}`}>
+                <span className="saude-razao-icone" aria-hidden="true">
+                  {razao.tipo === "positiva" ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                  ) : razao.tipo === "negativa" ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 7v6" /><path d="M12 17h.01" /></svg>
+                  )}
+                </span>
+                <span>{razao.texto}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </>
   );

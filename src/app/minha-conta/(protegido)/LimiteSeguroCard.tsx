@@ -53,53 +53,90 @@ export function LimiteSeguroCard({ limite }: { limite: LimiteSeguro }) {
   }
 
   const negativo = limite.saldoLivre < 0;
-  const cor = negativo ? "var(--red)" : "var(--green)";
+
+  // Linha do mês: onde estamos (hoje, em Brasília) e, se existir, o dia que aperta.
+  // Este card só aparece no mês corrente (ver page.tsx), então o mês é o de hoje.
+  const [anoHoje, mesHoje, diaHoje] = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  const diasNoMes = new Date(anoHoje, mesHoje, 0).getDate();
+  const posicao = (dia: number) => `${Math.max(0, Math.min((dia - 1) / Math.max(diasNoMes - 1, 1), 1)) * 100}%`;
+  const diaApertado = limite.diaApertado ? Number(limite.diaApertado.data.slice(8, 10)) : null;
 
   return (
     <>
       {CABECALHO}
 
-      <div className="card" style={{ paddingBottom: 18 }}>
-        <div style={{ padding: "0 18px 4px", display: "grid", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 13.5, color: "var(--mc-ink-dim)" }}>
-            {limite.diasRestantes > 0
-              ? `Faltam ${limite.diasRestantes} dia${limite.diasRestantes !== 1 ? "s" : ""} pro fim do mês`
-              : "Hoje é o último dia do mês"}
-          </p>
-
-          <div>
-            <p style={{ margin: 0, fontSize: 11.5, color: "var(--mc-ink-faint, var(--mc-ink-dim))" }}>Livre até lá</p>
-            <p style={{ margin: "2px 0 0", fontSize: 22, fontWeight: 800, color: cor }}>{fmt(limite.saldoLivre)}</p>
-            {limite.compromissosRestantes > 0 && (
-              <p style={{ margin: "3px 0 0", fontSize: 11.5, color: "var(--mc-ink-faint, var(--mc-ink-dim))" }}>
-                já descontando {fmt(limite.compromissosRestantes)} em dívidas que ainda vencem este mês
-              </p>
+      <div className="card limite-card">
+        <div className="limite-topo">
+          <div className="limite-principal">
+            <p className="limite-rot">Livre até lá</p>
+            <p className={`limite-valor${negativo ? " neg" : ""}`}>{fmt(limite.saldoLivre)}</p>
+          </div>
+          <div className="limite-dias">
+            {limite.diasRestantes > 0 ? (
+              <>
+                <strong>{limite.diasRestantes}</strong>
+                <span>dia{limite.diasRestantes !== 1 ? "s" : ""} pro fim do mês</span>
+              </>
+            ) : (
+              <span>Último dia do mês</span>
             )}
           </div>
-
-          {!negativo && (
-            <div style={{ background: "var(--card-tint)", borderRadius: 10, padding: "10px 12px" }}>
-              <p style={{ margin: 0, fontSize: 12, color: "var(--mc-ink-dim)" }}>Limite seguro por dia</p>
-              <p style={{ margin: "2px 0 0", fontSize: 19, fontWeight: 800, color: "var(--mc-ink)" }}>{fmt(Math.max(limite.limiteSeguroDiario, 0))}</p>
-            </div>
-          )}
-
-          {negativo && (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--red)", fontWeight: 600 }}>
-              ✗ Sua sobra prevista até o fim do mês já está negativa.
-            </p>
-          )}
-
-          {limite.diaApertado && (
-            <p style={{ margin: 0, fontSize: 12.5, color: "var(--orange)", lineHeight: 1.4 }}>
-              ⚠ Dia {fmtDataDia(limite.diaApertado.data)} aperta: {limite.diaApertado.itens.length} contas vencem juntas, somando {fmt(limite.diaApertado.totalNoDia)}.
-            </p>
-          )}
-
-          <p style={{ margin: 0, fontSize: 10.5, color: "var(--mc-ink-faint, var(--mc-ink-dim))" }}>
-            Análise baseada nas informações registradas no QuitaZap.
-          </p>
         </div>
+
+        {limite.compromissosRestantes > 0 && (
+          <p className="limite-nota">já descontando {fmt(limite.compromissosRestantes)} em dívidas que ainda vencem este mês</p>
+        )}
+
+        <div className="limite-linha" role="img" aria-label={`Dia ${diaHoje} de ${diasNoMes} do mês`}>
+          <span className="limite-linha-trilho">
+            <span className="limite-linha-preenchido" style={{ width: posicao(diaHoje) }} />
+          </span>
+          {diaApertado != null && (
+            <span className="limite-pino aperta" style={{ left: posicao(diaApertado) }} title={`Dia ${diaApertado} aperta`} />
+          )}
+          <span className="limite-pino hoje" style={{ left: posicao(diaHoje) }} title="Hoje" />
+        </div>
+        <div className="limite-linha-legenda">
+          <span>Dia 1</span>
+          <span>Hoje, dia {diaHoje}</span>
+          <span>Dia {diasNoMes}</span>
+        </div>
+
+        {!negativo && (
+          <div className="limite-diario">
+            <span className="limite-diario-icone" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="4" /><path d="M3 9.5h18" /><path d="M8 3v3M16 3v3" /></svg>
+            </span>
+            <span className="limite-diario-texto">
+              <span>Limite seguro por dia</span>
+              <strong>{fmt(Math.max(limite.limiteSeguroDiario, 0))}</strong>
+            </span>
+          </div>
+        )}
+
+        {(negativo || limite.diaApertado) && (
+          <ul className="saude-razoes">
+            {negativo && (
+              <li className="saude-razao negativa">
+                <span className="saude-razao-icone" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </span>
+                <span>Sua sobra prevista até o fim do mês já está negativa.</span>
+              </li>
+            )}
+            {limite.diaApertado && (
+              <li className="saude-razao atencao">
+                <span className="saude-razao-icone" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 7v6" /><path d="M12 17h.01" /></svg>
+                </span>
+                <span>Dia {fmtDataDia(limite.diaApertado.data)} aperta: {limite.diaApertado.itens.length} {limite.diaApertado.itens.length === 1 ? "conta vence" : "contas vencem juntas"}, somando {fmt(limite.diaApertado.totalNoDia)}.</span>
+              </li>
+            )}
+          </ul>
+        )}
       </div>
     </>
   );
