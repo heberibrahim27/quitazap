@@ -17,6 +17,7 @@ import type { CandidatoAlerta, TipoAlerta } from "./alertas";
 import { chaveDedupe } from "./alertas";
 import type { HistoricoAlerta } from "./politica";
 import type { FeedbackAlerta } from "./feedback";
+import type { Cobertura } from "./lotes";
 
 const TIPO_MENSAGEM = "alerta_proativo";
 const EVENTO_FEEDBACK = "alerta_feedback";
@@ -153,9 +154,29 @@ export async function aplicarFeedbackAlerta(
   return "Certo, não te aviso mais sobre esse tipo de alerta. Os outros continuam. Pra religar tudo, diga *ativar alertas*. 👌";
 }
 
+/** Liga/desliga um tipo de alerta (ou "TODOS") — mesma preferência dos comandos "parar esse alerta"/"ativar alertas". */
+export async function definirAlertaLigado(clienteId: string, tipo: string, ligado: boolean): Promise<void> {
+  if (ligado) {
+    await prisma.eventoAnalytics.deleteMany({ where: { clienteId, tipo: EVENTO_MUTE, caminho: tipo } });
+  } else {
+    await silenciar(clienteId, tipo);
+  }
+}
+
 async function silenciar(clienteId: string, tipo: string): Promise<void> {
   const ja = await prisma.eventoAnalytics.findFirst({ where: { clienteId, tipo: EVENTO_MUTE, caminho: tipo }, select: { id: true } });
   if (!ja) await prisma.eventoAnalytics.create({ data: { clienteId, tipo: EVENTO_MUTE, caminho: tipo } });
+}
+
+/** Cobertura (checkpoint) do dia gravada na última execução do agente, se houver. */
+export async function carregarCoberturaDoDia(agente: string, dia: string): Promise<Cobertura | null> {
+  const linha = await prisma.auditoriaAssistente.findFirst({
+    where: { ferramenta: `agente:${agente}`, depois: { path: ["cobertura", "dia"], equals: dia } },
+    orderBy: { criadoEm: "desc" },
+    select: { depois: true },
+  });
+  const c = (linha?.depois as { cobertura?: Cobertura } | null)?.cobertura;
+  return c && c.dia === dia ? c : null;
 }
 
 /** Saúde dos alertas nos últimos 7 dias, pro disjuntor global do Sentinela. */

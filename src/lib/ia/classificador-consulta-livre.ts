@@ -70,6 +70,7 @@
 
 import { chatCompletion } from "@/lib/ai/openai-client";
 import { tentarResponderComQuita } from "@/lib/agentes/quita/agente";
+import type { MensagemHistorico } from "@/lib/agentes/quita/loop";
 import { responderConsultaFinanceira, type TipoConsultaFinanceira } from "./consulta-financeira-resolver";
 import { responderLimiteSeguro } from "./limite-seguro-resolver";
 import { responderRotaDividas } from "./rota-dividas-resolver";
@@ -214,6 +215,7 @@ export async function tentarResponderConsultaLivre(
   mensagem: string,
   clienteId: string,
   gratuito: boolean,
+  historicoCanal?: MensagemHistorico[],
 ): Promise<string | null> {
   if (!pareceConsultaLivre(mensagem)) return null;
 
@@ -221,7 +223,7 @@ export async function tentarResponderConsultaLivre(
   // numérica) tem a primeira chance; se não responder (flag desligada, erro,
   // timeout, mensagem que não é consulta), o classificador de intenção única
   // abaixo roda exatamente como antes.
-  const respostaQuita = await tentarResponderComQuita(mensagem, clienteId, gratuito);
+  const respostaQuita = await tentarResponderComQuita(mensagem, clienteId, gratuito, historicoCanal);
   if (respostaQuita) return respostaQuita;
 
   const intent = await classificarIntentLivre(mensagem, clienteId, gratuito);

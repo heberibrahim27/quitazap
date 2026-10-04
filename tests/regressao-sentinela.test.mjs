@@ -195,6 +195,8 @@ test("status do agente sai das execuções reais, não de rótulo fixo", () => {
   assert.equal(calcularStatusAgente(sentinela, { terminadoEm: h(4), sucesso: true }, agora), "OPERANDO");
   assert.equal(calcularStatusAgente(sentinela, { terminadoEm: h(40), sucesso: true }, agora), "ATRASADO");
   assert.equal(calcularStatusAgente(sentinela, { terminadoEm: h(4), sucesso: false }, agora), "ERRO");
+  // cobertura incompleta do dia nunca aparece como "operando"
+  assert.equal(calcularStatusAgente(sentinela, { terminadoEm: h(1), sucesso: true }, agora, true), "PARCIAL");
   // agente sob demanda não fica "atrasado" por não ter sido usado
   assert.equal(calcularStatusAgente(quita, null, agora), "AGUARDANDO_USO");
   assert.equal(calcularStatusAgente(quita, { terminadoEm: h(500), sucesso: true }, agora), "OPERANDO");
@@ -215,4 +217,95 @@ test("feedback: frases exatas, sem sequestrar mensagens comuns", () => {
   for (const f of ["o valor ficou errado, corrige pra 50", "gastei 50 no mercado", "quanto é minha fatura", "isso foi útil pra mim ontem quando comprei", "desfazer", ""]) {
     assert.equal(detectarFeedbackAlerta(f), null, f);
   }
+});
+
+// ── lotes, checkpoint e cobertura ───────────────────────────────────────
+
+const lotes = loadTsModule("src/lib/agentes/lotes.ts");
+
+test("500 clientes em vários lotes: cada um avaliado exatamente uma vez, checkpoint conclui no fim", () => {
+  const ids = Array.from({ length: 500 }, (_, i) => `c${String(i).padStart(4, "0")}`);
+  const vistos = [];
+  let cob = null;
+  let execucoes = 0;
+  while (!(cob && cob.concluido) && execucoes < 20) {
+    const lote = lotes.selecionarLote(ids, cob?.cursor ?? null, 100);
+    cob = lotes.atualizarCobertura(cob, "2026-10-05", lote, ids);
+    vistos.push(...lote);
+    execucoes++;
+  }
+  assert.equal(execucoes, 5);
+  assert.equal(vistos.length, 500);
+  assert.equal(new Set(vistos).size, 500); // nenhum duplicado, nenhum pulado
+  assert.deepEqual(vistos, ids);
+  assert.deepEqual(cob, { dia: "2026-10-05", cursor: "c0499", avaliados: 500, total: 500, concluido: true });
+  assert.equal(lotes.rotuloCobertura(cob, "2026-10-05"), "CONCLUIDO");
+});
+
+test("tempo esgotado no meio do lote: checkpoint para onde parou e o próximo lote retoma dali", () => {
+  const ids = Array.from({ length: 250 }, (_, i) => `c${String(i).padStart(4, "0")}`);
+  let cob = null;
+  const lote1 = lotes.selecionarLote(ids, null, 100);
+  const processados1 = lote1.slice(0, 37); // só 37 couberam no tempo
+  cob = lotes.atualizarCobertura(cob, "2026-10-05", processados1, ids);
+  assert.equal(cob.avaliados, 37);
+  assert.equal(cob.concluido, false);
+  assert.equal(lotes.rotuloCobertura(cob, "2026-10-05"), "PARCIAL");
+  const lote2 = lotes.selecionarLote(ids, cob.cursor, 100);
+  assert.equal(lote2[0], "c0037"); // sem pular ninguém
+  assert.equal(lote2.length, 100);
+});
+
+test("cobertura é por dia: dia novo recomeça do zero", () => {
+  const ids = ["a", "b", "c"];
+  const ontem = lotes.atualizarCobertura(null, "2026-10-04", ids, ids);
+  assert.equal(ontem.concluido, true);
+  const hoje = lotes.atualizarCobertura(ontem, "2026-10-05", ["a"], ids);
+  assert.equal(hoje.avaliados, 1);
+  assert.equal(hoje.concluido, false);
+  assert.equal(lotes.rotuloCobertura(ontem, "2026-10-05"), "SEM_DADOS");
+  // base vazia: concluído sem avaliar ninguém
+  assert.equal(lotes.atualizarCobertura(null, "2026-10-05", [], []).concluido, true);
+});
+
+test("sem starvation: 5 candidatos simultâneos saem todos, um por dia, na ordem de prioridade, sem repetir", () => {
+  const mk = (tipo, entityId, qualifier, prioridade) => ({ tipo, entityId, qualifier, periodKey: "2026-10", prioridade, mensagem: "m" });
+  const candidatos = [
+    mk("CATEGORY_BUDGET", "Alimentação", "80", 50),
+    mk("CARD_CLOSING", "c1", "D-2", 55),
+    mk("NEGATIVE_PROJECTION", "GLOBAL", "BELOW_0", 85),
+    mk("MONTH_CLOSING", "GLOBAL", "MONTH", 70),
+    mk("SPENDING_ANOMALY", "i1", "ANOMALY", 40),
+  ];
+  const historico = [];
+  const ordemEnvio = [];
+  for (let dia = 5; dia <= 10; dia++) {
+    const agora = new Date(`2026-10-${String(dia).padStart(2, "0")}T11:30:00Z`);
+    const r = escolherAlerta(candidatos, { agora, aceitaProativas: true, tiposDesligados: [], historico });
+    if (r.escolhido) {
+      ordemEnvio.push(r.escolhido.tipo);
+      historico.push({ dedupeKey: chaveDedupe(r.escolhido), tipo: r.escolhido.tipo, enviadoEm: agora });
+    }
+  }
+  // limite semanal (4/7 dias) segura o 5º até a semana andar; os 4 primeiros seguem a prioridade
+  assert.deepEqual(ordemEnvio.slice(0, 4), ["NEGATIVE_PROJECTION", "MONTH_CLOSING", "CARD_CLOSING", "CATEGORY_BUDGET"]);
+  assert.equal(new Set(ordemEnvio).size, ordemEnvio.length); // nunca repete
+});
+
+test("métricas por tipo: enviados, úteis, errados, silenciados e utilidade com n", () => {
+  const { agregarMetricasPorTipo } = loadTsModule("src/lib/agentes/status.ts");
+  const m = agregarMetricasPorTipo(
+    ["CATEGORY_BUDGET", "CATEGORY_BUDGET", "CATEGORY_BUDGET", "CARD_CLOSING"],
+    ["CATEGORY_BUDGET|Mercado|80|2026-10#UTIL", "CATEGORY_BUDGET|Mercado|90|2026-10#UTIL", "CATEGORY_BUDGET|Lazer|80|2026-10#ERRADO", "CARD_CLOSING|c1|D-2|2026-10-06#ERRADO"],
+    ["CARD_CLOSING", "TODOS"]
+  );
+  const orc = m.find((x) => x.tipo === "CATEGORY_BUDGET");
+  assert.deepEqual([orc.enviados, orc.uteis, orc.errados, orc.silenciados, orc.respostas], [3, 2, 1, 0, 3]);
+  assert.ok(Math.abs(orc.utilidade - 2 / 3) < 1e-9);
+  const card = m.find((x) => x.tipo === "CARD_CLOSING");
+  assert.deepEqual([card.enviados, card.errados, card.silenciados, card.utilidade], [1, 1, 1, 0]);
+  const todos = m.find((x) => x.tipo === "TODOS");
+  assert.equal(todos.silenciados, 1);
+  assert.equal(todos.utilidade, null); // sem feedback: nada a concluir
+  assert.equal(m[0].tipo, "CATEGORY_BUDGET"); // ordenado por enviados
 });

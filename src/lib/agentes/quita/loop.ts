@@ -46,6 +46,29 @@ export interface ResultadoLoop {
   violacoes: string[];
 }
 
+/**
+ * Histórico do WhatsApp: o webhook guarda a conversa em BotSessao.dividasTemp
+ * (JSON de {role, content}). Aproveita só as últimas 4 falas de texto
+ * (cliente/assistente) — contexto de referência, nunca fonte de valor.
+ */
+export function historicoDeSessaoWhatsApp(dividasTemp: string | null | undefined, mensagemAtual: string): MensagemHistorico[] {
+  let bruto: unknown;
+  try {
+    bruto = JSON.parse(dividasTemp || "[]");
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(bruto)) return [];
+  const falas = bruto
+    .filter((m): m is { role: string; content: string } => Boolean(m) && typeof m === "object" && typeof (m as { content?: unknown }).content === "string")
+    .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0)
+    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  // a mensagem atual pode já ter sido anexada ao histórico: tira a duplicata
+  const ultima = falas[falas.length - 1];
+  if (ultima && ultima.role === "user" && ultima.content.trim() === mensagemAtual.trim()) falas.pop();
+  return falas.slice(-4);
+}
+
 export const PROMPT_SISTEMA_QUITA = `Você é o Quita, assistente financeiro do QuitaZAP (WhatsApp/app). Responda em português do Brasil, curto, claro e amigável, sem sermão.
 
 REGRAS INEGOCIÁVEIS

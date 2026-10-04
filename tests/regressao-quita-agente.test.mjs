@@ -205,3 +205,24 @@ test("disjuntor: só abre com volume mínimo e taxa alta de errado/silenciado", 
   assert.equal(disjuntorAberto({ enviados: 20, errados: 4, silenciados: 3 }), true); // 35%
   assert.equal(disjuntorAberto({ enviados: 10, errados: 3, silenciados: 0 }), false); // exatamente 30% não abre
 });
+
+// ── memória do WhatsApp ─────────────────────────────────────────────────
+
+test("histórico do WhatsApp: últimas 4 falas de texto, sem duplicar a mensagem atual", () => {
+  const { historicoDeSessaoWhatsApp } = loadTsModule("src/lib/agentes/quita/loop.ts");
+  const sessao = JSON.stringify([
+    { role: "user", content: "a" },
+    { role: "assistant", content: "b" },
+    { role: "system", content: "ignora" },
+    { role: "user", content: "c" },
+    { role: "assistant", content: null },
+    { role: "assistant", content: "d" },
+    { role: "user", content: "e" },
+    { role: "user", content: "e agora?" },
+  ]);
+  const h = historicoDeSessaoWhatsApp(sessao, "e agora?");
+  assert.deepEqual(h.map((m) => m.content), ["b", "c", "d", "e"]); // a mensagem atual saiu; system/null ignorados; só as 4 últimas
+  assert.deepEqual(historicoDeSessaoWhatsApp("não é json", "x"), []);
+  assert.deepEqual(historicoDeSessaoWhatsApp(null, "x"), []);
+  assert.deepEqual(historicoDeSessaoWhatsApp('{"a":1}', "x"), []);
+});

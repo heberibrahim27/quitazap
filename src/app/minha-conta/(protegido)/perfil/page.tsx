@@ -7,6 +7,8 @@ import { subirFotoPerfil } from "@/lib/supabase-storage";
 import { FotoPerfilForm } from "./FotoPerfilForm";
 import { NotificacoesPush } from "../NotificacoesPush";
 import { MensagensProativas } from "../MensagensProativas";
+import { AlertasFinanceiros } from "../AlertasFinanceiros";
+import { carregarTiposDesligados } from "@/lib/agentes/alertas-store";
 import { ResetTotalForm } from "./ResetTotalForm";
 import { resetarDadosFinanceiros } from "./reset-actions";
 import { HORAS_TRABALHO_MENSAL_PADRAO } from "@/lib/financeiro/horas-trabalho";
@@ -21,6 +23,20 @@ export default async function PerfilPage({
   const { ok, erro, debug } = await searchParams;
   const modoDebug = debug === "1";
   const buildId = process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
+
+  // Preferência por tipo de alerta (mesma dos comandos "parar esse alerta" /
+  // "ativar alertas" no WhatsApp e no chat). Anomalia só aparece quando o
+  // envio dela está liberado (ver SENTINELA_ANOMALIA_ATIVA).
+  const tiposDesligados = await carregarTiposDesligados(cliente.id).catch(() => [] as string[]);
+  const ITENS_ALERTAS = [
+    { tipo: "CATEGORY_BUDGET", titulo: "Orçamento por categoria", descricao: "Quando você chega a 80%, 90% ou estoura o limite de uma categoria." },
+    { tipo: "CARD_CLOSING", titulo: "Fechamento da fatura", descricao: "2 dias antes do fechamento do cartão, com o valor da fatura aberta." },
+    { tipo: "NEGATIVE_PROJECTION", titulo: "Mês no vermelho", descricao: "Quando a projeção do mês aponta que vai faltar dinheiro." },
+    { tipo: "MONTH_CLOSING", titulo: "Fechamento do mês", descricao: "Resumo do mês que passou, nos primeiros dias do mês." },
+    ...(process.env.SENTINELA_ANOMALIA_ATIVA === "true"
+      ? [{ tipo: "SPENDING_ANOMALY", titulo: "Gasto fora do padrão", descricao: "Quando uma categoria gasta bem acima da sua média." }]
+      : []),
+  ];
 
   async function salvarFotoPerfil(formData: FormData) {
     "use server";
@@ -150,6 +166,7 @@ export default async function PerfilPage({
 
       <NotificacoesPush debug={modoDebug} buildId={buildId} />
       <MensagensProativas aceitaProativasInicial={cliente.aceitaProativas} />
+      <AlertasFinanceiros desligadosIniciais={tiposDesligados} itens={ITENS_ALERTAS} />
 
       <div className="card-head">
         <p className="card-title" style={{ fontSize: 14 }}>

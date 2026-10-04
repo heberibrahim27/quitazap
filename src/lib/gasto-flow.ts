@@ -319,6 +319,14 @@ export function definirCategoriaGasto(mensagem: string): CategoriaGasto {
 
   if (TERMOS_APOSTAS.test(texto)) return "Apostas";
 
+  // Compra no cartão sem dizer o item ("gastei 200 no nubank"): a descrição vira
+  // só o nome do cartão e caía em "Dívidas/Cartões", poluindo "Onde está indo
+  // meu dinheiro" e orçamentos (achado em QA, 04/10/2026). Sem item, é "Outros".
+  // "fatura/parcela/empréstimo do nubank" continuam em Dívidas/Cartões.
+  if (/^(cartao\s+)?(nubank|inter|c6|itau|bradesco|santander|caixa|picpay|xp|neon|next|original|will|bb|visa|master(card)?|elo)(\s+cartao)?$/.test(texto.trim())) {
+    return "Outros";
+  }
+
   if (/\baguas?\b/.test(texto)) {
     if (/\b(conta|boleto|embasa|servico|residencial|casa|energia|despesa fixa|todo mes)\b/.test(texto)) {
       return "Contas da casa";

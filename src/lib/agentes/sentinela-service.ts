@@ -25,8 +25,10 @@ import {
   proximoFechamento,
   type CandidatoAlerta,
 } from "./alertas";
+import { atualizarCobertura, selecionarLote, TAMANHO_LOTE_PADRAO } from "./lotes";
 import { disjuntorAberto, escolherAlerta, type MotivoBloqueio } from "./politica";
 import {
+  carregarCoberturaDoDia,
   carregarHistoricoAlertas,
   carregarSaudeAlertas,
   carregarTiposDesligados,
@@ -37,8 +39,7 @@ import {
 const TIPOS_GASTO = ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"];
 const AGENTE = "sentinela";
 const RODAPE_FEEDBACK = "\n\n_Foi útil? Responda *útil*, *errado* ou *parar esse alerta*._";
-/** Teto por execução: protege o tempo da função serverless. */
-const MAX_CLIENTES_POR_EXECUCAO = 500;
+/** Tempo da função serverless: ao estourar, o lote para e o checkpoint segue dali. */
 const ORCAMENTO_DE_TEMPO_MS = 50_000;
 
 export interface OpcoesSentinela {
@@ -256,28 +257,36 @@ export async function executarSentinela(opcoes: OpcoesSentinela = {}): Promise<R
     return resultado;
   }
 
-  const clientes = await prisma.cliente.findMany({
-    where: {
-      aceitaProativas: true,
-      ...(opcoes.clienteId
-        ? { id: opcoes.clienteId }
-        : opcoes.incluirTestes
-          ? { gratuito: false }
-          : whereStatusAssinatura("PAGO")),
-    },
+  const filtro = {
+    aceitaProativas: true,
+    ...(opcoes.clienteId ? { id: opcoes.clienteId } : opcoes.incluirTestes ? { gratuito: false } : whereStatusAssinatura("PAGO")),
+  };
+  const todosIds = (await prisma.cliente.findMany({ where: filtro, select: { id: true }, orderBy: { id: "asc" } })).map((c) => c.id);
+
+  // Lotes com checkpoint: cada execução continua de onde a anterior DO MESMO
+  // DIA parou. Execução de um cliente só (ensaio/QA) ou dryRun não usa nem
+  // grava checkpoint.
+  const usaCheckpoint = !opcoes.clienteId && !opcoes.dryRun;
+  const diaHoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(agora);
+  const coberturaAnterior = usaCheckpoint ? await carregarCoberturaDoDia(AGENTE, diaHoje) : null;
+  if (usaCheckpoint && coberturaAnterior?.concluido) return resultado; // dia já coberto: nada a fazer, nada a registrar
+
+  const idsDoLote = opcoes.clienteId ? todosIds : selecionarLote(todosIds, coberturaAnterior?.cursor ?? null, TAMANHO_LOTE_PADRAO);
+  const encontrados = await prisma.cliente.findMany({
+    where: { id: { in: idsDoLote } },
     select: { id: true, telefone: true, nome: true, modoLembrete: true, aceitaProativas: true },
-    take: MAX_CLIENTES_POR_EXECUCAO,
-    orderBy: { id: "asc" },
   });
+  const porId = new Map(encontrados.map((c) => [c.id, c]));
+  const clientes = idsDoLote.map((id) => porId.get(id)).filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const processados: string[] = [];
 
   const enviar = opcoes.enviar ?? (async (tel: string, texto: string, modo?: string | null) => deliverReminder({ phone: tel, mensagem: texto, modo }));
 
   for (const cliente of clientes) {
-    if (Date.now() - iniciadoEm.getTime() > ORCAMENTO_DE_TEMPO_MS) {
-      resultado.erros.push("orçamento de tempo esgotado — clientes restantes ficam pra próxima execução");
-      break;
-    }
+    // Tempo esgotado: para aqui; o checkpoint continua deste ponto (não é erro).
+    if (Date.now() - iniciadoEm.getTime() > ORCAMENTO_DE_TEMPO_MS) break;
     resultado.clientesAvaliados++;
+    processados.push(cliente.id);
     try {
       const [candidatos, historico, tiposDesligados] = await Promise.all([
         coletarCandidatos(cliente.id, agora),
@@ -331,7 +340,11 @@ export async function executarSentinela(opcoes: OpcoesSentinela = {}): Promise<R
       acoes: resultado.enviados,
       puladas: resultado.decisoes.filter((d) => !d.enviado).length,
       erros: resultado.erros,
-      detalhes: { motivosSupressao: motivosAgregados(resultado.decisoes), versao: "1.0" },
+      detalhes: {
+        motivosSupressao: motivosAgregados(resultado.decisoes),
+        versao: "1.0",
+        ...(usaCheckpoint ? { cobertura: atualizarCobertura(coberturaAnterior, diaHoje, processados, todosIds) } : {}),
+      },
     });
   }
   return resultado;

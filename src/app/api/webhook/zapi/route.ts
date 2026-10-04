@@ -45,6 +45,7 @@ import { detectarPlanoPagamento, detectarMetaPrazo, responderPlanoPagamento, res
 import { detectarConsultaVazamentos, responderConsultaVazamentos } from "@/lib/ia/vazamentos-resolver";
 import { detectarHorasTrabalho, responderHorasTrabalho } from "@/lib/ia/horas-trabalho-resolver";
 import { tentarResponderConsultaLivre } from "@/lib/ia/classificador-consulta-livre";
+import { historicoDeSessaoWhatsApp } from "@/lib/agentes/quita/agente";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -1934,7 +1935,12 @@ Pode mandar tudo em uma mensagem só.`;
     // proposta (exemplos aprovados + correção do usuário como sinal de
     // treino, com humano aprovando antes de virar regra nova).
     if (sessao.clienteId) {
-      const respostaConsultaLivre = await tentarResponderConsultaLivre(mensagem, sessao.clienteId, isGratuito);
+      const respostaConsultaLivre = await tentarResponderConsultaLivre(
+        mensagem,
+        sessao.clienteId,
+        isGratuito,
+        historicoDeSessaoWhatsApp(sessao.dividasTemp, mensagem)
+      );
       if (respostaConsultaLivre) {
         await sendWhatsApp(telefone, respostaConsultaLivre);
 

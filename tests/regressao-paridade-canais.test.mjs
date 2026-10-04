@@ -121,3 +121,16 @@ test("skills de escrita nunca estão na allowlist de ferramentas do agente Quita
   // e o executor do Quita só usa resolvers de leitura / prisma.find*/groupBy
   assert.doesNotMatch(src, /prisma\.\w+\.(create|update|delete|upsert|createMany|updateMany|deleteMany)\(/);
 });
+
+test("as leituras do Quita passam pelo registro de skills (fonte única) e todas as skills esperadas estão registradas", () => {
+  const registro = ler("src/lib/agentes/skills/index.ts");
+  for (const nome of ["consultar_fatura", "desfazer_ultimo_lancamento", "criar_lembrete", "depositar_meta", "consultar_resumo_mes", "consultar_orcamento", "consultar_compromissos", "consultar_metas"]) {
+    assert.match(registro, new RegExp(`"${nome}"`), `skill ${nome} não registrada`);
+  }
+  const ferramentas = ler("src/lib/agentes/quita/ferramentas.ts");
+  for (const skill of ["consultar_resumo_mes", "consultar_orcamento", "consultar_compromissos", "consultar_metas"]) {
+    assert.ok(ferramentas.includes(`viaRegistro("${skill}")`), `Quita não usa a skill ${skill} via registro`);
+  }
+  // nenhuma query direta de leitura duplicada dentro das ferramentas do Quita
+  assert.doesNotMatch(ferramentas, /prisma\./);
+});

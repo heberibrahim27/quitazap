@@ -7,6 +7,15 @@ import ts from "typescript";
 
 const root = path.resolve(import.meta.dirname, "..");
 
+// Permite que um módulo .ts importe outro por caminho relativo sem extensão.
+Module._extensions[".ts"] = function carregarTypeScript(module, filename) {
+  const output = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    fileName: filename,
+  }).outputText;
+  module._compile(output, filename);
+};
+
 function loadTsModule(relativePath) {
   const filename = path.join(root, relativePath);
   const output = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
@@ -65,4 +74,16 @@ test("o que nunca se repete: meta, parcela, fatura fechada", () => {
 
 test("descrição equivalente ignora acento, caixa e espaços", () => {
   assert.equal(normalizarDescricaoRecorrencia("  Salário  Janeiro "), normalizarDescricaoRecorrencia("salario janeiro"));
+});
+
+// ── categoria de compra no cartão sem item (QA 04/10/2026) ───────────────
+
+const { definirCategoriaGasto } = loadTsModule("src/lib/gasto-flow.ts");
+
+test("compra no cartão sem item ('nubank') é Outros; fatura/parcela do cartão continuam Dívidas/Cartões", () => {
+  assert.equal(definirCategoriaGasto("Nubank"), "Outros");
+  assert.equal(definirCategoriaGasto("cartao nubank"), "Outros");
+  assert.equal(definirCategoriaGasto("fatura do nubank"), "Dívidas/Cartões");
+  assert.equal(definirCategoriaGasto("parcela do cartao"), "Dívidas/Cartões");
+  assert.equal(definirCategoriaGasto("mercado"), "Mercado");
 });

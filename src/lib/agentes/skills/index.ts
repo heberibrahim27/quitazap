@@ -11,6 +11,7 @@ import { detectarComandoTarefa } from "@/lib/tarefa-flow";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import { criarDepositoTyped, encontrarMetaPorNome } from "@/lib/meta-service";
 import { RegistroDeSkills, type Skill } from "./contrato";
+import { compromissosProximos, metasDoCliente, orcamentoPorCategoria, resumoDoMes } from "./leituras";
 
 export * from "./contrato";
 
@@ -75,7 +76,37 @@ const depositarMeta: Skill<{ meta: string; valor: number; origem: "TEXTO" | "AUD
   },
 };
 
+/** Leitura sem parâmetros do cliente; "agora" opcional só pra ensaio/teste. */
+function leitura(
+  name: string,
+  description: string,
+  executar: (clienteId: string, agora: Date) => Promise<string>
+): Skill<{ agora: Date }, { texto: string }> {
+  return {
+    name,
+    description,
+    modo: "READ",
+    validate: (i) => {
+      const v = (i as { agora?: unknown } | null)?.agora;
+      const d = typeof v === "string" || v instanceof Date ? new Date(v) : new Date();
+      return { agora: Number.isNaN(d.getTime()) ? new Date() : d };
+    },
+    async execute(ctx, { agora }) {
+      return { ok: true, data: { texto: await executar(ctx.userId, agora) } };
+    },
+  };
+}
+
+const consultarResumoMes = leitura("consultar_resumo_mes", "Entradas, despesas, resultado e guardado em metas do mês atual.", resumoDoMes);
+const consultarOrcamento = leitura("consultar_orcamento", "Quanto já gastou do limite de cada categoria no mês.", orcamentoPorCategoria);
+const consultarCompromissos = leitura("consultar_compromissos", "Contas, lembretes e parcelas que vencem nos próximos 30 dias.", compromissosProximos);
+const consultarMetas = leitura("consultar_metas", "Metas (cofrinhos) e quanto já foi guardado em cada.", (id) => metasDoCliente(id));
+
 export const skillRegistry = new RegistroDeSkills();
+skillRegistry.register(consultarResumoMes);
+skillRegistry.register(consultarOrcamento);
+skillRegistry.register(consultarCompromissos);
+skillRegistry.register(consultarMetas);
 skillRegistry.register(consultarFatura);
 skillRegistry.register(desfazerUltimoLancamento);
 skillRegistry.register(criarLembrete);

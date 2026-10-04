@@ -12,7 +12,9 @@
 import { prisma } from "@/lib/prisma";
 import { chatCompletion, type MensagemChat as MensagemOpenAI } from "@/lib/ai/openai-client";
 import { registrarExecucaoAgente } from "@/lib/agentes/alertas-store";
-import { conversarComFerramentas, type MensagemHistorico } from "./loop";
+import { conversarComFerramentas, historicoDeSessaoWhatsApp, type MensagemHistorico } from "./loop";
+
+export { historicoDeSessaoWhatsApp };
 import { DEFINICOES_FERRAMENTAS, NOMES_FERRAMENTAS, criarExecutorFerramentas } from "./ferramentas";
 
 const TEMPO_MAXIMO_MS = 12_000;
@@ -56,7 +58,12 @@ async function carregarHistorico(clienteId: string, mensagemAtual: string): Prom
   }
 }
 
-export async function tentarResponderComQuita(mensagem: string, clienteId: string, gratuito: boolean): Promise<string | null> {
+export async function tentarResponderComQuita(
+  mensagem: string,
+  clienteId: string,
+  gratuito: boolean,
+  historicoCanal?: MensagemHistorico[]
+): Promise<string | null> {
   if (!quitaAtivo()) return null;
 
   const iniciadoEm = new Date();
@@ -64,7 +71,7 @@ export async function tentarResponderComQuita(mensagem: string, clienteId: strin
   const modelo = process.env.OPENAI_QUITA_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 
   try {
-    const historico = await carregarHistorico(clienteId, mensagem);
+    const historico = historicoCanal ?? (await carregarHistorico(clienteId, mensagem));
     const resultado = await Promise.race([
       conversarComFerramentas(
         {

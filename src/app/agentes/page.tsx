@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { AGENTES, ROTULO_STATUS, calcularStatusAgente } from "@/lib/agentes/status";
+import { AGENTES, ROTULO_STATUS, ROTULO_TIPO_ALERTA, agregarMetricasPorTipo, calcularStatusAgente } from "@/lib/agentes/status";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,6 +19,7 @@ function fmtDuracao(ms: unknown) {
 
 const COR_STATUS: Record<string, { bg: string; color: string; border: string }> = {
   OPERANDO: { bg: "rgba(16,185,129,0.12)", color: "#6ee7b7", border: "rgba(16,185,129,0.25)" },
+  PARCIAL: { bg: "rgba(245,158,11,0.12)", color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
   AGUARDANDO_USO: { bg: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "rgba(255,255,255,0.12)" },
   ATRASADO: { bg: "rgba(245,158,11,0.12)", color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
   ERRO: { bg: "rgba(239,68,68,0.12)", color: "#fca5a5", border: "rgba(239,68,68,0.25)" },
@@ -31,6 +32,21 @@ const COR_STATUS: Record<string, { bg: string; color: string; border: string }> 
 export default async function AgentesPage() {
   const agora = new Date();
   const seteDias = new Date(agora.getTime() - 7 * 86_400_000);
+
+  const trintaDias = new Date(agora.getTime() - 30 * 86_400_000);
+  const [alertas30d, feedbacks30d, mutes30d] = await Promise.all([
+    prisma.mensagemChat.findMany({
+      where: { direcao: "BOT", criadoEm: { gte: trintaDias }, dadosEstruturados: { path: ["tipo"], equals: "alerta_proativo" } },
+      select: { dadosEstruturados: true },
+    }),
+    prisma.eventoAnalytics.findMany({ where: { tipo: "alerta_feedback", criadoEm: { gte: trintaDias } }, select: { caminho: true } }),
+    prisma.eventoAnalytics.findMany({ where: { tipo: "alerta_silenciado", criadoEm: { gte: trintaDias } }, select: { caminho: true } }),
+  ]);
+  const metricasPorTipo = agregarMetricasPorTipo(
+    alertas30d.map((a) => (a.dadosEstruturados as { alerta?: { tipo?: string } } | null)?.alerta?.tipo ?? "DESCONHECIDO"),
+    feedbacks30d.map((e) => e.caminho),
+    mutes30d.map((e) => e.caminho)
+  );
 
   const [execucoes, alertas7d, feedbackUtil, feedbackErrado, silenciados] = await Promise.all([
     prisma.auditoriaAssistente.findMany({
@@ -63,7 +79,10 @@ export default async function AgentesPage() {
         {AGENTES.map((def) => {
           const lista = doAgente(def.chave);
           const ultima = lista[0] ?? null;
-          const status = calcularStatusAgente(def, ultima ? { terminadoEm: ultima.criadoEm, sucesso: ultima.sucesso } : null, agora);
+          const diaHoje = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(agora);
+          const comCobertura = lista.find((e) => (e.depois as { cobertura?: { dia?: string } } | null)?.cobertura?.dia === diaHoje);
+          const cobertura = (comCobertura?.depois as { cobertura?: { avaliados: number; total: number; concluido: boolean } } | null)?.cobertura ?? null;
+          const status = calcularStatusAgente(def, ultima ? { terminadoEm: ultima.criadoEm, sucesso: ultima.sucesso } : null, agora, Boolean(cobertura && !cobertura.concluido));
           const cor = COR_STATUS[status];
           const recentes = lista.filter((e) => e.criadoEm >= seteDias);
           const dados = (ultima?.depois ?? {}) as Record<string, unknown>;
@@ -89,6 +108,12 @@ export default async function AgentesPage() {
               </div>
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 6, fontSize: 12.5, color: "var(--qa-gray-400)" }}>
                 <span>Versão: {def.versao}</span>
+                {def.chave === "sentinela" && (
+                  <span>
+                    Cobertura hoje:{" "}
+                    {cobertura ? `${cobertura.avaliados}/${cobertura.total} — ${cobertura.concluido ? "CONCLUÍDO" : "PARCIAL"}` : "ainda sem execução hoje"}
+                  </span>
+                )}
                 {def.agenda && <span>Próxima execução: {def.agenda}</span>}
                 <span>Configuração: {desligados.includes(def.chave) ? "desligado (AGENTES_DESLIGADOS)" : "habilitado"}</span>
               </div>
@@ -120,6 +145,43 @@ export default async function AgentesPage() {
         <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--qa-gray-400)" }}>
           Alerta marcado como errado vira item em <Link href="/revisao-pendente">Revisão pendente</Link> para investigar o cálculo.
         </p>
+      </div>
+
+      <div className="qa-card" style={{ marginBottom: 20 }}>
+        <strong style={{ fontSize: 15 }}>Utilidade por tipo de alerta — últimos 30 dias</strong>
+        {metricasPorTipo.length === 0 ? (
+          <p style={{ margin: "10px 0 0", color: "var(--qa-gray-400)" }}>Nenhum alerta enviado ainda.</p>
+        ) : (
+          <div style={{ marginTop: 10, overflowX: "auto" }}>
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: "var(--qa-gray-400)" }}>
+                  <th style={{ padding: "4px 8px 4px 0" }}>Tipo</th>
+                  <th style={{ padding: "4px 8px" }}>Enviados</th>
+                  <th style={{ padding: "4px 8px" }}>Úteis</th>
+                  <th style={{ padding: "4px 8px" }}>Errados</th>
+                  <th style={{ padding: "4px 8px" }}>Silenciados</th>
+                  <th style={{ padding: "4px 8px" }}>Utilidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {metricasPorTipo.map((m) => (
+                  <tr key={m.tipo}>
+                    <td style={{ padding: "4px 8px 4px 0" }}>{ROTULO_TIPO_ALERTA[m.tipo] ?? m.tipo}</td>
+                    <td style={{ padding: "4px 8px" }}>{m.enviados}</td>
+                    <td style={{ padding: "4px 8px" }}>{m.uteis}</td>
+                    <td style={{ padding: "4px 8px" }}>{m.errados}</td>
+                    <td style={{ padding: "4px 8px" }}>{m.silenciados}</td>
+                    <td style={{ padding: "4px 8px" }}>{m.utilidade == null ? "—" : `${Math.round(m.utilidade * 100)}% (de ${m.respostas})`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--qa-gray-400)" }}>
+              Utilidade = úteis ÷ (úteis + errados). Sempre leia junto do número de respostas: 100% com 1 resposta não prova nada.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="qa-card">
