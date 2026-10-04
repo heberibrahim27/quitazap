@@ -35,6 +35,10 @@ function assinar(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 
+// Reaproveitado por primeiro-acesso.ts — mesmo segredo, tipo próprio no
+// payload (um token de um fluxo nunca vale no outro).
+export const assinarPayloadCliente = assinar;
+
 function criarToken(tipo: string, clienteId: string): string {
   const payload = `${tipo}:${clienteId}:${Date.now()}`;
   const sig = assinar(payload);

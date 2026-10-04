@@ -34,6 +34,7 @@ import {
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import { detectarComandoModoLembrete, deliverReminder } from "@/lib/reminder-delivery";
+import { pareceEsqueciSenha, urlPrimeiroAcesso } from "@/lib/primeiro-acesso";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
 import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
@@ -1390,6 +1391,29 @@ export async function POST(req: NextRequest) {
           await sendWhatsApp(telefone, "✍️ Combinado! Seus lembretes voltam a ser só em texto.");
         }
         return NextResponse.json({ ok: true });
+      }
+    }
+
+    // ── Esqueci a senha do site / link de acesso ───────────────────────
+    // O cliente escreve primeiro (nunca mandamos isso por iniciativa
+    // nossa) e o remetente vem do próprio WhatsApp, então o link só chega
+    // a quem controla o número cadastrado. Antes, recuperar senha exigia
+    // chamar o fundador (ver "Esqueci minha senha" em /minha-conta/entrar).
+    if (sessao.clienteId && tipoEntrada === "texto") {
+      if (pareceEsqueciSenha(mensagem)) {
+        const clienteSenha = await prisma.cliente.findUnique({
+          where: { id: sessao.clienteId },
+          select: { id: true, senhaHash: true },
+        });
+        if (clienteSenha) {
+          await sendWhatsApp(
+            telefone,
+            "🔐 Aqui está seu link pra criar uma senha nova de acesso ao site (vale por 7 dias e funciona uma vez):\n" +
+              `${urlPrimeiroAcesso(clienteSenha.id, clienteSenha.senhaHash)}\n\n` +
+              "Depois é só entrar com seu WhatsApp e a senha nova. Se não foi você que pediu, ignore esta mensagem."
+          );
+          return NextResponse.json({ ok: true });
+        }
       }
     }
 

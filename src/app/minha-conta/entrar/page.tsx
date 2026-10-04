@@ -130,7 +130,9 @@ export default function EntrarPage() {
               <button
                 type="button"
                 className="qz-forgot-link"
-                onClick={() => setErro("Fale com quem administra sua conta QuitaZAP.")}
+                onClick={() =>
+                  setErro("Mande “esqueci minha senha” no WhatsApp do QuitaZAP e enviamos um link pra criar uma senha nova.")
+                }
               >
                 Esqueci minha senha
               </button>

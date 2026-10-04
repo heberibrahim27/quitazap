@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hashSenhaCliente } from "@/lib/cliente-auth";
+import { urlPrimeiroAcesso } from "@/lib/primeiro-acesso";
 
 export default async function EditarClientePage({
   params,
@@ -16,6 +17,10 @@ export default async function EditarClientePage({
 
   const cliente = await prisma.cliente.findUnique({ where: { id } });
   if (!cliente) notFound();
+
+  // Gerado a cada abertura da página (vale 7 dias a partir daqui) e amarrado
+  // à senha atual: depois que o cliente usa, o link para de funcionar.
+  const linkAcesso = urlPrimeiroAcesso(cliente.id, cliente.senhaHash);
 
   async function salvarCliente(formData: FormData) {
     "use server";
@@ -122,6 +127,17 @@ export default async function EditarClientePage({
           </div>
 
         </form>
+
+        <div style={{ ...formStyle, marginTop: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Link de acesso — Minha Conta</h2>
+            <p style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
+              Link pra o próprio cliente {cliente.senhaHash ? "redefinir" : "criar"} a senha (vale 7 dias, funciona uma vez).
+              Mande por WhatsApp se a boas-vindas automática não chegou.
+            </p>
+          </div>
+          <input readOnly value={linkAcesso} style={inputStyle} aria-label="Link de acesso do cliente" />
+        </div>
 
         <div style={{ ...formStyle, marginTop: 24 }}>
           <div>

@@ -6,12 +6,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsApp, normalizarTelefone } from "@/lib/zapi";
+import { sendWhatsApp, normalizarTelefone, variacoesTelefone } from "@/lib/zapi";
 import { mensagemBoasVindasControle } from "@/lib/onboarding-controle";
+import { urlPrimeiroAcesso } from "@/lib/primeiro-acesso";
 
-function msgBoasVindas(nome: string, oferta: string): string {
-  return mensagemBoasVindasControle(nome, oferta);
+function msgBoasVindas(nome: string, oferta: string, linkAcesso?: string): string {
+  return mensagemBoasVindasControle(nome, oferta, linkAcesso);
 }
+
+const TRINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
 
 // A Cakto não tem schema de webhook confirmado nesta auditoria (sem acesso
 // à documentação deles a partir deste ambiente) — em vez de travar num
@@ -75,7 +78,10 @@ export async function POST(req: NextRequest) {
     const status = classificarStatusCakto(evento);
     const telefoneBruto = body.data?.customer?.phone as string | undefined;
     const clientePorTelefone = telefoneBruto
-      ? await prisma.cliente.findFirst({ where: { telefone: normalizarTelefone(telefoneBruto) }, select: { id: true } })
+      ? await prisma.cliente.findFirst({
+          where: { telefone: { in: variacoesTelefone(normalizarTelefone(telefoneBruto)) } },
+          select: { id: true },
+        })
       : null;
 
     // Registra TODO evento (payload bruto preservado) — não só aprovação —
@@ -140,12 +146,11 @@ export async function POST(req: NextRequest) {
     }
 
     const telefone = normalizarTelefone(phone);
+    const agora = Date.now();
 
-    // Vencimento = hoje + 30 dias
-    const assinaturaVenceEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-    // Cria ou encontra o cliente
-    let cliente = await prisma.cliente.findFirst({ where: { telefone } });
+    // Cria ou encontra o cliente (com/sem o 9 extra — mesmo critério do
+    // login, pra não duplicar cadastro por diferença de formato do número).
+    let cliente = await prisma.cliente.findFirst({ where: { telefone: { in: variacoesTelefone(telefone) } } });
 
     if (!cliente) {
       cliente = await prisma.cliente.create({
@@ -155,18 +160,30 @@ export async function POST(req: NextRequest) {
           email: email ?? null,
           statusAtendimento: "AGUARDANDO_INFORMACOES",
           obs: `Comprou: ${oferta} via CAKTO`,
-          assinaturaVenceEm,
+          // Vencimento = hoje + 30 dias
+          assinaturaVenceEm: new Date(agora + TRINTA_DIAS_MS),
         },
       });
     } else {
-      // Renova assinatura
-      await prisma.cliente.update({
+      // Renova a partir do vencimento atual quando ainda está no futuro —
+      // pagar antes da hora não pode comer os dias que já estavam pagos.
+      const baseRenovacao =
+        cliente.assinaturaVenceEm && cliente.assinaturaVenceEm.getTime() > agora
+          ? cliente.assinaturaVenceEm.getTime()
+          : agora;
+      cliente = await prisma.cliente.update({
         where: { id: cliente.id },
-        data: { statusAtendimento: "AGUARDANDO_INFORMACOES", assinaturaVenceEm },
+        data: {
+          statusAtendimento: "AGUARDANDO_INFORMACOES",
+          assinaturaVenceEm: new Date(baseRenovacao + TRINTA_DIAS_MS),
+        },
       });
     }
 
-    const boasVindas = msgBoasVindas(name ?? "cliente", oferta);
+    // Link pra criar a senha do site só quando o cliente ainda não tem uma —
+    // renovação de quem já entra normalmente não recebe link de novo.
+    const linkAcesso = cliente.senhaHash ? undefined : urlPrimeiroAcesso(cliente.id, null);
+    const boasVindas = msgBoasVindas(name ?? "cliente", oferta, linkAcesso);
 
     // Histórico inicial: só a mensagem de abertura do bot
     const historicoInicial = JSON.stringify([
@@ -192,11 +209,26 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Envia boas-vindas no WhatsApp
-    await sendWhatsApp(telefone, boasVindas);
+    // Envia boas-vindas no WhatsApp. Falha aqui (número bloqueado, instância
+    // desconectada) NÃO pode derrubar o webhook: o cliente já pagou e já foi
+    // criado, e a Cakto reenviar o evento não reprocessa (transacaoId é
+    // único) — devolver erro só deixaria o cliente sem nada. Em vez disso,
+    // grava um aviso no cadastro (visível em /clientes) pro fundador mandar
+    // o link manualmente (seção "Link de acesso" em /clientes/[id]/editar).
+    let boasVindasEnviada = true;
+    try {
+      await sendWhatsApp(telefone, boasVindas);
+    } catch (e) {
+      boasVindasEnviada = false;
+      console.error("[CAKTO] Cliente criado, mas o WhatsApp de boas-vindas falhou:", e);
+      const aviso = `[${new Date(agora).toISOString().slice(0, 10)}] Boas-vindas NÃO enviada por WhatsApp — mandar o link de acesso manualmente.`;
+      await prisma.cliente
+        .update({ where: { id: cliente.id }, data: { obs: cliente.obs ? `${cliente.obs}\n${aviso}` : aviso } })
+        .catch((err) => console.error("[CAKTO] Não consegui gravar o aviso no cadastro:", err));
+    }
 
     console.log(`[CAKTO] Cliente criado/atualizado: ${telefone} — ${name}`);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, boasVindasEnviada });
   } catch (err) {
     console.error("[CAKTO] Erro no webhook:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

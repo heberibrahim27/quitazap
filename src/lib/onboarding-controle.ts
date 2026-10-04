@@ -32,14 +32,19 @@ export function mensagensResetControle(nome: string): [string, string] {
   return [RESET_CONTROLE_MENSAGEM_1, mensagemInicioControle(nome)];
 }
 
-export function mensagemBoasVindasControle(nome: string, oferta: string): string {
+export function mensagemBoasVindasControle(nome: string, oferta: string, linkAcesso?: string): string {
   const nomeSeguro = nome?.trim() || "cliente";
   const ofertaSegura = oferta?.trim() || "Plano QuitaZAP";
+  const blocoAcesso = linkAcesso
+    ? "Pra acessar seu painel no site, crie sua senha por este link (vale por 7 dias):\n" +
+      `${linkAcesso}\n\n`
+    : "";
 
   return (
     `Olá, ${nomeSeguro}! 👋\n` +
     "Seu acesso ao *QuitaZAP Controle* foi ativado.\n\n" +
     `Sua assinatura do *${ofertaSegura}* está confirmada ✅\n\n` +
+    blocoAcesso +
     "Eu sou o *QuitaZAP Controle*, sua IA de organização financeira pelo WhatsApp.\n\n" +
     "Pode me mandar qualquer coisa: um gasto, uma receita, uma dívida, um cartão, uma meta... eu já entendo e registro pra você, sem precisar seguir um roteiro.\n\n" +
     "Exemplos:\n" +
