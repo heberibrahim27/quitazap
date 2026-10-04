@@ -58,6 +58,11 @@ import {
   type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
+import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
+import { processarComandoTarefa } from "@/lib/tarefa-service";
+import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
+import { pedidoDesfazerLancamento } from "@/lib/comandos-texto";
+import { desfazerUltimoLancamento } from "@/lib/desfazer-lancamento";
 import { detectarConsultaFatura } from "@/lib/financeiro/fatura-cartao";
 import { responderConsultaFatura } from "@/lib/financeiro/fatura-cartao-consulta";
 import {
@@ -270,6 +275,34 @@ export async function processarMensagemControle(input: {
     return resultado;
   }
 
+  // 1b) Comandos que o WhatsApp já tinha e o chat nativo não (achado em QA,
+  // 04/10/2026: "desfazer" e "lembrete: ..." caíam em "Eu sou o assistente
+  // financeiro..."). Desfazer só vale sem pendência de confirmação — um
+  // "desfazer" no meio de uma prévia 1/2 é cancelar a prévia, não apagar o
+  // último lançamento.
+  if (!estadoAntesFluxosControle.confirmacaoPendente && pedidoDesfazerLancamento(mensagem)) {
+    return finalizar(await desfazerUltimoLancamento(clienteId));
+  }
+
+  const comandoTarefa = detectarComandoTarefa(mensagem);
+  if (comandoTarefa) {
+    const respostaTarefa = await processarComandoTarefa(clienteId, comandoTarefa, "TEXTO");
+    // null = "concluir"/"cancelar" sem tarefa parecida: não intercepta, a
+    // cascata normal continua (mesma regra do webhook).
+    if (respostaTarefa) return finalizar(respostaTarefa);
+  }
+
+  // Pedido explícito em linguagem natural ("me lembra de pagar o IPVA dia 28")
+  // — ver pedidoExplicitoDeLembrete. Sempre cria como "lembrete:", que lê a
+  // data e o valor da própria frase.
+  if (!comandoTarefa && pedidoExplicitoDeLembrete(mensagem)) {
+    const comandoNatural = detectarComandoTarefa(`lembrete: ${mensagem}`);
+    if (comandoNatural) {
+      const respostaNatural = await processarComandoTarefa(clienteId, comandoNatural, "TEXTO");
+      if (respostaNatural) return finalizar(respostaNatural);
+    }
+  }
+
   // 2) Consulta de cartões / faturas / saldo — leitura pura.
   // "Como está minha fatura?" e "meus cartões" respondem direto do banco
   // (cartões reais + ciclo de fechamento de cada um), nunca do estado antigo
@@ -480,6 +513,22 @@ export async function processarMensagemControle(input: {
       atualizouEstado: gastoRapido.atualizouEstado,
       lancamentosCriados: criados,
     });
+  }
+
+  // 12b) Pedido de lembrete em linguagem natural ("me lembra de pagar o
+  // condomínio dia 25") — último recurso antes do rescue, igual ao webhook:
+  // só chega aqui se nada acima reconheceu a mensagem.
+  const tipoLembreteIA = devePularFallbackLembreteIA(comandoTarefa, null)
+    ? null
+    : await classificarLembreteLivreIA(mensagem);
+  if (tipoLembreteIA) {
+    // Sempre "lembrete:" — "pagamento:" ignora a data pedida (vencimento
+    // vira hoje) e é pra registrar um pagamento, não pra agendar um aviso.
+    const comandoTarefaIA = detectarComandoTarefa(`lembrete: ${mensagem}`);
+    if (comandoTarefaIA) {
+      const respostaTarefaIA = await processarComandoTarefa(clienteId, comandoTarefaIA, "TEXTO");
+      if (respostaTarefaIA) return finalizar(respostaTarefaIA);
+    }
   }
 
   // 13) Nada determinístico reconheceu a mensagem — cai no mesmo rescue

@@ -65,6 +65,13 @@ const PADROES_ESCOPO = [
   // 10/09/2026: "Freela 800" caía em fora de escopo por nenhuma delas
   // estar na lista, mesmo "salario" já estando — mesmo padrão do "uber"/
   // "farmacia" abaixo, mas do lado da receita).
+  // Pedido de lembrete ("me lembra de pagar o condomínio dia 25") — achado em
+  // QA (04/10/2026): sem isso a frase era recusada como fora de escopo ANTES
+  // de chegar no classificador de lembrete que existe como último recurso
+  // (tarefa-resolver.ts), nos dois canais.
+  /\bme\s+lembr(?:a|e|ar)\b/,
+  /\blembrar\b/,
+  /\blembretes?\b/,
   /\bfreela\b/,
   /\bfrila\b/,
   /\bfreelance\b/,

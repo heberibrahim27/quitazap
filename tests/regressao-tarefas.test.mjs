@@ -51,6 +51,7 @@ const {
   formatarConfirmacaoTarefa,
   formatarListaTarefas,
   formatarMensagemErroExtracao,
+  pedidoExplicitoDeLembrete,
 } = loadTsModule("src/lib/tarefa-flow.ts");
 
 // ── detectarComandoTarefa ────────────────────────────────────────────────
@@ -470,4 +471,59 @@ test("formatarListaTarefas lista as tarefas pendentes", () => {
 test("formatarMensagemErroExtracao cobre os dois motivos possiveis", () => {
   assert.match(formatarMensagemErroExtracao("SEM_DESCRICAO"), /Não entendi/);
   assert.match(formatarMensagemErroExtracao("RECORRENCIA_SEM_DATA"), /não achei o dia/);
+});
+
+// ── lembrete em linguagem natural (QA 04/10/2026) ────────────────────────
+
+test("pedidoExplicitoDeLembrete reconhece o início do pedido, não o meio da frase", () => {
+  for (const frase of [
+    "me lembra de pagar o IPVA dia 28 R$ 900",
+    "Me lembre de ligar pro banco",
+    "lembra eu de buscar o bolo",
+    "não esquece de pagar o boleto do carro amanhã",
+    "nao esquece de ligar",
+    "me avisa amanhã de pagar a luz",
+  ]) {
+    assert.equal(pedidoExplicitoDeLembrete(frase), true, frase);
+  }
+  for (const frase of [
+    "gastei 50 no mercado",
+    "paguei o boleto, não esquece de anotar",
+    "quanto tenho de fatura",
+    "lembrete: pagar a luz",
+  ]) {
+    assert.equal(pedidoExplicitoDeLembrete(frase), false, frase);
+  }
+});
+
+test("lembrete natural: tira o pedido do título e entende 'amanhã' no fim da frase", () => {
+  const r = extrairTarefa("não esquece de pagar o boleto do carro amanhã", "LEMBRETE");
+  assert.equal(r.ok, true);
+  assert.equal(r.tarefa.descricao.toLowerCase().includes("amanh"), false);
+  assert.equal(r.tarefa.descricao.toLowerCase().includes("esquece"), false);
+  assert.notEqual(r.tarefa.vencimento, null);
+  const diff = (r.tarefa.vencimento.getTime() - Date.now()) / 86400000;
+  assert.ok(diff > 0 && diff < 2.1, `vencimento deveria ser ~amanhã, diff=${diff}`);
+});
+
+test("lembrete natural: 'me lembra de ... dia 28 R$ 900' extrai valor, dia e título limpo", () => {
+  const r = extrairTarefa("me lembra de pagar o IPVA dia 28 R$ 900", "LEMBRETE");
+  assert.equal(r.ok, true);
+  assert.equal(r.tarefa.valor, 900);
+  assert.equal(r.tarefa.vencimento.getUTCDate() >= 27 && r.tarefa.vencimento.getUTCDate() <= 28, true);
+  assert.match(r.tarefa.descricao, /IPVA/i);
+  assert.doesNotMatch(r.tarefa.descricao, /lembra/i);
+});
+
+// ── desfazer no chat nativo (QA 04/10/2026) ──────────────────────────────
+
+const { pedidoDesfazerLancamento } = loadTsModule("src/lib/comandos-texto.ts");
+
+test("pedidoDesfazerLancamento pega 'desfazer/errei' e ignora frases que só contêm a palavra", () => {
+  for (const f of ["desfazer", "Desfaz", "errei", "apagar isso", "cancelar o último lançamento", "não era isso"]) {
+    assert.equal(pedidoDesfazerLancamento(f), true, f);
+  }
+  for (const f of ["gastei 50 e errei no troco", "quanto gastei", "cancelar assinatura da netflix"]) {
+    assert.equal(pedidoDesfazerLancamento(f), false, f);
+  }
 });

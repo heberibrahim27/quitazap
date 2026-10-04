@@ -86,7 +86,7 @@ import {
   devePularDespesasFixasControle,
 } from "@/lib/onboarding-controle";
 import { processarLeadVendas } from "@/lib/sales-bot";
-import { detectarComandoTarefa } from "@/lib/tarefa-flow";
+import { detectarComandoTarefa, pedidoExplicitoDeLembrete } from "@/lib/tarefa-flow";
 import { processarComandoTarefa } from "@/lib/tarefa-service";
 import {
   gerarResumoMensal,
@@ -1506,6 +1506,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Pedido explícito em linguagem natural ("me lembra de pagar o IPVA dia
+    // 28") — antes das demais etapas, que engoliam a frase (ver
+    // pedidoExplicitoDeLembrete). Sempre cria como "lembrete:".
+    if (!comandoTarefa && pedidoExplicitoDeLembrete(mensagem)) {
+      const comandoNatural = detectarComandoTarefa(`lembrete: ${mensagem}`);
+      if (comandoNatural) {
+        const respostaNatural = await processarComandoTarefa(
+          sessao.clienteId,
+          comandoNatural,
+          tipoEntrada === "audio" ? "AUDIO" : "TEXTO"
+        );
+        if (respostaNatural) {
+          await sendWhatsApp(telefone, respostaNatural);
+          return NextResponse.json({ ok: true });
+        }
+      }
+    }
+
     // ── Fluxo fixo: Servidor público / contracheque ───────────────────────
     const servidorMsgNormalizada = mensagem
       .toLowerCase()
@@ -2871,8 +2889,10 @@ Pode mandar tudo em uma mensagem só.`;
       ? null
       : await classificarLembreteLivreIA(mensagem);
     if (tipoLembreteIA) {
-      const prefixo = tipoLembreteIA === "PAGAMENTO" ? "pagamento" : "lembrete";
-      const comandoTarefaIA = detectarComandoTarefa(`${prefixo}: ${mensagem}`);
+      // Sempre "lembrete:" (achado em QA, 04/10/2026): "pagamento:" ignora a
+      // data pedida — "me lembra de pagar a luz dia 10" virava um pagamento
+      // com vencimento HOJE e o título com a frase inteira.
+      const comandoTarefaIA = detectarComandoTarefa(`lembrete: ${mensagem}`);
       if (comandoTarefaIA) {
         const origemMensagemTarefaIA = tipoEntrada === "audio" ? "AUDIO" : "TEXTO";
         const respostaTarefaIA = await processarComandoTarefa(sessao.clienteId, comandoTarefaIA, origemMensagemTarefaIA);

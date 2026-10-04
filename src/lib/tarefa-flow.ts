@@ -313,7 +313,26 @@ export function extrairTarefa(textoOriginal: string, tipo: TipoTarefa): Resultad
   }
 
   // tipo === "LEMBRETE"
-  let texto = textoOriginal;
+  // Pedido em linguagem natural ("me lembra de pagar a luz dia 10", "não
+  // esquece de pagar o boleto amanhã"): o pedido em si não faz parte do
+  // título do lembrete — achado em QA (04/10/2026), o título ficava
+  // "Me lembra de pagar a luz".
+  let texto = textoOriginal.replace(
+    /^\s*(?:me\s+lembr[ae]r?|lembra\s+eu|lembra\s+a\s+gente|me\s+avis[ae]|n[aã]o\s+esque[cç]a?e?|preciso\s+lembrar)\s*(?:de\s+|que\s+|do\s+|da\s+|pra\s+|para\s+)?/i,
+    ""
+  );
+
+  // "amanhã"/"hoje"/"depois de amanhã" → data relativa (só vale quando não há
+  // data explícita, que continua mandando).
+  let diasRelativos: number | null = null;
+  // Sem \b depois de "ã": no JS "ã" não é caractere de palavra, então "amanhã"
+  // no fim da frase nunca casaria.
+  const relativo = texto.match(/\bdepois\s+de\s+amanh[ãa](?![a-zà-ú])|\bamanh[ãa](?![a-zà-ú])|\bhoje\b/i);
+  if (relativo) {
+    const termo = relativo[0].toLowerCase();
+    diasRelativos = termo.startsWith("depois") ? 2 : termo === "hoje" ? 0 : 1;
+    texto = texto.replace(relativo[0], " ");
+  }
 
   const dataDDMM = extrairDataDDMM(texto);
   texto = dataDDMM.restante;
@@ -363,6 +382,9 @@ export function extrairTarefa(textoOriginal: string, tipo: TipoTarefa): Resultad
       recorrente = false;
       frequencia = null;
     }
+  } else if (diasRelativos != null && !recorrenciaInfo.recorrente) {
+    const { ano, mes, dia } = componentesBrasil(hoje);
+    vencimento = meiaNoiteBrasil(ano, mes, dia + diasRelativos);
   } else if (recorrenciaInfo.recorrente) {
     // Recorrência mencionada ("mensal", "todo mês"...) mas sem nenhum dia/data —
     // não dá pra agendar. Devolve erro específico pro chamador pedir a data.
@@ -535,4 +557,22 @@ export function formatarListaTarefas<T extends {
   }
   texto += `\n_Pra concluir: "concluí [nome da tarefa]"_`;
   return texto;
+}
+
+/**
+ * Pedido EXPLÍCITO de lembrete em linguagem natural: a frase começa com
+ * "me lembra de...", "lembra eu...", "não esquece de...", "me avisa...".
+ * Ancorado no início de propósito. Achado em QA (04/10/2026): essas frases
+ * eram engolidas por etapas anteriores — a IA de intenção respondia "fora de
+ * escopo" (quando havia "R$ 900") ou o bloqueio de "pagar boleto/fatura"
+ * disparava ("não esquece de pagar o boleto amanhã") — e o lembrete nunca era
+ * criado. Quando o início já é inequívoco não precisa de classificador.
+ */
+export function pedidoExplicitoDeLembrete(mensagem: string): boolean {
+  const m = (mensagem ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+  return /^(me\s+lembr[ae]r?|lembra\s+eu|lembra\s+a\s+gente|nao\s+esque[cs]a?e?\b|nao\s+me\s+deixe\s+esquecer|me\s+avis[ae]\s+(de|que|pra|para|quando|dia|amanha)|preciso\s+lembrar\s+(de|que))\b/.test(m);
 }
