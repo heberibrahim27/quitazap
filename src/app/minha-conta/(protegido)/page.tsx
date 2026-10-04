@@ -166,7 +166,8 @@ export default async function MinhaContaPage({
   const diasJanela = Array.from({ length: 7 }, (_, k) => fmtDiaBR.format(new Date(fimJanela.getTime() - (6 - k) * 86400000)));
   const [anoJ, mesJ, diaJ] = diasJanela[0].split("-").map(Number);
   const inicioJanela = new Date(Date.UTC(anoJ, mesJ - 1, diaJ, 3, 0, 0, 0));
-  const [maioresDespesas, receitasDoMes, metasResumo, gastosJanela] = await Promise.all([
+  const { inicio: inicioAnt, fim: fimAnt } = limitesDoMes(mesAnterior.ano, mesAnterior.mes);
+  const [maioresDespesas, receitasDoMes, metasResumo, gastosJanela, despesasAnt, receitasAnt] = await Promise.all([
     prisma.lancamento.findMany({
       where: {
         clienteId: cliente.id,
@@ -203,7 +204,34 @@ export default async function MinhaContaPage({
       },
       select: { data: true, valor: true },
     }),
+    // Totais do mês anterior, só pra comparação ("↑ 12% vs. mês anterior").
+    prisma.lancamento.aggregate({
+      _sum: { valor: true },
+      where: {
+        clienteId: cliente.id,
+        tipo: { in: ["DESPESA_FIXA", "DESPESA_VARIAVEL"] },
+        data: { gte: inicioAnt, lt: fimAnt },
+        OR: [{ categoria: null }, { categoria: { not: "Metas" } }],
+      },
+    }),
+    prisma.lancamento.aggregate({
+      _sum: { valor: true },
+      where: {
+        clienteId: cliente.id,
+        tipo: "RECEITA",
+        data: { gte: inicioAnt, lt: fimAnt },
+        OR: [{ categoria: null }, { categoria: { not: "Metas" } }],
+      },
+    }),
   ]);
+  // Comparação com o mês anterior; null quando não há base (mês anterior zerado).
+  const compararComAnterior = (atual: number, anterior: number | null | undefined, menosEhBom: boolean) => {
+    if (!anterior || anterior <= 0) return null;
+    const variacao = ((atual - anterior) / anterior) * 100;
+    const pct = Math.round(Math.abs(variacao));
+    if (pct === 0) return { texto: "Igual ao mês anterior", bom: true };
+    return { texto: `${variacao > 0 ? "↑" : "↓"} ${pct}% vs. mês anterior`, bom: menosEhBom ? variacao < 0 : variacao > 0 };
+  };
   const gastoPorDia = diasJanela.map((dia) => ({
     dia,
     letra: new Intl.DateTimeFormat("pt-BR", { weekday: "narrow", timeZone: "America/Sao_Paulo" }).format(new Date(`${dia}T15:00:00Z`)),
@@ -814,105 +842,109 @@ export default async function MinhaContaPage({
     </>
   );
 
+  const totalReceitasAba = receitasDoMes.reduce((soma, r) => soma + r.valor, 0);
   const painelReceita = (
     <AbaResumo
       titulo={`Receitas — ${nomeMes}/${ano}`}
-      stats={[
-        { rotulo: "Total", valor: fmtValor(totalReceitasMes) },
-        { rotulo: "Maior entrada", valor: fmtValor(maioresReceitas[0]?.valor ?? 0) },
-        { rotulo: "Entradas", valor: String(receitasDoMes.length) },
-      ]}
+      destaque={{ rotulo: "Total de entradas", valor: fmtValor(totalReceitasAba), chip: `${receitasDoMes.length} entrada${receitasDoMes.length === 1 ? "" : "s"}`, tom: "verde" }}
+      delta={compararComAnterior(totalReceitasAba, receitasAnt._sum.valor, false)}
       temItens={maioresReceitas.length > 0}
       vazio={`Nenhuma receita registrada em ${nomeMes.toLowerCase()}.`}
       href={`/minha-conta/receitas${sufixoMesPagina}`}
       rotuloLink="Ver página completa"
     >
-      {maioresReceitas.map((r) => (
-        <div key={r.id} className="lanc-row">
-          <span className="lanc-icon pos">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
-          </span>
-          <span className="lanc-body">
-            <p className="lanc-desc">{r.descricao}</p>
-            <p className="lanc-meta">
-              {ROTULO_TIPO_LANCAMENTO[r.tipo] ?? r.tipo}
-              {r.categoria ? ` · ${r.categoria}` : ""}
-            </p>
-          </span>
-          <span className="lanc-side">
-            <p className="lanc-value pos">+{fmtValor(r.valor)}</p>
-            <p className="lanc-date">{fmtData(r.data)}</p>
-          </span>
-        </div>
-      ))}
+      <ul className="ult-lista">
+        {maioresReceitas.map((r) => (
+          <li key={r.id} className="ult-linha">
+            <span className="ult-chip entrada">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3" /><circle cx="12" cy="12" r="2.6" /><path d="M5.5 9v6M18.5 9v6" /></svg>
+            </span>
+            <span className="ult-corpo">
+              <span className="ult-desc">{r.descricao}</span>
+              <span className="ult-meta">{r.categoria ?? ROTULO_TIPO_LANCAMENTO[r.tipo] ?? r.tipo}</span>
+            </span>
+            <span className="ult-lado">
+              <span className="ult-valor entrada">+{fmtValor(r.valor)}</span>
+              <span className="ult-quando">{fmtData(r.data)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </AbaResumo>
   );
 
+  const totalDespesasAba = totalFixasMes + totalVariaveisMes;
   const painelDespesas = (
     <AbaResumo
       titulo={`Despesas — ${nomeMes}/${ano}`}
-      stats={[
-        { rotulo: "Total", valor: fmtValor(totalFixasMes + totalVariaveisMes) },
-        { rotulo: "Fixas", valor: fmtValor(totalFixasMes) },
-        { rotulo: "Variáveis", valor: fmtValor(totalVariaveisMes) },
+      destaque={{ rotulo: "Total de despesas", valor: fmtValor(totalDespesasAba), tom: "vermelho" }}
+      delta={compararComAnterior(totalDespesasAba, despesasAnt._sum.valor, true)}
+      segmentos={[
+        { rotulo: "Fixas", valor: totalFixasMes, valorTxt: fmtValor(totalFixasMes), cor: "#1E63E9" },
+        { rotulo: "Variáveis", valor: totalVariaveisMes, valorTxt: fmtValor(totalVariaveisMes), cor: "#17B4D8" },
       ]}
       temItens={maioresDespesas.length > 0}
       vazio={`Nenhuma despesa registrada em ${nomeMes.toLowerCase()}.`}
       href={`/minha-conta/despesas${sufixoMesPagina}`}
       rotuloLink="Ver página completa"
     >
-      {maioresDespesas.map((d) => (
-        <div key={d.id} className="lanc-row">
-          <span className="lanc-icon">
-            {d.tipo === "DESPESA_FIXA" ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.4" /><circle cx="17" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.7 12.5h9.8l2.1-8H6.4" /></svg>
-            )}
-          </span>
-          <span className="lanc-body">
-            <p className="lanc-desc">{d.descricao}</p>
-            <p className="lanc-meta">
-              {ROTULO_TIPO_LANCAMENTO[d.tipo] ?? d.tipo}
-              {d.categoria ? ` · ${d.categoria}` : ""}
-            </p>
-          </span>
-          <span className="lanc-side">
-            <p className="lanc-value">-{fmtValor(d.valor)}</p>
-            <p className="lanc-date">{fmtData(d.data)}</p>
-          </span>
-        </div>
-      ))}
+      <ul className="ult-lista">
+        {maioresDespesas.map((d) => (
+          <li key={d.id} className="ult-linha">
+            <span className={`ult-chip ${d.tipo === "DESPESA_FIXA" ? "fixa" : "variavel"}`}>
+              {d.tipo === "DESPESA_FIXA" ? ICONE_LINHA_RESUMO.fixa : ICONE_LINHA_RESUMO.variavel}
+            </span>
+            <span className="ult-corpo">
+              <span className="ult-desc">{d.descricao}</span>
+              <span className="ult-meta">
+                {ROTULO_TIPO_LANCAMENTO[d.tipo] ?? d.tipo}
+                {d.categoria ? ` · ${d.categoria}` : ""}
+              </span>
+            </span>
+            <span className="ult-lado">
+              <span className="ult-valor">−{fmtValor(d.valor)}</span>
+              <span className="ult-quando">{fmtData(d.data)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </AbaResumo>
   );
 
+  const faltaMetas = Math.max(totalAlvoMetas - totalGuardadoMetas, 0);
   const painelMetas = (
     <AbaResumo
       titulo="Metas"
-      stats={[
-        { rotulo: "Guardado", valor: fmtValor(totalGuardadoMetas) },
-        { rotulo: "Falta", valor: fmtValor(Math.max(totalAlvoMetas - totalGuardadoMetas, 0)) },
-        { rotulo: "Progresso", valor: percentualMetas != null ? `${Math.round(percentualMetas * 100)}%` : "—" },
-      ]}
+      destaque={{ rotulo: "Guardado nas metas", valor: fmtValor(totalGuardadoMetas), chip: percentualMetas != null ? `${Math.round(percentualMetas * 100)}% do alvo` : undefined, tom: "azul" }}
+      segmentos={
+        totalAlvoMetas > 0
+          ? [
+              { rotulo: "Guardado", valor: Math.max(totalGuardadoMetas, 0), valorTxt: fmtValor(totalGuardadoMetas), cor: "#12A150" },
+              { rotulo: "Falta", valor: faltaMetas, valorTxt: fmtValor(faltaMetas), cor: "#B8C7E6" },
+            ]
+          : undefined
+      }
       temItens={metasResumo.length > 0}
       vazio="Nenhuma meta ainda. Crie um cofrinho na página completa."
       href="/minha-conta/metas"
       rotuloLink="Ver página completa"
     >
-      {metasResumo.map((m) => {
-        const guardado = m.depositos.reduce((soma, d) => soma + d.valor, 0);
-        const pct = m.valorAlvo > 0 ? Math.max(0, Math.min(guardado / m.valorAlvo, 1)) : 0;
-        return (
-          <div key={m.id} className="aba-meta-row">
-            <div className="aba-meta-top">
-              <span className="aba-meta-nome">{m.nome}</span>
-              <span className="aba-meta-pct">{Math.round(pct * 100)}%</span>
-            </div>
-            <span className="aba-meta-track"><span className="aba-meta-fill" style={{ width: `${pct * 100}%` }} /></span>
-            <p className="aba-meta-valores">{fmtValor(guardado)} de {fmtValor(m.valorAlvo)}</p>
-          </div>
-        );
-      })}
+      <ul className="ult-lista">
+        {metasResumo.map((m) => {
+          const guardado = m.depositos.reduce((soma, d) => soma + d.valor, 0);
+          const pct = m.valorAlvo > 0 ? Math.max(0, Math.min(guardado / m.valorAlvo, 1)) : 0;
+          return (
+            <li key={m.id} className="aba-meta">
+              <div className="aba-meta-topo">
+                <span className="aba-meta-nome">{m.nome}</span>
+                <span className="aba-meta-pct">{Math.round(pct * 100)}%</span>
+              </div>
+              <span className="aba-meta-trilho"><span className="aba-meta-barra" style={{ width: `${Math.max(pct * 100, pct > 0 ? 4 : 0)}%` }} /></span>
+              <p className="aba-meta-valores">{fmtValor(guardado)} <span>de {fmtValor(m.valorAlvo)}</span></p>
+            </li>
+          );
+        })}
+      </ul>
     </AbaResumo>
   );
 
