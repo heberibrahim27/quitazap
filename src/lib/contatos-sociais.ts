@@ -70,6 +70,10 @@ export function normalizarContato(tipo: string, valorBruto: string): { ok: true;
 // Todos os canais ativos, pro rodapé da landing (ícones/lista) — ordenados
 // pela ordem definida no admin.
 export async function listarContatosAtivos(): Promise<ContatoSocialPublico[]> {
+  // Sem banco configurado (build do CI sem secrets) a landing gera o rodapé sem
+  // canais em vez de derrubar o build. Em produção DATABASE_URL sempre existe,
+  // então um erro real do banco continua estourando como antes.
+  if (!process.env.DATABASE_URL) return [];
   const linhas = await prisma.contatoSocial.findMany({
     where: { ativo: true },
     orderBy: { ordem: "asc" },
