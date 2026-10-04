@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import {
   IconHome, IconWallet, IconUsers, IconClock, IconDownload,
   IconFlask, IconSettings, IconLogout, IconPlus, IconMenu, IconX, IconTrendUp, IconLink, IconBot, IconAlertTriangle, IconTarget, IconMegaphone, IconArrowUpRight,
 } from "./icons";
 import "./admin-shell.css";
 
-const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600"] });
+const inter = localFont({ src: "../fonts/inter.woff2", weight: "100 900", display: "swap" });
 
 // Rotas que NÃO fazem parte do painel admin com menu lateral — cada uma
 // já tem seu próprio layout/autenticação (painel do cliente, página de

@@ -4,7 +4,7 @@
 // pro redirecionamento mantido por compatibilidade)
 // ─────────────────────────────────────────
 
-import { Inter, Fraunces, Oswald, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ScrollReveal } from "./ScrollReveal";
 import { CountUp } from "./CountUp";
 import { ComoFuncionaScroll } from "./ComoFuncionaScroll";
@@ -20,14 +20,23 @@ import { listarContatosAtivos } from "@/lib/contatos-sociais";
 // pra trazer as duas fontes da identidade "Hero Ousado" (serifada
 // itálica pros acentos, mono pros rótulos) — escopado só a esta página,
 // não mexe na tipografia do resto do produto logado.
-const inter = Inter({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-inter" });
-const fraunces = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], weight: ["300", "500", "600"], variable: "--font-fraunces" });
+// Fontes auto-hospedadas (src/fonts, variáveis, subset latin): o build não depende mais de baixar nada do Google.
+const inter = localFont({ src: "../fonts/inter.woff2", weight: "100 900", display: "swap", variable: "--font-inter" });
+const fraunces = localFont({
+  src: [
+    { path: "../fonts/fraunces.woff2", style: "normal" },
+    { path: "../fonts/fraunces-italic.woff2", style: "italic" },
+  ],
+  weight: "100 900",
+  display: "swap",
+  variable: "--font-fraunces",
+});
 // Fonte extra usada só no Hero (pedido explícito) — condensada/geométrica
 // como no headline da referência Finex que o Ibrahim mandou, aplicada em
 // cima da nossa paleta (verde), não as cores azuis do original. O resto
 // do site continua com Fraunces (serifada itálica), sem mudança.
-const oswald = Oswald({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-oswald" });
-const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-mono" });
+const oswald = localFont({ src: "../fonts/oswald.woff2", weight: "200 700", display: "swap", variable: "--font-oswald" });
+const mono = localFont({ src: "../fonts/jetbrains-mono.woff2", weight: "100 800", display: "swap", variable: "--font-mono" });
 
 // Textura de grain sutil (SVG de ruído em data-URI) — mesmo recurso visto
 // nas referências de design (Aura Build) pra tirar a sensação de fundo
