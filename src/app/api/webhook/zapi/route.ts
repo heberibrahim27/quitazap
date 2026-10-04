@@ -35,6 +35,8 @@ import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync
 import { classificarConfirmacaoIA } from "@/lib/ia/confirmacao-resolver";
 import { detectarComandoModoLembrete, deliverReminder } from "@/lib/reminder-delivery";
 import { pareceEsqueciSenha, urlPrimeiroAcesso } from "@/lib/primeiro-acesso";
+import { detectarConsultaFatura } from "@/lib/financeiro/fatura-cartao";
+import { responderConsultaFatura } from "@/lib/financeiro/fatura-cartao-consulta";
 import { detectarConsultaFinanceira, responderConsultaFinanceira } from "@/lib/ia/consulta-financeira-resolver";
 import { detectarSimulacaoParcela, responderSimulacaoParcela } from "@/lib/ia/simulador-parcela-resolver";
 import { detectarLimiteSeguro, responderLimiteSeguro } from "@/lib/ia/limite-seguro-resolver";
@@ -1668,9 +1670,13 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
+    // "Como está minha fatura?" / "meus cartões": responde direto do banco
+    // (cartões reais + ciclo de fechamento de cada um) — mesmo critério do
+    // chat nativo (controle-orquestrador.ts). Achado em QA, 04/10/2026.
     const resultadoConsultaCartoesControle = consultarCartoesControle(mensagem, estadoAntesFluxosControle);
-    if (resultadoConsultaCartoesControle) {
-      await sendWhatsApp(telefone, resultadoConsultaCartoesControle.resposta);
+    if (sessao.clienteId && (resultadoConsultaCartoesControle || detectarConsultaFatura(mensagem))) {
+      const respostaFaturas = await responderConsultaFatura(sessao.clienteId, mensagem);
+      await sendWhatsApp(telefone, respostaFaturas);
 
       await prisma.botSessao.updateMany({
         where: { id: sessao.id },
@@ -1678,7 +1684,7 @@ Pode mandar tudo em uma mensagem só.`;
           dividasTemp: JSON.stringify([
             ...servidorHistoricoSessao,
             { role: "user", content: mensagem },
-            { role: "assistant", content: resultadoConsultaCartoesControle.resposta },
+            { role: "assistant", content: respostaFaturas },
           ]),
         },
       });
@@ -2398,8 +2404,13 @@ Pode mandar tudo em uma mensagem só.`;
       return NextResponse.json({ ok: true });
     }
 
+    // Pendência "qual foi o valor?" não bloqueia o interpretador (ver o
+    // mesmo ajuste em controle-orquestrador.ts, passo 11).
+    const tipoPendenciaGasto = estadoAntesGasto.confirmacaoPendente?.tipo;
+    const pendenciaDeValorGasto =
+      tipoPendenciaGasto === "aguardar_valor_gasto" || tipoPendenciaGasto === "aguardar_valor_pagamento_divida";
     const intentFinanceiro = await resolverIntencaoFinanceiraIA(mensagem, {
-      temConfirmacaoPendente: Boolean(estadoAntesGasto.confirmacaoPendente),
+      temConfirmacaoPendente: Boolean(estadoAntesGasto.confirmacaoPendente) && !pendenciaDeValorGasto,
     });
     if (intentFinanceiro) {
       const intentConfirmavel = intentFinanceiroConfirmavel(intentFinanceiro);

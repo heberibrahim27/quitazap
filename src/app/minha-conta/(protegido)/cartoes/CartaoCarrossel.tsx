@@ -64,7 +64,7 @@ function ProximasParcelas({ parcelas, totalFmt }: { parcelas: ParcelaFuturaView[
   const parcelasDoMes = parcelas.filter((p) => p.mesChave === mesSelecionado);
 
   return (
-    <ParcelasAccordion resumo={`${parcelas.length} parcela(s) agendada(s) — ${totalFmt}`}>
+    <ParcelasAccordion resumo={`${parcelas.length} lançamento(s) nas próximas faturas — ${totalFmt}`}>
       {meses.length > 1 && (
         <div className="cartao-parcelas-meses">
           {meses.map((m) => (
@@ -281,7 +281,7 @@ export function CartaoCarrossel({ cartoes }: { cartoes: CartaoCarrosselItem[] })
             <>
               <div className="card-head" style={{ marginTop: 16 }}>
                 <p className="card-title" style={{ fontSize: 14 }}>
-                  <span className="title-label">Próximas parcelas</span>
+                  <span className="title-label">Próximas faturas</span>
                 </p>
               </div>
               <ProximasParcelas

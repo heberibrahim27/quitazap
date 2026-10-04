@@ -58,6 +58,8 @@ import {
   type ResultadoGastoControle,
 } from "@/lib/controle-financeiro-flow";
 import { sincronizarEstadoComMotorCentral } from "@/lib/controle-financeiro-sync";
+import { detectarConsultaFatura } from "@/lib/financeiro/fatura-cartao";
+import { responderConsultaFatura } from "@/lib/financeiro/fatura-cartao-consulta";
 import {
   persistirLancamentosControle,
   persistirCartaoControle,
@@ -268,9 +270,15 @@ export async function processarMensagemControle(input: {
     return resultado;
   }
 
-  // 2) Consulta de cartões / saldo — leitura pura.
+  // 2) Consulta de cartões / faturas / saldo — leitura pura.
+  // "Como está minha fatura?" e "meus cartões" respondem direto do banco
+  // (cartões reais + ciclo de fechamento de cada um), nunca do estado antigo
+  // da conversa — que só conhecia cartões configurados pelo chat e sempre
+  // mostrava fatura R$ 0,00. Achado em QA do Ibrahim (04/10/2026).
   const resultadoConsultaCartoes = consultarCartoesControle(mensagem, estadoAntesFluxosControle);
-  if (resultadoConsultaCartoes) return finalizar(resultadoConsultaCartoes.resposta);
+  if (resultadoConsultaCartoes || detectarConsultaFatura(mensagem)) {
+    return finalizar(await responderConsultaFatura(clienteId, mensagem));
+  }
 
   const resultadoConsultaSaldo = consultarSaldoControle(mensagem, estadoAntesFluxosControle);
   if (resultadoConsultaSaldo) return finalizar(resultadoConsultaSaldo.resposta);
@@ -415,8 +423,15 @@ export async function processarMensagemControle(input: {
   // DEPOIS das 8 consultas "Skill Analista" e da consulta livre (item 3):
   // o caminho "fora de escopo" deste resolver é terminal, então um
   // classificador de consulta colocado depois dele nunca seria alcançado.
+  // Pendência "qual foi o valor?" NÃO bloqueia o interpretador: se a
+  // mensagem fosse só o valor, o passo 6/7 já teria resolvido; qualquer
+  // outra coisa é assunto novo (achado em QA, 04/10/2026: "quero criar uma
+  // meta..." caía no menu de resgate porque uma pergunta de valor antiga
+  // continuava pendente). Já 1/2 de uma prévia continua sendo bloqueado.
+  const tipoPendencia = estadoAntesFluxosControle.confirmacaoPendente?.tipo;
+  const pendenciaDeValor = tipoPendencia === "aguardar_valor_gasto" || tipoPendencia === "aguardar_valor_pagamento_divida";
   const intentFinanceiro = await resolverIntencaoFinanceiraIA(mensagem, {
-    temConfirmacaoPendente: Boolean(estadoAntesFluxosControle.confirmacaoPendente),
+    temConfirmacaoPendente: Boolean(estadoAntesFluxosControle.confirmacaoPendente) && !pendenciaDeValor,
   });
   if (intentFinanceiro) {
     const intentConfirmavel = intentFinanceiroConfirmavel(intentFinanceiro);

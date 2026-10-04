@@ -95,3 +95,91 @@ test("ciclo de dezembro/janeiro cruza o ano corretamente", () => {
   const fatura = mesFaturaDaCompra(dataBR(2026, 12, 26), 25, 1);
   assert.deepEqual(fatura, { ano: 2027, mes: 2 });
 });
+
+// ── Consulta por texto e resumo de faturas (achados em QA, 04/10/2026) ──
+const { detectarConsultaFatura, resumirFaturasDoCartao, formatarRespostaFaturas } = loadTsModule("src/lib/financeiro/fatura-cartao.ts");
+
+test("perguntas sobre fatura/cartão são consulta; registro e comandos não são", () => {
+  for (const frase of [
+    "como está minha fatura do nubank",
+    "minha fatura",
+    "minhas faturas",
+    "quanto está minha fatura?",
+    "qual o valor da fatura",
+    "fatura do nubank",
+    "quanto gastei no cartão este mês",
+    "quanto eu gastei no cartão?",
+  ]) {
+    assert.equal(detectarConsultaFatura(frase), true, frase);
+  }
+
+  for (const frase of [
+    "fatura nubank fechou em 70",
+    "paguei fatura nubank 70",
+    "gastei 50 no cartão nubank",
+    "mercado 100 no nubank",
+    "uber 30",
+    "o cartão nubank fecha dia 2 e vence dia 9",
+    "quero criar uma meta de 5000 pra viagem",
+    "como está meu saldo",
+  ]) {
+    assert.equal(detectarConsultaFatura(frase), false, frase);
+  }
+});
+
+// Mesmo cenário conferido ao vivo no chat: hoje 03/10/2026.
+const HOJE = dataBR(2026, 10, 3);
+const compra = (valor, ano, mes, dia) => ({ valor, data: dataBR(ano, mes, dia) });
+
+test("cartão que fecha dia 2 (já passou): compra de hoje vai pra fatura aberta de novembro, outubro fica como anterior", () => {
+  const r = resumirFaturasDoCartao(
+    { nome: "Cartao A", diaFechamento: 2, diaVencimento: 9 },
+    [compra(200, 2026, 9, 15), compra(100, 2026, 10, 1), compra(50, 2026, 10, 2), compra(70, 2026, 10, 3), compra(30, 2026, 10, 15)],
+    HOJE
+  );
+  assert.equal(r.atual.rotulo, "Nov/2026");
+  assert.equal(r.atual.valor, 100);
+  assert.equal(r.atual.fechaEm, "02/11");
+  assert.equal(r.anterior.rotulo, "Out/2026");
+  assert.equal(r.anterior.valor, 350);
+  assert.equal(r.anterior.vencimento, "09/10");
+  assert.equal(r.gastoMesCalendario, 250); // Dashboard conta pelo mês da compra: 100+50+70+30
+});
+
+test("cartão que fecha dia 25 e vence dia 1: fatura aberta é novembro e fecha em 25/10", () => {
+  const r = resumirFaturasDoCartao(
+    { nome: "Cartao B", diaFechamento: 25, diaVencimento: 1 },
+    [compra(60, 2026, 9, 25), compra(80, 2026, 9, 26), compra(40, 2026, 10, 1)],
+    HOJE
+  );
+  assert.equal(r.atual.rotulo, "Nov/2026");
+  assert.equal(r.atual.valor, 120);
+  assert.equal(r.atual.fechaEm, "25/10");
+  assert.equal(r.anterior.rotulo, "Out/2026");
+  assert.equal(r.anterior.valor, 60);
+  assert.equal(r.anterior.vencimento, "01/10");
+});
+
+test("mudar o fechamento de dia 2 (passou) para dia 5 (não chegou) devolve a compra de hoje pra fatura de outubro", () => {
+  const compras = [compra(100, 2026, 10, 3)];
+  const fechouAntes = resumirFaturasDoCartao({ nome: "Nubank", diaFechamento: 2, diaVencimento: 9 }, compras, HOJE);
+  assert.equal(fechouAntes.atual.rotulo, "Nov/2026");
+  assert.equal(fechouAntes.anterior.valor, 0);
+
+  const aindaAberta = resumirFaturasDoCartao({ nome: "Nubank", diaFechamento: 5, diaVencimento: 12 }, compras, HOJE);
+  assert.equal(aindaAberta.atual.rotulo, "Out/2026");
+  assert.equal(aindaAberta.atual.valor, 100);
+  assert.equal(aindaAberta.atual.fechaEm, "05/10");
+});
+
+test("cartão sem fechamento soma pelo mês calendário e avisa; sem cartão orienta a cadastrar", () => {
+  const r = resumirFaturasDoCartao({ nome: "Cartao C", diaFechamento: null, diaVencimento: null }, [compra(35, 2026, 9, 20), compra(25, 2026, 10, 2)], HOJE);
+  assert.equal(r.semFechamento, true);
+  assert.equal(r.atual.valor, 25);
+
+  const texto = formatarRespostaFaturas([r], "outubro");
+  assert.match(texto, /ainda não tem dia de fechamento/);
+  assert.match(texto, /Gasto no cartão em outubro/);
+
+  assert.match(formatarRespostaFaturas([], "outubro"), /ainda não tem cartão cadastrado/);
+});
