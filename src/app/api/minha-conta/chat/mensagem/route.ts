@@ -41,7 +41,9 @@ export async function GET(req: NextRequest) {
     take: HISTORICO_LIMITE,
   });
 
-  return NextResponse.json({ mensagens: mensagens.reverse() });
+  return NextResponse.json({
+    mensagens: mensagens.reverse().map((m) => (m.direcao === "BOT" ? { ...m, texto: adaptarRespostaParaChat(m.texto) } : m)),
+  });
 }
 
 export async function POST(req: NextRequest) {

@@ -120,3 +120,8 @@ test("conversa livre não grava: o modo conversa só usa ferramentas de leitura"
   const ferramentas = ler("src/lib/agentes/quita/ferramentas.ts");
   assert.ok(!/criar_meta_respiro|prisma\.\w+\.(create|update|delete)/.test(ferramentas));
 });
+
+test("histórico do chat (avisos automáticos incluídos) é adaptado ao carregar", () => {
+  assert.match(ler("src/app/minha-conta/(protegido)/chat/page.tsx"), /adaptarRespostaParaChat\(m\.texto\)/);
+  assert.match(ler("src/app/api/minha-conta/chat/mensagem/route.ts"), /adaptarRespostaParaChat\(m\.texto\)/);
+});

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getClienteAtual } from "@/lib/get-cliente";
 import { prisma } from "@/lib/prisma";
 import { ChatClient } from "./ChatClient";
+import { adaptarRespostaParaChat } from "@/lib/canal-chat";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,8 @@ export default async function ChatPage({
       mensagensIniciais={mensagens.reverse().map((m) => ({
         id: m.id,
         direcao: m.direcao as "CLIENTE" | "BOT",
-        texto: m.texto,
+        // Avisos automáticos e respostas antigas foram escritos pro WhatsApp: no chat do app, texto do chat.
+        texto: m.direcao === "BOT" ? adaptarRespostaParaChat(m.texto) : m.texto,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         dadosEstruturados: m.dadosEstruturados as any,
       }))}
