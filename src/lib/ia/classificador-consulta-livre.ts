@@ -125,6 +125,31 @@ const REGEX_PISTA_NECESSIDADE =
   /\b(?:preciso|quero|queria|gostaria|tenho\s+que|tenho\s+de|vou)\b[^.!?]{0,30}\b(?:livrar|sair\s+d[aeo]s?|sair\s+do\s+vermelho|quitar|acabar\s+com|resolver|pagar\s+(?:tudo|as|os|meus|minhas)|ficar\s+sem\s+divida)|\b(?:estou|to|ta|ando|fiquei)\s+(?:muito\s+|bem\s+)?(?:devendo|endividad|apertad|no\s+vermelho|afogad|enrolad)|\bnao\s+(?:consigo|dou\s+conta\s+de|sei\s+como)\s+(?:mais\s+)?pagar\b|\b(?:me\s+ajud[ae]|ajuda\s+(?:a|pra|para)|me\s+aconselh|conselho|me\s+orient|alguma\s+dica|uma\s+dica|sugest[ao]o?)\b/;
 const REGEX_REGISTRO_INICIO = /^\s*(?:gastei|paguei|recebi|comprei|cadastr|registr|adicion|lanc)/;
 
+/**
+ * Pergunta pura (sem número e sem verbo de registro): "o que é consignado?", "o que acontece se eu não
+ * pagar o cartão?", "como funciona o simulador?". Vai pro Quita em modo conversa (que também chama
+ * ferramentas quando a pergunta é sobre os dados do cliente). Frase com valor ou verbo de registro
+ * ("gastei 30…", "paguei o carnê") nunca entra aqui: escrita tem precedência e segue o fluxo de sempre.
+ */
+export function ehConversaLivre(mensagem: string): boolean {
+  const n = normalizar(mensagem);
+  if (/\d/.test(n)) return false;
+  if (REGEX_REGISTRO_INICIO.test(n)) return false;
+  if (/\b(?:gastei|paguei|recebi|comprei|cadastre|registre|lance|apague|exclua|delete|remova|crie)\b/.test(n)) return false;
+  return pareceConsultaLivre(mensagem);
+}
+
+/**
+ * Vale tentar a conversa livre para mensagem que nenhuma regra reconheceu? Só se não tiver número nem
+ * verbo de registro (escrita tem precedência e segue o fluxo de sempre).
+ */
+export function podeConversarLivre(mensagem: string): boolean {
+  const n = normalizar(mensagem);
+  if (/\d/.test(n)) return false;
+  if (REGEX_REGISTRO_INICIO.test(n)) return false;
+  return !/\b(?:gastei|paguei|recebi|comprei|cadastre|registre|lance|apague|exclua|delete|remova|crie)\b/.test(n);
+}
+
 export function pareceConsultaLivre(mensagem: string): boolean {
   const n = normalizar(mensagem);
   if (REGEX_PISTA_PERGUNTA.test(n)) return true;
@@ -233,7 +258,7 @@ export async function tentarResponderConsultaLivre(
   // numérica) tem a primeira chance; se não responder (flag desligada, erro,
   // timeout, mensagem que não é consulta), o classificador de intenção única
   // abaixo roda exatamente como antes.
-  const respostaQuita = await tentarResponderComQuita(mensagem, clienteId, gratuito, historicoCanal);
+  const respostaQuita = await tentarResponderComQuita(mensagem, clienteId, gratuito, historicoCanal, ehConversaLivre(mensagem));
   if (respostaQuita) return respostaQuita;
 
   const intent = await classificarIntentLivre(mensagem, clienteId, gratuito);

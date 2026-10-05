@@ -58,11 +58,26 @@ async function carregarHistorico(clienteId: string, mensagemAtual: string): Prom
   }
 }
 
-export async function tentarResponderComQuita(
+/**
+ * Conversa livre: último recurso antes da resposta fixa de "fora de escopo". Mesma lógica nos dois
+ * canais (chat do app e WhatsApp). Devolve null se o agente estiver desligado, estourar o tempo, a
+ * guarda numérica reprovar ou o modelo não tiver o que dizer — quem chama segue com a resposta fixa.
+ */
+export async function responderConversaLivre(
   mensagem: string,
   clienteId: string,
   gratuito: boolean,
   historicoCanal?: MensagemHistorico[]
+): Promise<string | null> {
+  return tentarResponderComQuita(mensagem, clienteId, gratuito, historicoCanal, true);
+}
+
+export async function tentarResponderComQuita(
+  mensagem: string,
+  clienteId: string,
+  gratuito: boolean,
+  historicoCanal?: MensagemHistorico[],
+  modoConversa = false
 ): Promise<string | null> {
   if (!quitaAtivo()) return null;
 
@@ -90,7 +105,7 @@ export async function tentarResponderComQuita(
             return { conteudo: r.conteudo, toolCalls: r.toolCalls };
           },
         },
-        { mensagem, historico }
+        { mensagem, historico, modoConversa }
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), TEMPO_MAXIMO_MS)),
     ]);
@@ -103,7 +118,20 @@ export async function tentarResponderComQuita(
       return null;
     }
 
-    if (resultado.ferramentasUsadas.length > 0) {
+    // Métrica da conversa livre SEM guardar o texto do cliente: só rota, uso de ferramenta e guarda.
+    if (modoConversa) {
+      await registrarExecucaoAgente({
+        agente: "quita", iniciadoEm, terminadoEm: new Date(), clientesAvaliados: 1, acoes: resultado.resposta ? 1 : 0, erros: [],
+        detalhes: {
+          rota: "conversa_livre",
+          respondeu: Boolean(resultado.resposta),
+          ferramentas: resultado.ferramentasUsadas,
+          chamadasLLM: resultado.chamadasLLM,
+          validouNumeros: resultado.validouNumeros,
+          violacoes: resultado.violacoes.slice(0, 5),
+        },
+      });
+    } else if (resultado.ferramentasUsadas.length > 0) {
       await registrarExecucaoAgente({
         agente: "quita",
         iniciadoEm,

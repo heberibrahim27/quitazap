@@ -91,7 +91,8 @@ import {
 } from "@/lib/ia/plano-pagamento-resolver";
 import { detectarConsultaVazamentos, responderConsultaVazamentos } from "@/lib/ia/vazamentos-resolver";
 import { detectarHorasTrabalho, responderHorasTrabalho } from "@/lib/ia/horas-trabalho-resolver";
-import { tentarResponderConsultaLivre } from "@/lib/ia/classificador-consulta-livre";
+import { tentarResponderConsultaLivre, podeConversarLivre } from "@/lib/ia/classificador-consulta-livre";
+import { responderConversaLivre } from "@/lib/agentes/quita/agente";
 import {
   resolverIntencaoFinanceiraIA,
   intentFinanceiroConfirmavel,
@@ -518,7 +519,9 @@ export async function processarMensagemControle(input: {
       return finalizar(respostaPendencia, { estadoNovo: estadoComPendencia, atualizouEstado: true });
     }
 
-    const respostaIntent = formatarPreviaIntentFinanceiro(intentFinanceiro);
+    // Mensagem que nenhuma regra reconheceu como registro: conversa livre do Quita antes da resposta fixa.
+    const conversaLivre = !intentFinanceiro.emEscopo && podeConversarLivre(mensagem) ? await responderConversaLivre(mensagem, clienteId, isGratuito) : null;
+    const respostaIntent = conversaLivre ?? formatarPreviaIntentFinanceiro(intentFinanceiro);
     const estadoComIntent = intentConfirmavel
       ? criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoAntesFluxosControle, intentFinanceiro)
       : estadoAntesFluxosControle;

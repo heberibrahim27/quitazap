@@ -306,3 +306,58 @@ test("criar a meta Respiro é escrita determinística: skill WRITE usada pelos d
   assert.match(servico, /contains: "respiro"/, "tem que checar se a meta já existe (idempotente)");
   assert.doesNotMatch(servico, /lancamento/i, "criar a meta não pode gerar lançamento");
 });
+
+// ── Consignado: "quero quitar os empréstimos pra aumentar meu salário" ──
+const { montarFilaConsignados } = loadTsModule("src/lib/orientador-quitacao/motor.ts");
+
+const consig = (credor, saldo, parcela, n) =>
+  divida({ credor, consignado: true, tipo: "EMPRESTIMO", saldoDevedor: saldo, parcelasPendentes: Array(n).fill(parcela) });
+
+test("consignado: começa pelo que mais libera contracheque por real gasto (parcela ÷ saldo)", () => {
+  const fila = montarFilaConsignados([
+    consig("Banco Grande", 20000, 400, 50), // 2,0% do saldo por mês
+    consig("Banco Pequeno", 3000, 250, 12), // 8,3% do saldo por mês
+    consig("Banco Médio", 9000, 450, 20), // 5,0%
+  ]);
+  assert.deepEqual(fila.map((c) => c.credor), ["Banco Pequeno", "Banco Médio", "Banco Grande"]);
+  assert.equal(fila[0].parcelaMensal, 250);
+  assert.equal(fila[0].parcelasRestantes, 12);
+});
+
+test("só consignados: o plano NOMEIA o consignado-alvo e o salário que ele libera, sem perguntar nada", () => {
+  const o = montarOrientacao(
+    entrada({
+      percentualComprometido: 0,
+      saldoProjetado: 2000,
+      respiroMetaExiste: true,
+      respiroAtual: 99999,
+      dividas: [consig("Banco Pequeno", 3000, 250, 12), consig("Banco Grande", 20000, 400, 50)],
+    })
+  );
+  const passo = o.passos.find((p) => p.tipo === "LIBERAR_SALARIO");
+  assert.ok(passo, "deve haver passo LIBERAR_SALARIO");
+  assert.equal(passo.quando, "AGORA");
+  assert.match(passo.texto, /Banco Pequeno/);
+  assert.match(passo.texto, /R\$\s*250,00 por mês no seu contracheque/);
+  assert.match(passo.texto, /Depois, o próximo é Banco Grande/);
+  const texto = formatarOrientacao(o);
+  assert.ok(!texto.includes("?"), "o plano não pergunta o que o sistema já sabe");
+  for (const f of FRASES_PROIBIDAS) assert.ok(!texto.toLowerCase().includes(f.toLowerCase()), f);
+});
+
+test("consignado junto de dívida comum: a fila de atraso continua mandando e o consignado vira PRÓXIMO", () => {
+  const o = montarOrientacao(
+    entrada({
+      dividas: [divida({ credor: "Carnê", emAtraso: true, diasAtraso: 5, saldoDevedor: 300 }), consig("Banco Pequeno", 3000, 250, 12)],
+    })
+  );
+  assert.equal(o.alvo.credor, "Carnê");
+  const passo = o.passos.find((p) => p.tipo === "LIBERAR_SALARIO");
+  assert.equal(passo.quando, "PROXIMO");
+});
+
+test("Quita não pergunta ao cliente o que já está cadastrado e cita a dívida pelo nome", () => {
+  const prompt = fs.readFileSync(path.join(root, "src/lib/agentes/quita/loop.ts"), "utf8");
+  assert.match(prompt, /NUNCA pergunte ao cliente o que o sistema já sabe/);
+  assert.match(prompt, /PELO NOME/);
+});

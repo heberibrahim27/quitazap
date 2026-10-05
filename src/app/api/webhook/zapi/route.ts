@@ -44,8 +44,8 @@ import { detectarRotaDividas, responderRotaDividas } from "@/lib/ia/rota-dividas
 import { detectarPlanoPagamento, detectarMetaPrazo, responderPlanoPagamento, responderMetaPrazo } from "@/lib/ia/plano-pagamento-resolver";
 import { detectarConsultaVazamentos, responderConsultaVazamentos } from "@/lib/ia/vazamentos-resolver";
 import { detectarHorasTrabalho, responderHorasTrabalho } from "@/lib/ia/horas-trabalho-resolver";
-import { tentarResponderConsultaLivre } from "@/lib/ia/classificador-consulta-livre";
-import { historicoDeSessaoWhatsApp } from "@/lib/agentes/quita/agente";
+import { tentarResponderConsultaLivre, podeConversarLivre } from "@/lib/ia/classificador-consulta-livre";
+import { historicoDeSessaoWhatsApp, responderConversaLivre } from "@/lib/agentes/quita/agente";
 import { classificarLembreteLivreIA, devePularFallbackLembreteIA } from "@/lib/ia/tarefa-resolver";
 import {
   persistirLancamentosControle,
@@ -2491,7 +2491,12 @@ Pode mandar tudo em uma mensagem só.`;
         return NextResponse.json({ ok: true });
       }
 
-      const respostaIntent = formatarPreviaIntentFinanceiro(intentFinanceiro);
+      // Mensagem que nenhuma regra reconheceu como registro: conversa livre do Quita antes da resposta fixa.
+      const conversaLivre =
+        !intentFinanceiro.emEscopo && sessao.clienteId && podeConversarLivre(mensagem)
+          ? await responderConversaLivre(mensagem, sessao.clienteId, isGratuito, historicoDeSessaoWhatsApp(sessao.dividasTemp, mensagem))
+          : null;
+      const respostaIntent = conversaLivre ?? formatarPreviaIntentFinanceiro(intentFinanceiro);
       const estadoComIntent = intentConfirmavel
         ? criarEstadoComConfirmacaoInterpretacaoFinanceira(estadoAntesGasto, intentFinanceiro)
         : estadoAntesGasto;

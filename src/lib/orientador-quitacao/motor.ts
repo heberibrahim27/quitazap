@@ -51,7 +51,7 @@ export interface EntradaOrientacao {
   totalPago: number;
 }
 
-export type TipoPasso = "REGULARIZAR" | "RESPIRO" | "ATACAR" | "PRESERVAR" | "MAPEAR" | "NEGOCIAR" | "SEM_SOBRA" | "SEM_DIVIDAS" | "COMPLETAR_DADOS";
+export type TipoPasso = "LIBERAR_SALARIO" | "REGULARIZAR" | "RESPIRO" | "ATACAR" | "PRESERVAR" | "MAPEAR" | "NEGOCIAR" | "SEM_SOBRA" | "SEM_DIVIDAS" | "COMPLETAR_DADOS";
 
 export interface Passo {
   quando: "AGORA" | "DEPOIS" | "PROXIMO";
@@ -148,6 +148,46 @@ export function montarFila(dividas: DividaEntrada[]): ItemFila[] {
       motivo,
       parcelaMensal: d.parcelasPendentes.length > 0 ? d.parcelasPendentes[0] : null,
     }));
+}
+
+export interface ItemFilaConsignado {
+  id: string;
+  credor: string;
+  saldoDevedor: number;
+  /** Parcela que sai do contracheque todo mês. */
+  parcelaMensal: number;
+  parcelasRestantes: number;
+  /** Salário liberado por real gasto pra quitar: quanto maior, mais vale quitar primeiro. */
+  liberaPorReal: number;
+}
+
+/**
+ * Consignado (desconto em folha) não entra na fila de atraso — o banco já desconta —, mas é o que
+ * mais prende o salário. Quem quer "aumentar o salário" quitando empréstimo deve começar pelo que
+ * libera mais contracheque por real gasto (maior parcela ÷ saldo); empate: o que acaba antes.
+ */
+export function montarFilaConsignados(dividas: DividaEntrada[]): ItemFilaConsignado[] {
+  return dividas
+    .filter((d) => d.consignado && d.saldoDevedor > 0.005 && d.parcelasPendentes.length > 0)
+    .map((d) => {
+      const parcela = d.parcelasPendentes[0];
+      return {
+        id: d.id,
+        credor: d.credor,
+        saldoDevedor: arred(d.saldoDevedor),
+        parcelaMensal: arred(parcela),
+        parcelasRestantes: d.parcelasPendentes.length,
+        liberaPorReal: parcela / d.saldoDevedor,
+        parcelas: d.parcelasPendentes,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.liberaPorReal - a.liberaPorReal ||
+        a.parcelasRestantes - b.parcelasRestantes ||
+        a.credor.localeCompare(b.credor, "pt-BR")
+    )
+    .map(({ parcelas: _p, ...resto }) => resto);
 }
 
 /** Quantos meses antes a dívida termina se, todo mês, forem pagos `extra` reais além da parcela.
@@ -282,6 +322,30 @@ export function montarOrientacao(entrada: EntradaOrientacao): Orientacao {
     const proximo = fila[1] ?? null;
     if (proximo) {
       passos.push({ quando: "PROXIMO", tipo: "ATACAR", texto: `Depois dessa, o próximo alvo é ${proximo.credor} (${brl(proximo.saldoDevedor)}).`, dividaId: proximo.id });
+    }
+
+    // Salário preso em consignado: diz QUAL quitar primeiro (o que mais libera contracheque).
+    const consig = montarFilaConsignados(entrada.dividas);
+    if (consig.length > 0) {
+      const c = consig[0];
+      const dep = consig[1] ?? null;
+      const parcelasDoAlvo = entrada.dividas.find((d) => d.id === c.id)?.parcelasPendentes ?? [];
+      const sim = sobra > 0 ? simularExtraMensal(parcelasDoAlvo, sobra) : null;
+      const linhaSim =
+        sim && sim.mesesAntes > 0
+          ? ` Se você colocar ${brl(sobra)} por mês além da parcela, ele termina em cerca de ${sim.novoPrazoMeses} ${sim.novoPrazoMeses === 1 ? "mês" : "meses"} em vez de ${sim.prazoAtualMeses}.`
+          : "";
+      passos.push({
+        quando: passos.length === 0 || !alvo ? "AGORA" : "PROXIMO",
+        tipo: "LIBERAR_SALARIO",
+        texto:
+          `Para aumentar seu salário líquido, comece por ${c.credor} (consignado): ele libera ${brl(c.parcelaMensal)} por mês no seu contracheque (faltam ${c.parcelasRestantes} parcela${c.parcelasRestantes === 1 ? "" : "s"}, ${brl(c.saldoDevedor)} no total).` +
+          linhaSim +
+          " Peça ao banco o valor para quitar hoje: antecipar costuma reduzir juros, mas só ele informa quanto." +
+          (dep ? ` Depois, o próximo é ${dep.credor} (libera ${brl(dep.parcelaMensal)} por mês).` : ""),
+        valor: c.parcelaMensal,
+        dividaId: c.id,
+      });
     }
   }
 
