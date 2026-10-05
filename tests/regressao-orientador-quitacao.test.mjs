@@ -361,3 +361,20 @@ test("Quita não pergunta ao cliente o que já está cadastrado e cita a dívida
   assert.match(prompt, /NUNCA pergunte ao cliente o que o sistema já sabe/);
   assert.match(prompt, /PELO NOME/);
 });
+
+test("sem conversa de juros: a tela de Dívidas, a rota clássica e o plano não falam de taxa nem de 'economiza'", () => {
+  const rota = fs.readFileSync(path.join(root, "src/lib/ia/rota-dividas-resolver.ts"), "utf8");
+  assert.ok(!/juros embutido|maior juros primeiro|prioridadeJuros/.test(rota));
+  const pagina = fs.readFileSync(path.join(root, "src/app/minha-conta/(protegido)/dividas/page.tsx"), "utf8");
+  assert.ok(!/juros/i.test(pagina.replace(/\/\/.*$/gm, "")));
+  assert.ok(!/calcularRotaLivreDividas/.test(pagina));
+  const o = montarOrientacao(entrada({ percentualComprometido: 0, saldoProjetado: 2000, respiroMetaExiste: true, respiroAtual: 99999, dividas: [consig("Banco Pequeno", 3000, 250, 12)] }));
+  assert.ok(!/juros/i.test(formatarOrientacao(o)));
+});
+
+test("Dívidas mostra empréstimo e consignado (antes dizia 'nenhuma dívida' com contratos ativos)", () => {
+  const pagina = fs.readFileSync(path.join(root, "src/app/minha-conta/(protegido)/dividas/page.tsx"), "utf8");
+  assert.ok(!/tipo:\s*\{\s*not:\s*"EMPRESTIMO"\s*\}/.test(pagina));
+  assert.match(pagina, /montarFilaConsignados/);
+  assert.match(pagina, /Descontado em folha/);
+});

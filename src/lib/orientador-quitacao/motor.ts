@@ -341,7 +341,7 @@ export function montarOrientacao(entrada: EntradaOrientacao): Orientacao {
         texto:
           `Para aumentar seu salário líquido, comece por ${c.credor} (consignado): ele libera ${brl(c.parcelaMensal)} por mês no seu contracheque (faltam ${c.parcelasRestantes} parcela${c.parcelasRestantes === 1 ? "" : "s"}, ${brl(c.saldoDevedor)} no total).` +
           linhaSim +
-          " Peça ao banco o valor para quitar hoje: antecipar costuma reduzir juros, mas só ele informa quanto." +
+          " Peça ao banco o valor para quitar hoje e o custo total antes de decidir: só ele informa o valor exato." +
           (dep ? ` Depois, o próximo é ${dep.credor} (libera ${brl(dep.parcelaMensal)} por mês).` : ""),
         valor: c.parcelaMensal,
         dividaId: c.id,
@@ -411,6 +411,6 @@ export function formatarSimulacaoExtra(credor: string, extra: number, parcelas: 
   if (r.mesesAntes <= 0) return `Pagando ${brl(extra)} a mais por mês em ${credor}, o prazo quase não muda (${r.prazoAtualMeses} parcela${r.prazoAtualMeses === 1 ? "" : "s"}). Um valor maior ajudaria mais.`;
   return [
     `Pagando ${brl(extra)} a mais por mês em ${credor}, ela terminaria em cerca de ${r.novoPrazoMeses} ${r.novoPrazoMeses === 1 ? "mês" : "meses"} em vez de ${r.prazoAtualMeses} — aproximadamente ${r.mesesAntes} ${r.mesesAntes === 1 ? "mês" : "meses"} antes.`,
-    "Esse prazo vem do cronograma das parcelas. Pergunte ao credor o valor de quitação: pagar antes costuma dar desconto nos juros, mas não temos como prometer quanto.",
+    "Esse prazo vem do cronograma das parcelas. Pergunte ao credor o valor de quitação: só ele informa o valor exato para quitar antes.",
   ].join("\n");
 }

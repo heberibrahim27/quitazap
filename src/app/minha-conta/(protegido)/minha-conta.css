@@ -2589,3 +2589,27 @@ body.mc-chat-tela .mc-chat-composer {
   font-weight: 700;
   color: var(--mc-ink);
 }
+
+/* ── Dívidas: plano de quitação ── */
+.dv-nota { margin: 10px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-faint); }
+.dv-barra { height: 10px; margin-top: 16px; border-radius: 999px; background: rgba(30,99,233,0.12); overflow: hidden; }
+.dv-barra span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1E63E9, #17B4D8); }
+.dv-barra-legenda { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-dim); }
+.dv-barra-legenda strong { color: #0B1E33; font-weight: 800; }
+.dv-titulo { margin: 0; font-size: 15px; font-weight: 800; color: #0B1E33; }
+.dv-passos { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.dv-passo { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 16px; background: rgba(30,99,233,0.06); border: 1px solid rgba(30,99,233,0.1); }
+.dv-passo.agora { background: rgba(240,70,108,0.07); border-color: rgba(240,70,108,0.16); }
+.dv-passo.proximo { background: rgba(23,166,90,0.07); border-color: rgba(23,166,90,0.16); }
+.dv-passo-rot { font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue); }
+.dv-passo.agora .dv-passo-rot { color: var(--red); }
+.dv-passo.proximo .dv-passo-rot { color: var(--green); }
+.dv-passo-txt { font-size: 13.5px; line-height: 1.5; color: #0B1E33; }
+.dv-chat { display: inline-flex; margin-top: 14px; padding: 10px 16px; font-size: 13px; }
+.dv-ordem { flex-shrink: 0; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; font-weight: 800; background: rgba(30,99,233,0.1); color: var(--blue); }
+.dv-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.dv-tag { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.dv-tag.folha { background: rgba(30,99,233,0.1); color: var(--blue); }
+.dv-tag.libera { background: rgba(23,166,90,0.12); color: #0E8F4A; }
+.dv-mini { height: 5px; margin-top: 8px; border-radius: 999px; background: rgba(30,99,233,0.1); overflow: hidden; }
+.dv-mini span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1E63E9, #17B4D8); }

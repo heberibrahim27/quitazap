@@ -35,11 +35,7 @@ async function fatosRotaDividas(clienteId: string) {
   return {
     quantidadeDividas: resultado.porMenorSaldo.length,
     ordemMenorSaldo: resultado.porMenorSaldo.map((d) => ({ credor: d.credor, saldoDevedor: d.saldoDevedor })),
-    ordemMaiorJuros: resultado.porMaiorJuros.map((d) => ({ credor: d.credor, saldoDevedor: d.saldoDevedor, jurosRestante: d.jurosRestante })),
     dataLivreDeTudo: resultado.dataLivreDeTudo,
-    prioridadeJuros: resultado.prioridadeJuros
-      ? { credor: resultado.prioridadeJuros.credor, saldoDevedor: resultado.prioridadeJuros.saldoDevedor, jurosRestante: resultado.prioridadeJuros.jurosRestante }
-      : null,
   };
 }
 
@@ -49,11 +45,8 @@ function fallbackRotaDividas(f: Awaited<ReturnType<typeof fatosRotaDividas>>): s
   }
   const menorSaldo = f.ordemMenorSaldo[0];
   const linhaMenorSaldo = `Por menor saldo primeiro: comece por "${menorSaldo.credor}" (${fmt(menorSaldo.saldoDevedor)}).`;
-  const linhaJuros = f.prioridadeJuros
-    ? `Por maior juros primeiro: "${f.prioridadeJuros.credor}" tem ${fmt(f.prioridadeJuros.jurosRestante ?? 0)} de juros ainda embutido — quitando ela à vista, você economiza esse valor em vez de pagar o cronograma todo.`
-    : "Por maior juros primeiro: nenhuma das suas dívidas tem juros identificável nos dados cadastrados (parcelamento sem juros, ou sem cronograma).";
   const linhaData = f.dataLivreDeTudo ? ` Se nada mudar, você fica livre de tudo em ${fmtData(f.dataLivreDeTudo)}.` : "";
-  return `${linhaMenorSaldo}\n${linhaJuros}${linhaData}`;
+  return `${linhaMenorSaldo}${linhaData}`;
 }
 
 async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean, fallback: () => string): Promise<string> {
@@ -64,7 +57,7 @@ async function frasearComIA(fatos: unknown, clienteId: string, gratuito: boolean
         {
           role: "system",
           content:
-            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Explique as duas estratégias (menor saldo primeiro vs maior juros primeiro) de forma simples, cite os nomes reais das dívidas do JSON, e se prioridadeJuros não for null, destaque quanto de juros dá pra economizar quitando ela à vista. Se prioridadeJuros for null, diga que não há juros identificável nos dados. Responda em português do Brasil, tom direto e amigável, no máximo 6 linhas, emoji com moderação." +
+            "Você é o assistente financeiro do QuitaZAP, respondendo pelo WhatsApp. Use SOMENTE os números do JSON fornecido — nunca invente, recalcule ou arredonde de forma diferente do que já vem pronto. Explique de forma simples por qual dívida começar (a de menor saldo) e a ordem seguinte, cite os nomes reais das dívidas do JSON e, se houver dataLivreDeTudo, quando ela fica livre de tudo. Não fale de juros nem de taxa, e nunca prometa economia em R$. Responda em português do Brasil, tom direto e amigável, no máximo 6 linhas, emoji com moderação." +
             INSTRUCAO_FORMATACAO_WHATSAPP,
         },
         { role: "user", content: `Dados reais (JSON, já calculados — só formate):\n${JSON.stringify(fatos)}` },
