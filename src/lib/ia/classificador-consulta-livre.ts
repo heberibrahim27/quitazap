@@ -117,8 +117,18 @@ function normalizar(texto: string): string {
 const REGEX_PISTA_PERGUNTA =
   /\?|\b(quanto|quantos|quantas|qual|quais|como|onde|posso|consigo|da\s+pra|de\s+pra|sera\s+que|sobrou|sobra|falta|tenho\s+quanto|cade|queria\s+saber|quero\s+saber|me\s+diz|me\s+fala)\b/;
 
+// Pedido de ajuda / desabafo sobre dívida SEM ponto de interrogação ("preciso me
+// livrar dos empréstimos", "tô devendo muito", "não consigo pagar tudo", "me ajuda").
+// Antes caía no "Eu sou o assistente financeiro…" porque não parecia pergunta.
+// Registro de gasto/dívida (gastei, paguei, cadastrar…) fica de fora de propósito.
+const REGEX_PISTA_NECESSIDADE =
+  /\b(?:preciso|quero|queria|gostaria|tenho\s+que|tenho\s+de|vou)\b[^.!?]{0,30}\b(?:livrar|sair\s+d[aeo]s?|sair\s+do\s+vermelho|quitar|acabar\s+com|resolver|pagar\s+(?:tudo|as|os|meus|minhas)|ficar\s+sem\s+divida)|\b(?:estou|to|ta|ando|fiquei)\s+(?:muito\s+|bem\s+)?(?:devendo|endividad|apertad|no\s+vermelho|afogad|enrolad)|\bnao\s+(?:consigo|dou\s+conta\s+de|sei\s+como)\s+(?:mais\s+)?pagar\b|\b(?:me\s+ajud[ae]|ajuda\s+(?:a|pra|para)|me\s+aconselh|conselho|me\s+orient|alguma\s+dica|uma\s+dica|sugest[ao]o?)\b/;
+const REGEX_REGISTRO_INICIO = /^\s*(?:gastei|paguei|recebi|comprei|cadastr|registr|adicion|lanc)/;
+
 export function pareceConsultaLivre(mensagem: string): boolean {
-  return REGEX_PISTA_PERGUNTA.test(normalizar(mensagem));
+  const n = normalizar(mensagem);
+  if (REGEX_PISTA_PERGUNTA.test(n)) return true;
+  return !REGEX_REGISTRO_INICIO.test(n) && REGEX_PISTA_NECESSIDADE.test(n);
 }
 
 const SCHEMA_INTENT_CONSULTA_LIVRE = {

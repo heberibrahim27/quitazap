@@ -14,8 +14,13 @@ import { INSTRUCAO_FORMATACAO_WHATSAPP } from "./whatsapp-formatacao";
 const REGEX_ROTA_DIVIDAS =
   /\b(?:qual\s+d[ií]vida\s+(?:eu\s+|devo\s+)?(?:pag[oaer]*|quit[oaer]*)\s+primeiro|por\s+onde\s+(?:eu\s+)?come[cç]o\s+a\s+pagar|como\s+(?:eu\s+)?fic(?:o|ar)\s+livre\s+d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|como\s+(?:eu\s+)?sa(?:io|ir)\s+(?:livre\s+)?d(?:e|as)\s+(?:minhas\s+)?d[ií]vidas|rota\s+(?:pra|para)\s+(?:ficar\s+livre|sair)\s+d(?:e|as)\s+d[ií]vidas|o\s+que\s+(?:eu\s+)?fa[cç]o\s+com\s+(?:a|minha)\s+sobra|como\s+(?:eu\s+)?quito\s+(?:minhas\s+|as\s+)?d[ií]vidas|(?:me\s+ajuda|quero\s+ajuda)\s+(?:a|pra|para)\s+(?:sair|quitar)|qual\s+d[ií]vida\s+(?:eu\s+|devo\s+)?ataco|quero\s+(?:sair|quitar)\s+(?:das|minhas)\s+d[ií]vidas)\b/i;
 
+// "Preciso me livrar dos empréstimos", "quero acabar com as dívidas", "tô devendo muito" —
+// o cliente não pergunta, declara o objetivo; a resposta é a mesma rota do Orientador.
+const REGEX_ROTA_DIVIDAS_OBJETIVO =
+  /\b(?:(?:preciso|quero|queria|gostaria\s+de|tenho\s+que|vou)\s+(?:me\s+)?(?:livrar|sair|fugir|acabar|quitar|pagar)\s+(?:d[aeo]s?|com\s+(?:as|os)|tod[ao]s?\s+(?:as|os)|meus|minhas)?\s*(?:minhas\s+|meus\s+)?(?:d[ií]vidas?|empr[eé]stimos?|consignados?|parcelas|cart[aã]o|cart[oõ]es|contas\s+atrasadas)|(?:t[oô]|estou|ando)\s+(?:muito\s+|bem\s+)?(?:devendo|endividad[oa]|afogad[oa]\s+em\s+d[ií]vidas?)|n[aã]o\s+(?:consigo|dou\s+conta\s+de)\s+(?:mais\s+)?pagar\s+(?:minhas|as|meus|os)\s+(?:d[ií]vidas?|contas|empr[eé]stimos?|parcelas))\b/i;
+
 export function detectarRotaDividas(mensagem: string): boolean {
-  return REGEX_ROTA_DIVIDAS.test(mensagem);
+  return REGEX_ROTA_DIVIDAS.test(mensagem) || REGEX_ROTA_DIVIDAS_OBJETIVO.test(mensagem);
 }
 
 function fmt(v: number): string {

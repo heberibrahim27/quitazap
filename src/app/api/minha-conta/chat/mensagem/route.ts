@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle, processarMensagemControle } from "@/lib/controle-orquestrador";
+import { adaptarRespostaParaChat } from "@/lib/canal-chat";
 
 const MENSAGEM_MAX_LEN = 2000;
 const HISTORICO_LIMITE = 100;
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
     // nativo mostra no máximo uma frase curta antes dele. Só cai de volta
     // pro texto original quando não há card pra mostrar (ex.: consulta sem
     // dado suficiente pro gráfico).
-    const resposta = dadosEstruturados ? respostaCurtaParaCard(dadosEstruturados) : resultado.resposta;
+    const resposta = adaptarRespostaParaChat(dadosEstruturados ? respostaCurtaParaCard(dadosEstruturados) : resultado.resposta);
 
     await prisma.mensagemChat.create({
       data: { clienteId, canal: "APP", direcao: "BOT", texto: resposta, dadosEstruturados },
