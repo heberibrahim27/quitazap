@@ -173,7 +173,7 @@ export async function calcularMetricasNegocio(mesRef?: string): Promise<Metricas
   // — mesmo critério de whereStatusAssinatura em status-assinatura.ts.
   const [clientes, eventos] = await Promise.all([
     prisma.cliente.findMany({ where: { isTeste: false }, select: { criadoEm: true, gratuito: true, assinaturaVenceEm: true } }),
-    prisma.eventoCakto.findMany({ select: { clienteId: true, status: true, criadoEm: true } }),
+    prisma.eventoCakto.findMany({ where: { OR: [{ clienteId: null }, { cliente: { isTeste: false } }] }, select: { clienteId: true, status: true, criadoEm: true } }),
   ]);
 
   const primeiroEncerramentoPorCliente = new Map<string, Date>();

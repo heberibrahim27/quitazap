@@ -7,28 +7,38 @@ export const revalidate = 0;
 
 const FUSO = "America/Sao_Paulo";
 
-function fmtData(d: Date | string) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: FUSO }).format(new Date(d));
+const DIA_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO });
+const HORA_FMT = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
+const DATA_FMT = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", timeZone: FUSO });
+
+/** "hoje às 08:31", "ontem às 08:30" ou "4 de out às 08:30" — texto de gente, não de log. */
+function quando(d: Date | string, agora: Date) {
+  const data = new Date(d);
+  const hora = HORA_FMT.format(data);
+  const dia = DIA_FMT.format(data);
+  if (dia === DIA_FMT.format(agora)) return `hoje às ${hora}`;
+  if (dia === DIA_FMT.format(new Date(agora.getTime() - 86_400_000))) return `ontem às ${hora}`;
+  return `${DATA_FMT.format(data).replace(".", "")} às ${hora}`;
 }
 
-function fmtDuracao(ms: unknown) {
-  const n = Number(ms);
-  if (!Number.isFinite(n)) return "—";
-  return n < 1000 ? `${Math.round(n)} ms` : `${(n / 1000).toFixed(1)} s`;
+function plural(n: number, um: string, varios: string) {
+  return `${n} ${n === 1 ? um : varios}`;
 }
 
-const COR_STATUS: Record<string, { bg: string; color: string; border: string }> = {
-  OPERANDO: { bg: "rgba(16,185,129,0.12)", color: "#6ee7b7", border: "rgba(16,185,129,0.25)" },
-  PARCIAL: { bg: "rgba(245,158,11,0.12)", color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
-  AGUARDANDO_USO: { bg: "rgba(255,255,255,0.06)", color: "#9ca3af", border: "rgba(255,255,255,0.12)" },
-  ATRASADO: { bg: "rgba(245,158,11,0.12)", color: "#fcd34d", border: "rgba(245,158,11,0.25)" },
-  ERRO: { bg: "rgba(239,68,68,0.12)", color: "#fca5a5", border: "rgba(239,68,68,0.25)" },
-  SEM_EXECUCAO: { bg: "rgba(239,68,68,0.12)", color: "#fca5a5", border: "rgba(239,68,68,0.25)" },
+const COR_STATUS: Record<string, string> = {
+  OPERANDO: "ok",
+  PARCIAL: "aviso",
+  AGUARDANDO_USO: "neutro",
+  ATRASADO: "aviso",
+  ERRO: "erro",
+  SEM_EXECUCAO: "erro",
 };
 
 // Tela read-only: status de cada agente calculado das execuções REAIS
 // (AuditoriaAssistente, ferramenta "agente:<nome>") — nunca de um rótulo
-// fixo. Sem dado pessoal do cliente: só contagens.
+// fixo. Sem dado pessoal do cliente: só contagens. O texto é pensado pro
+// fundador (não pro desenvolvedor): nada de duração em ms, versão, flag de
+// ambiente ou contador interno de política.
 export default async function AgentesPage() {
   const agora = new Date();
   const seteDias = new Date(agora.getTime() - 7 * 86_400_000);
@@ -64,147 +74,189 @@ export default async function AgentesPage() {
 
   const desligados = (process.env.AGENTES_DESLIGADOS ?? "").split(",").map((s) => s.trim().toLowerCase());
   const doAgente = (chave: string) => execucoes.filter((e) => e.ferramenta === `agente:${chave}`);
+  const diaHoje = DIA_FMT.format(agora);
+
+  const cartoes = AGENTES.map((def) => {
+    const lista = doAgente(def.chave);
+    const ultima = lista[0] ?? null;
+    const comCobertura = lista.find((e) => (e.depois as { cobertura?: { dia?: string } } | null)?.cobertura?.dia === diaHoje);
+    const cobertura = (comCobertura?.depois as { cobertura?: { avaliados: number; total: number; concluido: boolean } } | null)?.cobertura ?? null;
+    const status = calcularStatusAgente(def, ultima ? { terminadoEm: ultima.criadoEm, sucesso: ultima.sucesso } : null, agora, Boolean(cobertura && !cobertura.concluido));
+    const recentes = lista.filter((e) => e.criadoEm >= seteDias);
+    const dados = (ultima?.depois ?? {}) as Record<string, unknown>;
+    return { def, ultima, cobertura, status, dados, falhas7d: recentes.filter((e) => !e.sucesso).length, desligado: desligados.includes(def.chave) };
+  });
+  const automaticos = cartoes.filter((c) => c.def.modo === "periodico");
+  const sobDemanda = cartoes.filter((c) => c.def.modo === "sob_demanda");
+  const precisamAtencao = cartoes.filter((c) => !c.desligado && (c.status === "ERRO" || c.status === "ATRASADO" || c.status === "SEM_EXECUCAO")).length;
+  const funcionando = cartoes.filter((c) => !c.desligado && (c.status === "OPERANDO" || c.status === "PARCIAL")).length;
+  const nomeDoAgente = new Map(AGENTES.map((a) => [a.chave, a.nome]));
+
+  const renderAgente = (c: (typeof cartoes)[number]) => {
+    const { def, ultima, cobertura, status, dados, falhas7d, desligado } = c;
+    const avaliados = typeof dados.clientesAvaliados === "number" ? dados.clientesAvaliados : null;
+    const enviados = typeof dados.enviados === "number" ? dados.enviados : typeof dados.acoes === "number" ? dados.acoes : null;
+    const fatos: string[] = [];
+    if (avaliados != null) fatos.push(`Olhou ${plural(avaliados, "cliente", "clientes")}`);
+    if (enviados != null) fatos.push(def.chave === "recorrencias" ? `Lançou ${plural(enviados, "item", "itens")}` : `Mandou ${plural(enviados, "aviso", "avisos")}`);
+    return (
+      <div key={def.chave} className="ag-card">
+        <div className="ag-topo">
+          <div className="ag-titulo">
+            <strong>{def.nome}</strong>
+            <p>{def.descricao}</p>
+          </div>
+          <span className={`ag-status ${desligado ? "neutro" : COR_STATUS[status]}`}>{desligado ? "Desligado" : ROTULO_STATUS[status]}</span>
+        </div>
+        <dl className="ag-fatos">
+          <div>
+            <dt>Última vez</dt>
+            <dd>{ultima ? quando(ultima.criadoEm, agora) : def.modo === "sob_demanda" ? "Ainda não foi usado" : "Ainda não rodou"}</dd>
+          </div>
+          {fatos.length > 0 && (
+            <div>
+              <dt>Resultado</dt>
+              <dd>{fatos.join(" · ")}</dd>
+            </div>
+          )}
+          {def.agenda && (
+            <div>
+              <dt>Quando roda</dt>
+              <dd>{def.agenda}</dd>
+            </div>
+          )}
+          {def.chave === "sentinela" && cobertura && (
+            <div>
+              <dt>Hoje</dt>
+              <dd>{cobertura.concluido ? `Olhou todos os ${cobertura.total} clientes` : `Olhou ${cobertura.avaliados} de ${cobertura.total} clientes (continua no próximo ciclo)`}</dd>
+            </div>
+          )}
+        </dl>
+        {typeof dados.pausado === "string" && (
+          <p className="ag-nota aviso">Parou sozinho na última vez por segurança, porque muitos avisos foram marcados como errados.</p>
+        )}
+        {ultima && !ultima.sucesso && <p className="ag-nota erro">A última execução teve um problema. Veja o histórico no fim da página.</p>}
+        {ultima?.sucesso && falhas7d > 0 && (
+          <p className="ag-nota aviso">{plural(falhas7d, "execução teve problema", "execuções tiveram problema")} nos últimos 7 dias.</p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
       <div className="qa-page-header">
         <div>
           <h1 className="qa-page-title">Agentes</h1>
-          <p className="qa-page-subtitle">Status calculado das execuções reais — se um agente parar, aparece aqui.</p>
+          <p className="qa-page-subtitle">Os ajudantes automáticos do QuitaZAP e como estão trabalhando.</p>
         </div>
         <Link href="/painel" className="qa-btn-secondary">← Dashboard</Link>
       </div>
 
-      <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
-        {AGENTES.map((def) => {
-          const lista = doAgente(def.chave);
-          const ultima = lista[0] ?? null;
-          const diaHoje = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(agora);
-          const comCobertura = lista.find((e) => (e.depois as { cobertura?: { dia?: string } } | null)?.cobertura?.dia === diaHoje);
-          const cobertura = (comCobertura?.depois as { cobertura?: { avaliados: number; total: number; concluido: boolean } } | null)?.cobertura ?? null;
-          const status = calcularStatusAgente(def, ultima ? { terminadoEm: ultima.criadoEm, sucesso: ultima.sucesso } : null, agora, Boolean(cobertura && !cobertura.concluido));
-          const cor = COR_STATUS[status];
-          const recentes = lista.filter((e) => e.criadoEm >= seteDias);
-          const dados = (ultima?.depois ?? {}) as Record<string, unknown>;
-          const args = (ultima?.argumentos ?? {}) as Record<string, unknown>;
-          return (
-            <div key={def.chave} className="qa-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ maxWidth: 560 }}>
-                  <strong style={{ fontSize: 16 }}>{def.nome}</strong>
-                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--qa-gray-400)" }}>{def.descricao}</p>
-                </div>
-                <span className="qa-badge" style={{ background: cor.bg, color: cor.color, border: `1px solid ${cor.border}` }}>
-                  {ROTULO_STATUS[status]}
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 12, fontSize: 13 }}>
-                <span>Última execução: <strong>{ultima ? fmtData(ultima.criadoEm) : "—"}</strong></span>
-                <span>Duração: <strong>{fmtDuracao(args.duracaoMs)}</strong></span>
-                <span>Clientes avaliados: <strong>{String(dados.clientesAvaliados ?? "—")}</strong></span>
-                <span>Ações: <strong>{String(dados.acoes ?? "—")}</strong></span>
-                <span>Execuções (7 dias): <strong>{recentes.length}</strong></span>
-                <span>Com erro (7 dias): <strong>{recentes.filter((e) => !e.sucesso).length}</strong></span>
-              </div>
-              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 6, fontSize: 12.5, color: "var(--qa-gray-400)" }}>
-                <span>Versão: {def.versao}</span>
-                {def.chave === "sentinela" && (
-                  <span>
-                    Cobertura hoje:{" "}
-                    {cobertura ? `${cobertura.avaliados}/${cobertura.total} — ${cobertura.concluido ? "CONCLUÍDO" : "PARCIAL"}` : "ainda sem execução hoje"}
-                  </span>
-                )}
-                {def.agenda && <span>Próxima execução: {def.agenda}</span>}
-                <span>Configuração: {desligados.includes(def.chave) ? "desligado (AGENTES_DESLIGADOS)" : "habilitado"}</span>
-              </div>
-              {typeof dados.propostos === "number" && (
-                <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--qa-gray-400)" }}>
-                  Última execução — brutos {String(dados.brutos ?? 0)} · propostos {String(dados.propostos)} · selecionados {String(dados.selecionados ?? 0)} · enviados{" "}
-                  {String(dados.enviados ?? 0)} · suprimidos por política {String(dados.suprimidosPolitica ?? 0)} · por prioridade {String(dados.suprimidosPrioridade ?? 0)}
-                </p>
-              )}
-              {typeof dados.pausado === "string" && (
-                <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#fcd34d" }}>Pausado na última execução: {dados.pausado}</p>
-              )}
-              {!!dados.motivosSupressao && typeof dados.motivosSupressao === "object" && Object.keys(dados.motivosSupressao as object).length > 0 && (
-                <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--qa-gray-400)" }}>
-                  Suprimidos na última execução:{" "}
-                  {Object.entries(dados.motivosSupressao as Record<string, number>).map(([motivo, n]) => `${motivo}: ${n}`).join(" · ")}
-                </p>
-              )}
-              {ultima && !ultima.sucesso && ultima.erro && (
-                <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "#fca5a5" }}>Erro: {ultima.erro}</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="qa-card" style={{ marginBottom: 20 }}>
-        <strong style={{ fontSize: 15 }}>Alertas proativos — últimos 7 dias</strong>
-        <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 10, fontSize: 13 }}>
-          <span>Enviados: <strong>{alertas7d}</strong></span>
-          <span>Marcados como úteis: <strong>{feedbackUtil}</strong></span>
-          <span>Marcados como errados: <strong>{feedbackErrado}</strong></span>
-          <span>Pediram para parar: <strong>{silenciados}</strong></span>
+      <div className="ag-resumo">
+        <div>
+          <span>{funcionando}</span>
+          <small>{funcionando === 1 ? "funcionando" : "funcionando"}</small>
         </div>
-        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--qa-gray-400)" }}>
-          Alerta marcado como errado vira item em <Link href="/revisao-pendente">Revisão pendente</Link> para investigar o cálculo.
-        </p>
+        <div className={precisamAtencao > 0 ? "alerta" : undefined}>
+          <span>{precisamAtencao}</span>
+          <small>{precisamAtencao === 1 ? "precisa de atenção" : "precisam de atenção"}</small>
+        </div>
+        <div>
+          <span>{alertas7d}</span>
+          <small>{alertas7d === 1 ? "aviso enviado em 7 dias" : "avisos enviados em 7 dias"}</small>
+        </div>
       </div>
 
-      <div className="qa-card" style={{ marginBottom: 20 }}>
-        <strong style={{ fontSize: 15 }}>Utilidade por tipo de alerta — últimos 30 dias</strong>
+      <h2 className="ag-secao">Avisos automáticos</h2>
+      <p className="ag-secao-texto">Rodam sozinhos todos os dias e mandam mensagem para os clientes no WhatsApp.</p>
+      <div className="ag-lista">{automaticos.map(renderAgente)}</div>
+
+      <h2 className="ag-secao">Ajudantes do dia a dia</h2>
+      <p className="ag-secao-texto">Entram em ação quando o cliente pede ou manda algo.</p>
+      <div className="ag-lista">{sobDemanda.map(renderAgente)}</div>
+
+      <h2 className="ag-secao">Como os clientes reagem aos avisos</h2>
+      <p className="ag-secao-texto">Últimos 7 dias.</p>
+      <div className="ag-resumo">
+        <div>
+          <span>{alertas7d}</span>
+          <small>enviados</small>
+        </div>
+        <div>
+          <span>{feedbackUtil}</span>
+          <small>marcados como úteis</small>
+        </div>
+        <div>
+          <span>{feedbackErrado}</span>
+          <small>marcados como errados</small>
+        </div>
+        <div>
+          <span>{silenciados}</span>
+          <small>pediram para parar</small>
+        </div>
+      </div>
+      {feedbackErrado > 0 && (
+        <p className="ag-secao-texto" style={{ marginTop: 10 }}>
+          Aviso marcado como errado vai para <Link href="/revisao-pendente">Revisão pendente</Link> para conferirmos o cálculo.
+        </p>
+      )}
+
+      <div className="qa-card" style={{ marginTop: 14 }}>
+        <strong style={{ fontSize: 15 }}>Qual tipo de aviso funciona melhor</strong>
+        <p className="ag-secao-texto" style={{ margin: "4px 0 10px" }}>Últimos 30 dias.</p>
         {metricasPorTipo.length === 0 ? (
-          <p style={{ margin: "10px 0 0", color: "var(--qa-gray-400)" }}>Nenhum alerta enviado ainda.</p>
+          <p style={{ margin: 0, color: "var(--qa-gray-400)" }}>Nenhum aviso enviado ainda.</p>
         ) : (
-          <div style={{ marginTop: 10, overflowX: "auto" }}>
-            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+          <>
+            <table className="ag-tabela">
               <thead>
-                <tr style={{ textAlign: "left", color: "var(--qa-gray-400)" }}>
-                  <th style={{ padding: "4px 8px 4px 0" }}>Tipo</th>
-                  <th style={{ padding: "4px 8px" }}>Enviados</th>
-                  <th style={{ padding: "4px 8px" }}>Úteis</th>
-                  <th style={{ padding: "4px 8px" }}>Errados</th>
-                  <th style={{ padding: "4px 8px" }}>Silenciados</th>
-                  <th style={{ padding: "4px 8px" }}>Utilidade</th>
+                <tr>
+                  <th>Tipo de aviso</th>
+                  <th>Enviados</th>
+                  <th>Úteis</th>
+                  <th>Errados</th>
+                  <th>Pediram para parar</th>
+                  <th>Aprovação</th>
                 </tr>
               </thead>
               <tbody>
                 {metricasPorTipo.map((m) => (
                   <tr key={m.tipo}>
-                    <td style={{ padding: "4px 8px 4px 0" }}>{ROTULO_TIPO_ALERTA[m.tipo] ?? m.tipo}</td>
-                    <td style={{ padding: "4px 8px" }}>{m.enviados}</td>
-                    <td style={{ padding: "4px 8px" }}>{m.uteis}</td>
-                    <td style={{ padding: "4px 8px" }}>{m.errados}</td>
-                    <td style={{ padding: "4px 8px" }}>{m.silenciados}</td>
-                    <td style={{ padding: "4px 8px" }}>{m.utilidade == null ? "—" : `${Math.round(m.utilidade * 100)}% (de ${m.respostas})`}</td>
+                    <td>{ROTULO_TIPO_ALERTA[m.tipo] ?? "Outro tipo"}</td>
+                    <td>{m.enviados}</td>
+                    <td>{m.uteis}</td>
+                    <td>{m.errados}</td>
+                    <td>{m.silenciados}</td>
+                    <td>{m.utilidade == null ? "Sem respostas" : `${Math.round(m.utilidade * 100)}% (${plural(m.respostas, "resposta", "respostas")})`}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--qa-gray-400)" }}>
-              Utilidade = úteis ÷ (úteis + errados). Sempre leia junto do número de respostas: 100% com 1 resposta não prova nada.
+            <p className="ag-secao-texto" style={{ margin: "10px 0 0" }}>
+              Aprovação é a parte dos clientes que achou o aviso útil. Com poucas respostas, não dá para tirar conclusão.
             </p>
-          </div>
+          </>
         )}
       </div>
 
-      <div className="qa-card">
-        <strong style={{ fontSize: 15 }}>Últimas execuções</strong>
+      <details className="qa-card ag-historico" style={{ marginTop: 14 }}>
+        <summary>Histórico das últimas execuções</summary>
         {execucoes.length === 0 ? (
-          <p style={{ margin: "10px 0 0", color: "var(--qa-gray-400)" }}>Nenhuma execução registrada ainda — os crons rodam 1x por dia.</p>
+          <p style={{ margin: "10px 0 0", color: "var(--qa-gray-400)" }}>Nada registrado ainda — os agentes rodam uma vez por dia.</p>
         ) : (
-          <div style={{ marginTop: 10, display: "grid", gap: 6, fontSize: 13 }}>
+          <ul>
             {execucoes.slice(0, 25).map((e) => (
-              <div key={e.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <span>{fmtData(e.criadoEm)} · <strong>{e.ferramenta.replace("agente:", "")}</strong></span>
-                <span style={{ color: e.sucesso ? "var(--qa-gray-400)" : "#fca5a5" }}>{e.resumo}</span>
-              </div>
+              <li key={e.id}>
+                <span>
+                  {quando(e.criadoEm, agora)} · <strong>{nomeDoAgente.get(e.ferramenta.replace("agente:", "")) ?? e.ferramenta.replace("agente:", "")}</strong>
+                </span>
+                <span className={e.sucesso ? "ok" : "erro"}>{e.sucesso ? "Rodou bem" : "Teve um problema"}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </div>
+      </details>
     </div>
   );
 }

@@ -164,7 +164,9 @@ export default async function ClienteDetalhePage({
 
           <div>
             <span className="qa-label" style={{ display: "block", marginBottom: 4 }}>Total em assinaturas</span>
-            {(cliente as { gratuito?: boolean }).gratuito ? (
+            {cliente.isTeste ? (
+              <strong style={{ fontSize: 14, color: "var(--qa-gray-400)" }}>Teste — fora das contas</strong>
+            ) : (cliente as { gratuito?: boolean }).gratuito ? (
               <strong style={{ fontSize: 14, color: "#7dc4ff" }}>Gratuito</strong>
             ) : (
               <strong style={{ fontSize: 14, color: "#c4b5fd" }}>{fmt(totalAssinaturas)}</strong>

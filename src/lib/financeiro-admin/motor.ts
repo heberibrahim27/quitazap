@@ -38,18 +38,23 @@ export async function calcularDreAdmin(mesRef?: string): Promise<DreAdminResumo>
   const mes = mesRef ?? mesAtualBrasil();
   const { inicio, fim } = limitesDoMes(mes);
 
+  // Cadastros de teste interno (isTeste) não contam em nada: nem assinantes,
+  // nem receita, nem custo de IA (LogIA não tem relação, então filtra por id).
+  const idsTeste = (await prisma.cliente.findMany({ where: { isTeste: true }, select: { id: true } })).map((c) => c.id);
+  const foraDoTeste = { OR: [{ clienteId: null }, { clienteId: { notIn: idsTeste } }] };
+
   const [totalAssinantes, totalGratuitos, custosManuais, custoIAPagantesRaw, custoIAGratuitosRaw, eventosCakto] = await Promise.all([
     // PAGO de verdade (status-assinatura.ts) — antes contava qualquer
     // cliente com gratuito=false, inclusive quem já tinha a assinatura
     // vencida (status CANCELADO); inflava tanto essa contagem quanto o
     // fallback de receita estimada (contagem × preço) por causa disso.
     prisma.cliente.count({ where: whereStatusAssinatura("PAGO") }),
-    prisma.cliente.count({ where: { gratuito: true } }),
+    prisma.cliente.count({ where: { gratuito: true, isTeste: false } }),
     prisma.custoMensal.findMany({ where: { mes } }),
-    prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { gratuito: false, criadoEm: { gte: inicio, lt: fim } } }),
-    prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { gratuito: true, criadoEm: { gte: inicio, lt: fim } } }),
+    prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { gratuito: false, criadoEm: { gte: inicio, lt: fim }, ...foraDoTeste } }),
+    prisma.logIA.aggregate({ _sum: { custoUSD: true }, where: { gratuito: true, criadoEm: { gte: inicio, lt: fim }, ...foraDoTeste } }),
     prisma.eventoCakto.findMany({
-      where: { criadoEm: { gte: inicio, lt: fim }, valorPago: { not: null } },
+      where: { criadoEm: { gte: inicio, lt: fim }, valorPago: { not: null }, OR: [{ clienteId: null }, { cliente: { isTeste: false } }] },
       select: { status: true, valorPago: true },
     }),
   ]);

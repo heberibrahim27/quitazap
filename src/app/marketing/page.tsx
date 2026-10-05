@@ -29,6 +29,10 @@ export const dynamic = "force-dynamic";
 function fmt(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 }
+/** Reais inteiros (sem centavos) — a tabela de projeção é compacta. */
+function fmtInt(v: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
+}
 function fmtNum(v: number) {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 }
@@ -40,6 +44,10 @@ function fmtMeses(v: number | null) {
 }
 
 const NOMES_MES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+function rotuloMesCurto(mes: string): string {
+  const [ano, mesNum] = mes.split("-").map(Number);
+  return `${NOMES_MES[mesNum - 1].slice(0, 3)}/${String(ano).slice(2)}`;
+}
 function rotuloMes(mes: string): string {
   const [ano, mesNum] = mes.split("-").map(Number);
   return `${NOMES_MES[mesNum - 1]}/${ano}`;
@@ -351,34 +359,46 @@ export default async function MarketingPage({
         <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "var(--qa-gray-400)" }}>
           Investimento constante de {fmt(parametros.investimentoInicialMensal)}/mês, CAC de {fmt(parametros.cacProjetado)} e churn de {pct(parametros.churnMensal)} — "se nada mudar a partir de hoje".
         </p>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr>
-                {["Mês", "Investimento", "CAC", "Novos pagos", "Cancelados", "Ativos finais", "MRR", "Receita líquida", "Infraestrutura", "Resultado operacional", "Acumulado"].map((h) => (
-                  <th key={h} style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, color: "var(--qa-gray-400)", borderBottom: "1px solid var(--qa-line)", whiteSpace: "nowrap" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map((linha) => (
-                <tr key={linha.mes} style={{ background: linha.mesCalendario === mesAtual ? "rgba(0,123,255,0.08)" : "transparent" }}>
-                  <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: linha.mesCalendario === mesAtual ? 700 : 400 }}>{rotuloMes(linha.mesCalendario)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center" }}>{fmt(linha.investimentoAds)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center" }}>{fmt(linha.cac)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center" }}>{fmtNum(linha.novosPagos)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center", color: "#fcd34d" }}>{fmtNum(linha.cancelados)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600 }}>{fmtNum(linha.ativosFim)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center" }}>{fmt(linha.mrr)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center" }}>{fmt(linha.receitaLiquida)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center", color: "#fca5a5" }}>- {fmt(linha.infraestrutura)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: linha.resultadoOperacional >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmt(linha.resultadoOperacional)}</td>
-                  <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: linha.resultadoAcumulado >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmt(linha.resultadoAcumulado)}</td>
-                </tr>
+        {/* Compacta de propósito: layout fixo, valores em reais inteiros e cabeçalhos curtos pra caber sem rolagem horizontal. */}
+        <table className="qa-proj-tabela">
+          <colgroup>
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "8.5%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7.5%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "7.5%" }} />
+            <col style={{ width: "9.5%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "11.5%" }} />
+            <col style={{ width: "11%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              {["Mês", "Invest.", "CAC", "Novos", "Cancel.", "Ativos", "MRR", "Rec. líq.", "Infra", "Resultado", "Acumulado"].map((h) => (
+                <th key={h}>{h}</th>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((linha) => (
+              <tr key={linha.mes} className={linha.mesCalendario === mesAtual ? "atual" : undefined}>
+                <td className="mes">{rotuloMesCurto(linha.mesCalendario)}</td>
+                <td>{fmtInt(linha.investimentoAds)}</td>
+                <td>{fmtInt(linha.cac)}</td>
+                <td>{fmtNum(linha.novosPagos)}</td>
+                <td style={{ color: "#fcd34d" }}>{fmtNum(linha.cancelados)}</td>
+                <td className="forte">{fmtNum(linha.ativosFim)}</td>
+                <td>{fmtInt(linha.mrr)}</td>
+                <td>{fmtInt(linha.receitaLiquida)}</td>
+                <td style={{ color: "#fca5a5" }}>-{fmtInt(linha.infraestrutura)}</td>
+                <td className="forte" style={{ color: linha.resultadoOperacional >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmtInt(linha.resultadoOperacional)}</td>
+                <td className="forte" style={{ color: linha.resultadoAcumulado >= 0 ? "#6ee7b7" : "#fca5a5" }}>{fmtInt(linha.resultadoAcumulado)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

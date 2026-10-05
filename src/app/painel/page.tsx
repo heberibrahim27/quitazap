@@ -37,7 +37,9 @@ export default async function Home() {
   // /financeiro usa; antes desta unificação, esta tela calculava "lucro"
   // do seu próprio jeito (ignorando comissão Cakto e custo manual).
   const [clientes, totalPlanos, dre] = await Promise.all([
+    // isTeste=false: cadastro de teste interno nunca entra em métrica nenhuma.
     prisma.cliente.findMany({
+      where: { isTeste: false },
       select: {
         id: true,
         nome: true,
@@ -50,7 +52,7 @@ export default async function Home() {
       },
       orderBy: { criadoEm: "desc" },
     }),
-    prisma.planoEnviado.count(),
+    prisma.planoEnviado.count({ where: { cliente: { isTeste: false } } }),
     calcularDreAdmin(),
   ]);
 
