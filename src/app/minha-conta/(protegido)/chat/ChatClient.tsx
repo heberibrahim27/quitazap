@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { LancamentoCard, type LancamentoCardDado } from "./LancamentoCard";
 import { GraficoCategoriaCard, type GraficoCategoriaDado } from "./GraficoCategoriaCard";
 import { ComprovanteCard, type ComprovanteDado } from "./ComprovanteCard";
+import { FaturaCard, type FaturaDado } from "./FaturaCard";
 import { PainelDebugTeclado } from "./DebugTeclado";
 
 type DadosEstruturados =
   | { tipo: "lancamento_criado"; lancamentos: LancamentoCardDado[] }
   | GraficoCategoriaDado
   | ComprovanteDado
+  | FaturaDado
   | null
   | undefined;
 
@@ -18,6 +20,8 @@ type MensagemUI = { id: string; direcao: "CLIENTE" | "BOT"; texto: string; dados
 
 const ALTURA_COMPOSER_MAX = 116; // ~4 linhas
 const LADO_MAX_FOTO = 1600;
+const LADO_MIN_LEGIVEL = 1000;
+const LADO_MAX_PRINT_ALTO = 9000;
 const QUALIDADE_FOTO = 0.85;
 
 // Nunca fixa um formato de gravação — nem todo navegador suporta os
@@ -41,8 +45,16 @@ async function converterFotoParaJpeg(arquivo: File): Promise<Blob> {
   const bitmap = await createImageBitmap(arquivo, { imageOrientation: "from-image" });
   let largura = bitmap.width;
   let altura = bitmap.height;
-  if (largura > LADO_MAX_FOTO || altura > LADO_MAX_FOTO) {
-    const escala = LADO_MAX_FOTO / Math.max(largura, altura);
+  const maior = Math.max(largura, altura);
+  const menor = Math.min(largura, altura);
+  if (maior > LADO_MAX_FOTO) {
+    let escala = LADO_MAX_FOTO / maior;
+    // Print alto de fatura (ex.: 1290x10200) viraria uma tira ilegível se o
+    // lado maior mandasse sozinho — preserva ao menos LADO_MIN_LEGIVEL no
+    // lado menor, até o teto de LADO_MAX_PRINT_ALTO no maior.
+    if (menor * escala < LADO_MIN_LEGIVEL) {
+      escala = Math.min(1, LADO_MIN_LEGIVEL / menor, LADO_MAX_PRINT_ALTO / maior);
+    }
     largura = Math.round(largura * escala);
     altura = Math.round(altura * escala);
   }
@@ -427,6 +439,9 @@ export function ChatClient({
             )}
             {m.dadosEstruturados?.tipo === "comprovante_detectado" && (
               <ComprovanteCard dado={m.dadosEstruturados} onResolvido={aoResolverComprovante} />
+            )}
+            {m.dadosEstruturados?.tipo === "fatura_detectada" && (
+              <FaturaCard dado={m.dadosEstruturados} onResolvido={aoResolverComprovante} />
             )}
           </div>
         ))}

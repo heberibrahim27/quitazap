@@ -230,10 +230,23 @@ export async function transcreverAudioBytes(audioBlob: Blob, telemetria: Telemet
  * É o trabalho do agente Documentos: cada execução (sucesso ou erro) vai pro
  * log de agentes, visível em /agentes.
  */
-export async function analisarImagem(imageUrl: string, prompt: string, telemetria: TelemetriaIA): Promise<string> {
+export interface OpcoesVisao {
+  /** "high" pra documento longo/com letra miúda (fatura); padrão "low" (recibo). */
+  detail?: "low" | "high";
+  maxTokens?: number;
+  /** Força resposta em JSON (o prompt precisa pedir JSON). */
+  json?: boolean;
+}
+
+export async function analisarImagem(
+  imageUrl: string,
+  prompt: string,
+  telemetria: TelemetriaIA,
+  opcoes: OpcoesVisao = {}
+): Promise<string> {
   const iniciadoEm = new Date();
   try {
-    const texto = await analisarImagemBruta(imageUrl, prompt, telemetria);
+    const texto = await analisarImagemBruta(imageUrl, prompt, telemetria, opcoes);
     void registrarExecucaoDocumento(iniciadoEm, telemetria, texto.trim().length > 0 ? null : "imagem sem texto extraído");
     return texto;
   } catch (err) {
@@ -260,7 +273,12 @@ async function registrarExecucaoDocumento(iniciadoEm: Date, telemetria: Telemetr
   }
 }
 
-async function analisarImagemBruta(imageUrl: string, prompt: string, telemetria: TelemetriaIA): Promise<string> {
+async function analisarImagemBruta(
+  imageUrl: string,
+  prompt: string,
+  telemetria: TelemetriaIA,
+  opcoes: OpcoesVisao
+): Promise<string> {
   const apiKey = apiKeyValida();
   if (!apiKey) throw new Error("OPENAI_API_KEY não configurada.");
 
@@ -274,11 +292,12 @@ async function analisarImagemBruta(imageUrl: string, prompt: string, telemetria:
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
+            { type: "image_url", image_url: { url: imageUrl, detail: opcoes.detail ?? "low" } },
           ],
         },
       ],
-      max_tokens: 600,
+      max_tokens: opcoes.maxTokens ?? 600,
+      ...(opcoes.json ? { response_format: { type: "json_object" }, temperature: 0 } : {}),
     }),
   });
 

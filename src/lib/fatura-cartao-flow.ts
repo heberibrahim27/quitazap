@@ -50,6 +50,8 @@ export interface ParceladaFatura {
   parcelaAtual: number;
   totalParcelas: number;
   valorParcela: number;
+  /** Data da compra original (YYYY-MM-DD), quando o print/PDF mostra. */
+  dataCompra?: string;
 }
 
 export interface FaturaCartaoDetectada {
@@ -367,7 +369,7 @@ export async function salvarComprasParceladasFatura(
         valorTotal: Math.round(item.valorParcela * parcelasRestantes * 100) / 100,
         totalParcelas: item.totalParcelas,
         diaVencimento: vencimentoFatura.getDate(),
-        obs: `Importado automaticamente da fatura em PDF (${pendente.cartaoNome}, venc. ${fmtData(pendente.vencimentoFatura)}). Parcelas 1-${item.parcelaAtual} não incluídas (já refletidas em faturas anteriores).`,
+        obs: `Importado automaticamente da fatura (${pendente.cartaoNome}, venc. ${fmtData(pendente.vencimentoFatura)}).${item.dataCompra ? ` Compra em ${fmtData(item.dataCompra)}.` : ""} Parcelas 1-${item.parcelaAtual} não incluídas (já refletidas em faturas anteriores).`,
       },
     });
 
