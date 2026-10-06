@@ -14,7 +14,8 @@
 // ─────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { pareceFaturaCartao, processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
+import { processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
+import { faturaTemNovidade } from "@/lib/fatura-cartao-flow";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
@@ -75,12 +76,12 @@ async function tratarPrintDeFatura(opts: {
   const parecidas = pendente.filaAmbiguos.length;
   const lote = { ...pendente, filaAmbiguos: [], indice: 0 };
 
-  if (lote.confirmados.length === 0) {
-    const ja = lote.jaCadastradas + parecidas;
+  if (!faturaTemNovidade(lote)) {
+    const ja = lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0);
     return responder(
       ja > 0
-        ? `📄 Li a fatura ${lote.cartaoNome} — as ${ja} compra(s) parcelada(s) já estavam no seu Controle, não lancei de novo.`
-        : `📄 Li a fatura ${lote.cartaoNome}, mas não encontrei compra parcelada em aberto pra lançar.`
+        ? `📄 Li a fatura ${lote.cartaoNome} — as ${ja} compra(s) já estavam no seu Controle, não lancei de novo.`
+        : `📄 Li a fatura ${lote.cartaoNome}, mas não encontrei nenhuma compra pra lançar.`
     );
   }
 
@@ -98,7 +99,9 @@ async function tratarPrintDeFatura(opts: {
     cartao: lote.cartaoNome,
     vencimento: lote.vencimentoFatura,
     proximaParcela: proxima.toISOString().slice(0, 10),
-    ignoradas: lote.jaCadastradas + parecidas,
+    vencimentoEstimado: lote.vencimentoEstimado ?? false,
+    ignoradas: lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0),
+    compras: (lote.compras ?? []).map((c) => ({ descricao: c.descricao, valor: c.valor, data: c.data })),
     itens: lote.confirmados.map((i) => ({
       descricao: i.descricao,
       parcelaAtual: i.parcelaAtual,
@@ -107,9 +110,10 @@ async function tratarPrintDeFatura(opts: {
       dataCompra: i.dataCompra ?? null,
     })),
   };
-  const total = lote.confirmados.reduce((s, i) => s + i.valorParcela, 0);
+  const nCompras = lote.compras?.length ?? 0;
+  const totalCompras = (lote.compras ?? []).reduce((s, c) => s + c.valor, 0);
   return responder(
-    `Li a fatura ${lote.cartaoNome}: ${lote.confirmados.length} compra(s) parcelada(s), ${fmt(total)} por mês nas próximas parcelas. Confere e confirma?`,
+    `Li a fatura ${lote.cartaoNome}: ${nCompras} gasto(s) no cartão (${fmt(totalCompras)}) e ${lote.confirmados.length} compra(s) parcelada(s) com parcelas futuras. Confere e confirma?`,
     dadosEstruturados
   );
 }
@@ -153,7 +157,7 @@ export async function POST(req: NextRequest) {
     const textoNormalizado = normalizarRespostaCompraImagem(textoExtraido.trim());
     const detectado = extrairComprovante(textoNormalizado);
 
-    if (!detectado && pareceFaturaCartao(textoNormalizado)) {
+    if (!detectado && !textoNormalizado.includes("[NAO_FINANCEIRA]")) {
       const respostaFatura = await tratarPrintDeFatura({ cliente, arquivoBase64: base64, buffer, caminhoStorage });
       if (respostaFatura) return NextResponse.json(respostaFatura);
     }

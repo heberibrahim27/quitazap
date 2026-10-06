@@ -41,6 +41,8 @@ import { prisma } from "@/lib/prisma";
 import { normalizarTextoBusca } from "@/lib/descricao-financeira";
 import { normalizarNomeCartaoControle } from "@/lib/controle-financeiro-flow";
 import { upsertCartao } from "@/lib/controle-financeiro-service";
+import { definirCategoriaGasto } from "@/lib/gasto-flow";
+import { anoMesDiaBrasil } from "@/lib/financeiro/fatura-cartao";
 
 // ── Tipos ────────────────────────────────────────────────────────────────
 
@@ -54,10 +56,23 @@ export interface ParceladaFatura {
   dataCompra?: string;
 }
 
+/** Qualquer compra da fatura (à vista ou parcelada) — vira gasto no cartão. */
+export interface CompraFatura {
+  descricao: string;
+  valor: number;
+  data: string; // YYYY-MM-DD
+  /** Só quando a linha é parcelada (ex.: "1/3" → 1). */
+  parcelaAtual?: number | null;
+}
+
 export interface FaturaCartaoDetectada {
   emissor: string;
   vencimentoFatura: string; // YYYY-MM-DD
+  /** Print que só mostra o mês da fatura: o dia do vencimento é um palpite. */
+  vencimentoEstimado?: boolean;
   parceladas: ParceladaFatura[];
+  /** Só nos prints (o PDF segue só com parceladas). */
+  compras?: CompraFatura[];
 }
 
 type ItemConfirmado = ParceladaFatura;
@@ -73,6 +88,11 @@ export interface FaturaCartaoPendente {
   cartaoNome: string;
   hash: string;
   vencimentoFatura: string; // YYYY-MM-DD
+  vencimentoEstimado?: boolean;
+  /** Compras novas (ainda não registradas no cartão) que viram gasto na confirmação. */
+  compras?: CompraFatura[];
+  /** Quantas compras do print já estavam registradas (mesmo cartão, dia e valor). */
+  comprasJaRegistradas?: number;
   /** Compras com match "provável" (mesmo valor/total, descrição diferente)
    * aguardando resolução uma por uma, na ordem — só depois de zerada essa
    * fila é que a confirmação em lote (etapa final) é oferecida. */
@@ -157,8 +177,12 @@ export async function hashJaProcessado(clienteId: string, hash: string): Promise
 }
 
 async function registrarDocumentoImportado(clienteId: string, hash: string): Promise<void> {
-  await prisma.documentoImportado.create({
-    data: { clienteId, hash, tipo: "FATURA_CARTAO" },
+  // upsert: o mesmo print pode ser reenviado (a deduplicação por compra
+  // já impede duplicar) e a chave clienteId+hash é única.
+  await prisma.documentoImportado.upsert({
+    where: { clienteId_hash: { clienteId, hash } },
+    update: {},
+    create: { clienteId, hash, tipo: "FATURA_CARTAO" },
   });
 }
 
@@ -235,6 +259,63 @@ async function buscarDividaSemelhante(
   return provavel ?? { match: "nenhum" };
 }
 
+// ── Compras da fatura (gasto no cartão) ──────────────────────────────────
+
+function compraValida(c: CompraFatura): boolean {
+  if (!c.descricao.trim() || !Number.isFinite(c.valor) || c.valor <= 0) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(c.data)) return false;
+  const d = new Date(`${c.data}T12:00:00`);
+  // Compra não pode estar no futuro (leitura com ano errado) nem ser de parcela
+  // posterior à 1ª (essa já entrou como Parcela quando a compra foi importada).
+  if (Number.isNaN(d.getTime()) || d.getTime() > Date.now() + 24 * 3600 * 1000) return false;
+  return c.parcelaAtual == null || c.parcelaAtual <= 1;
+}
+
+/** Separa o que ainda não está registrado no cartão do que já está. Chave:
+ * mesmo cartão + mesmo dia (Brasília) + mesmo valor — a descrição do cliente
+ * ("mercado") quase nunca bate com a da fatura ("Atacadao Atakarejo"). */
+async function separarComprasNovas(
+  clienteId: string,
+  cartaoId: string,
+  compras: CompraFatura[]
+): Promise<{ novas: CompraFatura[]; jaRegistradas: number }> {
+  const validas = compras.filter(compraValida);
+  if (validas.length === 0) return { novas: [], jaRegistradas: 0 };
+
+  const datas = validas.map((c) => new Date(`${c.data}T12:00:00`).getTime());
+  const existentes = await prisma.lancamento.findMany({
+    where: {
+      clienteId,
+      cartaoId,
+      data: { gte: new Date(Math.min(...datas) - 36 * 3600 * 1000), lte: new Date(Math.max(...datas) + 36 * 3600 * 1000) },
+    },
+    select: { valor: true, data: true },
+  });
+  const usados = new Set<number>();
+  const novas: CompraFatura[] = [];
+  let jaRegistradas = 0;
+  for (const c of validas) {
+    const alvo = anoMesDiaBrasil(new Date(`${c.data}T12:00:00`));
+    const idx = existentes.findIndex((e, i) => {
+      if (usados.has(i) || Math.abs(e.valor - c.valor) > 0.01) return false;
+      const d = anoMesDiaBrasil(e.data);
+      return d.ano === alvo.ano && d.mes === alvo.mes && d.dia === alvo.dia;
+    });
+    if (idx >= 0) {
+      usados.add(idx);
+      jaRegistradas += 1;
+    } else {
+      novas.push(c);
+    }
+  }
+  return { novas, jaRegistradas };
+}
+
+/** Tem algo pra confirmar (compra parcelada futura ou gasto novo no cartão)? */
+export function faturaTemNovidade(p: FaturaCartaoPendente): boolean {
+  return p.confirmados.length > 0 || (p.compras?.length ?? 0) > 0;
+}
+
 // ── Monta o estado pendente a partir da extração ─────────────────────────
 
 export async function montarFaturaCartaoPendente(
@@ -245,6 +326,11 @@ export async function montarFaturaCartaoPendente(
   const cartao = await resolverCartaoFatura(clienteId, fatura.emissor);
 
   const itensValidos = fatura.parceladas.filter(parceladaValida);
+  const { novas: comprasNovas, jaRegistradas: comprasJaRegistradas } = await separarComprasNovas(
+    clienteId,
+    cartao.id,
+    fatura.compras ?? []
+  );
 
   const filaAmbiguos: ItemAmbiguo[] = [];
   const confirmados: ItemConfirmado[] = [];
@@ -271,6 +357,9 @@ export async function montarFaturaCartaoPendente(
     cartaoNome: cartao.nome,
     hash,
     vencimentoFatura: fatura.vencimentoFatura,
+    vencimentoEstimado: fatura.vencimentoEstimado,
+    compras: comprasNovas,
+    comprasJaRegistradas,
     filaAmbiguos,
     indice: 0,
     confirmados,
@@ -303,12 +392,16 @@ export function mensagemResumoLote(p: FaturaCartaoPendente): string {
   const linhas = p.confirmados.map(
     (i) => `• ${i.descricao} — ${fmt(i.valorParcela)} — restam ${i.totalParcelas - i.parcelaAtual}x`
   );
+  const nCompras = p.compras?.length ?? 0;
+  const totalCompras = (p.compras ?? []).reduce((soma, c) => soma + c.valor, 0);
+  const linhaCompras = nCompras > 0 ? `Gastos no cartão a registrar: ${nCompras} (${fmt(totalCompras)})\n\n` : "";
   const notaCadastradas = p.jaCadastradas > 0 ? `\n_(${p.jaCadastradas} compra(s) já cadastrada(s) foram ignoradas, sem duplicar.)_` : "";
 
   return (
     `💳 *Fatura ${p.cartaoNome}* — venc. ${fmtData(p.vencimentoFatura)}\n\n` +
     `Encontrei ${p.confirmados.length} compra(s) com parcelas futuras:\n\n` +
     `${linhas.join("\n")}\n\n` +
+    linhaCompras +
     `Compromissos futuros identificados: ${fmt(total)}${notaCadastradas}\n\n` +
     `Quer que eu lance isso no seu Controle? Responda *sim* ou *não*.`
   );
@@ -316,7 +409,9 @@ export function mensagemResumoLote(p: FaturaCartaoPendente): string {
 
 export function mensagemLoteConfirmado(p: FaturaCartaoPendente): string {
   const total = p.confirmados.reduce((soma, i) => soma + i.valorParcela, 0);
-  return `✅ Lancei ${p.confirmados.length} compra(s) parcelada(s) da fatura ${p.cartaoNome} (${fmt(total)} em compromissos futuros). Vou considerar isso no seu Comprometido a partir do mês que vencer cada parcela.`;
+  const nCompras = p.compras?.length ?? 0;
+  const gastos = nCompras > 0 ? ` e registrei ${nCompras} gasto(s) no cartão` : "";
+  return `✅ Lancei ${p.confirmados.length} compra(s) parcelada(s) da fatura ${p.cartaoNome} (${fmt(total)} em compromissos futuros)${gastos}. Vou considerar isso no seu Comprometido a partir do mês que vencer cada parcela.`;
 }
 
 // ── Resposta sim/não (mesmo padrão do Boleto Inteligente) ────────────────
@@ -353,6 +448,25 @@ export async function salvarComprasParceladasFatura(
   pendente: FaturaCartaoPendente
 ): Promise<void> {
   const vencimentoFatura = new Date(`${pendente.vencimentoFatura}T12:00:00`);
+
+  // Gastos no cartão (à vista e a 1ª parcela de cada parcelado) — mesmo tipo
+  // que o gasto por texto no cartão, com a data da compra. Sem alerta de
+  // orçamento: é importação de histórico, não um gasto novo do dia.
+  if (pendente.compras && pendente.compras.length > 0) {
+    await prisma.lancamento.createMany({
+      data: pendente.compras.map((c) => ({
+        clienteId,
+        tipo: "COMPRA_CARTAO",
+        descricao: c.descricao,
+        categoria: definirCategoriaGasto(c.descricao),
+        valor: c.valor,
+        data: new Date(`${c.data}T12:00:00`),
+        recorrente: false,
+        cartaoId: pendente.cartaoId,
+        origem: "FOTO",
+      })),
+    });
+  }
 
   for (const item of pendente.confirmados) {
     const parcelasRestantes = item.totalParcelas - item.parcelaAtual;

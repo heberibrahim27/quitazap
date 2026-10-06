@@ -7,7 +7,9 @@ export type FaturaDado = {
   cartao: string;
   vencimento: string; // YYYY-MM-DD
   proximaParcela: string; // YYYY-MM-DD
+  vencimentoEstimado?: boolean;
   ignoradas: number;
+  compras: { descricao: string; valor: number; data: string }[];
   itens: {
     descricao: string;
     parcelaAtual: number;
@@ -74,8 +76,32 @@ export function FaturaCard({
   return (
     <div className="mc-comprovante-card">
       <p className="mc-comprovante-titulo">
-        💳 Fatura {dado.cartao} — vence {fmtData(dado.vencimento)}
+        💳 Fatura {dado.cartao} — {dado.vencimentoEstimado ? fmtMes(dado.vencimento) : `vence ${fmtData(dado.vencimento)}`}
       </p>
+      {dado.compras.length > 0 && (
+        <p>
+          <small>
+            <strong>Gastos no cartão ({dado.compras.length})</strong>
+          </small>
+        </p>
+      )}
+      {dado.compras.map((c, idx) => (
+        <div key={`c${idx}`} className="mc-comprovante-topo">
+          <span>
+            {c.descricao}
+            <br />
+            <small>{fmtData(c.data)}</small>
+          </span>
+          <span className="mc-comprovante-valor">{fmtValor(c.valor)}</span>
+        </div>
+      ))}
+      {dado.itens.length > 0 && (
+        <p>
+          <small>
+            <strong>Parcelas futuras</strong>
+          </small>
+        </p>
+      )}
       {dado.itens.map((i, idx) => (
         <div key={idx} className="mc-comprovante-topo">
           <span>

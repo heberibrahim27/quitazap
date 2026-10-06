@@ -6,11 +6,11 @@
 import crypto from "crypto";
 import { analisarImagem, type TelemetriaIA } from "@/lib/ai/openai-client";
 import { PROMPT_FATURA_IMAGEM, interpretarFaturaImagem } from "@/lib/ai/fatura-imagem";
-import { hashJaProcessado, montarFaturaCartaoPendente, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
+import { montarFaturaCartaoPendente, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
 
 /** Texto da primeira leitura indica fatura de cartão? (gatilho barato antes da 2ª leitura) */
 export function pareceFaturaCartao(texto: string): boolean {
-  return /fatura|cart[aã]o de cr[eé]dito/i.test(texto);
+  return /fatura|cart[aã]o|parcela|vencimento|nubank|inter|c6/i.test(texto);
 }
 
 export type ResultadoPrintFatura =
@@ -34,7 +34,9 @@ export async function processarPrintFatura(opts: {
   if (!fatura) return { tipo: "nao_fatura" };
 
   const hash = crypto.createHash("sha256").update(opts.bytes).digest("hex");
-  if (await hashJaProcessado(opts.clienteId, hash)) return { tipo: "ja_processada" };
+  // Print reenviado NÃO é bloqueado pelo hash (diferente do PDF): a
+  // deduplicação por compra/parcelamento já evita duplicar, e o cliente
+  // pode reenviar depois de uma leitura incompleta.
 
   return { tipo: "pendente", pendente: await montarFaturaCartaoPendente(opts.clienteId, hash, fatura) };
 }

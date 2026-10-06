@@ -111,6 +111,7 @@ import {
   montarFaturaCartaoPendente,
   mensagemPerguntaAmbiguo,
   mensagemFaturaSemNovidade,
+  faturaTemNovidade,
   mensagemResumoLote,
   mensagemLoteConfirmado,
   detectarRespostaFaturaCartao,
@@ -1140,8 +1141,8 @@ export async function POST(req: NextRequest) {
             }
             if (leitura.tipo === "pendente") {
               const pendente = leitura.pendente;
-              if (pendente.filaAmbiguos.length === 0 && pendente.confirmados.length === 0) {
-                await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendente.jaCadastradas));
+              if (pendente.filaAmbiguos.length === 0 && !faturaTemNovidade(pendente)) {
+                await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendente.jaCadastradas + (pendente.comprasJaRegistradas ?? 0)));
                 return NextResponse.json({ ok: true });
               }
               await prisma.botSessao.updateMany({

@@ -29,8 +29,13 @@ test("lê fatura do print com parcelas e data da compra", () => {
       emissor: "Nubank",
       vencimentoFatura: "2026-10-15",
       parceladas: [
-        { descricao: "Magazine Luiza", parcelaAtual: 3, totalParcelas: 10, valorParcela: "299,90", dataCompra: "2026-08-12" },
+        { descricao: "Magazine Luiza", parcelaAtual: 3, totalParcelas: 10, valorParcela: "299,90" },
         { descricao: "", parcelaAtual: 1, totalParcelas: 2, valorParcela: 10 },
+      ],
+      compras: [
+        { descricao: "Magazine Luiza", valor: 299.9, data: "2026-08-12", parcelaAtual: 3 },
+        { descricao: "Vercel Inc.", valor: "139,12", data: "2026-10-05", parcelaAtual: null },
+        { descricao: "Sem data", valor: 5, data: null },
       ],
     })
   );
@@ -38,6 +43,14 @@ test("lê fatura do print com parcelas e data da compra", () => {
   assert.equal(f.parceladas.length, 1);
   assert.equal(f.parceladas[0].valorParcela, 299.9);
   assert.equal(f.parceladas[0].dataCompra, "2026-08-12");
+  assert.equal(f.compras.length, 2);
+  assert.equal(f.compras[1].valor, 139.12);
+});
+
+test("print que só mostra o mês da fatura vira vencimento estimado", () => {
+  const f = interpretarFaturaImagem('{"tipo":"FATURA_CARTAO","emissor":"Nubank","vencimentoFatura":null,"mesFatura":"2026-11","compras":[],"parceladas":[]}');
+  assert.equal(f.vencimentoFatura, "2026-11-10");
+  assert.equal(f.vencimentoEstimado, true);
 });
 
 test("aceita JSON em bloco markdown e rejeita sem vencimento ou tipo OUTRO", () => {
