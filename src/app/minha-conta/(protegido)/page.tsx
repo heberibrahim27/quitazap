@@ -14,6 +14,7 @@ import { MesSwipe } from "./MesSwipe";
 import { MesFiltro } from "./MesFiltro";
 import { AbaResumo } from "./AbaResumo";
 import { AbasHome } from "./AbasHome";
+import { inicioDeAmanhaBrasil } from "@/lib/financeiro/receita-futura";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -183,7 +184,8 @@ export default async function MinhaContaPage({
       where: {
         clienteId: cliente.id,
         tipo: "RECEITA",
-        data: { gte: inicioMes, lt: fimMes },
+        // Receita com data futura é "a receber": não entra no total recebido do mês.
+        data: { gte: inicioMes, lt: new Date(Math.min(fimMes.getTime(), inicioDeAmanhaBrasil().getTime())) },
         // Saque de meta é dinheiro voltando pro disponível, não renda — mesmo corte da página de receitas.
         OR: [{ categoria: null }, { categoria: { not: "Metas" } }],
       },

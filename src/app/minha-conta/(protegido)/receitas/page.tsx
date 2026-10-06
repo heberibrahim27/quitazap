@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { MesSwipe } from "../MesSwipe";
 import { MesFiltro } from "../MesFiltro";
 import { ValorLista } from "../ValorLista";
+import { ehReceitaFutura } from "@/lib/financeiro/receita-futura";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -79,7 +80,8 @@ export default async function ReceitasPage({
       orderBy: { data: "desc" },
     })
   ).filter((r) => r.categoria !== "Metas");
-  const total = receitas.reduce((soma, r) => soma + r.valor, 0);
+  const total = receitas.filter((r) => !ehReceitaFutura(r.data)).reduce((soma, r) => soma + r.valor, 0);
+  const aReceber = receitas.filter((r) => ehReceitaFutura(r.data)).reduce((soma, r) => soma + r.valor, 0);
 
   return (
     <MesSwipe
@@ -109,6 +111,7 @@ export default async function ReceitasPage({
           </div>
           <span className="aba-destaque-chip">{receitas.length} entrada{receitas.length === 1 ? "" : "s"}</span>
         </div>
+        {aReceber > 0 && <p className="aba-delta bom">Ainda a receber neste mês: {fmtValor(aReceber)}</p>}
       </section>
 
       <div className="mc-card">
@@ -123,7 +126,10 @@ export default async function ReceitasPage({
                 </div>
                 <div className="mc-list-body">
                   <div className="mc-list-desc">{r.descricao}</div>
-                  <div className="mc-list-meta">{r.recorrente ? "Recorrente" : "Receita"}</div>
+                  <div className="mc-list-meta">
+                    {r.recorrente ? "Recorrente" : "Receita"}
+                    {ehReceitaFutura(r.data) && <span className="dv-tag libera" style={{ marginLeft: 6 }}>A receber</span>}
+                  </div>
                 </div>
                 <div className="mc-list-side">
                   <ValorLista valor={r.valor} sinal="+" cor="pos" />

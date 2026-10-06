@@ -8,6 +8,7 @@
 // arquitetura do Controle: "não faça migração só para unificar visualmente".
 
 import { prisma } from "@/lib/prisma";
+import { ehReceitaFutura } from "@/lib/financeiro/receita-futura";
 
 export type MovimentacaoUnificada = {
   id: string;
@@ -21,6 +22,8 @@ export type MovimentacaoUnificada = {
   valor: number;
   sinal: "entrada" | "saida";
   editarUrl: string | null;
+  /** Receita com data que ainda não chegou: aparece na lista, mas não conta como entrada. */
+  aReceber?: boolean;
 };
 
 const ROTULO_TIPO_LANCAMENTO: Record<string, string> = {
@@ -61,6 +64,7 @@ export async function listarMovimentacoes(params: {
     valor: l.valor,
     sinal: l.tipo === "RECEITA" ? "entrada" : "saida",
     editarUrl: `/minha-conta/lancamento/${l.id}/editar`,
+    aReceber: l.tipo === "RECEITA" && l.categoria !== "Metas" && ehReceitaFutura(l.data),
   }));
 
   const doPagamento: MovimentacaoUnificada[] = pagamentos.map((p) => ({

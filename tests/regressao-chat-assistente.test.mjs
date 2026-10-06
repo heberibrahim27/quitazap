@@ -125,3 +125,24 @@ test("histórico do chat (avisos automáticos incluídos) é adaptado ao carrega
   assert.match(ler("src/app/minha-conta/(protegido)/chat/page.tsx"), /adaptarRespostaParaChat\(m\.texto\)/);
   assert.match(ler("src/app/api/minha-conta/chat/mensagem/route.ts"), /adaptarRespostaParaChat\(m\.texto\)/);
 });
+
+test("desempenho: funções na mesma região do banco (gru1/São Paulo) e painel sem refresh cego a cada 4s", () => {
+  const v = JSON.parse(ler("vercel.json"));
+  assert.deepEqual(v.regions, ["gru1"]);
+  const auto = ler("src/app/minha-conta/(protegido)/AutoRefreshDashboard.tsx");
+  assert.match(auto, /\/api\/minha-conta\/versao/);
+  assert.ok(!/setInterval\(tick/.test(auto));
+  assert.match(ler("src/app/api/minha-conta/versao/route.ts"), /aggregate/);
+});
+
+test("receita com data futura é 'a receber' e não entra em renda/disponível/entradas", () => {
+  const { inicioDeAmanhaBrasil, ehReceitaFutura } = loadTsModule("src/lib/financeiro/receita-futura.ts");
+  const agora = new Date("2026-10-06T10:00:00Z"); // 07:00 em Brasília
+  assert.equal(inicioDeAmanhaBrasil(agora).toISOString(), "2026-10-07T03:00:00.000Z");
+  assert.equal(ehReceitaFutura(new Date("2026-10-07T12:00:00Z"), agora), true); // amanhã (meio-dia UTC)
+  assert.equal(ehReceitaFutura(new Date("2026-10-07T03:00:00Z"), agora), true); // amanhã 00:00 BRT
+  assert.equal(ehReceitaFutura(new Date("2026-10-06T12:00:00Z"), agora), false); // hoje
+  assert.equal(ehReceitaFutura(new Date("2026-10-06T23:30:00Z"), agora), false); // hoje à noite
+  assert.match(ler("src/lib/financeiro/motor.ts"), /inicioDeAmanhaBrasil\(\)/);
+  assert.match(ler("src/lib/movimentacoes-service.ts"), /aReceber/);
+});

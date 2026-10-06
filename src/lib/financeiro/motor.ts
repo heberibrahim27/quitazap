@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/prisma";
 import { resumoPlanoSimplificado } from "@/lib/plano-pagamento-service";
 import { calcularMediaDeMeses } from "./media-mensal";
+import { inicioDeAmanhaBrasil } from "./receita-futura";
 import type {
   EntradaMotorFinanceiro,
   MediaMensal,
@@ -104,10 +105,14 @@ async function calcularTotaisBase(
   // próprio total, líquido do período (depósitos − saques).
   let investimentos = 0;
 
+  const amanha = inicioDeAmanhaBrasil();
   for (const l of lancamentos) {
     if (l.categoria === "Metas") {
       investimentos += l.tipo === "RECEITA" ? -l.valor : l.valor;
-    } else if (l.tipo === "RECEITA") receitas += l.valor;
+    } else if (l.tipo === "RECEITA") {
+      // Receita com data futura é "a receber": só entra na renda/disponível a partir do dia.
+      if (l.data.getTime() < amanha.getTime()) receitas += l.valor;
+    }
     else if (l.tipo === "DESPESA_FIXA") despesasFixas += l.valor;
     else if (l.tipo === "DESPESA_VARIAVEL") despesasVariaveis += l.valor;
     else if (l.tipo === "COMPRA_CARTAO") {

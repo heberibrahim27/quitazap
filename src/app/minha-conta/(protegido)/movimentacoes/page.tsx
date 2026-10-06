@@ -71,7 +71,7 @@ export default async function MovimentacoesPage({
   const nomeMes = NOMES_MES[mes - 1];
 
   const movimentacoes = await listarMovimentacoes({ clienteId: cliente.id, inicio, fim });
-  const entradas = movimentacoes.filter((m) => m.sinal === "entrada").reduce((s, m) => s + m.valor, 0);
+  const entradas = movimentacoes.filter((m) => m.sinal === "entrada" && !m.aReceber).reduce((s, m) => s + m.valor, 0);
   const saidas = movimentacoes.filter((m) => m.sinal === "saida").reduce((s, m) => s + m.valor, 0);
 
   return (
@@ -127,7 +127,10 @@ export default async function MovimentacoesPage({
                 </div>
                 <div className="mc-list-body">
                   <div className="mc-list-desc">{m.descricao}</div>
-                  <div className="mc-list-meta">{m.meta}</div>
+                  <div className="mc-list-meta">
+                    {m.meta}
+                    {m.aReceber && <span className="dv-tag libera" style={{ marginLeft: 6 }}>A receber</span>}
+                  </div>
                 </div>
                 <div className="mc-list-side">
                   <ValorLista valor={m.valor} sinal={m.sinal === "entrada" ? "+" : "-"} cor={m.sinal === "entrada" ? "pos" : undefined} />

@@ -44,7 +44,11 @@ const ROTAS_SEM_AUTO_REFRESH = ["/minha-conta/hoje"];
  * interação do cliente, sem abrir mão do "quase em tempo real" quando ele
  * só está olhando a tela parado.
  */
-export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: number }) {
+// Atualização automática (revisada em 06/10/2026): em vez de router.refresh() cego a cada 4s — que re-executava
+// a página inteira (dezenas de queries) mesmo sem nada novo —, consulta /api/minha-conta/versao (3 agregados
+// baratos) e só dispara o refresh quando um lançamento, pagamento ou dívida mudou. Mantém o "quase em tempo
+// real" do WhatsApp sem sobrecarregar o servidor.
+export function AutoRefreshDashboard({ intervalMs = 5000 }: { intervalMs?: number }) {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -54,16 +58,32 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
   useEffect(() => {
     if (desativado) return;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let ultimaVersao: string | null = null;
+    let consultando = false;
 
-    function tick() {
-      if (document.visibilityState === "visible") {
-        routerRef.current.refresh();
+    // Consulta barata (3 agregados): só recarrega a tela pesada quando algo mudou de verdade.
+    // Nunca empilha: se a consulta anterior ainda não voltou, pula o tick.
+    async function verificar(forcar = false) {
+      if (consultando || document.visibilityState !== "visible") return;
+      consultando = true;
+      try {
+        const r = await fetch("/api/minha-conta/versao", { cache: "no-store" });
+        if (!r.ok) return;
+        const { versao } = (await r.json()) as { versao?: string };
+        if (!versao) return;
+        const mudou = ultimaVersao !== null && versao !== ultimaVersao;
+        ultimaVersao = versao;
+        if (mudou || forcar) routerRef.current.refresh();
+      } catch {
+        // sem rede / servidor ocupado: tenta de novo no próximo tick
+      } finally {
+        consultando = false;
       }
     }
 
     function iniciar() {
       if (intervalId) return;
-      intervalId = setInterval(tick, intervalMs);
+      intervalId = setInterval(() => void verificar(), intervalMs);
     }
 
     function parar() {
@@ -73,35 +93,23 @@ export function AutoRefreshDashboard({ intervalMs = 4000 }: { intervalMs?: numbe
       }
     }
 
-    function reiniciarContagem() {
-      if (document.visibilityState !== "visible") return;
-      parar();
-      iniciar();
-    }
-
     function aoTrocarVisibilidade() {
       if (document.visibilityState === "visible") {
-        // Ao voltar pra aba, atualiza na hora (não espera o próximo tick)
-        // — cobre o caso comum de "mandei o gasto no WhatsApp, voltei pro
-        // painel pra conferir".
-        routerRef.current.refresh();
+        // Voltou pra aba (ex.: mandou o gasto no WhatsApp e voltou): confere na hora.
+        void verificar();
         iniciar();
       } else {
         parar();
       }
     }
 
+    // Marca a versão atual sem recarregar nada; a partir daí, só muda se houver dado novo.
+    void verificar();
     if (document.visibilityState === "visible") iniciar();
     document.addEventListener("visibilitychange", aoTrocarVisibilidade);
-    // capture:true pra pegar o clique o mais cedo possível (antes de
-    // qualquer preventDefault/stopPropagation de quem foi clicado) e
-    // passive:true porque só lemos o evento, nunca cancelamos nada aqui.
-    document.addEventListener("click", reiniciarContagem, { capture: true, passive: true });
-
     return () => {
       parar();
       document.removeEventListener("visibilitychange", aoTrocarVisibilidade);
-      document.removeEventListener("click", reiniciarContagem, { capture: true });
     };
   }, [intervalMs, desativado]);
 
