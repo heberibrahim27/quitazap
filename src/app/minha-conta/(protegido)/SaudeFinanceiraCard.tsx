@@ -7,12 +7,21 @@ const COR_CLASSIFICACAO: Record<SaudeFinanceira["classificacao"], string> = {
   Crítica: "var(--red)",
 };
 
+// Nomes em linguagem de gente (antes: "Renda", "Resultado", "Ritmo", "Sem atrasos" — o cliente não
+// entendia o que cada barra media; Ibrahim, 06/10/2026). Cada um tem uma frase de explicação abaixo.
 const ROTULO_CURTO: Record<string, string> = {
-  "Comprometimento da renda": "Renda",
-  "Resultado do período": "Resultado",
-  "Ritmo de despesas variáveis": "Ritmo",
-  "Dívidas em atraso": "Atrasos",
+  "Comprometimento da renda": "Peso das contas",
+  "Resultado do período": "Sobra do mês",
+  "Ritmo de despesas variáveis": "Gastos do dia",
+  "Dívidas em atraso": "Contas em dia",
 };
+
+const EXPLICACAO: Array<{ nome: string; texto: string }> = [
+  { nome: "Peso das contas", texto: "Quanto da sua renda já está comprometido com contas, parcelas e cartão. Quanto menos, mais pontos." },
+  { nome: "Sobra do mês", texto: "O que deve sobrar depois de pagar tudo do mês. Quanto maior a sobra, mais pontos." },
+  { nome: "Gastos do dia", texto: "Se o que você gasta no dia a dia (mercado, transporte, lazer) está dentro do seu normal dos últimos meses. Sem histórico ainda, vale metade dos pontos." },
+  { nome: "Contas em dia", texto: "Sem nenhuma dívida atrasada você ganha todos os pontos." },
+];
 
 const ICONE_CORACAO = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
@@ -87,11 +96,22 @@ export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
                 <span className="saude-trilho">
                   <span className={`saude-barra ${tom}`} style={{ "--h": `${Math.max(pct * 100, 5)}%`, "--i": i } as React.CSSProperties} />
                 </span>
-                <span className="saude-rot">{comp.nome === "Dívidas em atraso" && pct === 1 ? "Sem atrasos" : (ROTULO_CURTO[comp.nome] ?? comp.nome)}</span>
+                <span className="saude-rot">{comp.nome === "Dívidas em atraso" && pct < 1 ? "Com atraso" : (ROTULO_CURTO[comp.nome] ?? comp.nome)}</span>
               </div>
             );
           })}
         </div>
+
+        <details className="saude-como">
+          <summary>Como essa nota é calculada</summary>
+          <ul>
+            {EXPLICACAO.map((e) => (
+              <li key={e.nome}>
+                <strong>{e.nome}:</strong> {e.texto}
+              </li>
+            ))}
+          </ul>
+        </details>
 
         {razoes.length > 0 && (
           <ul className="saude-razoes">

@@ -2613,3 +2613,13 @@ body.mc-chat-tela .mc-chat-composer {
 .dv-tag.libera { background: rgba(23,166,90,0.12); color: #0E8F4A; }
 .dv-mini { height: 5px; margin-top: 8px; border-radius: 999px; background: rgba(30,99,233,0.1); overflow: hidden; }
 .dv-mini span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1E63E9, #17B4D8); }
+
+/* Saúde financeira: explicação dos critérios */
+.saude-como { margin: 14px 0 0; padding: 10px 14px; border-radius: 14px; background: rgba(30,99,233,0.05); border: 1px solid rgba(30,99,233,0.1); }
+.saude-como summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--blue); list-style: none; }
+.saude-como summary::-webkit-details-marker { display: none; }
+.saude-como summary::after { content: " ▾"; }
+.saude-como[open] summary::after { content: " ▴"; }
+.saude-como ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.saude-como li { font-size: 12.5px; line-height: 1.45; color: var(--ink-dim); }
+.saude-como li strong { color: #0B1E33; }
