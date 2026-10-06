@@ -1,77 +1,69 @@
 // ─────────────────────────────────────────
-// QuitaZAP Controle — Saúde Financeira (contrato)
+// QuitaZAP Controle — Saúde Financeira (contrato) — fórmula v2
 // ─────────────────────────────────────────
-// Score 0-100 determinístico, calculado só a partir do que o motor
-// financeiro (src/lib/financeiro/motor.ts) já devolve — nenhuma IA decide
-// o número, nenhuma soma nova é feita aqui além da matemática do próprio
-// score. Nome deliberadamente diferente de "QuitaScore" (que já existe em
-// duas outras áreas do produto, sem relação com o Controle — ver
-// src/lib/plano.ts e src/lib/quita-score.ts): este é um conceito novo e
-// específico do Controle, não reaproveita lógica nem nome de nenhum dos
-// dois.
+// Nota 0-100 determinística (nenhuma IA decide o número). Revisada em 06/10/2026 com o ChatGPT depois
+// que uma conta com ~R$ 159 mil em consignados e ZERO gasto registrado recebeu 90 "Excelente":
+//
+//   REGRA DE OURO: falta de informação nunca vira ponto positivo. "R$ 0 registrado" não é "R$ 0 gasto".
+//   Sem renda ou sem como saber o custo mensal, a tela mostra "Montando sua nota" (e o que falta),
+//   nunca um número enganoso. O saldo devedor do consignado entra 100% no "Peso da dívida" — só a
+//   PARCELA em folha fica de fora do fluxo do mês (já está descontada do salário líquido).
+//
+// Nome deliberadamente diferente de "QuitaScore" (conceito de outras áreas do produto).
 
-export type ClassificacaoSaude = "Excelente" | "Boa" | "Atenção" | "Crítica";
+/** Faixas em linguagem de bússola, não de boletim ("Crítica" desanimava quem mais precisa do app). */
+export type ClassificacaoSaude = "Bem encaminhada" | "Em organização" | "Atenção" | "Prioridade agora";
 
 export interface RazaoSaude {
   tipo: "positiva" | "atencao" | "negativa";
   texto: string;
 }
 
-/** Cada componente listado com seus pontos — é isto que torna o score
- * auditável: dado o mesmo ResumoFinanceiro, os mesmos componentes sempre
- * saem, na mesma ordem, com a mesma pontuação. */
+/** Cada componente com seus pontos — é isto que torna a nota auditável. */
 export interface ComponenteSaude {
   nome: string;
   pontos: number;
   pontosMaximos: number;
 }
 
-/** Identificador da fórmula usada neste cálculo — grava junto de cada
- * registro salvo (ver SaudeFinanceiraLog no schema) pra que uma futura
- * revisão dos pesos não bagunce silenciosamente o histórico: um score
- * antigo fica marcado com a versão que o gerou, nunca reinterpretado como
- * se tivesse saído da fórmula nova. */
-export const VERSAO_FORMULA_SAUDE = "financial_health_v1";
+/** Grava junto de cada registro salvo (SaudeFinanceiraLog): uma revisão futura dos pesos não reinterpreta o passado. */
+export const VERSAO_FORMULA_SAUDE = "financial_health_v2";
+
+export type ItemFaltante = "renda" | "gastos";
 
 export interface SaudeFinanceira {
-  score: number; // 0-100, soma dos componentes
+  /** 0-100; 0 e sem significado enquanto `dadosInsuficientes` (a tela não mostra o número). */
+  score: number;
   classificacao: ClassificacaoSaude;
   componentes: ComponenteSaude[];
-  /** 2-3 razões concretas, as mais relevantes (negativas/atenção primeiro
-   * quando existirem) — nunca texto genérico tipo "evite gastos". */
+  /** 2-3 razões concretas (negativas/atenção primeiro). */
   razoes: RazaoSaude[];
-  /** Identificador da fórmula que gerou este score — sempre VERSAO_FORMULA_SAUDE
-   * (constante acima), nunca calculado condicionalmente. */
   versaoFormula: string;
-  /** true quando renda, receita do período E ritmo de despesas variáveis
-   * são todos não-calculáveis ao mesmo tempo (conta praticamente vazia) —
-   * a única exceção é dívida em atraso: se existe uma real, nunca é "dados
-   * insuficientes" (é um sinal real, não ausência de dado). Quando true, a
-   * tela deve mostrar um estado de "ainda sem dados suficientes" em vez do
-   * score/classificação — um "78/100 Boa" pra conta recém-criada e vazia
-   * seria enganoso. */
+  /** true = "Montando sua nota": falta renda ou como saber o custo mensal. Nunca mostrar nota nesse estado. */
   dadosInsuficientes: boolean;
+  /** O que falta informar (vazio quando a nota está completa). */
+  faltando: ItemFaltante[];
+  /** Próximo passo curto, sempre ao lado da nota (a nota é bússola, não boletim). */
+  proximoPasso: string;
+  /** Informativo mesmo no estado "montando": dívida total e quanto ela pesa na renda anual. */
+  pesoDivida: { totalDevido: number; percentualDaRendaAnual: number | null } | null;
 }
 
 export interface EntradaSaudeFinanceira {
-  /** Resumo do mês corrente (calcularResumoFinanceiro, sem precisar de
-   * comHistorico — o ritmo usa mediaDespesasVariaveis abaixo). */
-  totais: {
-    despesasVariaveis: number;
-    receitas: number;
-    resultadoSemPlano: number;
-  };
-  comprometimento: {
-    calculavel: boolean;
-    percentualComprometido: number | null;
-    saldoProjetado: number;
-    rendaEfetiva: number | null;
-  };
-  /** Média de despesas variáveis dos últimos N meses — vem de
-   * calcularMediaMensal(clienteId, período, 3). 0 quando não há histórico
-   * suficiente ainda (cliente novo). */
-  mediaDespesasVariaveis: number;
-  /** Existe pelo menos uma Divida ATIVA com emAtraso=true — dado que a
-   * própria Home já busca pra sua lista de dívidas, não é query nova. */
-  temDividaEmAtraso: boolean;
+  /** Renda do mês (receitas já recebidas ou a declarada no Perfil); null = desconhecida. */
+  rendaMensal: number | null;
+  /**
+   * Custo mensal de referência: o MAIOR entre o que foi registrado no mês, a média dos meses anteriores e
+   * as despesas fixas declaradas no Perfil, mais as parcelas fora da folha. null = nada registrado nem
+   * declarado ("zero lançamentos ≠ zero gastos").
+   */
+  custoMensalReferencia: number | null;
+  /** Saldo devedor de TODAS as dívidas ativas, consignado incluído. */
+  totalDevido: number;
+  /** Maior atraso em dias entre as dívidas ativas; null = nenhuma em atraso. */
+  maiorAtrasoDias: number | null;
+  /** % já pago do total contratado das dívidas ativas (0-100). */
+  percentualPago: number;
+  /** Dias de custo de vida cobertos pelo que está guardado na meta Respiro; null = não existe meta Respiro. */
+  respiroDias: number | null;
 }

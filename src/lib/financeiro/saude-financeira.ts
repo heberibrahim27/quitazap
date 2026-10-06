@@ -1,105 +1,139 @@
 // ─────────────────────────────────────────
-// QuitaZAP Controle — Saúde Financeira (implementação)
+// QuitaZAP Controle — Saúde Financeira (implementação) — fórmula v2
 // ─────────────────────────────────────────
-// Função pura — sem Prisma, sem IA. Ver saude-financeira-contrato.ts pro
-// porquê de cada peso. Pesos documentados aqui, únicos lugar que precisa
-// mudar se a fórmula for revista:
-//   35 pts — % da renda comprometida
-//   25 pts — resultado do período (sobra vs. déficit) sobre a receita
-//   20 pts — ritmo de despesas variáveis vs. média dos últimos 3 meses
-//   20 pts — nenhuma dívida em atraso
+// Função pura — sem Prisma, sem IA. Pesos (únicos lugares a mudar se a fórmula for revista):
+//   30 pts — Fôlego do mês: (renda − custo mensal de referência) ÷ renda
+//   30 pts — Peso da dívida: total devido ÷ renda anual (consignado incluído)
+//   20 pts — Contas em dia: maior atraso entre as dívidas
+//   10 pts — Respiro: dias de custo de vida cobertos pela meta Respiro (alvo: 7)
+//   10 pts — Avanço na quitação: % já pago do que foi contratado
+// Sem renda ou sem custo de referência a nota NÃO é calculada ("Montando sua nota").
 
-import type { ClassificacaoSaude, ComponenteSaude, EntradaSaudeFinanceira, RazaoSaude, SaudeFinanceira } from "./saude-financeira-contrato";
+import type { ClassificacaoSaude, ComponenteSaude, EntradaSaudeFinanceira, ItemFaltante, RazaoSaude, SaudeFinanceira } from "./saude-financeira-contrato";
 import { VERSAO_FORMULA_SAUDE } from "./saude-financeira-contrato";
 
-function pontuarComprometimento(entrada: EntradaSaudeFinanceira): { pontos: number; razao: RazaoSaude } {
-  const { calculavel, percentualComprometido: pct } = entrada.comprometimento;
-  if (!calculavel || pct == null) {
-    return { pontos: 17.5, razao: { tipo: "atencao", texto: "⚠ Sem renda cadastrada para avaliar o comprometimento" } };
-  }
-  const p = Math.round(pct * 100);
-  if (pct <= 0.5) return { pontos: 35, razao: { tipo: "positiva", texto: `✓ Renda pouco comprometida (${p}%)` } };
-  if (pct <= 0.7) return { pontos: 25, razao: { tipo: "positiva", texto: `✓ Renda comprometida em nível saudável (${p}%)` } };
-  if (pct <= 0.9) return { pontos: 15, razao: { tipo: "atencao", texto: `⚠ Renda comprometida acima de 70% (${p}%)` } };
-  if (pct <= 1.0) return { pontos: 5, razao: { tipo: "atencao", texto: `⚠ Renda quase toda comprometida (${p}%)` } };
-  return { pontos: 0, razao: { tipo: "negativa", texto: `✗ Compromissos já superam a renda (${p}%)` } };
+type Parte = { pontos: number; razao: RazaoSaude };
+
+function pontuarFolego(renda: number, custo: number): Parte {
+  const folga = (renda - custo) / renda;
+  const p = Math.round(folga * 100);
+  if (folga >= 0.2) return { pontos: 30, razao: { tipo: "positiva", texto: `Sobra prevista folgada neste mês (${p}% da renda)` } };
+  if (folga >= 0.1) return { pontos: 22, razao: { tipo: "positiva", texto: `Sobra prevista positiva neste mês (${p}% da renda)` } };
+  if (folga >= 0) return { pontos: 12, razao: { tipo: "atencao", texto: "Sobra prevista, mas apertada neste mês" } };
+  return { pontos: 0, razao: { tipo: "negativa", texto: "As contas previstas passam da renda deste mês" } };
 }
 
-function pontuarResultado(entrada: EntradaSaudeFinanceira): { pontos: number; razao: RazaoSaude } {
-  const receita = entrada.comprometimento.rendaEfetiva ?? entrada.totais.receitas;
-  const resultado = entrada.comprometimento.calculavel ? entrada.comprometimento.saldoProjetado : entrada.totais.resultadoSemPlano;
-  if (receita <= 0) {
-    return { pontos: 12.5, razao: { tipo: "atencao", texto: "⚠ Sem receita lançada para avaliar a sobra do mês" } };
-  }
-  const proporcao = resultado / receita;
-  if (proporcao >= 0.3) return { pontos: 25, razao: { tipo: "positiva", texto: "✓ Sobra prevista robusta este mês" } };
-  if (proporcao >= 0.1) return { pontos: 18, razao: { tipo: "positiva", texto: "✓ Sobra prevista positiva este mês" } };
-  if (proporcao >= 0) return { pontos: 10, razao: { tipo: "atencao", texto: "⚠ Sobra prevista, mas apertada" } };
-  return { pontos: 0, razao: { tipo: "negativa", texto: "✗ Déficit previsto este mês" } };
+function pontuarPesoDivida(renda: number, totalDevido: number): Parte {
+  if (totalDevido <= 0.005) return { pontos: 30, razao: { tipo: "positiva", texto: "Nenhuma dívida ativa cadastrada" } };
+  const r = totalDevido / (renda * 12);
+  const p = Math.round(r * 100);
+  if (r <= 0.25) return { pontos: 30, razao: { tipo: "positiva", texto: `Dívida pequena perto da renda (${p}% da renda anual)` } };
+  if (r <= 0.5) return { pontos: 24, razao: { tipo: "positiva", texto: `Dívida administrável (${p}% da renda anual)` } };
+  if (r <= 1) return { pontos: 18, razao: { tipo: "atencao", texto: `Dívida equivale a ${p}% da sua renda anual` } };
+  if (r <= 2) return { pontos: 10, razao: { tipo: "atencao", texto: `Dívida alta: ${p}% da sua renda anual` } };
+  if (r <= 3) return { pontos: 4, razao: { tipo: "negativa", texto: `Dívida muito alta: ${p}% da sua renda anual` } };
+  return { pontos: 0, razao: { tipo: "negativa", texto: `Dívida muito alta: ${p}% da sua renda anual` } };
 }
 
-function pontuarRitmo(entrada: EntradaSaudeFinanceira): { pontos: number; razao: RazaoSaude } {
-  const { despesasVariaveis } = entrada.totais;
-  const { mediaDespesasVariaveis } = entrada;
-  if (mediaDespesasVariaveis <= 0) {
-    return { pontos: 10, razao: { tipo: "atencao", texto: "— Ainda sem histórico suficiente para avaliar o ritmo de gastos" } };
-  }
-  const razaoMultiplicador = despesasVariaveis / mediaDespesasVariaveis;
-  const percentualAcima = Math.round((razaoMultiplicador - 1) * 100);
-  if (razaoMultiplicador <= 1.1) return { pontos: 20, razao: { tipo: "positiva", texto: "✓ Despesas variáveis dentro do ritmo normal" } };
-  if (razaoMultiplicador <= 1.3) return { pontos: 10, razao: { tipo: "atencao", texto: `⚠ Despesas variáveis ${percentualAcima}% acima da sua média dos meses anteriores` } };
-  return { pontos: 0, razao: { tipo: "negativa", texto: `✗ Despesas variáveis ${percentualAcima}% acima da sua média dos meses anteriores` } };
+function pontuarContasEmDia(maiorAtrasoDias: number | null): Parte {
+  if (maiorAtrasoDias == null) return { pontos: 20, razao: { tipo: "positiva", texto: "Nenhuma dívida em atraso" } };
+  if (maiorAtrasoDias <= 30) return { pontos: 12, razao: { tipo: "atencao", texto: "Há dívida em atraso (até 30 dias)" } };
+  if (maiorAtrasoDias <= 60) return { pontos: 6, razao: { tipo: "negativa", texto: "Há dívida em atraso (31 a 60 dias)" } };
+  return { pontos: 0, razao: { tipo: "negativa", texto: "Há dívida em atraso há mais de 60 dias" } };
 }
 
-function pontuarAtraso(entrada: EntradaSaudeFinanceira): { pontos: number; razao: RazaoSaude } {
-  if (entrada.temDividaEmAtraso) {
-    return { pontos: 0, razao: { tipo: "negativa", texto: "✗ Existe dívida em atraso" } };
-  }
-  return { pontos: 20, razao: { tipo: "positiva", texto: "✓ Nenhuma dívida em atraso" } };
+function pontuarRespiro(respiroDias: number | null): Parte {
+  if (respiroDias == null) return { pontos: 0, razao: { tipo: "atencao", texto: "Ainda sem a meta Respiro para imprevistos" } };
+  if (respiroDias >= 7) return { pontos: 10, razao: { tipo: "positiva", texto: "Respiro completo: 7 dias do dia a dia guardados" } };
+  if (respiroDias >= 5) return { pontos: 7, razao: { tipo: "positiva", texto: "Respiro quase completo" } };
+  if (respiroDias >= 3) return { pontos: 4, razao: { tipo: "atencao", texto: "Respiro cobre poucos dias" } };
+  if (respiroDias >= 1) return { pontos: 2, razao: { tipo: "atencao", texto: "Respiro cobre só um ou dois dias" } };
+  return { pontos: 0, razao: { tipo: "atencao", texto: "Respiro ainda vazio" } };
+}
+
+function pontuarAvanco(totalDevido: number, percentualPago: number): Parte {
+  if (totalDevido <= 0.005) return { pontos: 10, razao: { tipo: "positiva", texto: "Sem dívida para quitar" } };
+  if (percentualPago >= 75) return { pontos: 10, razao: { tipo: "positiva", texto: `Você já pagou ${Math.round(percentualPago)}% do que contratou` } };
+  if (percentualPago >= 50) return { pontos: 8, razao: { tipo: "positiva", texto: `Você já pagou ${Math.round(percentualPago)}% do que contratou` } };
+  if (percentualPago >= 25) return { pontos: 5, razao: { tipo: "positiva", texto: `Você já pagou ${Math.round(percentualPago)}% do que contratou` } };
+  if (percentualPago >= 1) return { pontos: 2, razao: { tipo: "atencao", texto: "A quitação está só começando" } };
+  return { pontos: 0, razao: { tipo: "atencao", texto: "A dívida ainda não começou a cair" } };
 }
 
 function classificar(score: number): ClassificacaoSaude {
-  if (score >= 80) return "Excelente";
-  if (score >= 60) return "Boa";
+  if (score >= 80) return "Bem encaminhada";
+  if (score >= 60) return "Em organização";
   if (score >= 40) return "Atenção";
-  return "Crítica";
+  return "Prioridade agora";
 }
 
-// Prioridade de exibição das razões: negativa > atenção > positiva — o
-// que precisa de atenção aparece primeiro; só mostra só positivas quando
-// não há nada de negativo/atenção pra reportar.
 const PRIORIDADE_TIPO: Record<RazaoSaude["tipo"], number> = { negativa: 0, atencao: 1, positiva: 2 };
 
 export function calcularSaudeFinanceira(entrada: EntradaSaudeFinanceira): SaudeFinanceira {
-  const comprometimento = pontuarComprometimento(entrada);
-  const resultado = pontuarResultado(entrada);
-  const ritmo = pontuarRitmo(entrada);
-  const atraso = pontuarAtraso(entrada);
+  const renda = entrada.rendaMensal != null && entrada.rendaMensal > 0 ? entrada.rendaMensal : null;
+  const custo = entrada.custoMensalReferencia != null && entrada.custoMensalReferencia > 0 ? entrada.custoMensalReferencia : null;
+
+  const pesoDivida =
+    entrada.totalDevido > 0.005
+      ? { totalDevido: entrada.totalDevido, percentualDaRendaAnual: renda != null ? Math.round((entrada.totalDevido / (renda * 12)) * 100) : null }
+      : null;
+
+  const faltando: ItemFaltante[] = [];
+  if (renda == null) faltando.push("renda");
+  if (custo == null) faltando.push("gastos");
+
+  if (renda == null || custo == null) {
+    return {
+      score: 0,
+      classificacao: "Prioridade agora",
+      componentes: [],
+      razoes: [],
+      versaoFormula: VERSAO_FORMULA_SAUDE,
+      dadosInsuficientes: true,
+      faltando,
+      proximoPasso:
+        faltando.length === 2
+          ? "Cadastre sua renda e registre alguns gastos (mercado, contas, transporte) para eu calcular."
+          : faltando[0] === "renda"
+            ? "Cadastre sua renda no Perfil ou lance o salário do mês para eu calcular."
+            : "Registre seus gastos do mês (mercado, contas, transporte) para eu calcular com segurança.",
+      pesoDivida,
+    };
+  }
+
+  const folego = pontuarFolego(renda, custo);
+  const peso = pontuarPesoDivida(renda, entrada.totalDevido);
+  const atraso = pontuarContasEmDia(entrada.maiorAtrasoDias);
+  const respiro = pontuarRespiro(entrada.respiroDias);
+  const avanco = pontuarAvanco(entrada.totalDevido, entrada.percentualPago);
 
   const componentes: ComponenteSaude[] = [
-    { nome: "Comprometimento da renda", pontos: comprometimento.pontos, pontosMaximos: 35 },
-    { nome: "Resultado do período", pontos: resultado.pontos, pontosMaximos: 25 },
-    { nome: "Ritmo de despesas variáveis", pontos: ritmo.pontos, pontosMaximos: 20 },
-    { nome: "Dívidas em atraso", pontos: atraso.pontos, pontosMaximos: 20 },
+    { nome: "Fôlego do mês", pontos: folego.pontos, pontosMaximos: 30 },
+    { nome: "Peso da dívida", pontos: peso.pontos, pontosMaximos: 30 },
+    { nome: "Contas em dia", pontos: atraso.pontos, pontosMaximos: 20 },
+    { nome: "Respiro", pontos: respiro.pontos, pontosMaximos: 10 },
+    { nome: "Avanço na quitação", pontos: avanco.pontos, pontosMaximos: 10 },
   ];
-
-  const score = Math.round(componentes.reduce((soma, c) => soma + c.pontos, 0));
-
-  const razoes = [comprometimento.razao, resultado.razao, ritmo.razao, atraso.razao]
+  const score = Math.round(componentes.reduce((s, c) => s + c.pontos, 0));
+  const razoes = [folego.razao, peso.razao, atraso.razao, respiro.razao, avanco.razao]
     .sort((a, b) => PRIORIDADE_TIPO[a.tipo] - PRIORIDADE_TIPO[b.tipo])
     .slice(0, 3);
 
-  // "Dados insuficientes" = os três componentes que dependem de histórico
-  // ficaram todos no valor neutro (nada de renda, nada de receita lançada,
-  // nada de média de despesas) — a mesma condição que cada pontuarX() usa
-  // pra decidir seu próprio "neutro", checada aqui de novo em cima da
-  // entrada crua pra não depender de expor esse detalhe de cada função.
-  // Dívida em atraso fica de fora de propósito: é sinal real, não ausência
-  // de dado, e não pode ser mascarado por "conta vazia".
-  const semRenda = !entrada.comprometimento.calculavel;
-  const semReceita = (entrada.comprometimento.rendaEfetiva ?? entrada.totais.receitas) <= 0;
-  const semHistoricoRitmo = entrada.mediaDespesasVariaveis <= 0;
-  const dadosInsuficientes = semRenda && semReceita && semHistoricoRitmo && !entrada.temDividaEmAtraso;
+  // Próximo passo: o que mais move a nota, em ordem de urgência.
+  let proximoPasso = "Siga o seu plano de quitação: ele mostra o que pagar primeiro.";
+  if (entrada.maiorAtrasoDias != null) proximoPasso = "Regularize a dívida em atraso primeiro: é o que mais pesa agora.";
+  else if (folego.pontos === 0) proximoPasso = "Veja no plano onde abrir espaço no mês: as contas passaram da renda.";
+  else if (entrada.respiroDias == null || entrada.respiroDias < 7) proximoPasso = "Monte o seu Respiro: um colchão de 7 dias evita voltar ao cartão num imprevisto.";
 
-  return { score, classificacao: classificar(score), componentes, razoes, versaoFormula: VERSAO_FORMULA_SAUDE, dadosInsuficientes };
+  return {
+    score,
+    classificacao: classificar(score),
+    componentes,
+    razoes,
+    versaoFormula: VERSAO_FORMULA_SAUDE,
+    dadosInsuficientes: false,
+    faltando: [],
+    proximoPasso,
+    pesoDivida,
+  };
 }

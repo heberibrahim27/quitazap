@@ -30,7 +30,6 @@ function loadTsModule(rel) {
 }
 
 const { calcularMediaDeMeses } = loadTsModule("src/lib/financeiro/media-mensal.ts");
-const { calcularSaudeFinanceira } = loadTsModule("src/lib/financeiro/saude-financeira.ts");
 
 const vazio = { despesasFixas: 0, despesasVariaveis: 0, cartoes: 0, porCategoria: [] };
 const mes = (variaveis, categorias = []) => ({ despesasFixas: 0, despesasVariaveis: variaveis, cartoes: 0, porCategoria: categorias });
@@ -61,28 +60,4 @@ test("nenhum mês com dado devolve tudo zerado", () => {
   const media = calcularMediaDeMeses([vazio, vazio, vazio]);
   assert.equal(media.quantidadeMeses, 0);
   assert.equal(media.despesasVariaveis, 0);
-});
-
-test("Saúde Financeira de cliente com 1 mês de histórico não acusa 'acima da média'", () => {
-  const media = calcularMediaDeMeses([vazio, vazio, mes(150)]);
-  const saude = calcularSaudeFinanceira({
-    totais: { despesasVariaveis: 340, receitas: 5800, resultadoSemPlano: 3945 },
-    comprometimento: { calculavel: true, percentualComprometido: 0.32, saldoProjetado: 3945, rendaEfetiva: 5800 },
-    mediaDespesasVariaveis: media.despesasVariaveis,
-    temDividaEmAtraso: false,
-  });
-  const textos = JSON.stringify(saude.razoes);
-  assert.doesNotMatch(textos, /acima da/);
-  assert.match(textos, /sem histórico suficiente/i);
-});
-
-test("com histórico real, gasto muito acima da média continua sendo avisado", () => {
-  const media = calcularMediaDeMeses([mes(100), mes(100), mes(100)]);
-  const saude = calcularSaudeFinanceira({
-    totais: { despesasVariaveis: 300, receitas: 5800, resultadoSemPlano: 3945 },
-    comprometimento: { calculavel: true, percentualComprometido: 0.32, saldoProjetado: 3945, rendaEfetiva: 5800 },
-    mediaDespesasVariaveis: media.despesasVariaveis,
-    temDividaEmAtraso: false,
-  });
-  assert.match(JSON.stringify(saude.razoes), /200% acima da sua média dos meses anteriores/);
 });

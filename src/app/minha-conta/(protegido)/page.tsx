@@ -316,19 +316,26 @@ export default async function MinhaContaPage({
   // determinístico só a partir do que o motor já calculou acima + a média
   // de 3 meses buscada junto no Promise.all. Só faz sentido mostrar
   // quando já existe algum lançamento no mês (mesmo guard do Resumo).
-  const saude = quantidadeLancamentos > 0
-    ? calcularSaudeFinanceira({
-        totais: { despesasVariaveis: totalVariaveisMes, receitas: totalReceitasMes, resultadoSemPlano: resultadoMes },
-        comprometimento: {
-          calculavel: resumoPlano.calculavel,
-          percentualComprometido,
-          saldoProjetado: resumoPlano.saldoProjetado,
-          rendaEfetiva,
-        },
-        mediaDespesasVariaveis: mediaMensal.despesasVariaveis,
-        temDividaEmAtraso: dividasEmAtraso.length > 0,
-      })
-    : null;
+  // Nota v2 (ver saude-financeira-contrato.ts): falta de registro nunca vira ponto positivo. O custo mensal
+  // de referência é o MAIOR entre o registrado no mês, a média dos meses anteriores e as despesas fixas
+  // declaradas no Perfil (mais as parcelas fora da folha); se os três forem zero, a nota fica "montando".
+  const registradoMes = totais.despesasFixas + totais.despesasVariaveis + totais.cartoes;
+  const mediaHistorica = mediaMensal.despesasFixas + mediaMensal.despesasVariaveis + mediaMensal.cartoes;
+  const baseCusto = Math.max(registradoMes, mediaHistorica, cliente.despesasFixas ?? 0);
+  const custoMensalReferencia = baseCusto > 0 ? baseCusto + totais.emprestimos + totais.outrasDividas : null;
+  const totalDevidoSaude = dividas.reduce((soma, d) => soma + Math.max(d.valorTotal - d.valorPago, 0), 0);
+  const totalContratadoSaude = dividas.reduce((soma, d) => soma + d.valorTotal, 0);
+  const totalPagoSaude = dividas.reduce((soma, d) => soma + d.valorPago, 0);
+  const metaRespiro = metasResumo.find((m) => /respiro/i.test(m.nome));
+  const respiroGuardado = metaRespiro ? Math.max(metaRespiro.depositos.reduce((soma, dep) => soma + dep.valor, 0), 0) : null;
+  const saude = calcularSaudeFinanceira({
+    rendaMensal: rendaEfetiva,
+    custoMensalReferencia,
+    totalDevido: totalDevidoSaude,
+    maiorAtrasoDias: todasEmAtraso.length > 0 ? Math.max(...todasEmAtraso.map((d) => d.diasAtraso ?? 1)) : null,
+    percentualPago: totalContratadoSaude > 0 ? (totalPagoSaude / totalContratadoSaude) * 100 : 0,
+    respiroDias: respiroGuardado == null ? null : custoMensalReferencia != null ? respiroGuardado / (custoMensalReferencia / 30) : 0,
+  });
 
   // Histórico do score (SaudeFinanceiraLog) — 1 registro por dia, versão da
   // fórmula gravada junto (ver saude-financeira-contrato.ts). Persistência

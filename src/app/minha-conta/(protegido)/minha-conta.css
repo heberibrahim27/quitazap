@@ -2623,3 +2623,12 @@ body.mc-chat-tela .mc-chat-composer {
 .saude-como ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .saude-como li { font-size: 12.5px; line-height: 1.45; color: var(--ink-dim); }
 .saude-como li strong { color: #0B1E33; }
+
+/* Saúde financeira v2: 5 critérios, estado "Montando sua nota" e próximo passo */
+.saude-grafico-5 { gap: 6px; }
+.saude-grafico-5 .saude-rot { font-size: 10.5px; line-height: 1.2; text-align: center; }
+.saude-faltam { list-style: disc; margin: 10px 0 0 18px; padding: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-dim); }
+.saude-nota-divida { margin: 12px 0 0; font-size: 13px; color: var(--ink-dim); }
+.saude-nota-divida strong { color: #0B1E33; }
+.saude-proximo { margin: 14px 0 0; padding: 10px 14px; border-radius: 14px; background: rgba(30,99,233,0.07); font-size: 13px; line-height: 1.45; color: #0B1E33; }
+.saude-grafico.saude-grafico-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }

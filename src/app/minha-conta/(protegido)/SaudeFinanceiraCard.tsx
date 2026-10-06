@@ -1,26 +1,32 @@
 import type { SaudeFinanceira } from "@/lib/financeiro/saude-financeira-contrato";
 
+// Faixas em linguagem de bússola, não de boletim: "Prioridade agora" usa azul (foco), não vermelho (culpa).
 const COR_CLASSIFICACAO: Record<SaudeFinanceira["classificacao"], string> = {
-  Excelente: "var(--green)",
-  Boa: "var(--green)",
+  "Bem encaminhada": "var(--green)",
+  "Em organização": "var(--green)",
   Atenção: "var(--orange)",
-  Crítica: "var(--red)",
+  "Prioridade agora": "var(--blue)",
 };
 
-// Nomes em linguagem de gente (antes: "Renda", "Resultado", "Ritmo", "Sem atrasos" — o cliente não
-// entendia o que cada barra media; Ibrahim, 06/10/2026). Cada um tem uma frase de explicação abaixo.
-const ROTULO_CURTO: Record<string, string> = {
-  "Comprometimento da renda": "Peso das contas",
-  "Resultado do período": "Sobra do mês",
-  "Ritmo de despesas variáveis": "Gastos do dia",
-  "Dívidas em atraso": "Contas em dia",
+const SUBTITULO: Record<SaudeFinanceira["classificacao"], string> = {
+  "Bem encaminhada": "Você está no caminho certo.",
+  "Em organização": "Boa base, com espaço para melhorar.",
+  Atenção: "Alguns pontos pedem cuidado.",
+  "Prioridade agora": "Vamos focar primeiro no que traz mais respiro.",
 };
 
+const FALTA_TEXTO: Record<string, string> = {
+  renda: "Sua renda (no Perfil ou lançando o salário)",
+  gastos: "Seus gastos do mês (mercado, contas, transporte)",
+};
+
+// Nomes em linguagem de gente; cada um tem uma frase de explicação no "Como essa nota é calculada".
 const EXPLICACAO: Array<{ nome: string; texto: string }> = [
-  { nome: "Peso das contas", texto: "Quanto da sua renda já está comprometido com contas, parcelas e cartão. Quanto menos, mais pontos." },
-  { nome: "Sobra do mês", texto: "O que deve sobrar depois de pagar tudo do mês. Quanto maior a sobra, mais pontos." },
-  { nome: "Gastos do dia", texto: "Se o que você gasta no dia a dia (mercado, transporte, lazer) está dentro do seu normal dos últimos meses. Sem histórico ainda, vale metade dos pontos." },
-  { nome: "Contas em dia", texto: "Sem nenhuma dívida atrasada você ganha todos os pontos." },
+  { nome: "Fôlego do mês", texto: "Quanto sobra da sua renda depois do que já está previsto. Mais sobra, mais pontos." },
+  { nome: "Peso da dívida", texto: "Quanto ainda falta quitar em relação à sua renda. As parcelas descontadas em folha não pesam no mês, mas o saldo todo conta aqui." },
+  { nome: "Contas em dia", texto: "Como estão seus vencimentos. Sem atraso você ganha todos os pontos." },
+  { nome: "Respiro", texto: "Quantos dias do seu dia a dia a meta Respiro já cobre (o alvo é 7)." },
+  { nome: "Avanço na quitação", texto: "Quanto da dívida que você contratou já foi paga." },
 ];
 
 const ICONE_CORACAO = (
@@ -36,38 +42,43 @@ const CABECALHO = (
   </div>
 );
 
-// Score 0-100 determinístico (src/lib/financeiro/saude-financeira.ts) — a
-// IA não participa desse número. Só é chamado quando o mês já tem algum
-// lançamento (ver page.tsx); mesmo assim, `dadosInsuficientes` pode vir
-// true (ex: conta nova com só um lançamento de meta, sem renda/receita
-// nenhuma) — nesse caso não mostra número nenhum, pra não passar a
-// impressão de um "78/100 Boa" que a conta ainda não tem dado pra sustentar.
-//
-// Título fica FORA de .card (mesmo padrão do "Resumo" logo abaixo na Home:
-// card-head como irmão antes do card, não aninhado dentro dele).
+function fmtValor(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Nota 0-100 determinística (src/lib/financeiro/saude-financeira.ts) — a IA não participa do número.
+// Regra de ouro: falta de informação nunca vira nota. Sem renda ou sem gastos conhecidos o card mostra
+// "Montando sua nota" e o que falta, em vez de um número enganoso.
 export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
   if (saude.dadosInsuficientes) {
     return (
       <>
         {CABECALHO}
-        <div className="card" style={{ paddingBottom: 18 }}>
-          <div style={{ padding: "0 18px 14px" }}>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4, color: "var(--mc-ink-dim)" }}>
-              Ainda não há renda, receita ou histórico de gastos suficientes este mês pra calcular sua saúde financeira. Continue lançando por aqui que o número aparece assim que tiver o que comparar.
+        <div className="card saude-card">
+          <p className="saude-classe" style={{ color: "var(--blue)", margin: 0 }}>Montando sua nota</p>
+          <p className="saude-sub" style={{ marginTop: 6 }}>
+            Falta{saude.faltando.length === 1 ? "" : "m"} {saude.faltando.length} informaç{saude.faltando.length === 1 ? "ão" : "ões"} para mostrar uma avaliação confiável.
+          </p>
+          <ul className="saude-faltam">
+            {saude.faltando.map((f) => (
+              <li key={f}>{FALTA_TEXTO[f] ?? f}</li>
+            ))}
+          </ul>
+          {saude.pesoDivida && (
+            <p className="saude-nota-divida">
+              Dívidas cadastradas: <strong>{fmtValor(saude.pesoDivida.totalDevido)}</strong>
+              {saude.pesoDivida.percentualDaRendaAnual != null ? ` — ${saude.pesoDivida.percentualDaRendaAnual}% da sua renda anual.` : "."}
             </p>
-          </div>
+          )}
+          <p className="saude-proximo">
+            <strong>Próximo passo:</strong> {saude.proximoPasso}
+          </p>
         </div>
       </>
     );
   }
 
   const cor = COR_CLASSIFICACAO[saude.classificacao];
-
-  // Razões neutras sem dado ("— Ainda sem histórico…") não agregam: o gráfico
-  // já mostra o componente. O símbolo ✓/✗/⚠ do texto vira ícone próprio.
-  const razoes = saude.razoes
-    .filter((r) => !r.texto.startsWith("—"))
-    .map((r) => ({ tipo: r.tipo, texto: r.texto.replace(/^[✓✗⚠]s*/, "") }));
 
   return (
     <>
@@ -82,11 +93,11 @@ export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
           </div>
           <div className="saude-resumo">
             <p className="saude-classe" style={{ color: cor }}>{saude.classificacao}</p>
-            <p className="saude-sub">Sua saúde financeira em {saude.score} pontos</p>
+            <p className="saude-sub">{SUBTITULO[saude.classificacao]}</p>
           </div>
         </div>
 
-        <div className="saude-grafico" role="img" aria-label={`Pontuação por critério: ${saude.componentes.map((c) => `${c.nome} ${Math.round(c.pontos)} de ${c.pontosMaximos}`).join(", ")}`}>
+        <div className="saude-grafico saude-grafico-5" role="img" aria-label={`Pontuação por critério: ${saude.componentes.map((c) => `${c.nome} ${Math.round(c.pontos)} de ${c.pontosMaximos}`).join(", ")}`}>
           {saude.componentes.map((comp, i) => {
             const pct = comp.pontosMaximos > 0 ? Math.max(0, Math.min(comp.pontos / comp.pontosMaximos, 1)) : 0;
             const tom = pct >= 0.7 ? "bom" : pct >= 0.4 ? "medio" : "ruim";
@@ -96,11 +107,15 @@ export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
                 <span className="saude-trilho">
                   <span className={`saude-barra ${tom}`} style={{ "--h": `${Math.max(pct * 100, 5)}%`, "--i": i } as React.CSSProperties} />
                 </span>
-                <span className="saude-rot">{comp.nome === "Dívidas em atraso" && pct < 1 ? "Com atraso" : (ROTULO_CURTO[comp.nome] ?? comp.nome)}</span>
+                <span className="saude-rot">{comp.nome}</span>
               </div>
             );
           })}
         </div>
+
+        <p className="saude-proximo">
+          <strong>Próximo passo:</strong> {saude.proximoPasso}
+        </p>
 
         <details className="saude-como">
           <summary>Como essa nota é calculada</summary>
@@ -113,15 +128,15 @@ export function SaudeFinanceiraCard({ saude }: { saude: SaudeFinanceira }) {
           </ul>
         </details>
 
-        {razoes.length > 0 && (
+        {saude.razoes.length > 0 && (
           <ul className="saude-razoes">
-            {razoes.map((razao, i) => (
+            {saude.razoes.map((razao, i) => (
               <li key={i} className={`saude-razao ${razao.tipo}`}>
                 <span className="saude-razao-icone" aria-hidden="true">
                   {razao.tipo === "positiva" ? (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
                   ) : razao.tipo === "negativa" ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 7v6" /><path d="M12 17h.01" /></svg>
                   ) : (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 7v6" /><path d="M12 17h.01" /></svg>
                   )}
