@@ -71,6 +71,7 @@ async function converterFotoParaJpeg(arquivo: File): Promise<Blob> {
 
 type EnvioEmAndamento =
   | { tipo: "foto"; fase: "preparando" | "enviando" | "processando"; previewUrl: string }
+  | { tipo: "arquivo"; fase: "enviando" | "processando" }
   | { tipo: "audio"; fase: "enviando" | "processando" };
 
 type ErroEnvio = { mensagem: string; tentar: () => void };
@@ -201,6 +202,7 @@ export function ChatClient({
   const [erroEnvio, setErroEnvio] = useState<ErroEnvio | null>(null);
   const inputCameraRef = useRef<HTMLInputElement>(null);
   const inputGaleriaRef = useRef<HTMLInputElement>(null);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
 
   async function enviarFoto(arquivo: File) {
     if (envio) return;
@@ -248,16 +250,42 @@ export function ChatClient({
   function abrirGaleria() {
     inputGaleriaRef.current?.click();
   }
-  function avisarDocumentoIndisponivel() {
+  function abrirArquivo() {
     setMenuAnexoAberto(false);
-    setMensagens((atual) => [
-      ...atual,
-      {
-        id: `doc-aviso-${Date.now()}`,
-        direcao: "BOT",
-        texto: "Documentos ainda não são lidos automaticamente por aqui — me conta o que é por texto que eu registro certinho.",
-      },
-    ]);
+    inputArquivoRef.current?.click();
+  }
+
+  // Fatura exportada do banco (OFX/CSV) — lida por regra, sem depender de foto.
+  async function enviarArquivo(arquivo: File) {
+    if (envio) return;
+    setErroEnvio(null);
+    setEnvio({ tipo: "arquivo", fase: "enviando" });
+    try {
+      const formData = new FormData();
+      formData.set("arquivo", arquivo, arquivo.name);
+      const res = await fetch("/api/minha-conta/chat/arquivo", { method: "POST", body: formData });
+      setEnvio({ tipo: "arquivo", fase: "processando" });
+      const dados = await res.json();
+      if (!res.ok) throw new Error(dados.error || "Não consegui enviar o arquivo.");
+      setMensagens((atual) => [
+        ...atual,
+        { id: `arq-${Date.now()}`, direcao: "CLIENTE", texto: `📎 ${arquivo.name}`, dadosEstruturados: undefined },
+        { id: `resp-${Date.now()}`, direcao: "BOT", texto: dados.resposta, dadosEstruturados: dados.dadosEstruturados },
+      ]);
+      setEnvio(null);
+    } catch (err) {
+      setEnvio(null);
+      setErroEnvio({
+        mensagem: err instanceof Error ? err.message : "Não consegui enviar o arquivo.",
+        tentar: () => enviarArquivo(arquivo),
+      });
+    }
+  }
+
+  function aoEscolherArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0];
+    e.target.value = "";
+    if (arquivo) enviarArquivo(arquivo);
   }
 
   function aoResolverComprovante(resultado: { resposta: string; dadosEstruturados?: unknown }) {
@@ -455,7 +483,7 @@ export function ChatClient({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={envio.previewUrl} alt="" className="mc-envio-thumb" />
               )}
-              <span>{envio.tipo === "foto" ? FASE_LABEL[envio.fase] : FASE_LABEL[envio.fase] ?? "Enviando áudio..."}</span>
+              <span>{envio.tipo === "foto" ? FASE_LABEL[envio.fase] : envio.tipo === "arquivo" ? (envio.fase === "enviando" ? "Enviando arquivo..." : "Lendo a fatura...") : FASE_LABEL[envio.fase] ?? "Enviando áudio..."}</span>
             </div>
           </div>
         )}
@@ -555,11 +583,11 @@ export function ChatClient({
                 </span>
                 Galeria
               </button>
-              <button type="button" onClick={avisarDocumentoIndisponivel}>
+              <button type="button" onClick={abrirArquivo}>
                 <span className="mc-anexo-menu-icone laranja">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
                 </span>
-                Documento
+                Fatura (OFX/CSV)
               </button>
             </div>
           </>
@@ -567,6 +595,7 @@ export function ChatClient({
 
         <input ref={inputCameraRef} type="file" accept="image/*" capture="environment" onChange={aoEscolherFoto} style={{ display: "none" }} />
         <input ref={inputGaleriaRef} type="file" accept="image/*" onChange={aoEscolherFoto} style={{ display: "none" }} />
+        <input ref={inputArquivoRef} type="file" accept=".ofx,.csv,.txt,text/csv,application/x-ofx,text/plain" onChange={aoEscolherArquivo} style={{ display: "none" }} />
       </form>
     </div>
   );

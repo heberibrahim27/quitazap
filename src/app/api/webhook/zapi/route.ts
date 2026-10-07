@@ -71,6 +71,7 @@ import { parseMoneyBR } from "@/lib/money";
 import { normalizarRespostaCompraImagem, formatarValorBR } from "@/lib/gasto-flow";
 import { transcreverAudio, analisarImagem } from "@/lib/ai/openai-client";
 import { processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
+import { processarArquivoFatura, MENSAGEM_ARQUIVO_NAO_RECONHECIDO, MENSAGEM_ARQUIVO_SEM_CARTAO } from "@/lib/ai/fatura-arquivo";
 import {
   deveAguardarDespesasFixasControle,
   ETAPA_AGUARDANDO_DESPESAS_FIXAS,
@@ -1175,6 +1176,46 @@ export async function POST(req: NextRequest) {
     // o mesmo extrairPDF, só reage quando o retorno é BOLETO com dados
     // completos (nunca cria compromisso sem confirmação do cliente).
     if (tipoEntrada === "documento") {
+      // Fatura exportada (OFX/CSV) — espelho do chat nativo
+      // (/api/minha-conta/chat/arquivo). Detecta pelo CONTEÚDO (PDF começa com
+      // "%PDF"), não pelo nome: o nome que o WhatsApp entrega nem sempre vem.
+      if (sessao.clienteId) {
+        try {
+          const docRes = await fetch(body.document.documentUrl);
+          if (docRes.ok) {
+            const bytes = Buffer.from(await docRes.arrayBuffer());
+            if (bytes.subarray(0, 5).toString("latin1") !== "%PDF-") {
+              const nomeDoc = String(body.document.fileName ?? body.document.title ?? "fatura");
+              const lido = await processarArquivoFatura({ clienteId: sessao.clienteId, gratuito: isGratuito, nomeArquivo: nomeDoc, bytes });
+              if (lido.tipo === "sem_emissor") {
+                await sendWhatsApp(sessao.telefone, MENSAGEM_ARQUIVO_SEM_CARTAO);
+                return NextResponse.json({ ok: true });
+              }
+              if (lido.tipo === "pendente") {
+                const pendente = lido.pendente;
+                if (pendente.filaAmbiguos.length === 0 && !faturaTemNovidade(pendente)) {
+                  await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendente.jaCadastradas + (pendente.comprasJaRegistradas ?? 0)));
+                  return NextResponse.json({ ok: true });
+                }
+                await prisma.botSessao.updateMany({
+                  where: { id: sessao.id },
+                  data: { faturaCartaoPendente: pendente as unknown as Prisma.InputJsonValue },
+                });
+                await sendWhatsApp(
+                  sessao.telefone,
+                  pendente.filaAmbiguos.length > 0 ? mensagemPerguntaAmbiguo(pendente.filaAmbiguos[0]) : mensagemResumoLote(pendente)
+                );
+                return NextResponse.json({ ok: true });
+              }
+              await sendWhatsApp(sessao.telefone, MENSAGEM_ARQUIVO_NAO_RECONHECIDO);
+              return NextResponse.json({ ok: true });
+            }
+          }
+        } catch (err) {
+          console.error("[Z-API] Erro ao ler arquivo de fatura:", err);
+        }
+      }
+
       try {
         const resultado = await extrairPDF(body.document.documentUrl);
 

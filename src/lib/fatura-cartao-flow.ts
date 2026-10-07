@@ -270,7 +270,7 @@ function compraValida(c: CompraFatura): boolean {
 }
 
 /** Separa o que ainda não está registrado no cartão do que já está. Chave:
- * mesmo cartão + mesmo dia (Brasília) + mesmo valor — a descrição do cliente
+ * mesmo cartão + mesmo dia (Brasília) + valor (±1 centavo: print e arquivo arredondam diferente) — a descrição do cliente
  * ("mercado") quase nunca bate com a da fatura ("Atacadao Atakarejo"). */
 async function separarComprasNovas(
   clienteId: string,
@@ -295,7 +295,7 @@ async function separarComprasNovas(
   for (const c of validas) {
     const alvo = anoMesDiaBrasil(new Date(`${c.data}T12:00:00`));
     const idx = existentes.findIndex((e, i) => {
-      if (usados.has(i) || Math.abs(e.valor - c.valor) > 0.01) return false;
+      if (usados.has(i) || Math.abs(e.valor - c.valor) > 0.015) return false;
       const d = anoMesDiaBrasil(e.data);
       return d.ano === alvo.ano && d.mes === alvo.mes && d.dia === alvo.dia;
     });

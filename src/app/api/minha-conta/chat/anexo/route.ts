@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
-import { faturaTemNovidade } from "@/lib/fatura-cartao-flow";
+import { registrarPreviaFaturaNoChat, responderNoChat } from "@/lib/fatura-previa-chat";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
@@ -59,63 +59,10 @@ async function tratarPrintDeFatura(opts: {
   });
   if (leitura.tipo === "nao_fatura") return null;
 
-  async function responder(texto: string, dadosEstruturados?: unknown) {
-    await prisma.mensagemChat.create({
-      data: { clienteId: cliente.id, canal: "APP", direcao: "BOT", texto, dadosEstruturados: dadosEstruturados as object | undefined },
-    });
-    return { resposta: texto, dadosEstruturados };
-  }
-
   if (leitura.tipo === "ja_processada") {
-    return responder("📄 Essa fatura já foi processada antes — não lancei de novo.");
+    return responderNoChat(cliente.id, "📄 Essa fatura já foi processada antes — não lancei de novo.");
   }
-
-  const pendente = leitura.pendente;
-  // No chat, compra "parecida" com uma já cadastrada fica de fora (nunca
-  // duplica); o cliente lança à parte por texto se for realmente outra.
-  const parecidas = pendente.filaAmbiguos.length;
-  const lote = { ...pendente, filaAmbiguos: [], indice: 0 };
-
-  if (!faturaTemNovidade(lote)) {
-    const ja = lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0);
-    return responder(
-      ja > 0
-        ? `📄 Li a fatura ${lote.cartaoNome} — as ${ja} compra(s) já estavam no seu Controle, não lancei de novo.`
-        : `📄 Li a fatura ${lote.cartaoNome}, mas não encontrei nenhuma compra pra lançar.`
-    );
-  }
-
-  const sessao = await obterOuCriarSessaoControle(cliente);
-  await prisma.botSessao.updateMany({
-    where: { id: sessao.id },
-    data: { faturaCartaoPendente: lote as unknown as object },
-  });
-
-  const venc = new Date(`${lote.vencimentoFatura}T12:00:00`);
-  const proxima = new Date(venc);
-  proxima.setMonth(proxima.getMonth() + 1);
-  const dadosEstruturados = {
-    tipo: "fatura_detectada" as const,
-    cartao: lote.cartaoNome,
-    vencimento: lote.vencimentoFatura,
-    proximaParcela: proxima.toISOString().slice(0, 10),
-    vencimentoEstimado: lote.vencimentoEstimado ?? false,
-    ignoradas: lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0),
-    compras: (lote.compras ?? []).map((c) => ({ descricao: c.descricao, valor: c.valor, data: c.data })),
-    itens: lote.confirmados.map((i) => ({
-      descricao: i.descricao,
-      parcelaAtual: i.parcelaAtual,
-      totalParcelas: i.totalParcelas,
-      valorParcela: i.valorParcela,
-      dataCompra: i.dataCompra ?? null,
-    })),
-  };
-  const nCompras = lote.compras?.length ?? 0;
-  const totalCompras = (lote.compras ?? []).reduce((s, c) => s + c.valor, 0);
-  return responder(
-    `Li a fatura ${lote.cartaoNome}: ${nCompras} gasto(s) no cartão (${fmt(totalCompras)}) e ${lote.confirmados.length} compra(s) parcelada(s) com parcelas futuras. Confere e confirma?`,
-    dadosEstruturados
-  );
+  return registrarPreviaFaturaNoChat(cliente, leitura.pendente);
 }
 
 export async function POST(req: NextRequest) {
