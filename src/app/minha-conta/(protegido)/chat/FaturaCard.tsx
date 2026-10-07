@@ -8,8 +8,8 @@ export type FaturaDado = {
   vencimento: string; // YYYY-MM-DD
   proximaParcela: string; // YYYY-MM-DD
   vencimentoEstimado?: boolean;
-  ignoradas: number;
-  compras: { descricao: string; valor: number; data: string }[];
+  ignoradas?: number;
+  compras?: { descricao: string; valor: number; data: string }[];
   itens: {
     descricao: string;
     parcelaAtual: number;
@@ -73,19 +73,23 @@ export function FaturaCard({
 
   if (resolvido) return null;
 
+  // Mensagens guardadas antes da leitura de todas as compras não têm `compras`.
+  const compras = dado.compras ?? [];
+  const itens = dado.itens ?? [];
+
   return (
     <div className="mc-comprovante-card">
       <p className="mc-comprovante-titulo">
         💳 Fatura {dado.cartao} — {dado.vencimentoEstimado ? fmtMes(dado.vencimento) : `vence ${fmtData(dado.vencimento)}`}
       </p>
-      {dado.compras.length > 0 && (
+      {compras.length > 0 && (
         <p>
           <small>
-            <strong>Gastos no cartão ({dado.compras.length})</strong>
+            <strong>Gastos no cartão ({compras.length})</strong>
           </small>
         </p>
       )}
-      {dado.compras.map((c, idx) => (
+      {compras.map((c, idx) => (
         <div key={`c${idx}`} className="mc-comprovante-topo">
           <span>
             {c.descricao}
@@ -95,14 +99,14 @@ export function FaturaCard({
           <span className="mc-comprovante-valor">{fmtValor(c.valor)}</span>
         </div>
       ))}
-      {dado.itens.length > 0 && (
+      {itens.length > 0 && (
         <p>
           <small>
             <strong>Parcelas futuras</strong>
           </small>
         </p>
       )}
-      {dado.itens.map((i, idx) => (
+      {itens.map((i, idx) => (
         <div key={idx} className="mc-comprovante-topo">
           <span>
             <strong>{i.descricao}</strong>
@@ -118,7 +122,7 @@ export function FaturaCard({
       <p>
         <small>
           Próximas parcelas a partir de {fmtMes(dado.proximaParcela)}.
-          {dado.ignoradas > 0 ? ` ${dado.ignoradas} compra(s) já cadastrada(s) ficaram de fora, sem duplicar.` : ""}
+          {(dado.ignoradas ?? 0) > 0 ? ` ${dado.ignoradas} compra(s) já cadastrada(s) ficaram de fora, sem duplicar.` : ""}
         </small>
       </p>
       {erro && <p className="mc-lancamento-card-erro">{erro}</p>}

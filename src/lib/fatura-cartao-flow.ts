@@ -325,6 +325,16 @@ export async function montarFaturaCartaoPendente(
 ): Promise<FaturaCartaoPendente> {
   const cartao = await resolverCartaoFatura(clienteId, fatura.emissor);
 
+  // Print que só mostra o mês: se o cartão já tem dia de vencimento, usa-o em
+  // vez do palpite.
+  if (fatura.vencimentoEstimado && cartao.diaVencimento) {
+    fatura = {
+      ...fatura,
+      vencimentoFatura: `${fatura.vencimentoFatura.slice(0, 7)}-${String(cartao.diaVencimento).padStart(2, "0")}`,
+      vencimentoEstimado: false,
+    };
+  }
+
   const itensValidos = fatura.parceladas.filter(parceladaValida);
   const { novas: comprasNovas, jaRegistradas: comprasJaRegistradas } = await separarComprasNovas(
     clienteId,

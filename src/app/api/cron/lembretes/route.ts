@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deliverReminder } from "@/lib/reminder-delivery";
 import { registrarExecucaoAgente } from "@/lib/agentes/alertas-store";
+import { anoMesDiaBrasil } from "@/lib/financeiro/fatura-cartao";
 
 // ── Handler principal ─────────────────────
 
@@ -46,6 +47,8 @@ export async function GET(req: NextRequest) {
       },
       include: {
         cliente: { include: { botSessoes: { take: 1 } } },
+        parcelas: { where: { status: "PENDENTE" }, orderBy: { vencimento: "asc" }, take: 1 },
+        _count: { select: { parcelas: true } },
       },
     });
 
@@ -54,9 +57,22 @@ export async function GET(req: NextRequest) {
       if (!sessao?.telefone) continue;
       if (!divida.cliente.aceitaProativas) continue;
 
-      const diasRestantes = divida.diaVencimento! - diaHoje;
+      // Dívida parcelada: avisa a PRÓXIMA parcela pendente (valor e data dela),
+      // nunca o total restante, e só quando ela está mesmo na janela — antes
+      // o aviso saía todo mês no mesmo dia, mesmo com a parcela a meses de
+      // distância. Dívida sem parcelas segue a regra antiga (dia do mês).
+      const proximaParcela = divida.parcelas[0];
+      let diasRestantes = divida.diaVencimento! - diaHoje;
+      let valorAviso = divida.valorTotal;
+      if (divida._count.parcelas > 0) {
+        if (!proximaParcela) continue; // todas pagas
+        const hoje = anoMesDiaBrasil(agora);
+        const venc = anoMesDiaBrasil(proximaParcela.vencimento);
+        diasRestantes = Math.round((Date.UTC(venc.ano, venc.mes - 1, venc.dia) - Date.UTC(hoje.ano, hoje.mes - 1, hoje.dia)) / 86400000);
+        valorAviso = proximaParcela.valor;
+      }
       const nomeCliente   = divida.cliente.nome;
-      const valorFmt      = divida.valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+      const valorFmt      = valorAviso.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
       let mensagem = "";
 
       if (diasRestantes === 0) {
@@ -64,7 +80,7 @@ export async function GET(req: NextRequest) {
       } else if (diasRestantes === 1) {
         mensagem = `📅 *Lembrete, ${nomeCliente}!*\n\nAmanhã vence o *${divida.credor}* — *R$ ${valorFmt}*.\n\nJá separou o dinheiro? Pague antes do vencimento! 💚`;
       } else if (diasRestantes === 3) {
-        mensagem = `💡 *${nomeCliente}, em 3 dias vence:*\n\n*${divida.credor}* — *R$ ${valorFmt}* (dia ${divida.diaVencimento})\n\nPlaneje-se para não atrasar! 💚`;
+        mensagem = `💡 *${nomeCliente}, em 3 dias vence:*\n\n*${divida.credor}* — *R$ ${valorFmt}* (dia ${proximaParcela ? anoMesDiaBrasil(proximaParcela.vencimento).dia : divida.diaVencimento})\n\nPlaneje-se para não atrasar! 💚`;
       }
 
       if (!mensagem) continue;
