@@ -595,7 +595,7 @@ export function ChatClient({
 
         <input ref={inputCameraRef} type="file" accept="image/*" capture="environment" onChange={aoEscolherFoto} style={{ display: "none" }} />
         <input ref={inputGaleriaRef} type="file" accept="image/*" onChange={aoEscolherFoto} style={{ display: "none" }} />
-        <input ref={inputArquivoRef} type="file" accept=".ofx,.csv,.txt,text/csv,application/x-ofx,text/plain" onChange={aoEscolherArquivo} style={{ display: "none" }} />
+        <input ref={inputArquivoRef} type="file" onChange={aoEscolherArquivo} style={{ display: "none" }} />
       </form>
     </div>
   );
