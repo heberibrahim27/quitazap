@@ -5,7 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
-import { faturaTemNovidade, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
+import { faturaTemNovidade, totalNaoBate, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
 
 type ClienteChat = Parameters<typeof obterOuCriarSessaoControle>[0];
 
@@ -54,6 +54,7 @@ export async function registrarPreviaFaturaNoChat(
     vencimento: lote.vencimentoFatura,
     proximaParcela: proxima.toISOString().slice(0, 10),
     vencimentoEstimado: lote.vencimentoEstimado ?? false,
+    avisoTotal: totalNaoBate(lote) ? { totalImpresso: lote.totalImpresso, somaLida: lote.somaLida } : null,
     ignoradas: lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0),
     compras: (lote.compras ?? []).map((c) => ({ descricao: c.descricao, valor: c.valor, data: c.data })),
     itens: lote.confirmados.map((i) => ({

@@ -4,6 +4,7 @@
 // sem mecanismo novo de parcelamento nem de deduplicação.
 
 import type { CompraFatura, FaturaCartaoDetectada, ParceladaFatura } from "@/lib/fatura-cartao-flow";
+import { interpretarEmprestimo, type EmprestimoDetectado } from "../emprestimo-imagem";
 
 // Dia assumido quando o print só mostra o mês da fatura ("Novembro de 2026").
 const DIA_VENCIMENTO_ESTIMADO = 10;
@@ -15,8 +16,9 @@ export const PROMPT_FATURA_IMAGEM = `Esta imagem é um PRINT de fatura de cartã
   "emissor": "nome popular do banco/cartão",
   "vencimentoFatura": "AAAA-MM-DD",
   "mesFatura": "AAAA-MM",
+  "totalFatura": 1234.56,
   "compras": [
-    { "descricao": "nome da compra/loja", "valor": 139.12, "data": "AAAA-MM-DD", "parcelaAtual": null }
+    { "descricao": "nome da compra/loja", "valor": 139.12, "data": "AAAA-MM-DD", "parcelaAtual": null, "totalParcelas": null }
   ],
   "parceladas": [
     { "descricao": "nome da compra/loja", "parcelaAtual": 1, "totalParcelas": 3, "valorParcela": 30.90 }
@@ -27,13 +29,30 @@ Regras:
 - emissor: nome popular (ex.: "Nubank"), nunca razão social nem CNPJ. Se o nome não estiver escrito, deduza pelo visual do app (ex.: tema roxo com "Pagar" e filtros "Tudo/Cartões" = Nubank); só use null se realmente não souber.
 - vencimentoFatura: data de VENCIMENTO da fatura (não a de fechamento), só se estiver impressa; senão null.
 - mesFatura: mês de referência da fatura mostrado no topo (ex.: "Novembro de 2026" → "2026-11"); null se não aparecer.
+- totalFatura: o total de compras do período se estiver impresso (não saldo anterior nem pagamento mínimo); null se não aparecer.
 - compras: TODA linha de cobrança do print, uma por linha, sem pular nenhuma: compras à vista, parcelas (a linha do mês), IOF, Pix no crédito, assinaturas, tarifas. NÃO inclua pagamentos, estornos, créditos nem o total da fatura. Cada linha é independente, mesmo que o nome se repita.
   - valor: número positivo exatamente como impresso.
   - data: a data impressa na linha (ex.: "06 OUT") no formato AAAA-MM-DD. O ano é o mais provável: compras são sempre ANTERIORES ou iguais ao dia de hoje e próximas da fatura.
-  - parcelaAtual: o X de "Parcela X/Y" quando a linha é parcelada; null quando é à vista.
+  - parcelaAtual: o X e totalParcelas: o Y de "Parcela X/Y" quando a linha é parcelada; null nos dois quando é à vista.
   - descricao: sem o texto da parcela (ex.: "Atacadao Atakarejo", nunca "Atacadao Atakarejo - Parcela 1/3").
+- REGRA DE CONFERÊNCIA: toda compra parcelada listada em parceladas TAMBÉM deve aparecer em compras (a linha do mês dela), com a data impressa. Antes de responder, confira linha por linha: o número de linhas de cobrança do print deve ser igual ao tamanho de compras.
 - parceladas: só as compras com parcelamento explicitamente impresso ("Parcela 1/3", "3x") em que ainda restam parcelas depois desta (Y maior que X). valorParcela = valor da linha. Nunca inclua à vista, última parcela (X igual a Y) nem parcelamento que você teria que adivinhar.
-- Se não for fatura de cartão, ou não conseguir ler (vencimentoFatura ou mesFatura) com confiança, responda { "tipo": "OUTRO" }.`;
+- Se não for fatura de cartão, ou não conseguir ler (vencimentoFatura ou mesFatura) com confiança, responda { "tipo": "OUTRO" }.
+
+SE A IMAGEM FOR A TELA DE UM EMPRÉSTIMO (título com "valor restante", botões como "Pagar próxima parcela", e listas de parcelas pagas e agendadas), ignore tudo acima e responda APENAS com este JSON:
+
+{
+  "tipo": "EMPRESTIMO",
+  "credor": "nome popular do banco (ex.: Nubank; deduza pelo visual do app se não estiver escrito)",
+  "nome": "nome do contrato impresso (ex.: Dinheiro do negócio), ou null",
+  "valorRestante": 1063.06,
+  "parcelas": [
+    { "numero": 1, "vencimento": "2026-09-24", "valor": 265.77, "paga": true },
+    { "numero": 2, "vencimento": "2026-10-24", "valor": 265.77, "paga": false }
+  ]
+}
+
+Regras do empréstimo: liste TODAS as parcelas visíveis (as da seção "parcelas pagas" com paga true e as "agendadas"/"a pagar" com paga false), uma por linha. numero = o ordinal impresso (1ª, 2ª...). vencimento no formato AAAA-MM-DD (ano completo como impresso). valor = número positivo. valorRestante = o valor total restante impresso no topo, ou null.`;
 
 function numero(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
@@ -56,6 +75,27 @@ function mesIso(v: unknown): string | null {
 
 /** Interpreta a resposta JSON da visão. null = não é fatura legível. Itens
  * malformados são descartados um a um (nunca arrisca valor adivinhado). */
+export type DocumentoImagemLido =
+  | { tipo: "FATURA"; fatura: FaturaCartaoDetectada }
+  | { tipo: "EMPRESTIMO"; emprestimo: EmprestimoDetectado }
+  | null;
+
+/** Decide entre fatura de cartão e empréstimo pelo "tipo" devolvido pela visão. */
+export function interpretarDocumentoImagem(texto: string, emissorReserva?: string): DocumentoImagemLido {
+  let bruto: unknown;
+  try {
+    bruto = JSON.parse(texto.replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
+  } catch {
+    return null;
+  }
+  if (bruto && typeof bruto === "object" && (bruto as Record<string, unknown>).tipo === "EMPRESTIMO") {
+    const emprestimo = interpretarEmprestimo(bruto as Record<string, unknown>);
+    return emprestimo ? { tipo: "EMPRESTIMO", emprestimo } : null;
+  }
+  const fatura = interpretarFaturaImagem(texto, emissorReserva);
+  return fatura ? { tipo: "FATURA", fatura } : null;
+}
+
 export function interpretarFaturaImagem(texto: string, emissorReserva?: string): FaturaCartaoDetectada | null {
   let bruto: unknown;
   try {
@@ -100,6 +140,14 @@ export function interpretarFaturaImagem(texto: string, emissorReserva?: string):
     const data = dataIso(c.data);
     if (!descricao || valor == null || valor <= 0 || !data) continue;
     compras.push({ descricao, valor, data, parcelaAtual: numero(c.parcelaAtual) });
+    // Parcelas futuras também saem da própria linha da compra ("X de Y"): não depende
+    // de a IA repetir a compra em "parceladas".
+    const atual = numero(c.parcelaAtual);
+    const total = numero(c.totalParcelas);
+    if (atual != null && total != null && Number.isInteger(atual) && Number.isInteger(total) && atual >= 1 && total > atual) {
+      const ja = parceladas.some((p) => p.descricao.toLowerCase() === descricao.toLowerCase() && Math.abs(p.valorParcela - valor) < 0.02 && p.parcelaAtual === atual);
+      if (!ja) parceladas.push({ descricao, parcelaAtual: atual, totalParcelas: total, valorParcela: valor });
+    }
   }
 
   // Data da compra: só a 1ª parcela tem (a linha das demais mostra a data da
@@ -110,5 +158,8 @@ export function interpretarFaturaImagem(texto: string, emissorReserva?: string):
     if (linha) p.dataCompra = linha.data;
   }
 
-  return { emissor, vencimentoFatura, ...(vencimentoEstimado ? { vencimentoEstimado } : {}), parceladas, compras };
+  const totalBruto = numero(r.totalFatura);
+  const totalImpresso = totalBruto != null && totalBruto > 0 ? Math.round(totalBruto * 100) / 100 : undefined;
+
+  return { emissor, vencimentoFatura, ...(totalImpresso != null ? { totalImpresso } : {}), ...(vencimentoEstimado ? { vencimentoEstimado } : {}), parceladas, compras };
 }

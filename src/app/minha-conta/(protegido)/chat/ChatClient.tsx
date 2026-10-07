@@ -6,6 +6,8 @@ import { LancamentoCard, type LancamentoCardDado } from "./LancamentoCard";
 import { GraficoCategoriaCard, type GraficoCategoriaDado } from "./GraficoCategoriaCard";
 import { ComprovanteCard, type ComprovanteDado } from "./ComprovanteCard";
 import { FaturaCard, type FaturaDado } from "./FaturaCard";
+import { BoletoCard, type BoletoDado } from "./BoletoCard";
+import { EmprestimoCard, type EmprestimoDado } from "./EmprestimoCard";
 import { PainelDebugTeclado } from "./DebugTeclado";
 
 type DadosEstruturados =
@@ -13,6 +15,8 @@ type DadosEstruturados =
   | GraficoCategoriaDado
   | ComprovanteDado
   | FaturaDado
+  | BoletoDado
+  | EmprestimoDado
   | null
   | undefined;
 
@@ -471,6 +475,12 @@ export function ChatClient({
             {m.dadosEstruturados?.tipo === "fatura_detectada" && (
               <FaturaCard dado={m.dadosEstruturados} onResolvido={aoResolverComprovante} />
             )}
+            {m.dadosEstruturados?.tipo === "emprestimo_detectado" && !m.dadosEstruturados.resolvido && (
+              <EmprestimoCard dado={m.dadosEstruturados} onResolvido={aoResolverComprovante} />
+            )}
+            {m.dadosEstruturados?.tipo === "boleto_detectado" && (
+              <BoletoCard dado={m.dadosEstruturados} onResolvido={aoResolverComprovante} />
+            )}
           </div>
         ))}
 
@@ -483,7 +493,7 @@ export function ChatClient({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={envio.previewUrl} alt="" className="mc-envio-thumb" />
               )}
-              <span>{envio.tipo === "foto" ? FASE_LABEL[envio.fase] : envio.tipo === "arquivo" ? (envio.fase === "enviando" ? "Enviando arquivo..." : "Lendo a fatura...") : FASE_LABEL[envio.fase] ?? "Enviando áudio..."}</span>
+              <span>{envio.tipo === "foto" ? FASE_LABEL[envio.fase] : envio.tipo === "arquivo" ? (envio.fase === "enviando" ? "Enviando arquivo..." : "Lendo o arquivo...") : FASE_LABEL[envio.fase] ?? "Enviando áudio..."}</span>
             </div>
           </div>
         )}
@@ -587,7 +597,7 @@ export function ChatClient({
                 <span className="mc-anexo-menu-icone laranja">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
                 </span>
-                Fatura (OFX/CSV)
+                Fatura, boleto (PDF/OFX/CSV)
               </button>
             </div>
           </>

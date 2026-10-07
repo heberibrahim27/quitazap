@@ -9,6 +9,7 @@ export type FaturaDado = {
   proximaParcela: string; // YYYY-MM-DD
   vencimentoEstimado?: boolean;
   ignoradas?: number;
+  avisoTotal?: { totalImpresso?: number; somaLida?: number } | null;
   compras?: { descricao: string; valor: number; data: string }[];
   itens: {
     descricao: string;
@@ -125,6 +126,11 @@ export function FaturaCard({
           {(dado.ignoradas ?? 0) > 0 ? ` ${dado.ignoradas} compra(s) já cadastrada(s) ficaram de fora, sem duplicar.` : ""}
         </small>
       </p>
+      {dado.avisoTotal?.totalImpresso != null && dado.avisoTotal.somaLida != null && (
+        <p className="mc-lancamento-card-erro">
+          ⚠️ O total impresso na fatura é {fmtValor(dado.avisoTotal.totalImpresso)}, mas as compras que li somam {fmtValor(dado.avisoTotal.somaLida)}. Pode ter ficado compra de fora — confira antes de salvar.
+        </p>
+      )}
       {erro && <p className="mc-lancamento-card-erro">{erro}</p>}
       <div className="mc-lancamento-card-acoes">
         <button type="button" onClick={() => responder("confirmar")} disabled={resolvendo !== null}>

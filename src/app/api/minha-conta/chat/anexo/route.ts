@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
 import { registrarPreviaFaturaNoChat, responderNoChat } from "@/lib/fatura-previa-chat";
+import { criarPendenteEmprestimo, textoPreviaEmprestimoApp } from "@/lib/emprestimo-previa";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
@@ -59,6 +60,13 @@ async function tratarPrintDeFatura(opts: {
   });
   if (leitura.tipo === "nao_fatura") return null;
 
+  if (leitura.tipo === "emprestimo_ja_cadastrado") {
+    return responderNoChat(cliente.id, `🏦 Esse empréstimo (${leitura.credor}) já está no seu Controle — não lancei de novo.`);
+  }
+  if (leitura.tipo === "emprestimo") {
+    const pendente = await criarPendenteEmprestimo(cliente.id, "APP", leitura.emprestimo);
+    return { resposta: textoPreviaEmprestimoApp(leitura.emprestimo), dadosEstruturados: pendente };
+  }
   if (leitura.tipo === "ja_processada") {
     return responderNoChat(cliente.id, "📄 Essa fatura já foi processada antes — não lancei de novo.");
   }

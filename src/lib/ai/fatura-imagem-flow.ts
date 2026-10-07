@@ -6,7 +6,9 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { analisarImagem, type TelemetriaIA } from "@/lib/ai/openai-client";
-import { PROMPT_FATURA_IMAGEM, interpretarFaturaImagem } from "@/lib/ai/fatura-imagem";
+import { PROMPT_FATURA_IMAGEM, interpretarDocumentoImagem, interpretarFaturaImagem } from "@/lib/ai/fatura-imagem";
+import { emprestimoJaCadastrado } from "@/lib/emprestimo-previa";
+import type { EmprestimoDetectado } from "@/lib/emprestimo-imagem";
 import { montarFaturaCartaoPendente, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
 
 /** Texto da primeira leitura indica fatura de cartão? (gatilho barato antes da 2ª leitura) */
@@ -17,7 +19,9 @@ export function pareceFaturaCartao(texto: string): boolean {
 export type ResultadoPrintFatura =
   | { tipo: "nao_fatura" }
   | { tipo: "ja_processada" }
-  | { tipo: "pendente"; pendente: FaturaCartaoPendente };
+  | { tipo: "pendente"; pendente: FaturaCartaoPendente }
+  | { tipo: "emprestimo"; emprestimo: EmprestimoDetectado }
+  | { tipo: "emprestimo_ja_cadastrado"; credor: string };
 
 export async function processarPrintFatura(opts: {
   clienteId: string;
@@ -31,6 +35,15 @@ export async function processarPrintFatura(opts: {
     maxTokens: 2500,
     json: true,
   });
+  // Empréstimo (tela do app com parcelas pagas/agendadas) — lançado como empréstimo.
+  const doc = interpretarDocumentoImagem(json);
+  if (doc?.tipo === "EMPRESTIMO") {
+    if (await emprestimoJaCadastrado(opts.clienteId, doc.emprestimo)) {
+      return { tipo: "emprestimo_ja_cadastrado", credor: doc.emprestimo.credor };
+    }
+    return { tipo: "emprestimo", emprestimo: doc.emprestimo };
+  }
+
   const fatura = await interpretarComEmissorDoCliente(json, opts.clienteId);
   if (!fatura) return { tipo: "nao_fatura" };
 

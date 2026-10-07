@@ -71,6 +71,8 @@ export interface FaturaCartaoDetectada {
   vencimentoFatura: string; // YYYY-MM-DD
   /** Print que só mostra o mês da fatura: o dia do vencimento é um palpite. */
   vencimentoEstimado?: boolean;
+  /** Total de compras impresso no documento, para conferir com a soma lida. */
+  totalImpresso?: number;
   parceladas: ParceladaFatura[];
   /** Só nos prints (o PDF segue só com parceladas). */
   compras?: CompraFatura[];
@@ -90,6 +92,9 @@ export interface FaturaCartaoPendente {
   hash: string;
   vencimentoFatura: string; // YYYY-MM-DD
   vencimentoEstimado?: boolean;
+  totalImpresso?: number;
+  /** Soma de TODAS as compras lidas (novas + já registradas). */
+  somaLida?: number;
   /** Compras novas (ainda não registradas no cartão) que viram gasto na confirmação. */
   compras?: CompraFatura[];
   /** Quantas compras do print já estavam registradas (mesmo cartão, dia e valor). */
@@ -310,6 +315,11 @@ async function separarComprasNovas(
   return { novas, jaRegistradas };
 }
 
+/** O total impresso no documento não bate com a soma das compras lidas (leitura pode ter pulado linha). */
+export function totalNaoBate(p: FaturaCartaoPendente): boolean {
+  return p.totalImpresso != null && p.somaLida != null && Math.abs(p.totalImpresso - p.somaLida) > 0.05;
+}
+
 /** Tem algo pra confirmar (compra parcelada futura ou gasto novo no cartão)? */
 export function faturaTemNovidade(p: FaturaCartaoPendente): boolean {
   return p.confirmados.length > 0 || (p.compras?.length ?? 0) > 0;
@@ -373,6 +383,8 @@ export async function montarFaturaCartaoPendente(
     hash,
     vencimentoFatura: fatura.vencimentoFatura,
     vencimentoEstimado: fatura.vencimentoEstimado,
+    totalImpresso: fatura.totalImpresso,
+    somaLida: Math.round((fatura.compras ?? []).reduce((s, c) => s + c.valor, 0) * 100) / 100,
     compras: comprasParaGasto,
     comprasJaRegistradas,
     filaAmbiguos,
@@ -410,6 +422,7 @@ export function mensagemResumoLote(p: FaturaCartaoPendente): string {
   const nCompras = p.compras?.length ?? 0;
   const totalCompras = (p.compras ?? []).reduce((soma, c) => soma + c.valor, 0);
   const linhaCompras = nCompras > 0 ? `Gastos no cartão a registrar: ${nCompras} (${fmt(totalCompras)})\n\n` : "";
+  const avisoTotal = totalNaoBate(p) ? `⚠️ O total impresso na fatura é ${fmt(p.totalImpresso as number)}, mas as compras que li somam ${fmt(p.somaLida as number)}. Pode ter ficado compra de fora — confira antes de confirmar.\n\n` : "";
   const notaCadastradas = p.jaCadastradas > 0 ? `\n_(${p.jaCadastradas} compra(s) já cadastrada(s) foram ignoradas, sem duplicar.)_` : "";
 
   return (
@@ -417,6 +430,7 @@ export function mensagemResumoLote(p: FaturaCartaoPendente): string {
     `Encontrei ${p.confirmados.length} compra(s) com parcelas futuras:\n\n` +
     `${linhas.join("\n")}\n\n` +
     linhaCompras +
+    avisoTotal +
     `Compromissos futuros identificados: ${fmt(total)}${notaCadastradas}\n\n` +
     `Quer que eu lance isso no seu Controle? Responda *sim* ou *não*.`
   );
