@@ -41,7 +41,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizarTextoBusca } from "@/lib/descricao-financeira";
 import { normalizarNomeCartaoControle } from "@/lib/controle-financeiro-flow";
 import { upsertCartao } from "@/lib/controle-financeiro-service";
-import { definirCategoriaGasto } from "@/lib/gasto-flow";
+import { categorizarCompras } from "@/lib/categorizacao-compras";
 import { anoMesDiaBrasil } from "@/lib/financeiro/fatura-cartao";
 import { nomesSemelhantes } from "@/lib/importacao-fatura";
 
@@ -482,12 +482,14 @@ export async function salvarComprasParceladasFatura(
   // que o gasto por texto no cartão, com a data da compra. Sem alerta de
   // orçamento: é importação de histórico, não um gasto novo do dia.
   if (pendente.compras && pendente.compras.length > 0) {
+    const dono = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { gratuito: true } });
+    const categorias = await categorizarCompras(clienteId, dono?.gratuito ?? false, pendente.compras.map((c) => c.descricao));
     await prisma.lancamento.createMany({
-      data: pendente.compras.map((c) => ({
+      data: pendente.compras.map((c, i) => ({
         clienteId,
         tipo: "COMPRA_CARTAO",
         descricao: c.descricao,
-        categoria: definirCategoriaGasto(c.descricao),
+        categoria: categorias[i],
         valor: c.valor,
         data: new Date(`${c.data}T12:00:00`),
         recorrente: false,

@@ -3,6 +3,7 @@ import { normalizarDescricaoFinanceira } from "./descricao-financeira";
 import { valorPorExtenso, removerValorPorExtenso } from "./numero-por-extenso";
 
 export type CategoriaGasto =
+  | "Pix/Boleto no crédito"
   | "Mercado"
   | "Alimentação"
   | "Transporte"
@@ -35,17 +36,21 @@ export type GastoDetectado = {
 const PERGUNTA_VALOR = "Qual foi o valor desse gasto?";
 
 export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }> = [
-  { categoria: "Mercado", palavras: ["mercado", "mercadinho", "mercadin", "mercadao", "mercearia", "feira", "supermercado", "hipermercado", "atacadao", "assai", "atacarejo"] },
-  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanxe", "lanches", "restaurante", "restarante", "padaria", "padoca", "lanchonete", "pizza", "almoco", "comida", "coca", "pao", "paes"] },
-  { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "gazolina", "combustivel", "posto", "transporte", "trasporte", "tranporte"] },
+  // Pix/boleto pago no CRÉDITO (Nubank etc.): cobra IOF + juros, é caro e o cliente quer ver
+  // quanto passa por aí (pedido do Ibrahim, 07/10/2026). Vem PRIMEIRO de propósito: o nome
+  // do favorecido que vem depois ("Pix no Crédito - Mercado X") não pode puxar outra categoria.
+  { categoria: "Pix/Boleto no crédito", palavras: ["pix no credito", "boleto no credito", "pix credito", "pix parcelado", "pix no cartao"] },
+  { categoria: "Mercado", palavras: ["mercado", "mercadinho", "mercadin", "mercadao", "mercearia", "feira", "supermercado", "hipermercado", "atacadao", "assai", "atacarejo", "atakarejo", "hortifruti", "acougue", "sacolao"] },
+  { categoria: "Alimentação", palavras: ["ifood", "lanche", "lanxe", "lanches", "restaurante", "restarante", "padaria", "padoca", "lanchonete", "pizza", "almoco", "comida", "coca", "pao", "paes", "sorvete", "sorvetes", "sorveteria", "acai", "delicatess", "delicatessen", "confeitaria", "cafeteria", "hamburguer", "hamburgueria", "churrasco", "pastelaria", "doceria", "bomboniere"] },
+  { categoria: "Transporte", palavras: ["uber", "99", "onibus", "gasolina", "gazolina", "combustivel", "posto", "transporte", "trasporte", "tranporte", "auto pecas", "autopecas", "oficina", "mecanica", "pneu", "estacionamento", "pedagio", "99app"] },
   { categoria: "Moradia", palavras: ["aluguel", "condominio", "prestacao da casa"] },
   { categoria: "Contas da casa", palavras: ["energia", "luz", "agua", "internet", "celular", "gas"] },
   { categoria: "Saúde/Farmácia", palavras: ["remedio", "farmacia", "farmasa", "drogaria", "consulta", "exame", "medico"] },
   { categoria: "Educação", palavras: ["escola", "curso", "faculdade", "material escolar"] },
   { categoria: "Filhos/Família", palavras: ["filho", "filha", "fralda", "leite", "pensao", "brinquedo"] },
-  { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "chat gpt", "claude", "assinatura", "prime"] },
+  { categoria: "Assinaturas", palavras: ["netflix", "spotify", "chatgpt", "chat gpt", "claude", "assinatura", "amazon prime", "prime video", "google premiere", "youtube premium", "google one", "disney", "hbo", "globoplay", "deezer", "icloud", "apple music"] },
   { categoria: "Apostas", palavras: ["aposta", "apostas", "bet", "betano", "blaze", "tigrinho", "jogo do tigrinho", "cassino", "cassino online", "roleta", "foguetinho", "pix bet", "banca", "casa de aposta", "jogo online"] },
-  { categoria: "Lazer", palavras: ["cerveja", "cinema", "festa", "bar", "viagem", "lazer"] },
+  { categoria: "Lazer", palavras: ["cerveja", "cinema", "festa", "bar", "viagem", "lazer", "ze delivery", "adega", "bebida", "bebidas", "cervejaria", "choperia", "show", "ingresso"] },
   { categoria: "Beleza/Cuidados", palavras: ["cabelo", "unha", "perfume", "skincare", "academia", "barbearia"] },
   // Revisão com o ChatGPT (09/09/2026): categoria pra "comprei uma camisa
   // 90"/"tenis novo"/"celular novo" — antes caía sem boa opção em Outros,
@@ -53,8 +58,8 @@ export const CATEGORIAS: Array<{ categoria: CategoriaGasto; palavras: string[] }
   { categoria: "Compras pessoais", palavras: ["roupa", "roupas", "camisa", "camiseta", "calca", "tenis", "sapato", "celular", "eletronico", "eletronicos", "presente"] },
   // IPVA/IPTU/multa/tarifa — não é "dívida" nem despesa fixa de moradia,
   // categoria própria pra não poluir Outros nem Dívidas/Cartões.
-  { categoria: "Impostos/Taxas", palavras: ["ipva", "iptu", "multa", "tarifa", "taxa", "imposto", "documento do carro", "licenciamento"] },
-  { categoria: "Trabalho/Negócio", palavras: ["fornecedor", "ferramenta", "anuncio", "trafego", "sistema", "negocio"] },
+  { categoria: "Impostos/Taxas", palavras: ["ipva", "iptu", "multa", "tarifa", "taxa", "imposto", "documento do carro", "licenciamento", "iof", "encargos", "anuidade"] },
+  { categoria: "Trabalho/Negócio", palavras: ["fornecedor", "ferramenta", "anuncio", "trafego", "sistema", "negocio", "vercel", "supabase", "z-api", "z-api.io", "zapi", "zapi.io", "github", "aws", "amazon web services", "google cloud", "digitalocean", "cloudflare", "hostinger", "godaddy", "namecheap", "dominio", "hospedagem"] },
   { categoria: "Dívidas/Cartões", palavras: ["cartao", "nubank", "fatura", "emprestimo", "parcela"] },
 ];
 

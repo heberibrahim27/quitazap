@@ -55,9 +55,10 @@ FORMATO DE CADA Item em "itens" — preencha SEMPRE os campos obrigatórios do t
 }
 
 CATEGORIAS VÁLIDAS pra "despesa_variavel"/"despesa_fixa" (escolha a mais parecida com o gasto descrito; nunca invente uma categoria nova nem deixe em branco — na dúvida use "Outros"):
-Mercado, Alimentação, Transporte, Moradia, Contas da casa, Saúde/Farmácia, Educação, Filhos/Família, Assinaturas, Apostas, Lazer, Beleza/Cuidados, Compras pessoais, Impostos/Taxas, Trabalho/Negócio, Dívidas/Cartões, Outros.
+Pix/Boleto no crédito, Mercado, Alimentação, Transporte, Moradia, Contas da casa, Saúde/Farmácia, Educação, Filhos/Família, Assinaturas, Apostas, Lazer, Beleza/Cuidados, Compras pessoais, Impostos/Taxas, Trabalho/Negócio, Dívidas/Cartões, Outros.
 "Compras pessoais" = roupa, calçado, eletrônico, item pessoal avulso (ex: "comprei uma camisa 90", "tênis novo 250") — não é Lazer nem Beleza/Cuidados.
-"Impostos/Taxas" = IPVA, IPTU, multa, tarifa bancária, taxa, documento — não é Dívidas/Cartões.
+"Impostos/Taxas" = IPVA, IPTU, multa, tarifa bancária, taxa, IOF, documento — não é Dívidas/Cartões.
+"Pix/Boleto no crédito" = SÓ quando o cliente diz que pagou um Pix ou boleto no crédito/no cartão (cobra IOF e juros) — nunca por conta própria.
 
 CATEGORIAS VÁLIDAS pra "receita" (escolha a mais parecida; na dúvida use "Outros"):
 Salário, Bico/Freelance, Dividendos/Investimentos, Aluguel recebido, Venda, Benefício/Auxílio, Prêmio, Gorjeta, Reembolso, Outros.
