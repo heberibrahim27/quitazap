@@ -102,8 +102,10 @@ export function interpretarFaturaImagem(texto: string, emissorReserva?: string):
     compras.push({ descricao, valor, data, parcelaAtual: numero(c.parcelaAtual) });
   }
 
-  // A data da compra de cada parcelada vem da linha correspondente em `compras`.
+  // Data da compra: só a 1ª parcela tem (a linha das demais mostra a data da
+  // cobrança, não a da compra original — parcela 10/12 não foi comprada este mês).
   for (const p of parceladas) {
+    if (p.parcelaAtual !== 1) continue;
     const linha = compras.find((c) => c.descricao.toLowerCase() === p.descricao.toLowerCase() && Math.abs(c.valor - p.valorParcela) < 0.02);
     if (linha) p.dataCompra = linha.data;
   }

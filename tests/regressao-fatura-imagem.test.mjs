@@ -42,7 +42,8 @@ test("lê fatura do print com parcelas e data da compra", () => {
   assert.equal(f.emissor, "Nubank");
   assert.equal(f.parceladas.length, 1);
   assert.equal(f.parceladas[0].valorParcela, 299.9);
-  assert.equal(f.parceladas[0].dataCompra, "2026-08-12");
+  // parcela 3/10: a data da linha é a da cobrança, não a da compra
+  assert.equal(f.parceladas[0].dataCompra, undefined);
   assert.equal(f.compras.length, 2);
   assert.equal(f.compras[1].valor, 139.12);
 });
