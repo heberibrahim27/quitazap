@@ -24,7 +24,7 @@ export const PROMPT_FATURA_IMAGEM = `Esta imagem é um PRINT de fatura de cartã
 }
 
 Regras:
-- emissor: nome popular (ex.: "Nubank"), nunca razão social nem CNPJ.
+- emissor: nome popular (ex.: "Nubank"), nunca razão social nem CNPJ. Se o nome não estiver escrito, deduza pelo visual do app (ex.: tema roxo com "Pagar" e filtros "Tudo/Cartões" = Nubank); só use null se realmente não souber.
 - vencimentoFatura: data de VENCIMENTO da fatura (não a de fechamento), só se estiver impressa; senão null.
 - mesFatura: mês de referência da fatura mostrado no topo (ex.: "Novembro de 2026" → "2026-11"); null se não aparecer.
 - compras: TODA linha de cobrança do print, uma por linha, sem pular nenhuma: compras à vista, parcelas (a linha do mês), IOF, Pix no crédito, assinaturas, tarifas. NÃO inclua pagamentos, estornos, créditos nem o total da fatura. Cada linha é independente, mesmo que o nome se repita.
@@ -33,7 +33,7 @@ Regras:
   - parcelaAtual: o X de "Parcela X/Y" quando a linha é parcelada; null quando é à vista.
   - descricao: sem o texto da parcela (ex.: "Atacadao Atakarejo", nunca "Atacadao Atakarejo - Parcela 1/3").
 - parceladas: só as compras com parcelamento explicitamente impresso ("Parcela 1/3", "3x") em que ainda restam parcelas depois desta (Y maior que X). valorParcela = valor da linha. Nunca inclua à vista, última parcela (X igual a Y) nem parcelamento que você teria que adivinhar.
-- Se não for fatura de cartão, ou não conseguir ler o emissor e (vencimentoFatura ou mesFatura) com confiança, responda { "tipo": "OUTRO" }.`;
+- Se não for fatura de cartão, ou não conseguir ler (vencimentoFatura ou mesFatura) com confiança, responda { "tipo": "OUTRO" }.`;
 
 function numero(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
@@ -56,7 +56,7 @@ function mesIso(v: unknown): string | null {
 
 /** Interpreta a resposta JSON da visão. null = não é fatura legível. Itens
  * malformados são descartados um a um (nunca arrisca valor adivinhado). */
-export function interpretarFaturaImagem(texto: string): FaturaCartaoDetectada | null {
+export function interpretarFaturaImagem(texto: string, emissorReserva?: string): FaturaCartaoDetectada | null {
   let bruto: unknown;
   try {
     bruto = JSON.parse(texto.replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
@@ -67,7 +67,7 @@ export function interpretarFaturaImagem(texto: string): FaturaCartaoDetectada | 
   const r = bruto as Record<string, unknown>;
   if (r.tipo !== "FATURA_CARTAO") return null;
 
-  const emissor = typeof r.emissor === "string" ? r.emissor.trim() : "";
+  const emissor = (typeof r.emissor === "string" ? r.emissor.trim() : "") || emissorReserva || "";
   let vencimentoFatura = dataIso(r.vencimentoFatura);
   let vencimentoEstimado = false;
   if (!vencimentoFatura) {

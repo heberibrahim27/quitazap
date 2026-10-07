@@ -265,10 +265,8 @@ function compraValida(c: CompraFatura): boolean {
   if (!c.descricao.trim() || !Number.isFinite(c.valor) || c.valor <= 0) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(c.data)) return false;
   const d = new Date(`${c.data}T12:00:00`);
-  // Compra não pode estar no futuro (leitura com ano errado) nem ser de parcela
-  // posterior à 1ª (essa já entrou como Parcela quando a compra foi importada).
-  if (Number.isNaN(d.getTime()) || d.getTime() > Date.now() + 24 * 3600 * 1000) return false;
-  return c.parcelaAtual == null || c.parcelaAtual <= 1;
+  // Compra não pode estar no futuro (leitura com ano errado).
+  return !Number.isNaN(d.getTime()) && d.getTime() <= Date.now() + 24 * 3600 * 1000;
 }
 
 /** Separa o que ainda não está registrado no cartão do que já está. Chave:
@@ -362,13 +360,19 @@ export async function montarFaturaCartaoPendente(
     }
   }
 
+  const chave = (descricao: string, valor: number) => `${normalizar(descricao)}|${Math.round(valor * 100)}`;
+  const novasComoDivida = new Set(confirmados.map((i) => chave(i.descricao, i.valorParcela)));
+  const comprasParaGasto = comprasNovas.filter(
+    (c) => c.parcelaAtual == null || c.parcelaAtual <= 1 || novasComoDivida.has(chave(c.descricao, c.valor))
+  );
+
   return {
     cartaoId: cartao.id,
     cartaoNome: cartao.nome,
     hash,
     vencimentoFatura: fatura.vencimentoFatura,
     vencimentoEstimado: fatura.vencimentoEstimado,
-    compras: comprasNovas,
+    compras: comprasParaGasto,
     comprasJaRegistradas,
     filaAmbiguos,
     indice: 0,

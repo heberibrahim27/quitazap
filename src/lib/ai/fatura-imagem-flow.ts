@@ -4,6 +4,7 @@
 // o pendente em BotSessao.faturaCartaoPendente e pede confirmação.
 
 import crypto from "crypto";
+import { prisma } from "@/lib/prisma";
 import { analisarImagem, type TelemetriaIA } from "@/lib/ai/openai-client";
 import { PROMPT_FATURA_IMAGEM, interpretarFaturaImagem } from "@/lib/ai/fatura-imagem";
 import { montarFaturaCartaoPendente, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
@@ -30,7 +31,7 @@ export async function processarPrintFatura(opts: {
     maxTokens: 2500,
     json: true,
   });
-  const fatura = interpretarFaturaImagem(json);
+  const fatura = await interpretarComEmissorDoCliente(json, opts.clienteId);
   if (!fatura) return { tipo: "nao_fatura" };
 
   const hash = crypto.createHash("sha256").update(opts.bytes).digest("hex");
@@ -39,4 +40,16 @@ export async function processarPrintFatura(opts: {
   // pode reenviar depois de uma leitura incompleta.
 
   return { tipo: "pendente", pendente: await montarFaturaCartaoPendente(opts.clienteId, hash, fatura) };
+}
+
+/** Print de app costuma não mostrar o nome do banco. Sem emissor na leitura,
+ * usa o cartão do cliente quando ele só tem um — nunca chuta entre vários. */
+async function interpretarComEmissorDoCliente(json: string, clienteId: string) {
+  const direto = interpretarFaturaImagem(json);
+  if (direto) return direto;
+  const semEmissor = interpretarFaturaImagem(json, "__sem_emissor__");
+  if (!semEmissor) return null;
+  const cartoes = await prisma.cartao.findMany({ where: { clienteId }, select: { nome: true }, take: 2 });
+  if (cartoes.length !== 1) return null;
+  return { ...semEmissor, emissor: cartoes[0].nome };
 }

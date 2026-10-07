@@ -70,7 +70,7 @@ import { gerarRespostaDadosFolhaServidor, deveConfirmarDadosFolhaServidor } from
 import { parseMoneyBR } from "@/lib/money";
 import { normalizarRespostaCompraImagem, formatarValorBR } from "@/lib/gasto-flow";
 import { transcreverAudio, analisarImagem } from "@/lib/ai/openai-client";
-import { pareceFaturaCartao, processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
+import { processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
 import {
   deveAguardarDespesasFixasControle,
   ETAPA_AGUARDANDO_DESPESAS_FIXAS,
@@ -1087,6 +1087,44 @@ export async function POST(req: NextRequest) {
         // (nome, cargo, salário) — só o suficiente pra depurar sem expor PII.
         console.log(`[Z-API] Imagem analisada (${analise?.length ?? 0} chars, financeira=${!analise?.includes("[NAO_FINANCEIRA]")})`);
 
+        // "Fatura Inteligente" por print — espelho do chat nativo
+        // (/api/minha-conta/chat/anexo): mesma leitura em alta resolução e
+        // mesmo fluxo de confirmação do PDF (fila de ambíguos + lote). Roda
+        // antes do "não é financeira": print de fatura sem o nome do banco
+        // visível costuma cair nesse rótulo na primeira leitura (barata).
+        const pareceRecibo = !!analise && /^Comprei em (.+), R\$ /.test(normalizarRespostaCompraImagem(analise));
+        if (sessao.clienteId && !pareceRecibo) {
+          const imgRes = await fetch(body.image.imageUrl);
+          if (imgRes.ok) {
+            const leitura = await processarPrintFatura({
+              clienteId: sessao.clienteId,
+              imagem: body.image.imageUrl,
+              bytes: Buffer.from(await imgRes.arrayBuffer()),
+              telemetria: { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "vision-fatura-webhook" },
+            });
+            if (leitura.tipo === "ja_processada") {
+              await sendWhatsApp(sessao.telefone, "📄 Essa fatura já foi processada antes — não lancei de novo.");
+              return NextResponse.json({ ok: true });
+            }
+            if (leitura.tipo === "pendente") {
+              const pendente = leitura.pendente;
+              if (pendente.filaAmbiguos.length === 0 && !faturaTemNovidade(pendente)) {
+                await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendente.jaCadastradas + (pendente.comprasJaRegistradas ?? 0)));
+                return NextResponse.json({ ok: true });
+              }
+              await prisma.botSessao.updateMany({
+                where: { id: sessao.id },
+                data: { faturaCartaoPendente: pendente as unknown as Prisma.InputJsonValue },
+              });
+              await sendWhatsApp(
+                sessao.telefone,
+                pendente.filaAmbiguos.length > 0 ? mensagemPerguntaAmbiguo(pendente.filaAmbiguos[0]) : mensagemResumoLote(pendente)
+              );
+              return NextResponse.json({ ok: true });
+            }
+          }
+        }
+
         if (!analise || analise.includes("[NAO_FINANCEIRA]")) {
           await sendWhatsApp(sessao.telefone, "Não identifiquei informações financeiras nessa imagem. Pode me descrever em texto (dívida, gasto, compra...)?");
           return NextResponse.json({ ok: true });
@@ -1120,41 +1158,6 @@ export async function POST(req: NextRequest) {
             });
             await sendWhatsApp(sessao.telefone, mensagemPreviaComprovante(pendente));
             return NextResponse.json({ ok: true });
-          }
-        }
-
-        // "Fatura Inteligente" por print — espelho do chat nativo
-        // (/api/minha-conta/chat/anexo): mesma leitura em alta resolução e
-        // mesmo fluxo de confirmação do PDF (fila de ambíguos + lote).
-        if (!matchCompra && sessao.clienteId && pareceFaturaCartao(normalizado)) {
-          const imgRes = await fetch(body.image.imageUrl);
-          if (imgRes.ok) {
-            const leitura = await processarPrintFatura({
-              clienteId: sessao.clienteId,
-              imagem: body.image.imageUrl,
-              bytes: Buffer.from(await imgRes.arrayBuffer()),
-              telemetria: { clienteId: sessao.clienteId, gratuito: isGratuito, skill: "vision-fatura-webhook" },
-            });
-            if (leitura.tipo === "ja_processada") {
-              await sendWhatsApp(sessao.telefone, "📄 Essa fatura já foi processada antes — não lancei de novo.");
-              return NextResponse.json({ ok: true });
-            }
-            if (leitura.tipo === "pendente") {
-              const pendente = leitura.pendente;
-              if (pendente.filaAmbiguos.length === 0 && !faturaTemNovidade(pendente)) {
-                await sendWhatsApp(sessao.telefone, mensagemFaturaSemNovidade(pendente.jaCadastradas + (pendente.comprasJaRegistradas ?? 0)));
-                return NextResponse.json({ ok: true });
-              }
-              await prisma.botSessao.updateMany({
-                where: { id: sessao.id },
-                data: { faturaCartaoPendente: pendente as unknown as Prisma.InputJsonValue },
-              });
-              await sendWhatsApp(
-                sessao.telefone,
-                pendente.filaAmbiguos.length > 0 ? mensagemPerguntaAmbiguo(pendente.filaAmbiguos[0]) : mensagemResumoLote(pendente)
-              );
-              return NextResponse.json({ ok: true });
-            }
           }
         }
 

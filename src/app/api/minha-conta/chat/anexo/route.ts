@@ -157,7 +157,9 @@ export async function POST(req: NextRequest) {
     const textoNormalizado = normalizarRespostaCompraImagem(textoExtraido.trim());
     const detectado = extrairComprovante(textoNormalizado);
 
-    if (!detectado && !textoNormalizado.includes("[NAO_FINANCEIRA]")) {
+    // Roda mesmo se a 1ª leitura disse "não financeira": print de fatura sem o
+    // nome do banco visível cai nesse rótulo.
+    if (!detectado) {
       const respostaFatura = await tratarPrintDeFatura({ cliente, arquivoBase64: base64, buffer, caminhoStorage });
       if (respostaFatura) return NextResponse.json(respostaFatura);
     }
