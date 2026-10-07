@@ -20,7 +20,7 @@ function loadTsModule(relativePath) {
   return mod.exports;
 }
 
-const { lerArquivoFatura, parseValor, decodificarTexto } = loadTsModule("src/lib/importacao-fatura.ts");
+const { lerArquivoFatura, parseValor, decodificarTexto, nomesSemelhantes } = loadTsModule("src/lib/importacao-fatura.ts");
 const fx = (nome) => fs.readFileSync(path.join(root, "tests/fixtures", nome));
 const soma = (compras) => Math.round(compras.reduce((s, c) => s + c.valor, 0) * 100) / 100;
 
@@ -69,6 +69,15 @@ test("OFX em Windows-1252 mantém acentos", () => {
 test("estrutura irreconhecível devolve null em vez de adivinhar", () => {
   assert.equal(lerArquivoFatura("a.csv", Buffer.from("foo,bar\n1,2\n")), null);
   assert.equal(lerArquivoFatura("a.txt", Buffer.from("texto qualquer")), null);
+});
+
+test("nomes com erro de leitura de print ainda são reconhecidos como o mesmo", () => {
+  assert.equal(nomesSemelhantes("Kiwiify *Afiliadasp", "Kiwify *Afiliadasp"), true);
+  assert.equal(nomesSemelhantes("Z-Api.lo", "Z-Api.Io"), true);
+  assert.equal(nomesSemelhantes("O Baratao Auto Pecas L", "O Baratao Auto Pecas L"), true);
+  assert.equal(nomesSemelhantes("Atacadao Atakarejo", "Asa*Upward Creative Ac"), false);
+  assert.equal(nomesSemelhantes("Loja A", "Loja B"), false); // nome curto exige igualdade
+  assert.equal(nomesSemelhantes("Vercel Inc.", "Supabase"), false);
 });
 
 test("parseValor entende formatos de valor brasileiros e internacionais", () => {

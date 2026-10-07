@@ -43,6 +43,7 @@ import { normalizarNomeCartaoControle } from "@/lib/controle-financeiro-flow";
 import { upsertCartao } from "@/lib/controle-financeiro-service";
 import { definirCategoriaGasto } from "@/lib/gasto-flow";
 import { anoMesDiaBrasil } from "@/lib/financeiro/fatura-cartao";
+import { nomesSemelhantes } from "@/lib/importacao-fatura";
 
 // ── Tipos ────────────────────────────────────────────────────────────────
 
@@ -243,7 +244,7 @@ async function buscarDividaSemelhante(
     if (valorTipico == null || Math.abs(valorTipico - item.valorParcela) > 0.02) continue;
 
     const nomeNormalizado = normalizar(divida.credor);
-    const descricaoBate = nomeNormalizado === alvo;
+    const descricaoBate = nomeNormalizado === alvo || nomesSemelhantes(nomeNormalizado, alvo);
     // Match "forte" (ignora sem perguntar) só quando também veio do MESMO
     // cartão já resolvido pra essa fatura — sem esse anexo (dívida antiga
     // do fluxo de texto, sem cartaoId), mesmo com descrição idêntica, ainda

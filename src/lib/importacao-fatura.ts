@@ -25,6 +25,38 @@ interface LinhaBruta {
 
 export type FormatoArquivoFatura = "OFX" | "CSV";
 
+// ── Nomes parecidos ──────────────────────────────────────────────────────
+
+function soAlfanumerico(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function distanciaEdicao(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+
+/** Mesmo estabelecimento escrito com pequena diferença (erro de leitura de print:
+ * "Kiwiify" × "Kiwify", "Z-Api.lo" × "Z-Api.Io"). Tolerância curta e só em nomes
+ * com 6+ caracteres — nomes curtos exigem igualdade. */
+export function nomesSemelhantes(a: string, b: string): boolean {
+  const x = soAlfanumerico(a);
+  const y = soAlfanumerico(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (Math.min(x.length, y.length) < 6) return false;
+  return distanciaEdicao(x, y) <= Math.max(1, Math.min(2, Math.floor(Math.max(x.length, y.length) * 0.12)));
+}
+
 // ── Decodificação ────────────────────────────────────────────────────────
 
 /** UTF-8 quando válido; senão Windows-1252 (OFX antigo de banco brasileiro). */
