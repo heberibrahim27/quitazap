@@ -42,7 +42,7 @@ Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só
 
 ### Testes e QA
 - `npm test` (≈485 testes, `node --test tests/*.test.mjs`). Módulos testados via loader de TS em `tests/`: **imports de módulos testados precisam ser relativos** (o alias `@/` não resolve nesse loader) e o `.ts` precisa de `Module._extensions`.
-- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100` **com `CRON_SECRET=qa-cron`**, conta `isTeste`) e os roteiros em `.claude/skills/qa-quitazap/`: `qa-importacao.mjs` (54 checagens, chat × WhatsApp), `qa-lembretes.mjs` (11, cron com `?clienteId=`/`?agora=`) `qa-paginas.mjs` (27: 15 páginas + básico nos dois canais), `qa-volume.mjs` (6: CSV com 60 estabelecimentos desconhecidos e PDF de 80 linhas — fatura grande não pode perder compra) e `qa-whats-parecidas.mjs` (8: fila "compra parecida" por sim/não no WhatsApp). Cada um usa conta de teste PRÓPRIA e limpa só a sua. Estado em 2026-10-08: **112/112 passando**. Os cards (fatura/boleto/empréstimo) também foram conferidos no navegador em largura de celular. Depois de `npm run build`, apague a pasta `.next` inteira antes de subir o servidor de dev (senão toda rota /api devolve 404). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
+- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100` **com `CRON_SECRET=qa-cron`**, conta `isTeste`) e os roteiros em `.claude/skills/qa-quitazap/`: `qa-importacao.mjs` (54 checagens, chat × WhatsApp), `qa-lembretes.mjs` (11, cron com `?clienteId=`/`?agora=`) `qa-paginas.mjs` (27: 15 páginas + básico nos dois canais), `qa-volume.mjs` (6: CSV com 60 estabelecimentos desconhecidos e PDF de 80 linhas — fatura grande não pode perder compra) e `qa-whats-parecidas.mjs` (8: fila "compra parecida" por sim/não no WhatsApp). Cada um usa conta de teste PRÓPRIA e limpa só a sua. Estado em 2026-10-08: **205/205 passando** (inclui `qa-compra.mjs` 38 e `qa-acesso.mjs` 55). Os cards (fatura/boleto/empréstimo) também foram conferidos no navegador em largura de celular. Depois de `npm run build`, apague a pasta `.next` inteira antes de subir o servidor de dev (senão toda rota /api devolve 404). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
 - Fixtures reais (Nubank OFX/CSV) em `tests/fixtures/` — contêm gastos reais do Ibrahim; anonimizar se o repo deixar de ser privado.
 
 ### Segurança (corrigido em 2026-10-08, commit 84486aa)
@@ -58,13 +58,16 @@ Crons `/api/cron/*` exigem `Authorization: Bearer <CRON_SECRET>` (`src/lib/cron-
 - Limites de resposta da IA: PDF `max_tokens` 12000 (≈45 tokens por compra; 4000 cortava em ~88 linhas), print 6000, categorização em lote 4000 — fatura grande não pode ser cortada no meio.
 - Compra futura é rejeitada de propósito na importação (leitura com ano errado); linha rejeitada gera aviso de total divergente no card.
 
-### Pendências abertas
-1. **PDF real do PagBank** (`invoice-01-10-2026.pdf`): a leitura de PDF só foi testada com PDF de teste (até 80 linhas). Quando o Ibrahim conseguir o arquivo, mandar pelo chat e conferir total/compras.
-2. Confirmar se o repositório é **privado** (as fixtures em `tests/fixtures/` têm gastos reais dele); se deixar de ser, anonimizar.
-3. Opcional: girar o `CRON_SECRET` (nunca vazou, mas a brecha do cabeçalho existiu até 2026-10-08).
-4. "transferi X pro Y" cai no menu de ajuda (de propósito: pode ser transferência entre contas); "paguei X pro Y" já registra como gasto.
-5. Crons: `lembretes` aceita `?clienteId=` e `?agora=` (com o Bearer); `sentinela` aceita `?clienteId=`. **Não rodar nenhum outro cron localmente sem filtro** (o banco local é o de produção).
-6. Já resolvido em 2026-10-08 (não reabrir): `ENABLE_TEST_ROUTES` removida da Vercel; categorias do Ibrahim definidas; vencimento do Nubank = dia 1.
+### Go-live (pré-venda, 2026-10-08) — o que falta pra começar a vender
+**Feito e provado em teste:** jornada de compra (compra → boas-vindas → criar senha → entrar → renovação → reembolso bloqueia app e WhatsApp → recompra libera), isolamento entre contas, admin exige login, importação de fatura/empréstimo/boleto nos dois canais, lembretes, faturas grandes. **205 checagens de ponta a ponta + 499 testes**, tudo passando.
+**Falta (só o Ibrahim consegue):**
+1. **Compra real de teste na Cakto** (R$ 15,89 ou cupom): a Cakto NUNCA enviou evento real (tabela EventoCakto vazia). Conferir: webhook cadastrado no painel da Cakto apontando pra `https://www.quitazap.com.br/api/webhook/cakto`, o segredo igual ao `CAKTO_SECRET` da Vercel, o cliente criado, a boas-vindas no WhatsApp com o link e o login. Se falhar, o log da Vercel mostra os NOMES dos campos recebidos.
+2. **Preço**: a página diz R$ 14,90/mês, o checkout cobra R$ 14,90 + R$ 0,99 de taxa = R$ 15,89. Embutir a taxa no preço ou avisar na página.
+3. **PDF real do PagBank** pelo chat (hoje só testado com PDF de teste).
+4. Confirmar que o repositório é **privado** (fixtures com gastos reais) e que o **backup do Supabase** está ligado.
+**Melhorias não bloqueantes:** teto diário de leituras de documento por cliente (custo de IA); cabeçalhos de segurança (X-Frame-Options, CSP); URL inexistente cai no login do admin (devia ser 404); "transferi X pro Y" cai no menu de ajuda (de propósito).
+Outras: girar `CRON_SECRET` (opcional); `lembretes` aceita `?clienteId=`/`?agora=`, `sentinela` aceita `?clienteId=` — **não rodar outro cron localmente sem filtro**.
+Cakto: chave única do evento = `id#STATUS` (reembolso com o mesmo id da compra NÃO é duplicata; renovação inclui o dia). Eventos de renovação ("renew") somam 30 dias.
 
 ---
 
