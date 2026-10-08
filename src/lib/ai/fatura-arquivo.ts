@@ -46,7 +46,7 @@ export async function processarArquivoFatura(opts: {
       model: "gpt-4o",
       mensagens: [{ role: "user", content: `${PROMPT_FATURA_TEXTO}\n\n---\n${decodificarTexto(opts.bytes)}` }],
       temperature: 0,
-      maxTokens: 3000,
+      maxTokens: 8000,
       telemetria: { clienteId: opts.clienteId, gratuito: opts.gratuito, skill: "fatura-arquivo-ia" } satisfies TelemetriaIA,
     });
     const porIa = interpretarFaturaImagem(resposta.conteudo, "__sem_emissor__");

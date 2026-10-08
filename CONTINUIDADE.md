@@ -40,7 +40,7 @@ Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só
 
 ### Testes e QA
 - `npm test` (≈485 testes, `node --test tests/*.test.mjs`). Módulos testados via loader de TS em `tests/`: **imports de módulos testados precisam ser relativos** (o alias `@/` não resolve nesse loader) e o `.ts` precisa de `Module._extensions`.
-- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100` **com `CRON_SECRET=qa-cron`**, conta `isTeste`) e os roteiros em `.claude/skills/qa-quitazap/`: `qa-importacao.mjs` (54 checagens, chat × WhatsApp), `qa-lembretes.mjs` (11, cron com `?clienteId=`/`?agora=`) e `qa-paginas.mjs` (27: 15 páginas + básico nos dois canais). Cada um usa conta de teste PRÓPRIA e limpa só a sua. Estado em 2026-10-08: **92/92 passando**. Depois de `npm run build`, apague a pasta `.next` inteira antes de subir o servidor de dev (senão toda rota /api devolve 404). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
+- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100` **com `CRON_SECRET=qa-cron`**, conta `isTeste`) e os roteiros em `.claude/skills/qa-quitazap/`: `qa-importacao.mjs` (54 checagens, chat × WhatsApp), `qa-lembretes.mjs` (11, cron com `?clienteId=`/`?agora=`) `qa-paginas.mjs` (27: 15 páginas + básico nos dois canais), `qa-volume.mjs` (6: CSV com 60 estabelecimentos desconhecidos e PDF de 80 linhas — fatura grande não pode perder compra) e `qa-whats-parecidas.mjs` (8: fila "compra parecida" por sim/não no WhatsApp). Cada um usa conta de teste PRÓPRIA e limpa só a sua. Estado em 2026-10-08: **112/112 passando**. Os cards (fatura/boleto/empréstimo) também foram conferidos no navegador em largura de celular. Depois de `npm run build`, apague a pasta `.next` inteira antes de subir o servidor de dev (senão toda rota /api devolve 404). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
 - Fixtures reais (Nubank OFX/CSV) em `tests/fixtures/` — contêm gastos reais do Ibrahim; anonimizar se o repo deixar de ser privado.
 
 ### Segurança (corrigido em 2026-10-08, commit 84486aa)
@@ -53,6 +53,7 @@ Crons `/api/cron/*` exigem `Authorization: Bearer <CRON_SECRET>` (`src/lib/cron-
 - Mensagens antigas do histórico do chat (`dadosEstruturados`) podem não ter campos novos: componentes de card precisam tolerar campo ausente.
 - Servidor Vercel roda em UTC; datas sempre ancoradas em Brasília.
 - Cascata de mensagens (chat e WhatsApp têm a MESMA ordem — mexeu num, espelhe no outro): o passo da IA (`resolverIntencaoFinanceiraIA`) vem ANTES do gasto rápido por regra; se a IA diz "fora de escopo", a regra de gasto ainda é consultada antes da resposta genérica.
+- Limites de resposta da IA: PDF `max_tokens` 12000 (≈45 tokens por compra; 4000 cortava em ~88 linhas), print 6000, categorização em lote 4000 — fatura grande não pode ser cortada no meio.
 - Compra futura é rejeitada de propósito na importação (leitura com ano errado); linha rejeitada gera aviso de total divergente no card.
 
 ### Pendências abertas (decisões/ações do Ibrahim)

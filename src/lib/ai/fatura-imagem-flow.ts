@@ -32,7 +32,7 @@ export async function processarPrintFatura(opts: {
 }): Promise<ResultadoPrintFatura> {
   const json = await analisarImagem(opts.imagem, PROMPT_FATURA_IMAGEM, opts.telemetria, {
     detail: "high",
-    maxTokens: 2500,
+    maxTokens: 6000,
     json: true,
   });
   // Empréstimo (tela do app com parcelas pagas/agendadas) — lançado como empréstimo.

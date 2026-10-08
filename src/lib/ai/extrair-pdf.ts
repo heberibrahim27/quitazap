@@ -292,7 +292,7 @@ Se não for contracheque, boleto nem fatura de cartão (for extrato bancário, c
           ],
         }],
        temperature: 0,
-max_tokens: 4000,
+max_tokens: 12000, // fatura grande: ~45 tokens por compra (4000 cortava em ~88 linhas)
 response_format: { type: "json_object" },
       }),
     });

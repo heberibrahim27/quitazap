@@ -59,7 +59,7 @@ export async function categorizarCompras(
     const r = await chatCompletion({
       model: "gpt-4o-mini",
       temperature: 0,
-      maxTokens: 800,
+      maxTokens: 4000,
       mensagens: [
         {
           role: "system",
