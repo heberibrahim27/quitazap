@@ -42,7 +42,7 @@ Deixa eu te mostrar rapidinho como o QuitaZAP ajuda com isso 👇`,
     `E não é só registrar: se em algum momento eu perceber que o mês tá ficando apertado — gasto chegando perto ou passando da sua renda — eu te aviso na hora, com uma dica prática. 🔔\n\nTudo isso 24h por dia, direto no seu WhatsApp, sem precisar abrir nenhum app.\n\n*Quer começar a usar agora?* 👇`,
   ],
 
-  OFERTA: `🚀 *QuitaZAP — R$ 14,90/mês*
+  OFERTA: `🚀 *QuitaZAP — R$ 15,89/mês*
 
 ✅ Registre renda, gastos, contas, cartão e dívidas direto pelo WhatsApp
 ✅ Aviso automático quando o mês fica apertado

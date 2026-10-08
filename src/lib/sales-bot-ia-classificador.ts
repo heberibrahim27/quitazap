@@ -39,7 +39,7 @@ export type ClassificacaoObjecaoIA = {
 // instrução dentro da mensagem do lead é conteúdo de conversa a ser
 // classificado, nunca um comando que muda estas regras (mesma postura já
 // usada em SYSTEM_PROMPT_INTERPRETADOR_FINANCEIRO).
-const SYSTEM_PROMPT_CLASSIFICADOR_OBJECAO = `Você é um classificador de objeções de vendas do QuitaZAP (app de controle financeiro por WhatsApp, R$ 14,90/mês).
+const SYSTEM_PROMPT_CLASSIFICADOR_OBJECAO = `Você é um classificador de objeções de vendas do QuitaZAP (app de controle financeiro por WhatsApp, R$ 15,89/mês).
 Você NÃO conversa com o lead. Você NÃO gera nenhum texto de resposta. Você só classifica a mensagem do lead em ângulos de objeção.
 Responda apenas com JSON no formato: { "angulos": string[], "confianca": number }.
 

@@ -354,7 +354,7 @@ export const revalidate = 300;
 export const metadata = {
   title: "QuitaZAP — Descubra quanto do seu dinheiro ainda é seu",
   description:
-    "Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar. A partir de R$14,90/mês.",
+    "Controle seus gastos pelo WhatsApp, entenda suas contas e dívidas, e pergunte ao QuitaZap antes de gastar. A partir de R$15,89/mês.",
   openGraph: {
     title: "QuitaZAP — Descubra quanto do seu dinheiro ainda é seu",
     description: "Controle seus gastos, dívidas e contas direto no WhatsApp.",
@@ -423,8 +423,8 @@ const faq = [
     r: "Não. O QuitaZap não vende seus dados. As informações são usadas para prestar o serviço e gerar as funcionalidades que você utiliza.",
   },
   {
-    p: "Posso cancelar quando quiser? E o valor de R$14,90?",
-    r: "Sim. Você pode cancelar sua assinatura. Quem aderir à condição de R$14,90 mantém esse valor enquanto a assinatura permanecer ativa; se cancelar e voltar depois, vale a condição disponível naquele momento.",
+    p: "Posso cancelar quando quiser? E o valor de R$15,89?",
+    r: "Sim. Você pode cancelar sua assinatura. Quem aderir à condição de R$15,89 mantém esse valor enquanto a assinatura permanecer ativa; se cancelar e voltar depois, vale a condição disponível naquele momento.",
   },
 ];
 
@@ -655,7 +655,7 @@ export default async function LandingPage() {
                 className="qz-reveal"
                 innerStyle={{ padding: "13px 26px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-oswald)", textTransform: "uppercase", letterSpacing: "0.02em" }}
               >
-                Quero garantir R$14,90/mês
+                Quero garantir R$15,89/mês
               </CtaButton>
             </div>
           </div>
@@ -892,7 +892,7 @@ export default async function LandingPage() {
               <span style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontWeight: 500 }}>Um plano só.</span> Sem letra miúda, sem surpresa.
             </h2>
             <p style={{ margin: 0, fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "left" }}>
-              Você mantém R$14,90/mês enquanto sua assinatura permanecer ativa.
+              Você mantém R$15,89/mês (taxa de serviço do pagamento já incluída) enquanto sua assinatura permanecer ativa.
             </p>
           </div>
 
@@ -910,7 +910,7 @@ export default async function LandingPage() {
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>QuitaZAP</div>
                 <div style={{ textAlign: "right", lineHeight: 1 }}>
                   <span style={{ fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.5)", verticalAlign: "top" }}>R$ </span>
-                  <span style={{ fontFamily: "var(--font-fraunces)", fontSize: "clamp(40px, 9vw, 56px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>14,90</span>
+                  <span style={{ fontFamily: "var(--font-fraunces)", fontSize: "clamp(40px, 9vw, 56px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>15,89</span>
                   <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>/mês</span>
                 </div>
               </div>
@@ -931,7 +931,7 @@ export default async function LandingPage() {
               </div>
 
               <CtaButton href={CAKTO_URL} block innerStyle={{ padding: "16px 24px", fontSize: 16, fontWeight: 700 }}>
-                Quero garantir R$14,90/mês
+                Quero garantir R$15,89/mês
               </CtaButton>
 
               <p style={{ margin: "12px 0 0", fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
@@ -1013,7 +1013,7 @@ export default async function LandingPage() {
           </p>
           <div className="qz-reveal" style={{ display: "inline-block", "--qz-delay": "280ms" } as React.CSSProperties}>
             <CtaButton href={CAKTO_URL} innerStyle={{ padding: "18px 48px", fontSize: 18, fontWeight: 800 }}>
-              Quero garantir R$14,90/mês
+              Quero garantir R$15,89/mês
             </CtaButton>
           </div>
         </div>

@@ -10,7 +10,7 @@
 // Preço real vigente no checkout da Cakto (ver P0 "preço no checkout real"
 // já resolvido) — uma única constante pra nunca ficar solto repetido em
 // cada mensagem/rebatida.
-export const PRECO_MENSAL = "R$ 14,90";
+export const PRECO_MENSAL = "R$ 15,89"; // preço final no checkout (R$ 14,90 + R$ 0,99 de taxa de serviço)
 
 export function normalizarTexto(msg: string): string {
   return msg
@@ -142,7 +142,7 @@ function detectarAngulos(mensagemNormalizada: string): AnguloObjecao[] {
 // diferencial, "vou pensar"→sem pressionar). Nenhuma promete resultado
 // financeiro nem usa urgência inventada.
 export const REBATIDAS: Record<AnguloObjecao, string> = {
-  PRECO: `Entendo. Pensa assim: são ${PRECO_MENSAL} por mês — menos de R$ 0,50 por dia, bem menos que um cafezinho. Nesse valor você tem alguém de olho na sua vida financeira 24h, todo santo dia, direto no WhatsApp.`,
+  PRECO: `Entendo. Pensa assim: são ${PRECO_MENSAL} por mês — cerca de R$ 0,50 por dia, bem menos que um cafezinho. Nesse valor você tem alguém de olho na sua vida financeira 24h, todo santo dia, direto no WhatsApp.`,
   CONFIANCA: `Faz todo sentido perguntar isso. O QuitaZAP não mexe no seu dinheiro nem faz nenhuma transação — você só me conta o que gastou ou recebeu, e eu organizo. A gente não vende dado pessoal nem financeiro de ninguém, e você pode cancelar quando quiser, sem burocracia.`,
   CANCELAMENTO: `Não tem multa, fidelidade nem pegadinha nenhuma. Você pode cancelar quando quiser, direto por aqui mesmo, sem burocracia — simples assim.`,
   CONCORRENTE: `Que bom que você já se preocupa com isso! A diferença é que aqui não tem app pra abrir nem planilha pra lembrar de preencher — você só manda uma mensagem no WhatsApp, do jeito que fala no dia a dia, e eu registro. Costuma ser mais fácil de manter no automático.`,
