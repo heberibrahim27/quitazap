@@ -49,7 +49,6 @@ async function tratarPrintDeFatura(opts: {
   cliente: Parameters<typeof obterOuCriarSessaoControle>[0] & { gratuito: boolean };
   arquivoBase64: string;
   buffer: Buffer;
-  caminhoStorage: string;
 }): Promise<{ resposta: string; dadosEstruturados?: unknown } | null> {
   const { cliente } = opts;
   const leitura = await processarPrintFatura({
@@ -99,8 +98,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const caminhoStorage = await subirComprovante(clienteId, arquivo);
-
     const buffer = Buffer.from(await arquivo.arrayBuffer());
     const base64 = buffer.toString("base64");
     const textoExtraido = await analisarImagem(`data:image/jpeg;base64,${base64}`, PROMPT_ANALISE_IMAGEM, {
@@ -115,7 +112,7 @@ export async function POST(req: NextRequest) {
     // Roda mesmo se a 1ª leitura disse "não financeira": print de fatura sem o
     // nome do banco visível cai nesse rótulo.
     if (!detectado) {
-      const respostaFatura = await tratarPrintDeFatura({ cliente, arquivoBase64: base64, buffer, caminhoStorage });
+      const respostaFatura = await tratarPrintDeFatura({ cliente, arquivoBase64: base64, buffer });
       if (respostaFatura) return NextResponse.json(respostaFatura);
     }
 
@@ -137,6 +134,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Só recibo precisa guardar a foto (vira comprovante do lançamento). Print de fatura/
+    // empréstimo é lido e descartado — e falha de Storage não pode derrubar essa leitura.
+    const caminhoStorage = await subirComprovante(clienteId, arquivo);
     const sessao = await obterOuCriarSessaoControle(cliente);
     const pendente: ComprovanteFotoDetectado = {
       loja: detectado.loja,

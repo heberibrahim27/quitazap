@@ -2,11 +2,60 @@
 
 > Documento de continuidade do QuitaZAP Controle.
 > Base: `LEVANTAMENTO-QUITAZAP.md` (raio-x read-only de 2026-08-15).
-> Escopo confirmado em chat: **só QuitaZAP Controle**. O QuitaZAP Receber (`Usuario`/`Pendencia`/`/dashboard`) é outro projeto/módulo, tratado à parte — nada aqui mexe nele.
+> Escopo: **só QuitaZAP Controle**. (O módulo Receber citado nas seções históricas abaixo foi removido em 2026-09-09.)
 
 ---
 
-## Status
+## ▶ ESTADO ATUAL (atualizado em 2026-10-08) — leia este bloco primeiro
+
+> As seções numeradas abaixo (1–13) são o **histórico de agosto/2026** e não descrevem mais o produto inteiro. Onde elas divergirem deste bloco, vale este bloco. Em especial: o módulo **Receber foi removido por completo em 2026-09-09** — o Controle é o único produto.
+
+### Produto e canais
+- **QuitaZAP Controle** (app web "Minha Conta" + WhatsApp). O **chat nativo do app é a válvula de escape do WhatsApp**: tem que fazer **tudo** que o WhatsApp faz (decisão do Ibrahim, 2026-10-07). Mexeu num canal → confira o outro (skill `espelhar-canais`; orquestrador do chat em `src/lib/controle-orquestrador.ts`, webhook em `src/app/api/webhook/zapi/route.ts`).
+- Agentes em produção (Sentinela, Recorrências, Quita/Orientador, Documentos etc.), saúde financeira v2, Orientador de Quitação, metas (Respiro), 10 agentes com tela admin `/agentes` — ver `docs/CONTEXTO_ATUAL_QUITAZAP_CONTROLE.md` e `docs/chat-nativo-arquitetura.md`. Filosofia: todo agente/dica orienta a **quitar dívidas e dar respiro**; investimento fora do centro.
+- **Deploy:** `git push` em `main` = produção (Vercel). Antes: skill `deploy-seguro` (fetch + divergência, `npx tsc --noEmit`, `npm test`, `npm run build`, **não publicar se o build falhar — conferir o código de saída, não só a saída**). DDL em produção só com autorização explícita do Ibrahim. O banco local **é o de produção** (Supabase `quitazap`): QA só com conta `isTeste`.
+
+### Pipeline de importação de documentos (novo, outubro/2026)
+Entrada → leitura → **um formato interno** (`FaturaCartaoDetectada` / `EmprestimoDetectado` / `BoletoDetectado`) → prévia → **confirmação do cliente** → gravação. Nada é gravado antes do "sim"/botão.
+
+| Entrada | Leitor | Módulo |
+|---|---|---|
+| Print/foto (chat e WhatsApp) | GPT-4o visão, alta resolução, JSON | `src/lib/ai/fatura-imagem.ts` (+ `fatura-imagem-flow.ts`) |
+| PDF (chat e WhatsApp) | GPT-4o com arquivo + releitura se a soma ≠ total impresso | `src/lib/ai/extrair-pdf.ts`, `fatura-pdf.ts` |
+| OFX / CSV (chat e WhatsApp) | **por regra, sem IA** (OFX padrão aberto; CSV por cabeçalho/sinônimos, separador, data, valor e sinal detectados); IA lê o texto só se a estrutura for desconhecida | `src/lib/importacao-fatura.ts`, `ai/fatura-arquivo.ts` |
+| Print de empréstimo | mesma visão; vira `Divida` EMPRESTIMO via `criarDividaComParcelas` (parcelas já pagas respeitadas) | `emprestimo-imagem.ts`, `emprestimo-previa.ts` |
+| Boleto PDF | `extrairPDF` → `boletoPendente` | `boleto-flow.ts` |
+
+- Fatura de cartão registra **todas as compras** como `COMPRA_CARTAO` (data da compra, cartão) **+ parcelas futuras** em `Divida`/`Parcela` (tipo CARTAO). Só a **parcela 1** tem "data da compra" (nas demais a data da linha é a da cobrança).
+- **Anti-duplicação** (`fatura-cartao-flow.ts`): compra = mesmo cartão + mesmo dia (Brasília) + valor (±1 centavo: print e arquivo arredondam diferente); parcelamento = mesmo cartão + total de parcelas + valor da parcela + nome parecido (`nomesSemelhantes`, tolera "Kiwiify"×"Kiwify"). **Não usar `FITID` do OFX** (repete entre transações no Nubank). Reenviar o mesmo print/arquivo não duplica.
+- **Estado pendente:** fatura em `BotSessao.faturaCartaoPendente`, boleto em `boletoPendente`, comprovante em `comprovanteFotoPendente`; **empréstimo na própria mensagem de prévia** (`MensagemChat.dadosEstruturados`, sem coluna nova, janela de 24h no WhatsApp). Confirmações no chat: `/api/minha-conta/{fatura,boleto,emprestimo,comprovante}/confirmar` (valores sempre do servidor, nunca do corpo).
+- **Conferência de total:** a IA informa o total impresso; se a soma lida não bate, relê 1x; persistindo, o card avisa.
+- **Vencimento:** nome do arquivo Nubank (`Nubank_AAAA-MM-DD`) = vencimento; print só com o mês → estimado (usa `Cartao.diaVencimento` se houver, senão dia 10). Nubank do Ibrahim: vence **dia 1**.
+
+### Categorias (`gasto-flow.ts` + `categorizacao-compras.ts`)
+Ordem: estrutura do banco (Pix/Boleto no crédito → categoria **"Pix/Boleto no crédito"**, IOF → Impostos/Taxas) → dicionário → histórico do próprio cliente → IA (`gpt-4o-mini`, só categorias do app; nunca Apostas/Dívidas/Pix-crédito) → "Outros". **Decisão pendente do Ibrahim:** Claude/ChatGPT em "Assinaturas" (atual) ou "Trabalho/Negócio".
+
+### Lembretes de vencimento (`api/cron/lembretes`)
+Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só em D-3/D-1/D0. Antes mostrava o total restante e repetia todo mês.
+
+### Testes e QA
+- `npm test` (≈485 testes, `node --test tests/*.test.mjs`). Módulos testados via loader de TS em `tests/`: **imports de módulos testados precisam ser relativos** (o alias `@/` não resolve nesse loader) e o `.ts` precisa de `Module._extensions`.
+- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100`, conta `isTeste`) e o roteiro de importação `.claude/skills/qa-quitazap/qa-importacao.mjs` (duas contas de teste próprias: chat × WhatsApp; limpa só as suas). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
+- Fixtures reais (Nubank OFX/CSV) em `tests/fixtures/` — contêm gastos reais do Ibrahim; anonimizar se o repo deixar de ser privado.
+
+### Armadilhas conhecidas
+- Arquivos do projeto usam **CRLF**: edições por script precisam normalizar `\r\n`.
+- Seletor de arquivo no iOS **bloqueia extensões que não reconhece** (`.ofx`): não usar `accept` restritivo.
+- App instalado (PWA) guarda a versão antiga até ser **fechado por completo** — depois de um deploy, peça para fechar e reabrir.
+- Mensagens antigas do histórico do chat (`dadosEstruturados`) podem não ter campos novos: componentes de card precisam tolerar campo ausente.
+- Servidor Vercel roda em UTC; datas sempre ancoradas em Brasília.
+
+### Pendências abertas (decisões/ações do Ibrahim)
+1. Claude/ChatGPT: Assinaturas × Trabalho/Negócio. 2. Identificar "Asa*Upward Creative", "Santos Pedreira" e "Kiwify" (hoje "Outros"). 3. Enviar o **PDF real do PagBank** (`invoice-01-10-2026.pdf`) para validar a leitura — só foi testado com PDF sintético. 4. Confirmar se o repo é privado (fixtures com dados reais). 5. Cron `lembretes` não tem filtro `?clienteId=`: **não rodar localmente** (atinge clientes reais).
+
+---
+
+## Status (histórico de agosto/2026 — feature de tarefas)
 
 **Feature "tarefas e pagamentos por áudio/texto": implementada, testada e auditada.**
 

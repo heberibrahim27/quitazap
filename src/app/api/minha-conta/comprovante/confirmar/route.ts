@@ -13,6 +13,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle, processarMensagemControle } from "@/lib/controle-orquestrador";
+import { reivindicarPendente } from "@/lib/pendente-atomico";
 import type { ComprovanteFotoDetectado } from "@/lib/comprovante-foto-flow";
 
 export async function POST(req: NextRequest) {
@@ -37,12 +38,11 @@ export async function POST(req: NextRequest) {
   }
 
   const sessao = await obterOuCriarSessaoControle(cliente);
-  const pendente = sessao.comprovanteFotoPendente as unknown as ComprovanteFotoDetectado | null;
+  // Reivindicação atômica: dois toques simultâneos não lançam o gasto em dobro.
+  const pendente = await reivindicarPendente<ComprovanteFotoDetectado>(sessao.id, "comprovanteFotoPendente");
   if (!pendente) {
     return NextResponse.json({ error: "Não há nenhuma foto de comprovante aguardando confirmação." }, { status: 409 });
   }
-
-  await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { comprovanteFotoPendente: Prisma.JsonNull } });
 
   if (acao === "negar") {
     const resposta = "Sem problema, não registrei nada a partir dessa foto.";

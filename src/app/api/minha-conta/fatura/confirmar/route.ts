@@ -11,6 +11,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
+import { reivindicarPendente } from "@/lib/pendente-atomico";
 import {
   mensagemLoteConfirmado,
   salvarComprasParceladasFatura,
@@ -39,12 +40,11 @@ export async function POST(req: NextRequest) {
   }
 
   const sessao = await obterOuCriarSessaoControle(cliente);
-  const pendente = sessao.faturaCartaoPendente as unknown as FaturaCartaoPendente | null;
+  // Reivindicação atômica: dois toques simultâneos não gravam em dobro.
+  const pendente = await reivindicarPendente<FaturaCartaoPendente>(sessao.id, "faturaCartaoPendente");
   if (!pendente) {
     return NextResponse.json({ error: "Não há nenhuma fatura aguardando confirmação." }, { status: 409 });
   }
-
-  await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { faturaCartaoPendente: Prisma.JsonNull } });
 
   let resposta: string;
   if (acao === "negar") {

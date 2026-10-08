@@ -384,7 +384,7 @@ export async function montarFaturaCartaoPendente(
     vencimentoFatura: fatura.vencimentoFatura,
     vencimentoEstimado: fatura.vencimentoEstimado,
     totalImpresso: fatura.totalImpresso,
-    somaLida: Math.round((fatura.compras ?? []).reduce((s, c) => s + c.valor, 0) * 100) / 100,
+    somaLida: Math.round((fatura.compras ?? []).filter(compraValida).reduce((s, c) => s + c.valor, 0) * 100) / 100,
     compras: comprasParaGasto,
     comprasJaRegistradas,
     filaAmbiguos,

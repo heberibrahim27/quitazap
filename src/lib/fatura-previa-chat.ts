@@ -30,7 +30,7 @@ export async function registrarPreviaFaturaNoChat(
   const lote = { ...pendente, filaAmbiguos: [], indice: 0 };
 
   if (!faturaTemNovidade(lote)) {
-    const ja = lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0);
+    const ja = (lote.comprasJaRegistradas ?? 0) > 0 ? (lote.comprasJaRegistradas ?? 0) : lote.jaCadastradas + parecidas;
     return responderNoChat(
       cliente.id,
       ja > 0

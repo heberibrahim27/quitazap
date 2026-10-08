@@ -10,6 +10,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
+import { reivindicarPendente } from "@/lib/pendente-atomico";
 import { boletoValido, salvarBoletoComoDivida, type BoletoDetectado } from "@/lib/boleto-flow";
 
 export async function POST(req: NextRequest) {
@@ -33,12 +34,11 @@ export async function POST(req: NextRequest) {
   }
 
   const sessao = await obterOuCriarSessaoControle(cliente);
-  const pendente = sessao.boletoPendente as unknown as Partial<BoletoDetectado> | null;
+  // Reivindicação atômica: dois toques simultâneos não gravam em dobro.
+  const pendente = await reivindicarPendente<Partial<BoletoDetectado>>(sessao.id, "boletoPendente");
   if (!pendente || !boletoValido(pendente)) {
     return NextResponse.json({ error: "Não há nenhum boleto aguardando confirmação." }, { status: 409 });
   }
-
-  await prisma.botSessao.updateMany({ where: { id: sessao.id }, data: { boletoPendente: Prisma.JsonNull } });
 
   let resposta: string;
   if (acao === "negar") {
