@@ -40,8 +40,11 @@ Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só
 
 ### Testes e QA
 - `npm test` (≈485 testes, `node --test tests/*.test.mjs`). Módulos testados via loader de TS em `tests/`: **imports de módulos testados precisam ser relativos** (o alias `@/` não resolve nesse loader) e o `.ts` precisa de `Module._extensions`.
-- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100`, conta `isTeste`) e o roteiro de importação `.claude/skills/qa-quitazap/qa-importacao.mjs` (duas contas de teste próprias: chat × WhatsApp; limpa só as suas). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
+- QA ponta a ponta: skill `qa-quitazap` (servidor `next dev -p 3100` **com `CRON_SECRET=qa-cron`**, conta `isTeste`) e os roteiros em `.claude/skills/qa-quitazap/`: `qa-importacao.mjs` (54 checagens, chat × WhatsApp), `qa-lembretes.mjs` (11, cron com `?clienteId=`/`?agora=`) e `qa-paginas.mjs` (27: 15 páginas + básico nos dois canais). Cada um usa conta de teste PRÓPRIA e limpa só a sua. Estado em 2026-10-08: **92/92 passando**. Depois de `npm run build`, apague a pasta `.next` inteira antes de subir o servidor de dev (senão toda rota /api devolve 404). **A conta de QA dos prints do Instagram e o servidor local ficam ligados de propósito** — só limpar quando o Ibrahim liberar.
 - Fixtures reais (Nubank OFX/CSV) em `tests/fixtures/` — contêm gastos reais do Ibrahim; anonimizar se o repo deixar de ser privado.
+
+### Segurança (corrigido em 2026-10-08, commit 84486aa)
+Crons `/api/cron/*` exigem `Authorization: Bearer <CRON_SECRET>` (`src/lib/cron-auth.ts`, falha fechado). **Nunca** confiar em cabeçalho do cliente (`x-internal-call`) como credencial — o middleware libera todo `/api`, então cada rota precisa do próprio guarda. `/api/test/bot-chat` exige cookie de admin. Confirmações de pendência (fatura/boleto/comprovante) usam `reivindicarPendente` (atômico) para o toque duplo não gravar em dobro.
 
 ### Armadilhas conhecidas
 - Arquivos do projeto usam **CRLF**: edições por script precisam normalizar `\r\n`.
@@ -49,9 +52,12 @@ Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só
 - App instalado (PWA) guarda a versão antiga até ser **fechado por completo** — depois de um deploy, peça para fechar e reabrir.
 - Mensagens antigas do histórico do chat (`dadosEstruturados`) podem não ter campos novos: componentes de card precisam tolerar campo ausente.
 - Servidor Vercel roda em UTC; datas sempre ancoradas em Brasília.
+- Cascata de mensagens (chat e WhatsApp têm a MESMA ordem — mexeu num, espelhe no outro): o passo da IA (`resolverIntencaoFinanceiraIA`) vem ANTES do gasto rápido por regra; se a IA diz "fora de escopo", a regra de gasto ainda é consultada antes da resposta genérica.
+- Compra futura é rejeitada de propósito na importação (leitura com ano errado); linha rejeitada gera aviso de total divergente no card.
 
 ### Pendências abertas (decisões/ações do Ibrahim)
-1. Claude/ChatGPT: Assinaturas × Trabalho/Negócio. 2. Identificar "Asa*Upward Creative", "Santos Pedreira" e "Kiwify" (hoje "Outros"). 3. Enviar o **PDF real do PagBank** (`invoice-01-10-2026.pdf`) para validar a leitura — só foi testado com PDF sintético. 4. Confirmar se o repo é privado (fixtures com dados reais). 5. Cron `lembretes` não tem filtro `?clienteId=`: **não rodar localmente** (atinge clientes reais).
+1. Claude/ChatGPT: Assinaturas × Trabalho/Negócio. 2. Identificar "Asa*Upward Creative", "Santos Pedreira" e "Kiwify" (hoje "Outros"). 3. Enviar o **PDF real do PagBank** (`invoice-01-10-2026.pdf`) para validar a leitura — só foi testado com PDF sintético. 4. Confirmar se o repo é privado (fixtures com dados reais). 5. **Remover a variável `ENABLE_TEST_ROUTES` da Vercel** (não é mais necessária; estava ligada em produção). Opcional: girar o `CRON_SECRET` — ele nunca vazou, mas a brecha do cabeçalho existiu até 2026-10-08.
+6. Crons: `lembretes` agora aceita `?clienteId=` e `?agora=` (com o Bearer); os demais crons com filtro de cliente: só `sentinela`. **Não rodar nenhum outro cron localmente sem filtro** (o banco local é o de produção).
 
 ---
 
