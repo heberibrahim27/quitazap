@@ -33,7 +33,9 @@ Entrada → leitura → **um formato interno** (`FaturaCartaoDetectada` / `Empre
 - **Vencimento:** nome do arquivo Nubank (`Nubank_AAAA-MM-DD`) = vencimento; print só com o mês → estimado (usa `Cartao.diaVencimento` se houver, senão dia 10). Nubank do Ibrahim: vence **dia 1**.
 
 ### Categorias (`gasto-flow.ts` + `categorizacao-compras.ts`)
-Ordem: estrutura do banco (Pix/Boleto no crédito → categoria **"Pix/Boleto no crédito"**, IOF → Impostos/Taxas) → dicionário → histórico do próprio cliente → IA (`gpt-4o-mini`, só categorias do app; nunca Apostas/Dívidas/Pix-crédito) → "Outros". **Decisão pendente do Ibrahim:** Claude/ChatGPT em "Assinaturas" (atual) ou "Trabalho/Negócio".
+Ordem: **estrutura do banco** ("Pix/Boleto no crédito" → categoria própria, nunca sobrescrita; IOF → Impostos/Taxas) → **histórico do próprio cliente** pro mesmo estabelecimento (a escolha dele vence o dicionário) → dicionário → IA (`gpt-4o-mini`, só categorias do app; nunca Apostas/Dívidas/Pix-crédito; nome de empresa sem ramo = "Outros") → "Outros".
+A categoria é calculada já na **prévia** e viaja com cada compra; no card do chat, as que ficaram em "Outros" mostram uma caixa pro cliente escolher antes de salvar (`/api/minha-conta/fatura/confirmar` valida o nome e nunca troca PARA/DE "Pix/Boleto no crédito"). A escolha vira lançamento e passa a valer nas próximas faturas. No WhatsApp não há caixa: a troca é pelo "editar" no app.
+Decisões do Ibrahim (2026-10-08): Claude/ChatGPT = Trabalho/Negócio (só pra ele, via histórico; o dicionário global segue "Assinaturas"); Asa*Upward e Kiwify = cursos (Educação); Santos Pedreira = posto (Transporte).
 
 ### Lembretes de vencimento (`api/cron/lembretes`)
 Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só em D-3/D-1/D0. Antes mostrava o total restante e repetia todo mês.
@@ -44,7 +46,7 @@ Dívida parcelada avisa a **próxima parcela pendente** (valor e data dela), só
 - Fixtures reais (Nubank OFX/CSV) em `tests/fixtures/` — contêm gastos reais do Ibrahim; anonimizar se o repo deixar de ser privado.
 
 ### Segurança (corrigido em 2026-10-08, commit 84486aa)
-Crons `/api/cron/*` exigem `Authorization: Bearer <CRON_SECRET>` (`src/lib/cron-auth.ts`, falha fechado). **Nunca** confiar em cabeçalho do cliente (`x-internal-call`) como credencial — o middleware libera todo `/api`, então cada rota precisa do próprio guarda. `/api/test/bot-chat` exige cookie de admin. Confirmações de pendência (fatura/boleto/comprovante) usam `reivindicarPendente` (atômico) para o toque duplo não gravar em dobro.
+Crons `/api/cron/*` exigem `Authorization: Bearer <CRON_SECRET>` (`src/lib/cron-auth.ts`, falha fechado). **Nunca** confiar em cabeçalho do cliente (`x-internal-call`) como credencial — o middleware libera todo `/api`, então cada rota precisa do próprio guarda. `/api/test/bot-chat` exige cookie de admin. Revisão de acesso entre contas (2026-10-08): todas as Server Actions e rotas de `/minha-conta` que mudam algo por ID conferem o dono antes (lançamento, cartão, empréstimo/parcela, tarefa, meta). Confirmações de pendência (fatura/boleto/comprovante) usam `reivindicarPendente` (atômico) para o toque duplo não gravar em dobro.
 
 ### Armadilhas conhecidas
 - Arquivos do projeto usam **CRLF**: edições por script precisam normalizar `\r\n`.
@@ -56,9 +58,13 @@ Crons `/api/cron/*` exigem `Authorization: Bearer <CRON_SECRET>` (`src/lib/cron-
 - Limites de resposta da IA: PDF `max_tokens` 12000 (≈45 tokens por compra; 4000 cortava em ~88 linhas), print 6000, categorização em lote 4000 — fatura grande não pode ser cortada no meio.
 - Compra futura é rejeitada de propósito na importação (leitura com ano errado); linha rejeitada gera aviso de total divergente no card.
 
-### Pendências abertas (decisões/ações do Ibrahim)
-1. Claude/ChatGPT: Assinaturas × Trabalho/Negócio. 2. Identificar "Asa*Upward Creative", "Santos Pedreira" e "Kiwify" (hoje "Outros"). 3. Enviar o **PDF real do PagBank** (`invoice-01-10-2026.pdf`) para validar a leitura — só foi testado com PDF sintético. 4. Confirmar se o repo é privado (fixtures com dados reais). 5. **Remover a variável `ENABLE_TEST_ROUTES` da Vercel** (não é mais necessária; estava ligada em produção). Opcional: girar o `CRON_SECRET` — ele nunca vazou, mas a brecha do cabeçalho existiu até 2026-10-08.
-6. Crons: `lembretes` agora aceita `?clienteId=` e `?agora=` (com o Bearer); os demais crons com filtro de cliente: só `sentinela`. **Não rodar nenhum outro cron localmente sem filtro** (o banco local é o de produção).
+### Pendências abertas
+1. **PDF real do PagBank** (`invoice-01-10-2026.pdf`): a leitura de PDF só foi testada com PDF de teste (até 80 linhas). Quando o Ibrahim conseguir o arquivo, mandar pelo chat e conferir total/compras.
+2. Confirmar se o repositório é **privado** (as fixtures em `tests/fixtures/` têm gastos reais dele); se deixar de ser, anonimizar.
+3. Opcional: girar o `CRON_SECRET` (nunca vazou, mas a brecha do cabeçalho existiu até 2026-10-08).
+4. "transferi X pro Y" cai no menu de ajuda (de propósito: pode ser transferência entre contas); "paguei X pro Y" já registra como gasto.
+5. Crons: `lembretes` aceita `?clienteId=` e `?agora=` (com o Bearer); `sentinela` aceita `?clienteId=`. **Não rodar nenhum outro cron localmente sem filtro** (o banco local é o de produção).
+6. Já resolvido em 2026-10-08 (não reabrir): `ENABLE_TEST_ROUTES` removida da Vercel; categorias do Ibrahim definidas; vencimento do Nubank = dia 1.
 
 ---
 
