@@ -121,7 +121,7 @@ async function sql() {
 async function cron(rota, qs = "") {
   const c = await cliente();
   // SEMPRE restrito à conta de teste: nunca rode cron sem clienteId a partir da máquina local.
-  const res = await fetch(`${BASE}/api/cron/${rota}?clienteId=${c.id}${qs ? `&${qs}` : ""}`, { headers: { "x-internal-call": "1" } });
+  const res = await fetch(`${BASE}/api/cron/${rota}?clienteId=${c.id}${qs ? `&${qs}` : ""}`, { headers: { authorization: `Bearer ${process.env.QA_CRON_SECRET ?? "qa-cron"}` } });
   console.log(rota, res.status, JSON.stringify(await res.json()).slice(0, 1800));
 }
 

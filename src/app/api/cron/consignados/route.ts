@@ -18,26 +18,14 @@
 // cron — continuam com baixa manual, como já é hoje.
 // ─────────────────────────────────────────
 
+import { negarCronNaoAutorizado } from "@/lib/cron-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   // Mesmo padrão de autenticação dos demais crons (lembretes, cobrador, tarefas).
-  const isInternal = req.headers.get("x-internal-call") === "1";
-  if (!isInternal) {
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const auth = req.headers.get("authorization");
-      if (auth !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      // Falha fechado: sem CRON_SECRET configurado, negar chamada externa em
-      // vez de deixar passar sem autenticação nenhuma.
-      console.error("[CRON CONSIGNADOS] CRON_SECRET não configurado — recusando chamada externa.");
-      return NextResponse.json({ error: "CRON_SECRET não configurado" }, { status: 500 });
-    }
-  }
+  const negado = negarCronNaoAutorizado(req);
+  if (negado) return negado;
 
   const agora = new Date();
   const erros: string[] = [];

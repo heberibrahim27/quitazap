@@ -6,25 +6,15 @@
 // mês" quando o dia chega. Regras em src/lib/financeiro/recorrencia.ts.
 // ─────────────────────────────────────────
 
+import { negarCronNaoAutorizado } from "@/lib/cron-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { gerarRecorrenciasPendentes } from "@/lib/financeiro/recorrencia-service";
 import { registrarExecucaoAgente } from "@/lib/agentes/alertas-store";
 
 export async function GET(req: NextRequest) {
   // Mesmo padrão de autenticação dos demais crons (lembretes, tarefas).
-  const isInternal = req.headers.get("x-internal-call") === "1";
-  if (!isInternal) {
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const auth = req.headers.get("authorization");
-      if (auth !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      console.error("[CRON RECORRENCIAS] CRON_SECRET não configurado — recusando chamada externa.");
-      return NextResponse.json({ error: "CRON_SECRET não configurado" }, { status: 500 });
-    }
-  }
+  const negado = negarCronNaoAutorizado(req);
+  if (negado) return negado;
 
   const iniciadoEm = new Date();
   try {

@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
 
   const res = await fetch(`${baseUrl}/api/cron/cobrador`, {
     method: "GET",
-    headers: { "x-internal-call": "1" }, // bypassa o check de CRON_SECRET
+    // chamada interna autenticada com o mesmo segredo dos crons (não existe mais bypass por cabeçalho)
+    headers: { authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` },
   });
 
   const data = await res.json();

@@ -12,7 +12,7 @@ O banco local **é o de produção** (Supabase `quitazap`). Por isso o QA só ro
 1. Servidor local com WhatsApp simulado (log `[EVO MOCK]`):
    ```bash
    rm -rf .next/dev
-   ZAPI_WEBHOOK_SECRET=qa-wh WHATSAPP_PROVIDER=evolution EVO_URL= NEXTAUTH_SECRET=qa-local-secret npx next dev -p 3100 > _dev.log 2>&1 &
+   CRON_SECRET=qa-cron ZAPI_WEBHOOK_SECRET=qa-wh WHATSAPP_PROVIDER=evolution EVO_URL= NEXTAUTH_SECRET=qa-local-secret npx next dev -p 3100 > _dev.log 2>&1 &
    ```
    Aguarde ~15s. Se `/api` devolver 404 ou 500 depois de um build, apague `.next/dev` e reinicie.
 2. `node .claude/skills/qa-quitazap/qa.mjs setup` cria a conta de teste.

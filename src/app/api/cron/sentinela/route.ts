@@ -6,24 +6,15 @@
 // ?dryRun=1 só avalia e devolve as decisões (nada é enviado nem gravado).
 // ─────────────────────────────────────────
 
+import { negarCronNaoAutorizado } from "@/lib/cron-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { executarSentinela } from "@/lib/agentes/sentinela-service";
 
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  const isInternal = req.headers.get("x-internal-call") === "1";
-  if (!isInternal) {
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      if (req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      console.error("[CRON SENTINELA] CRON_SECRET não configurado — recusando chamada externa.");
-      return NextResponse.json({ error: "CRON_SECRET não configurado" }, { status: 500 });
-    }
-  }
+  const negado = negarCronNaoAutorizado(req);
+  if (negado) return negado;
 
   try {
     const dryRun = req.nextUrl.searchParams.get("dryRun") === "1";

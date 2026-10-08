@@ -8,8 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { processarMensagemIA, type Mensagem } from "@/lib/ai-bot";
 
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV === "production" && !process.env.ENABLE_TEST_ROUTES) {
-    return NextResponse.json({ error: "Rota de teste desabilitada em produção" }, { status: 403 });
+  // Só o painel admin (cookie de login do admin, o mesmo do middleware). Antes o único guard era
+  // a env ENABLE_TEST_ROUTES — que está LIGADA em produção, deixando a rota aberta pra qualquer
+  // pessoa na internet gastar crédito da OpenAI (achado no QA de 2026-10-08).
+  if (req.cookies.get("qz_auth")?.value !== "qz_autenticado") {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
   try {

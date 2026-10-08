@@ -5,6 +5,7 @@
 // Lembretes por diaVencimento das Dividas (bot conselheiro)
 // ─────────────────────────────────────────
 
+import { negarCronNaoAutorizado } from "@/lib/cron-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deliverReminder } from "@/lib/reminder-delivery";
@@ -15,21 +16,8 @@ import { anoMesDiaBrasil } from "@/lib/financeiro/fatura-cartao";
 
 export async function GET(req: NextRequest) {
   // Segurança: bearer secret (Vercel injeta automaticamente no Cron)
-  const isInternal = req.headers.get("x-internal-call") === "1";
-  if (!isInternal) {
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const auth = req.headers.get("authorization");
-      if (auth !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      // Falha fechado: sem CRON_SECRET configurado, negar chamada externa em
-      // vez de deixar passar sem autenticação nenhuma.
-      console.error("[LEMBRETES] CRON_SECRET não configurado — recusando chamada externa.");
-      return NextResponse.json({ error: "CRON_SECRET não configurado" }, { status: 500 });
-    }
-  }
+  const negado = negarCronNaoAutorizado(req);
+  if (negado) return negado;
 
   const agora = new Date();
 
