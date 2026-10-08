@@ -328,6 +328,25 @@ async function main() {
   check("R11.1 ao menos 2 de 3 estabelecimentos reconhecíveis saíram de 'Outros'", ["Odontologia", "Pilates", "Auto Escola"].filter((p) => catDe(p) && catDe(p) !== "Outros").length >= 2);
   check("R11.2 estabelecimento sem sentido fica em 'Outros' (a IA não chuta)", catDe("Zxqv") === "Outros", catDe("Zxqv"));
 
+  // ── R12: a escolha do cliente vence o dicionário (menos a estrutura do banco) ──
+  console.log("\n=== R12  Histórico do cliente × dicionário");
+  const claude = (await estado(A)).lancs.find((l) => /anthropic/i.test(l.descricao));
+  check("R12.0 dicionário geral põe Claude em Assinaturas (ou já em Trabalho/Negócio pelo histórico)", claude?.categoria === "Assinaturas" || claude?.categoria === "Trabalho/Negócio", claude?.categoria);
+  await prisma.lancamento.update({ where: { id: claude.id }, data: { categoria: "Trabalho/Negócio" } });
+  const pixAntigo = (await estado(A)).lancs.find((l) => /pix no cr/i.test(l.descricao));
+  await prisma.lancamento.update({ where: { id: pixAntigo.id }, data: { categoria: "Lazer" } });
+  const csvHist = Buffer.from(
+    'date,title,amount\n2026-10-06,Anthropic* Claude Sub,"572,45"\n2026-10-06,' + pixAntigo.descricao + ',"11,11"\n',
+    "utf8"
+  );
+  r = await postArquivo(A, "Nubank_2026-12-01.csv", csvHist, "text/csv");
+  await postJson(A, "/api/minha-conta/fatura/confirmar", { acao: "confirmar" });
+  e = await estado(A);
+  const novoClaude = e.lancs.filter((l) => /anthropic/i.test(l.descricao)).sort((x, y) => y.criadoEm - x.criadoEm)[0];
+  const novoPix = e.lancs.filter((l) => l.descricao === pixAntigo.descricao).sort((x, y) => y.criadoEm - x.criadoEm)[0];
+  check("R12.1 Claude já classificado como Trabalho/Negócio pelo cliente segue nessa categoria", novoClaude?.categoria === "Trabalho/Negócio", novoClaude?.categoria);
+  check("R12.2 Pix no crédito NUNCA é sobrescrito pelo histórico (estrutura do banco)", novoPix?.categoria === "Pix/Boleto no crédito", novoPix?.categoria);
+
   // ══════ WhatsApp (conta B): mesmos cenários, mesmo efeito no banco ══════
   console.log("\n=== W  WhatsApp × Chat (conta B)");
   await postJson(B, "/api/minha-conta/chat/mensagem", { mensagem: "oi" }); // cria a sessão do bot

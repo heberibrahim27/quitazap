@@ -1,7 +1,8 @@
 // Categoria das compras importadas de fatura (print, PDF, OFX/CSV). Camadas, da mais
 // confiável pra menos:
 //  1. estrutura do banco e dicionário de estabelecimentos → definirCategoriaGasto (regra fixa);
-//  2. o que ESTE cliente já usou pro mesmo estabelecimento (histórico dele, sem coluna nova);
+//  2. o que ESTE cliente já usou pro mesmo estabelecimento (histórico dele, sem coluna nova) — vence o
+//     dicionário, exceto a estrutura do banco;
 //  3. IA (gpt-4o-mini, saída restrita às categorias que o app já tem) só pro que sobrou;
 //  4. "Outros".
 // Falha da IA nunca derruba a importação: cai em "Outros" e o cliente edita no extrato.
@@ -29,10 +30,9 @@ export async function categorizarCompras(
 ): Promise<string[]> {
   const resultado = descricoes.map((d) => definirCategoriaGasto(d) as string);
 
-  // 2) histórico do próprio cliente pro mesmo estabelecimento
-  const pendentesIdx = resultado.map((c, i) => (c === "Outros" ? i : -1)).filter((i) => i >= 0);
-  if (pendentesIdx.length === 0) return resultado;
-
+  // Histórico do PRÓPRIO cliente pro mesmo estabelecimento: a escolha dele vale mais que o
+  // dicionário genérico (ex.: ChatGPT é "Assinaturas" pra maioria, mas "Trabalho/Negócio" pra
+  // quem usa no trabalho). Só a estrutura do banco (Pix/Boleto no crédito) não é sobrescrita.
   const anteriores = await prisma.lancamento.findMany({
     where: { clienteId, categoria: { not: null }, NOT: { categoria: "Outros" } },
     select: { descricao: true, categoria: true },
@@ -44,12 +44,12 @@ export async function categorizarCompras(
     const k = chave(a.descricao);
     if (k && a.categoria && !historico.has(k)) historico.set(k, a.categoria);
   }
-  const aindaOutros: number[] = [];
-  for (const i of pendentesIdx) {
-    const achada = historico.get(chave(descricoes[i]));
-    if (achada) resultado[i] = achada;
-    else aindaOutros.push(i);
+  for (let i = 0; i < descricoes.length; i++) {
+    if (resultado[i] === "Pix/Boleto no crédito") continue;
+    const escolhida = historico.get(chave(descricoes[i]));
+    if (escolhida) resultado[i] = escolhida;
   }
+  const aindaOutros = resultado.map((c, i) => (c === "Outros" ? i : -1)).filter((i) => i >= 0);
   if (aindaOutros.length === 0) return resultado;
 
   // 3) IA só pro que sobrou — um estabelecimento por vez, sem repetir nomes iguais
