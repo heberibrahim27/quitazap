@@ -76,13 +76,21 @@ export default async function DespesasPage({
   const mesSeguinte = mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
   const nomeMes = NOMES_MES[mes - 1];
 
-  const tipos = aba === "fixas" ? ["DESPESA_FIXA"] : aba === "variaveis" ? ["DESPESA_VARIAVEL"] : ["DESPESA_FIXA", "DESPESA_VARIAVEL"];
+  // Compra no cartão também é despesa (o motor e a tela de Gastos já contam): sem ela a lista dizia
+  // "R$ 0,00" no mês de quem só usa cartão e não batia com o resto do app (achado no QA de 08/10/2026).
+  const tipos =
+    aba === "fixas"
+      ? ["DESPESA_FIXA"]
+      : aba === "variaveis"
+        ? ["DESPESA_VARIAVEL", "COMPRA_CARTAO"]
+        : ["DESPESA_FIXA", "DESPESA_VARIAVEL", "COMPRA_CARTAO"];
 
   // Depósito em meta (categoria "Metas") não é despesa — o motor o trata como
   // dinheiro guardado (investimentos); esta lista precisa bater com ele.
   const despesas = (
     await prisma.lancamento.findMany({
       where: { clienteId: cliente.id, tipo: { in: tipos }, data: { gte: inicioMes, lt: fimMes } },
+      include: { cartao: { select: { nome: true } } },
       orderBy: { data: "desc" },
     })
   ).filter((d) => d.categoria !== "Metas");
@@ -145,7 +153,7 @@ export default async function DespesasPage({
                 <div className="mc-list-body">
                   <div className="mc-list-desc">{d.descricao}</div>
                   <div className="mc-list-meta">
-                    {d.tipo === "DESPESA_FIXA" ? "Despesa fixa" : "Despesa variável"}
+                    {d.tipo === "DESPESA_FIXA" ? "Despesa fixa" : d.tipo === "COMPRA_CARTAO" ? `Compra no cartão${d.cartao?.nome ? ` ${d.cartao.nome}` : ""}` : "Despesa variável"}
                     {d.categoria ? ` · ${d.categoria}` : ""}
                     {d.recorrente ? " · recorrente" : ""}
                   </div>

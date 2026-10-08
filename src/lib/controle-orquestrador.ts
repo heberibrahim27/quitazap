@@ -519,6 +519,21 @@ export async function processarMensagemControle(input: {
       return finalizar(respostaPendencia, { estadoNovo: estadoComPendencia, atualizouEstado: true });
     }
 
+    // A IA disse "fora de escopo", mas a regra determinística pode reconhecer um gasto simples
+    // ("paguei 50 pro joao"): regra manda — registra em vez de devolver a apresentação (achado no
+    // QA de 08/10/2026: o passo 11 era terminal e a regra do passo 12 nunca era consultada).
+    if (!intentFinanceiro.emEscopo) {
+      const gastoPelaRegra = registrarGastoControle(mensagem, estadoAntesFluxosControle, new Date(), lancamentosRecentesControle);
+      if (gastoPelaRegra) {
+        const criados = await persistirLancamentosControle(clienteId, gastoPelaRegra.itensParaPersistir, origemLancamentoControle, comprovanteUrlControle);
+        return finalizar(gastoPelaRegra.resposta, {
+          estadoNovo: gastoPelaRegra.estado,
+          atualizouEstado: gastoPelaRegra.atualizouEstado,
+          lancamentosCriados: criados,
+        });
+      }
+    }
+
     // Mensagem que nenhuma regra reconheceu como registro: conversa livre do Quita antes da resposta fixa.
     const conversaLivre = !intentFinanceiro.emEscopo && podeConversarLivre(mensagem) ? await responderConversaLivre(mensagem, clienteId, isGratuito) : null;
     const respostaIntent = conversaLivre ?? formatarPreviaIntentFinanceiro(intentFinanceiro);

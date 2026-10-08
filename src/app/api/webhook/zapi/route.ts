@@ -2293,6 +2293,28 @@ Pode mandar tudo em uma mensagem só.`;
       }
 
       // Mensagem que nenhuma regra reconheceu como registro: conversa livre do Quita antes da resposta fixa.
+      // A IA disse "fora de escopo", mas a regra determinística pode reconhecer um gasto simples
+      // ("paguei 50 pro joao"): regra manda (espelho do chat — achado no QA de 08/10/2026).
+      if (!intentFinanceiro.emEscopo) {
+        const gastoPelaRegra = registrarGastoControle(mensagem, estadoAntesGasto, new Date(), lancamentosRecentesControle);
+        if (gastoPelaRegra) {
+          await sendWhatsApp(telefone, gastoPelaRegra.resposta);
+          await prisma.botSessao.updateMany({
+            where: { id: sessao.id },
+            data: {
+              dividasTemp: JSON.stringify([
+                ...servidorHistoricoSessao,
+                { role: "user", content: mensagem },
+                { role: "assistant", content: gastoPelaRegra.resposta },
+                ...(gastoPelaRegra.atualizouEstado ? [criarMensagemEstadoControle(gastoPelaRegra.estado)] : []),
+              ]),
+            },
+          });
+          after(() => persistirLancamentosControle(sessao.clienteId, gastoPelaRegra.itensParaPersistir, origemLancamentoControle, comprovanteUrlImagem));
+          return NextResponse.json({ ok: true });
+        }
+      }
+
       const conversaLivre =
         !intentFinanceiro.emEscopo && sessao.clienteId && podeConversarLivre(mensagem)
           ? await responderConversaLivre(mensagem, sessao.clienteId, isGratuito, historicoDeSessaoWhatsApp(sessao.dividasTemp, mensagem))
