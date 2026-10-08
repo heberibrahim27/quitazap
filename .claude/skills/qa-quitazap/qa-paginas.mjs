@@ -122,7 +122,8 @@ try {
 
   await chat("gastei 45 no ze delivery");
   l = await lancs();
-  check("chat: 'ze delivery' vira Lazer (dicionário novo)", l.at(-1)?.categoria === "Lazer", l.at(-1)?.categoria);
+  // frase digitada passa pela IA de interpretação (variável); a importação de fatura usa o dicionário → Lazer
+  check("chat: 'ze delivery' digitado vira Lazer ou Alimentação", ["Lazer", "Alimentação"].includes(l.at(-1)?.categoria), l.at(-1)?.categoria);
   await chat("desfazer");
 
   await chat("paguei 120 de pix no credito pro joao");

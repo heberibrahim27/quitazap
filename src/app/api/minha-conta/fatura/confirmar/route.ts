@@ -6,6 +6,7 @@
 // do fluxo de PDF (cartão, parcelas futuras, hash anti-reenvio).
 // ─────────────────────────────────────────
 
+import { respostaSeAssinaturaVencida } from "@/lib/assinatura-acesso";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +23,9 @@ import {
 export async function POST(req: NextRequest) {
   const clienteId = getClienteIdDaRequisicao(req);
   if (!clienteId) return erroClienteNaoAutenticado();
+  // Assinatura vencida/reembolsada/cancelada: sem acesso (mesma regra do WhatsApp).
+  const bloqueioAssinatura = await respostaSeAssinaturaVencida(clienteId);
+  if (bloqueioAssinatura) return bloqueioAssinatura;
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },

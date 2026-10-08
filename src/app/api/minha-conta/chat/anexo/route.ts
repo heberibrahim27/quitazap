@@ -13,6 +13,7 @@
 // seletor, não protege nada sozinho).
 // ─────────────────────────────────────────
 
+import { respostaSeAssinaturaVencida } from "@/lib/assinatura-acesso";
 import { NextRequest, NextResponse } from "next/server";
 import { processarPrintFatura } from "@/lib/ai/fatura-imagem-flow";
 import { registrarPreviaFaturaNoChat, responderNoChat } from "@/lib/fatura-previa-chat";
@@ -75,6 +76,9 @@ async function tratarPrintDeFatura(opts: {
 export async function POST(req: NextRequest) {
   const clienteId = getClienteIdDaRequisicao(req);
   if (!clienteId) return erroClienteNaoAutenticado();
+  // Assinatura vencida/reembolsada/cancelada: sem acesso (mesma regra do WhatsApp).
+  const bloqueioAssinatura = await respostaSeAssinaturaVencida(clienteId);
+  if (bloqueioAssinatura) return bloqueioAssinatura;
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },

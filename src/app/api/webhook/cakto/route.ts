@@ -4,6 +4,7 @@
 // Recebe: purchase_approved, subscription_canceled, etc.
 // ─────────────────────────────────────────
 
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp, normalizarTelefone, variacoesTelefone } from "@/lib/zapi";
@@ -69,8 +70,24 @@ export async function POST(req: NextRequest) {
       console.error("[CAKTO] CAKTO_SECRET não configurado — recusando webhook.");
       return NextResponse.json({ error: "CAKTO_SECRET não configurado" }, { status: 500 });
     }
-    if (body.secret !== secret) {
-      console.warn("[CAKTO] Secret inválido recebido.");
+    // O formato real do aviso da Cakto ainda não foi visto em produção (zero eventos até 08/10/2026).
+    // Aceita o segredo no corpo (formato esperado), no cabeçalho ou na URL — sempre comparado em
+    // tempo constante — pra um detalhe de formato não deixar o cliente pagar e ficar sem acesso.
+    const candidatos = [
+      typeof body.secret === "string" ? body.secret : "",
+      req.nextUrl.searchParams.get("secret") ?? "",
+      req.headers.get("x-cakto-secret") ?? "",
+      req.headers.get("x-webhook-secret") ?? "",
+      (req.headers.get("authorization") ?? "").replace(/^Bearers+/i, ""),
+    ];
+    const esperado = Buffer.from(secret);
+    const secretValido = candidatos.some((c) => {
+      const recebido = Buffer.from(c);
+      return recebido.length === esperado.length && timingSafeEqual(recebido, esperado);
+    });
+    if (!secretValido) {
+      // Só NOMES de campo/cabeçalho (nunca valores) — pra diagnosticar um formato novo nos logs da Vercel.
+      console.warn("[CAKTO] Secret inválido ou ausente. Campos do corpo:", Object.keys(body ?? {}), "| cabeçalhos:", [...req.headers.keys()].join(","));
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

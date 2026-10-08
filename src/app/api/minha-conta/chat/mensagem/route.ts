@@ -6,6 +6,7 @@
 // nunca aceito do corpo da requisição.
 // ─────────────────────────────────────────
 
+import { respostaSeAssinaturaVencida } from "@/lib/assinatura-acesso";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
@@ -49,6 +50,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const clienteId = getClienteIdDaRequisicao(req);
   if (!clienteId) return erroClienteNaoAutenticado();
+  // Assinatura vencida/reembolsada/cancelada: sem acesso (mesma regra do WhatsApp).
+  const bloqueioAssinatura = await respostaSeAssinaturaVencida(clienteId);
+  if (bloqueioAssinatura) return bloqueioAssinatura;
 
   try {
     const body = await req.json();
