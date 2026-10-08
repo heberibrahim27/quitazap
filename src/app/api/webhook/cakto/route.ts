@@ -28,6 +28,9 @@ function classificarStatusCakto(evento: string): string {
   if (e.includes("chargeback")) return "CHARGEBACK";
   if (e.includes("refund")) return "REEMBOLSADA";
   if (e.includes("cancel")) return "CANCELADA";
+  // Renovação mensal da assinatura ("subscription_renewed"...): conta como pagamento aprovado, exceto
+  // renovação RECUSADA/falha (essa não renova).
+  if (e.includes("renew") && !/refus|fail|declin|reject|error|denied/.test(e)) return "APROVADA";
   if (e.includes("approved") || e.includes("paid") || e === "purchase_approved") return "APROVADA";
   return "DESCONHECIDO";
 }
@@ -109,7 +112,15 @@ export async function POST(req: NextRequest) {
     // (retry de webhook), esse create falha por violação de constraint —
     // é assim que detectamos duplicata e paramos antes de renovar
     // assinatura ou reenviar boas-vindas de novo pro mesmo pagamento.
-    const transacaoId = extrairTransacaoId(body.data);
+    // A chave única precisa incluir O QUE aconteceu: um reembolso/chargeback costuma chegar com o MESMO
+    // id do pedido original — com o id puro ele colidia com a compra e era tratado como duplicata
+    // (reembolso ignorado, cliente seguia com acesso). Renovação mensal também repete o id, então
+    // inclui o dia: retry do mesmo dia é duplicata; a renovação do mês seguinte não.
+    const idPedido = extrairTransacaoId(body.data);
+    const ehRenovacao = /renew/i.test(evento);
+    const transacaoId = idPedido
+      ? `${idPedido}#${status}${ehRenovacao ? `#${new Date().toISOString().slice(0, 10)}` : ""}`
+      : null;
     let eventoJaProcessado = false;
     try {
       await prisma.eventoCakto.create({
@@ -150,7 +161,7 @@ export async function POST(req: NextRequest) {
 
     // Ignora qualquer outro evento que não seja compra aprovada (já
     // registrado acima, só não segue pro fluxo de boas-vindas/onboarding).
-    if (body.event !== "purchase_approved") {
+    if (!(evento === "purchase_approved" || (status === "APROVADA" && /renew/i.test(evento)))) {
       return NextResponse.json({ ok: true, skipped: body.event });
     }
 

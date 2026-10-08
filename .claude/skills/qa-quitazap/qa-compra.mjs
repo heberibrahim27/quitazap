@@ -83,7 +83,7 @@ try {
   const sessao = await prisma.botSessao.findFirst({ where: { telefone: TEL } });
   const link = String(sessao?.dividasTemp ?? "").match(/primeiro-acesso\?t=([A-Za-z0-9_\-]+)/);
   check("C2.4 boas-vindas guardam o link de primeiro acesso", !!link, link ? "link ok" : "sem link");
-  check("C2.5 evento registrado como APROVADA", (await prisma.eventoCakto.count({ where: { transacaoId: "qa-compra-1", status: "APROVADA" } })) === 1);
+  check("C2.5 evento registrado como APROVADA", (await prisma.eventoCakto.count({ where: { transacaoId: "qa-compra-1#APROVADA", status: "APROVADA" } })) === 1);
 
   console.log("\n=== C3  Aviso duplicado (a Cakto reenvia)");
   r = await cakto(evento("purchase_approved", "qa-compra-1"));
@@ -164,6 +164,24 @@ try {
   check("C9.2 o app volta a abrir", r.status === 200 && !/Sua assinatura venceu/.test(html), `status=${r.status}`);
   r = await fetch(`${BASE}/api/minha-conta/chat/mensagem`, { method: "POST", headers: { "Content-Type": "application/json", cookie }, body: JSON.stringify({ mensagem: "gastei 10 no mercado" }), signal: AbortSignal.timeout(120000) });
   check("C9.3 o chat volta a registrar", r.status === 200, `status=${r.status}`);
+
+  console.log("\n=== C11  Reembolso com o MESMO id do pedido original e renovação mensal");
+  await prisma.cliente.update({ where: { id: c.id }, data: { gratuito: false, assinaturaVenceEm: new Date(Date.now() + 20 * DIA) } });
+  r = await cakto(evento("purchase_refunded", "qa-compra-1"));
+  c = await cliente();
+  check("C11.1 reembolso com o MESMO id da compra NÃO é tratado como duplicata (expira o acesso)", r.data.duplicate !== true && c.assinaturaVenceEm.getTime() <= Date.now() + 1000, JSON.stringify(r.data));
+  r = await cakto(evento("purchase_refunded", "qa-compra-1"));
+  check("C11.2 o mesmo reembolso reenviado É duplicata (idempotente)", r.data.duplicate === true, JSON.stringify(r.data));
+  await prisma.cliente.update({ where: { id: c.id }, data: { assinaturaVenceEm: new Date(Date.now() + 10 * DIA) } });
+  const antesRenov = (await cliente()).assinaturaVenceEm.getTime();
+  r = await cakto(evento("subscription_renewed", "qa-compra-1"));
+  c = await cliente();
+  check("C11.3 renovação mensal (subscription_renewed) soma 30 dias, mesmo com o id do pedido original", r.status === 200 && Math.abs(c.assinaturaVenceEm.getTime() - (antesRenov + 30 * DIA)) < 60000, `+${Math.round((c.assinaturaVenceEm.getTime() - antesRenov) / DIA)} dias`);
+  r = await cakto(evento("subscription_renewed", "qa-compra-1"));
+  check("C11.4 a mesma renovação reenviada no mesmo dia é duplicata (não soma 2x)", r.data.duplicate === true && (await cliente()).assinaturaVenceEm.getTime() === c.assinaturaVenceEm.getTime(), JSON.stringify(r.data));
+  const antesRecusa = (await cliente()).assinaturaVenceEm.getTime();
+  r = await cakto(evento("subscription_renewal_refused", "qa-compra-9"));
+  check("C11.5 renovação RECUSADA não renova", (await cliente()).assinaturaVenceEm.getTime() === antesRecusa, JSON.stringify(r.data));
 
   console.log("\n=== C10  Cortesia nunca é bloqueada");
   await prisma.cliente.update({ where: { id: c.id }, data: { gratuito: true, assinaturaVenceEm: new Date(Date.now() - 60 * DIA) } });
