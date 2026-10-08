@@ -66,6 +66,7 @@ export async function categorizarCompras(
           content:
             "Você classifica compras de fatura de cartão de um brasileiro em UMA categoria da lista. " +
             "Use o nome do estabelecimento. Se não houver indício razoável do que é, responda \"Outros\" — nunca chute. " +
+            "Nome de empresa que não diz o ramo (Ltda, S.A., Holdings, Comercial, Com de, siglas, nomes de pessoa) é \"Outros\": o cliente escolhe a categoria depois. " +
             "Ferramentas de software, nuvem, hospedagem e anúncios usados no trabalho são Trabalho/Negócio.",
         },
         { role: "user", content: JSON.stringify(unicos.map((d, indice) => ({ indice, estabelecimento: d }))) },

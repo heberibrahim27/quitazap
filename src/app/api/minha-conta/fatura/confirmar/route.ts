@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { getClienteIdDaRequisicao, erroClienteNaoAutenticado } from "@/lib/get-cliente";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
 import { reivindicarPendente } from "@/lib/pendente-atomico";
+import { NOMES_CATEGORIAS_GASTO } from "@/lib/gasto-flow";
 import {
   mensagemLoteConfirmado,
   salvarComprasParceladasFatura,
@@ -29,9 +30,11 @@ export async function POST(req: NextRequest) {
   if (!cliente) return erroClienteNaoAutenticado();
 
   let acao: string;
+  let escolhidas: Record<string, unknown> = {};
   try {
     const body = await req.json();
     acao = String(body.acao ?? "");
+    if (body.categorias && typeof body.categorias === "object") escolhidas = body.categorias as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
   }
@@ -51,6 +54,21 @@ export async function POST(req: NextRequest) {
     resposta = "Sem problema, não lancei nada dessa fatura.";
   } else {
     try {
+      // Categorias escolhidas pelo cliente na prévia (índice da compra → categoria). Só aceita nomes
+      // que existem no app (nunca troca PARA nem DE a categoria estrutural Pix/Boleto no crédito).
+      for (const [idx, cat] of Object.entries(escolhidas)) {
+        const i = Number(idx);
+        if (
+          Number.isInteger(i) &&
+          pendente.compras?.[i] &&
+          pendente.compras[i].categoria !== "Pix/Boleto no crédito" &&
+          typeof cat === "string" &&
+          (NOMES_CATEGORIAS_GASTO as string[]).includes(cat) &&
+          cat !== "Pix/Boleto no crédito"
+        ) {
+          pendente.compras[i].categoria = cat;
+        }
+      }
       await salvarComprasParceladasFatura(clienteId, pendente);
       resposta = mensagemLoteConfirmado(pendente).replace(/\*/g, "");
     } catch (err) {

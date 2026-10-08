@@ -4,6 +4,7 @@
 // (ver /api/minha-conta/fatura/confirmar).
 
 import { prisma } from "@/lib/prisma";
+import { NOMES_CATEGORIAS_GASTO } from "@/lib/gasto-flow";
 import { obterOuCriarSessaoControle } from "@/lib/controle-orquestrador";
 import { faturaTemNovidade, totalNaoBate, type FaturaCartaoPendente } from "@/lib/fatura-cartao-flow";
 
@@ -56,7 +57,8 @@ export async function registrarPreviaFaturaNoChat(
     vencimentoEstimado: lote.vencimentoEstimado ?? false,
     avisoTotal: totalNaoBate(lote) ? { totalImpresso: lote.totalImpresso, somaLida: lote.somaLida } : null,
     ignoradas: lote.jaCadastradas + parecidas + (lote.comprasJaRegistradas ?? 0),
-    compras: (lote.compras ?? []).map((c) => ({ descricao: c.descricao, valor: c.valor, data: c.data })),
+    compras: (lote.compras ?? []).map((c) => ({ descricao: c.descricao, valor: c.valor, data: c.data, categoria: c.categoria ?? "Outros" })),
+    categorias: NOMES_CATEGORIAS_GASTO.filter((n) => n !== "Pix/Boleto no crédito"),
     itens: lote.confirmados.map((i) => ({
       descricao: i.descricao,
       parcelaAtual: i.parcelaAtual,

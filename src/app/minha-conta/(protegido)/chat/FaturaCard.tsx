@@ -10,7 +10,8 @@ export type FaturaDado = {
   vencimentoEstimado?: boolean;
   ignoradas?: number;
   avisoTotal?: { totalImpresso?: number; somaLida?: number } | null;
-  compras?: { descricao: string; valor: number; data: string }[];
+  compras?: { descricao: string; valor: number; data: string; categoria?: string }[];
+  categorias?: string[];
   itens: {
     descricao: string;
     parcelaAtual: number;
@@ -47,6 +48,8 @@ export function FaturaCard({
   const [resolvendo, setResolvendo] = useState<"confirmar" | "negar" | null>(null);
   const [resolvido, setResolvido] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Categorias escolhidas pelo cliente para compras que o app não soube classificar (índice → categoria).
+  const [escolhidas, setEscolhidas] = useState<Record<number, string>>({});
 
   async function responder(acao: "confirmar" | "negar") {
     if (resolvendo || resolvido) return;
@@ -56,7 +59,7 @@ export function FaturaCard({
       const res = await fetch("/api/minha-conta/fatura/confirmar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao }),
+        body: JSON.stringify({ acao, categorias: acao === "confirmar" ? escolhidas : undefined }),
       });
       const dados = await res.json();
       if (!res.ok) {
@@ -95,7 +98,29 @@ export function FaturaCard({
           <span>
             {c.descricao}
             <br />
-            <small>{fmtData(c.data)}</small>
+            <small>
+              {fmtData(c.data)}
+              {c.categoria && c.categoria !== "Outros" ? ` · ${c.categoria}` : ""}
+            </small>
+            {(c.categoria ?? "Outros") === "Outros" && (dado.categorias?.length ?? 0) > 0 && (
+              <>
+                <br />
+                <select
+                  aria-label={`Categoria de ${c.descricao}`}
+                  value={escolhidas[idx] ?? "Outros"}
+                  onChange={(e) => setEscolhidas((atual) => ({ ...atual, [idx]: e.target.value }))}
+                  disabled={resolvendo !== null}
+                  style={{ marginTop: 4, maxWidth: "100%" }}
+                >
+                  <option value="Outros">Outros — escolher categoria…</option>
+                  {dado.categorias!.filter((n) => n !== "Outros").map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </span>
           <span className="mc-comprovante-valor">{fmtValor(c.valor)}</span>
         </div>

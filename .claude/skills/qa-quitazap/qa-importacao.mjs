@@ -202,7 +202,12 @@ async function main() {
   check("R1.3 vencimento 2026-11-01 (do nome) e não estimado", d1.vencimento === "2026-11-01" && !d1.vencimentoEstimado, d1.vencimento);
   let e = await estado(A);
   check("R1.4 NADA gravado antes de confirmar", e.lancs.length === 0 && e.dividas.length === 0, `lanc=${e.lancs.length} div=${e.dividas.length}`);
-  r = await postJson(A, "/api/minha-conta/fatura/confirmar", { acao: "confirmar" });
+  // categoria por compra já na prévia + escolha do cliente pro que o app não soube classificar
+  check("R1.4b prévia traz categoria em cada compra e a lista de categorias", d1.compras?.every((c) => typeof c.categoria === "string") && d1.categorias?.includes("Transporte") && !d1.categorias?.includes("Pix/Boleto no crédito"), JSON.stringify(d1.categorias?.slice(0, 3)));
+  const iSantos = d1.compras.findIndex((c) => /santos pedreira/i.test(c.descricao));
+  const iVercel = d1.compras.findIndex((c) => /vercel/i.test(c.descricao));
+  const iPix = d1.compras.findIndex((c) => /pix no cr/i.test(c.descricao));
+  r = await postJson(A, "/api/minha-conta/fatura/confirmar", { acao: "confirmar", categorias: { [iSantos]: "Educação", [iVercel]: "CategoriaInventada", [iPix]: "Lazer" } });
   check("R1.5 confirmar responde 200", r.status === 200, r.data.resposta?.slice(0, 80) ?? r.data.error);
   e = await estado(A);
   check("R1.6 21 gastos no cartão, soma 2644.42", e.lancs.length === 21 && Math.abs(e.soma - 2644.42) < 0.02, `n=${e.lancs.length} soma=${e.soma}`);
@@ -211,6 +216,8 @@ async function main() {
   const kiwi = porCredor(e, "Kiwify");
   check("R1.9 parcelas futuras da Kiwify são 11 e 12, vencendo dia 1", kiwi && kiwi.parcelas.map((p) => p.numero).join() === "11,12" && kiwi.parcelas.every((p) => p.vencimento.getUTCDate() === 1), kiwi?.parcelas.map((p) => `${p.numero}:${p.vencimento.toISOString().slice(0, 10)}`).join());
   check("R1.10 Pix/Boleto no crédito = 3 lançamentos; IOF em Impostos/Taxas = 4", cats(e)["Pix/Boleto no crédito"] === 3 && cats(e)["Impostos/Taxas"] === 4, JSON.stringify(cats(e)));
+  check("R1.10b categoria escolhida pelo cliente na prévia é gravada (Santos → Educação)", e.lancs.find((l) => /santos pedreira/i.test(l.descricao))?.categoria === "Educação", e.lancs.find((l) => /santos pedreira/i.test(l.descricao))?.categoria);
+  check("R1.10c categoria inventada é recusada (Vercel segue Trabalho/Negócio) e Pix/Boleto no crédito não é sobrescrito", e.lancs.find((l) => /vercel/i.test(l.descricao))?.categoria === "Trabalho/Negócio" && e.lancs.filter((l) => /pix no cr/i.test(l.descricao)).every((l) => l.categoria === "Pix/Boleto no crédito"));
   check("R1.11 Atacadão como Mercado, Zé Delivery como Lazer", e.lancs.find((l) => /atacadao/i.test(l.descricao))?.categoria === "Mercado" && e.lancs.find((l) => /ze delivery|zé delivery/i.test(l.descricao))?.categoria === "Lazer");
   const base = { lanc: e.lancs.length, div: e.dividas.length, soma: e.soma };
 

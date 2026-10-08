@@ -64,6 +64,8 @@ export interface CompraFatura {
   data: string; // YYYY-MM-DD
   /** Só quando a linha é parcelada (ex.: "1/3" → 1). */
   parcelaAtual?: number | null;
+  /** Categoria proposta na prévia (o cliente pode trocar antes de salvar). */
+  categoria?: string;
 }
 
 export interface FaturaCartaoDetectada {
@@ -373,9 +375,14 @@ export async function montarFaturaCartaoPendente(
 
   const chave = (descricao: string, valor: number) => `${normalizar(descricao)}|${Math.round(valor * 100)}`;
   const novasComoDivida = new Set(confirmados.map((i) => chave(i.descricao, i.valorParcela)));
-  const comprasParaGasto = comprasNovas.filter(
+  // Categoria já na prévia: o cliente vê o que o app decidiu e corrige o que ficou em "Outros".
+  const comprasParaGastoBase = comprasNovas.filter(
     (c) => c.parcelaAtual == null || c.parcelaAtual <= 1 || novasComoDivida.has(chave(c.descricao, c.valor))
   );
+
+  const dono = comprasParaGastoBase.length > 0 ? await prisma.cliente.findUnique({ where: { id: clienteId }, select: { gratuito: true } }) : null;
+  const categoriasPropostas = await categorizarCompras(clienteId, dono?.gratuito ?? false, comprasParaGastoBase.map((c) => c.descricao));
+  const comprasComCategoria = comprasParaGastoBase.map((c, i) => ({ ...c, categoria: categoriasPropostas[i] }));
 
   return {
     cartaoId: cartao.id,
@@ -385,7 +392,7 @@ export async function montarFaturaCartaoPendente(
     vencimentoEstimado: fatura.vencimentoEstimado,
     totalImpresso: fatura.totalImpresso,
     somaLida: Math.round((fatura.compras ?? []).filter(compraValida).reduce((s, c) => s + c.valor, 0) * 100) / 100,
-    compras: comprasParaGasto,
+    compras: comprasComCategoria,
     comprasJaRegistradas,
     filaAmbiguos,
     indice: 0,
@@ -482,8 +489,12 @@ export async function salvarComprasParceladasFatura(
   // que o gasto por texto no cartão, com a data da compra. Sem alerta de
   // orçamento: é importação de histórico, não um gasto novo do dia.
   if (pendente.compras && pendente.compras.length > 0) {
-    const dono = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { gratuito: true } });
-    const categorias = await categorizarCompras(clienteId, dono?.gratuito ?? false, pendente.compras.map((c) => c.descricao));
+    // A prévia já traz a categoria (e o cliente pode ter trocado). Pendência antiga, sem categoria: calcula agora.
+    const semCategoria = pendente.compras.filter((c) => !c.categoria);
+    const dono = semCategoria.length > 0 ? await prisma.cliente.findUnique({ where: { id: clienteId }, select: { gratuito: true } }) : null;
+    const calculadas = semCategoria.length > 0 ? await categorizarCompras(clienteId, dono?.gratuito ?? false, semCategoria.map((c) => c.descricao)) : [];
+    let proxima = 0;
+    const categorias = pendente.compras.map((c) => c.categoria ?? calculadas[proxima++]);
     await prisma.lancamento.createMany({
       data: pendente.compras.map((c, i) => ({
         clienteId,
