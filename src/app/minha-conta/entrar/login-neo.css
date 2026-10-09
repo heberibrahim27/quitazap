@@ -1,0 +1,159 @@
+/* ─────────────────────────────────────────
+   QuitaZAP — Login do cliente ("Minha Conta")
+   Visual neomórfico aprovado pelo Ibrahim em 09/10/2026 (proposta no
+   artefato "Telas QuitaZAP"): superfícies em relevo, campos afundados,
+   botão azul em pílula. Tela própria, isolada de minha-conta.css.
+   Prefixo "qzn-entrar" evita colisão com o resto do app.
+   ───────────────────────────────────────── */
+
+.qzn-entrar {
+  --nq-bg: #e8eef8;
+  --nq-fg: #0c1730;
+  --nq-muted: #566784;
+  --nq-hi: rgba(255, 255, 255, 0.95);
+  --nq-lo: rgba(140, 160, 200, 0.55);
+  --nq-rim: rgba(255, 255, 255, 0.7);
+  --nq-accent: #1f5bff;
+  --nq-bad: #c9302f;
+  --nq-bad-bg: #fbdede;
+
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--nq-bg);
+  color: var(--nq-fg);
+}
+
+.qzn-entrar * { box-sizing: border-box; }
+
+/* Círculos decorativos em relevo / afundados */
+.qzn-blob { position: absolute; border-radius: 50%; pointer-events: none; background: var(--nq-bg); }
+.qzn-blob.alto {
+  box-shadow: -6px -6px 14px var(--nq-hi), 8px 8px 18px var(--nq-lo), inset 1px 1px 0 var(--nq-rim);
+}
+.qzn-blob.fundo {
+  box-shadow: inset 5px 5px 10px var(--nq-lo), inset -5px -5px 10px var(--nq-hi);
+}
+.qzn-blob.b1 {
+  width: 300px; height: 300px; left: -150px; top: -120px;
+  background: radial-gradient(circle at 70% 70%, rgba(60, 110, 255, 0.3), transparent 70%), var(--nq-bg);
+}
+.qzn-blob.b2 { width: 170px; height: 170px; right: -85px; top: 38%; }
+.qzn-blob.b3 { width: 220px; height: 220px; left: -110px; bottom: 6%; }
+
+.qzn-stage {
+  position: relative; z-index: 2;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: clamp(40px, 11vh, 92px) 28px max(28px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: stretch;
+}
+
+/* ── Marca ───────────────────────────────────── */
+.qzn-brand {
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  animation: qzn-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.qzn-brand-logo {
+  display: block; width: 88px; height: auto;
+  filter: drop-shadow(0 10px 14px rgba(31, 91, 255, 0.35));
+}
+.qzn-title { margin: 0; text-align: center; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.qzn-sub {
+  margin: 8px 0 0; text-align: center;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--nq-muted);
+}
+
+/* ── Formulário ──────────────────────────────── */
+.qzn-form {
+  margin-top: clamp(32px, 7vh, 56px);
+  display: flex; flex-direction: column; gap: 18px;
+  animation: qzn-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+.qzn-field {
+  display: flex; align-items: center; gap: 12px;
+  height: 58px; padding: 0 20px;
+  border-radius: 999px;
+  background: var(--nq-bg);
+  box-shadow: inset 5px 5px 10px var(--nq-lo), inset -5px -5px 10px var(--nq-hi);
+  color: var(--nq-muted);
+  transition: box-shadow 0.15s ease;
+}
+.qzn-field:focus-within {
+  box-shadow: inset 5px 5px 10px var(--nq-lo), inset -5px -5px 10px var(--nq-hi), 0 0 0 3px rgba(31, 91, 255, 0.25);
+}
+.qzn-field > svg { width: 22px; height: 22px; flex: none; }
+.qzn-field input {
+  flex: 1; min-width: 0;
+  background: transparent; border: none; outline: none; padding: 0;
+  color: var(--nq-fg); font: inherit; font-size: 16px; font-weight: 500; /* 16px evita o zoom do iOS */
+  caret-color: var(--nq-accent);
+}
+.qzn-field input::placeholder { color: var(--nq-muted); font-weight: 400; opacity: 0.85; }
+
+.qzn-eye-btn {
+  background: none; border: none; padding: 6px; margin-right: -6px;
+  color: var(--nq-muted); cursor: pointer; flex: none; display: flex; align-items: center;
+}
+.qzn-eye-btn svg { width: 22px; height: 22px; }
+
+.qzn-forgot-link {
+  align-self: flex-end;
+  background: none; border: none; padding: 2px 6px 0 0;
+  font: inherit; font-size: 14.5px; font-weight: 600;
+  color: var(--nq-accent); cursor: pointer;
+}
+
+.qzn-error-banner {
+  padding: 12px 16px; border-radius: 18px;
+  background: var(--nq-bad-bg); color: var(--nq-bad);
+  font-size: 13.5px; font-weight: 500; line-height: 1.4; text-align: center;
+  box-shadow: -4px -4px 9px var(--nq-hi), 5px 5px 12px var(--nq-lo), inset 1px 1px 0 var(--nq-rim);
+}
+
+/* ── ENTRAR ──────────────────────────────────── */
+.qzn-btn-enter {
+  position: relative;
+  width: 100%; height: 54px;
+  border: none; border-radius: 999px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font: inherit; font-size: 16px; font-weight: 600;
+  background:
+    radial-gradient(180px 40px at 30% 0%, rgba(255, 255, 255, 0.35), transparent 70%),
+    linear-gradient(180deg, #4a92ff, var(--nq-accent));
+  box-shadow:
+    0 14px 24px -10px rgba(31, 91, 255, 0.8),
+    -4px -4px 10px var(--nq-hi),
+    inset 2px 2px 3px rgba(255, 255, 255, 0.45),
+    inset -3px -4px 8px rgba(0, 25, 130, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.qzn-btn-enter:hover { box-shadow: 0 18px 30px -8px rgba(31, 91, 255, 0.95), 0 0 0 4px rgba(59, 130, 255, 0.25), -4px -4px 10px var(--nq-hi), inset 2px 2px 3px rgba(255, 255, 255, 0.55), inset -3px -4px 8px rgba(0, 25, 130, 0.4); }
+.qzn-btn-enter:active { transform: scale(0.98); }
+.qzn-btn-enter:disabled { cursor: default; opacity: 0.75; }
+.qzn-btn-arrow {
+  position: absolute; right: 9px; top: 9px;
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.4);
+}
+.qzn-btn-arrow svg { width: 18px; height: 18px; }
+
+/* ── Rodapé ──────────────────────────────────── */
+.qzn-foot { margin-top: auto; padding-top: 40px; text-align: center; }
+.qzn-lema {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--nq-muted);
+}
+.qzn-foot a { display: inline-block; margin-top: 12px; font-size: 12px; color: var(--nq-muted); text-decoration: underline; }
+
+@keyframes qzn-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .qzn-brand, .qzn-form { animation: none; }
+}
