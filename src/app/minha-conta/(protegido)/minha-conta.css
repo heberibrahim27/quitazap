@@ -287,7 +287,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .hero-glass .stat-icon { width: 24px; height: 24px; }
 .hero-glass .stat-icon svg { width: 12px; height: 12px; }
 @media (max-width: 380px) { .hero-glass .stat-icon { display: none; } }
-.hero-glass .stat-label { color: rgba(255,255,255,0.78); font-size: 10.5px; white-space: normal; line-height: 1.2; }
+/* min-height de 2 linhas + texto colado embaixo: rótulo de 1 linha
+   ("Comprometido") e de 2 linhas ("Renda mensal") deixam de empurrar os
+   números pra alturas diferentes — os 3 valores ficam na mesma linha. */
+.hero-glass .stat-label { color: rgba(255,255,255,0.78); font-size: 10.5px; white-space: normal; line-height: 1.2; min-height: 2.4em; display: flex; align-items: flex-end; }
 /* Fonte proporcional (a mono do resto do app é larga demais pra 3 colunas) e
    tamanho que acompanha a largura da tela. Sem nowrap de propósito: um valor
    gigante quebra de linha em vez de esconder dígitos. */
