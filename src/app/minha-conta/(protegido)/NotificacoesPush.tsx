@@ -79,6 +79,13 @@ export function NotificacoesPush({ debug = false, buildId = "dev" }: { debug?: b
       ]);
       const inscricaoAtual = await registro.pushManager.getSubscription();
       setEstado(inscricaoAtual ? "ativo" : "suportado");
+      // Auto-cura (achado em 08/10/2026): o aparelho mostrava "Ativadas" mas o
+      // banco tinha 0 inscrições — a tela só olhava o estado LOCAL do
+      // navegador, então nenhum aviso chegava. Reenviar a inscrição atual é
+      // idempotente (upsert por endpoint) e garante que o servidor a conhece.
+      if (inscricaoAtual) {
+        inscreverPush(inscricaoAtual.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }).catch(() => {});
+      }
     }
     verificar().catch(() => setEstado("nao-suportado"));
   }, []);

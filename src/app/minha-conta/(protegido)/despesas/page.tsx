@@ -103,15 +103,6 @@ export default async function DespesasPage({
       hrefAnterior={`/minha-conta/despesas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}&aba=${aba}`}
       hrefSeguinte={`/minha-conta/despesas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}&aba=${aba}`}
     >
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11L12 4l8 7" /><path d="M6 9.5V20a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1V9.5" /></svg>
-          </span>
-          <span className="title-label">Despesas — {nomeMes}/{ano}</span>
-        </p>
-      </div>
-
       <div className="mc-tabs">
         {ABAS.map((a) => (
           <Link key={a} href={`/minha-conta/despesas?${sufixoMes}&aba=${a}`} className={`mc-tab ${aba === a ? "active" : ""}`}>
