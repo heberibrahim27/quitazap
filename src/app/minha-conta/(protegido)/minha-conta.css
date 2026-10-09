@@ -24,7 +24,7 @@
      de antes praticamente não mostravam efeito nenhum. --bg continua
      existindo só pra bordas que precisam de uma cor sólida (ex: anel do
      botão "+"), não mais como fundo da página. */
-  --bg-gradient: radial-gradient(ellipse 140vw 75vh at 50% 0, #F5F6F8 0%, #EBEDF0 55%, #E1E4E8 100%);
+  --bg-gradient: radial-gradient(ellipse 140vw 75vh at 50% 0, #F1F5FC 0%, #E8EEF8 55%, #DDE5F2 100%);
   --card: #FFFFFF;
   --card-tint: #F8FBFF;
   --ink: #0B1E33;
@@ -48,7 +48,9 @@
   /* Sombra de elevação: o card "flutua" sobre o fundo (sombra suave só
      embaixo, sem luz do outro lado) + friso interno bem fino e claro no
      topo, como o brilho de vidro pegando luz. */
-  --shadow-card: 0 36px 60px -16px rgba(60, 70, 90, 0.35), 0 14px 26px -8px rgba(60, 70, 90, 0.28), inset 0 1.5px 1px rgba(255, 255, 255, 0.85);
+  /* Cards em alto relevo (neomorfismo aprovado em 09/10/2026): luz branca em
+     cima à esquerda, sombra azul-acinzentada embaixo à direita. */
+  --shadow-card: -6px -6px 14px rgba(255, 255, 255, 0.95), 9px 12px 24px -4px rgba(140, 160, 200, 0.55), inset 1px 1px 0 rgba(255, 255, 255, 0.85);
   --shadow-hero: 0 20px 40px -18px rgba(7, 27, 61, 0.45);
 
   /* tokens antigos — mantidos pelas telas que ainda não migraram
@@ -1610,16 +1612,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   margin: 0 auto 12px; padding: 6px 10px; width: fit-content;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.72));
+  /* Pílula em alto relevo (neomorfismo) com as setas em botões redondos também em relevo. */
+  background: linear-gradient(160deg, #fbfdff, #e3ebfa);
   box-shadow:
-    0 0 0 1px rgba(59,130,255,0.35),
-    0 8px 20px -8px rgba(59,130,255,0.6),
-    inset 0 1px 0 #fff;
+    -5px -5px 11px rgba(255,255,255,0.95),
+    6px 6px 14px rgba(140,160,200,0.55),
+    inset 1px 1px 0 rgba(255,255,255,0.8);
 }
 .mc-mes-seta {
-  width: 32px; height: 32px; flex-shrink: 0;
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: var(--blue); text-decoration: none;
+  background: linear-gradient(160deg, #fbfdff, #e9f0fc);
+  box-shadow: -3px -3px 7px rgba(255,255,255,0.95), 3px 3px 8px rgba(140,160,200,0.55), inset 1px 1px 0 rgba(255,255,255,0.8);
   transition: transform 0.12s ease, opacity 0.12s ease;
 }
 .mc-mes-seta:active { transform: scale(0.88); }
