@@ -835,10 +835,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 /* ── "Onde está indo meu dinheiro": categorias expansíveis ── */
 .gasto-categoria-toggle {
   all: unset;
-  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  /* Colunas fixas: ícone | nome+barra (flexível) | valor | seta. Assim o valor
+     e a seta caem no mesmo lugar em todas as linhas. */
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) 104px 16px; align-items: center; column-gap: 10px;
+  padding: 12px 0;
   width: 100%; cursor: pointer; box-sizing: border-box;
   border-top: 1px solid transparent; border-image: var(--divisor-gradiente) 1;
 }
+.gasto-col-nome { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.gasto-categoria-toggle .resumo-value { width: 100%; }
+.gasto-categoria-toggle > svg { margin: 0 !important; justify-self: end; }
 .gasto-categoria-conteudo { padding: 0 0 10px 44px; }
 
 .gasto-orcamento { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--card-tint); }
