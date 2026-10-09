@@ -298,6 +298,20 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
    gigante quebra de linha em vez de esconder dígitos. */
 .hero-glass .stat-value { color: #fff; font-family: inherit; font-weight: 800; font-size: clamp(10px, 2.8vw, 13px); letter-spacing: -0.02em; margin-top: 2px; white-space: nowrap; }
 .hero-glass-aviso { margin: 0; font-size: 12px; font-weight: 700; color: #FFB4C0; text-align: center; }
+.hero-glass-aviso.previsto { color: #CFE6FF; }
+
+/* Teto de compras no crédito do ciclo */
+.teto-card { padding-bottom: 16px; }
+.teto-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 0 2px 12px; }
+.teto-rot { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--ink-faint); }
+.teto-valor { margin: 2px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.teto-trilho { height: 10px; border-radius: 999px; overflow: hidden; background: rgba(226, 234, 248, 0.8); box-shadow: inset 2px 2px 5px rgba(140, 160, 200, 0.5), inset -2px -2px 5px rgba(255, 255, 255, 0.95); }
+.teto-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4a92ff, #1f5bff); }
+.teto-fill.atencao { background: linear-gradient(90deg, #ffd166, #f59e0b); }
+.teto-fill.quase { background: linear-gradient(90deg, #ffb26b, #f97316); }
+.teto-fill.acima { background: linear-gradient(90deg, #ff8fa3, #e23b5c); }
+.teto-msg { margin: 12px 2px 0; font-size: 13.5px; line-height: 1.45; color: var(--ink); }
+.teto-nota { margin: 6px 2px 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-faint); }
 .hero-glass-bar { padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.16); }
 .hero-glass-bar-top {
   display: flex; align-items: baseline; justify-content: space-between;

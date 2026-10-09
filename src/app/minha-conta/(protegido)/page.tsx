@@ -15,6 +15,10 @@ import { MesFiltro } from "./MesFiltro";
 import { AbaResumo } from "./AbaResumo";
 import { AbasHome } from "./AbasHome";
 import { inicioDeAmanhaBrasil } from "@/lib/financeiro/receita-futura";
+import { avaliarCaixaPrevisto } from "@/lib/financeiro/caixa-previsto";
+import { carregarReceitasPrevistas } from "@/lib/financeiro/caixa-previsto-service";
+import { carregarTetoCredito } from "@/lib/financeiro/teto-credito-service";
+import { TetoCreditoCard } from "./TetoCreditoCard";
 
 function fmtValor(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -156,7 +160,13 @@ export default async function MinhaContaPage({
   // (totais + plano de pagamento + parcelas) uma segunda vez no mesmo
   // request — essa duplicação era uma das causas da demora ao trocar de
   // mês.
-  const limiteSeguro = ehMesAtual ? await calcularLimiteSeguro(cliente.id, new Date(), resumoFinanceiro) : null;
+  const [limiteSeguro, receitasPrevistas] = ehMesAtual
+    ? await Promise.all([
+        calcularLimiteSeguro(cliente.id, new Date(), resumoFinanceiro),
+        // Entradas previstas (salário recorrente que ainda não caiu etc.) — só leitura, só mês atual.
+        carregarReceitasPrevistas(cliente.id, { inicio: inicioMes, fim: fimMes }),
+      ])
+    : [null, []];
 
   // Itens dos resumos das abas (Receita / Despesas / Metas). Vêm todos de uma
   // vez porque a troca de aba é só no cliente, sem nova requisição.
@@ -266,6 +276,19 @@ export default async function MinhaContaPage({
   const heroDisponivel = resumoPlano.calculavel ? resumoPlano.saldoProjetado : resultadoMes;
   const semDadosNoMes = !resumoPlano.calculavel && quantidadeLancamentos === 0;
   const heroComprometido = resumoPlano.calculavel ? resumoPlano.totalComprometido : totalSaidasMes;
+
+  // Entradas previstas × saldo do mês (ver caixa-previsto.ts): o número negativo
+  // continua verdadeiro, mas quando um salário previsto cobre a lacuna a tela
+  // diz isso em vez de só assustar. Quem tem dívida ativa nunca vê "sobra" —
+  // vê "caixa livre pra ganhar respiro" (decisão com o ChatGPT, 09/10/2026).
+  const caixa = avaliarCaixaPrevisto(heroDisponivel, receitasPrevistas);
+  const temDividaAtiva = dividas.length > 0;
+  const rotuloLivre = temDividaAtiva ? "Caixa livre pra ganhar respiro" : "Sobra prevista";
+  const textoEntrada = caixa.proxima ? `${caixa.proxima.descricao} de ${fmtValor(caixa.proxima.valor)} previsto pra ${fmtData(caixa.proxima.data)}` : "";
+  const esperandoEntrada = caixa.estado === "COBERTO";
+  // Teto de compras no crédito do ciclo: só pra quem tem dívida ativa (é quem usa o cartão como válvula
+  // de escape) e só no mês atual. Sem renda confiável ou sem cartão com fechamento, vem null (nada inventado).
+  const tetoCredito = ehMesAtual && temDividaAtiva ? await carregarTetoCredito(cliente.id, resumoFinanceiro, caixa.totalPrevisto, cliente.rendaMensal) : null;
 
   const totalAlvoMetas = agregadoMetas._sum.valorAlvo ?? 0;
   const totalGuardadoMetas = agregadoDepositos._sum.valor ?? 0;
@@ -456,8 +479,11 @@ export default async function MinhaContaPage({
         {/* Passou de 100%: o número sozinho não mostra o tamanho do estouro
             (achado real via print do Ibrahim, revisão do ChatGPT) — por isso o
             aviso explícito continua aqui, além do % em destaque. */}
-        {acimaDoLimite && pctComprometida != null && (
+        {acimaDoLimite && pctComprometida != null && !esperandoEntrada && (
           <p className="hero-glass-aviso">{Math.round(pctComprometida - 100)}% acima da renda prevista</p>
+        )}
+        {esperandoEntrada && (
+          <p className="hero-glass-aviso previsto">Aguardando entrada prevista: {textoEntrada}</p>
         )}
         {percentualMetas != null && (
           <div className="hero-glass-bar">
@@ -524,10 +550,10 @@ export default async function MinhaContaPage({
             </span>
             PLANO DE PAGAMENTO
           </p>
-          <Link href="/minha-conta/plano" className={`plano-card ${resumoPlano.saldoProjetado >= 0 ? "pos" : "neg"}`}>
+          <Link href="/minha-conta/plano" className={`plano-card ${resumoPlano.saldoProjetado >= 0 || esperandoEntrada ? "pos" : "neg"}`}>
         <span className="plano-glow" aria-hidden="true" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="plano-art" src={resumoPlano.saldoProjetado >= 0 ? "/plano-ok.webp" : "/plano-alerta.webp"} alt="" width={420} height={420} aria-hidden="true" decoding="async" />
+        <img className="plano-art" src={resumoPlano.saldoProjetado >= 0 || esperandoEntrada ? "/plano-ok.webp" : "/plano-alerta.webp"} alt="" width={420} height={420} aria-hidden="true" decoding="async" />
         {/* "Saúde financeira" como veredito é só do card dedicado abaixo
             (SaudeFinanceiraCard) — esse aqui fala só do plano de pagamento
             deste mês, pra nunca contradizer o outro (ex: saldo positivo aqui +
@@ -538,11 +564,13 @@ export default async function MinhaContaPage({
           ) : (
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 7v6" /><path d="M12 17h.01" /></svg>
           )}
-          {resumoPlano.saldoProjetado >= 0 ? "Plano em dia" : "Atenção"}
+          {resumoPlano.saldoProjetado >= 0 ? "Plano em dia" : esperandoEntrada ? "Aguardando entrada" : "Atenção"}
         </span>
         <p className="plano-headline">
           {resumoPlano.saldoProjetado >= 0 ? (
             <>Seu plano de pagamento <span className="plano-headline-destaque">está em dia</span></>
+          ) : esperandoEntrada ? (
+            <>Sua entrada prevista <span className="plano-headline-destaque">cobre o mês</span></>
           ) : (
             <>Suas contas <span className="plano-headline-destaque">estão no vermelho</span></>
           )}
@@ -550,7 +578,11 @@ export default async function MinhaContaPage({
         <p className="plano-caption">
           {resumoPlano.saldoProjetado >= 0
             ? `Saldo previsto de ${fmtValor(resumoPlano.saldoProjetado)} este mês`
-            : `Faltam ${fmtValor(Math.abs(resumoPlano.saldoProjetado))} pra fechar ${nomeMes.toLowerCase()} — veja seu plano de pagamento`}
+            : esperandoEntrada
+              ? `Hoje faltam ${fmtValor(caixa.falta)} pra cobrir os compromissos, mas ${textoEntrada} cobre esse valor. ${rotuloLivre}: ${fmtValor(caixa.saldoComPrevistas)}.`
+              : caixa.estado === "DEFICIT_PROJETADO"
+                ? `Mesmo com ${textoEntrada}, faltam ${fmtValor(Math.abs(caixa.saldoComPrevistas))} pra fechar ${nomeMes.toLowerCase()} — veja seu plano de pagamento`
+                : `Faltam ${fmtValor(Math.abs(resumoPlano.saldoProjetado))} pra fechar ${nomeMes.toLowerCase()} — veja seu plano de pagamento${ehMesAtual ? ". Cadastre seu salário como receita recorrente pra eu mostrar o que vem aí." : ""}`}
         </p>
         <span className="plano-cta">
           Ver meu plano
@@ -560,7 +592,9 @@ export default async function MinhaContaPage({
         </>
       )}
 
-      {limiteSeguro && <LimiteSeguroCard limite={limiteSeguro} />}
+      {limiteSeguro && <LimiteSeguroCard limite={limiteSeguro} entradaPrevista={esperandoEntrada ? { texto: textoEntrada, depoisLabel: rotuloLivre, depoisValor: caixa.saldoComPrevistas } : null} />}
+
+      {tetoCredito && <TetoCreditoCard teto={tetoCredito} />}
 
       <div className="card-head">
         <p className="card-title">

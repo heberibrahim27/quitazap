@@ -32,7 +32,14 @@ const CABECALHO = (
 
 // Título fica FORA de .card (mesmo padrão do "Resumo"/"Saúde financeira"
 // na Home: card-head como irmão antes do card, não aninhado dentro dele).
-export function LimiteSeguroCard({ limite }: { limite: LimiteSeguro }) {
+export function LimiteSeguroCard({
+  limite,
+  entradaPrevista = null,
+}: {
+  limite: LimiteSeguro;
+  /** Quando uma entrada prevista (salário recorrente etc.) cobre o saldo negativo do mês. */
+  entradaPrevista?: { texto: string; depoisLabel: string; depoisValor: number } | null;
+}) {
   // Sem renda lançada este mês nem declarada no Perfil: saldoLivre/
   // limiteSeguroDiario seriam só "0 menos despesas", não um saldo real —
   // não mostra como se fosse (achado de auditoria de edge case, mesmo
@@ -120,12 +127,23 @@ export function LimiteSeguroCard({ limite }: { limite: LimiteSeguro }) {
         {(negativo || limite.diaApertado) && (
           <ul className="saude-razoes">
             {negativo && (
-              <li className="saude-razao negativa">
-                <span className="saude-razao-icone" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                </span>
-                <span>Sua sobra prevista até o fim do mês já está negativa.</span>
-              </li>
+              entradaPrevista ? (
+                <li className="saude-razao atencao">
+                  <span className="saude-razao-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 2.5" /></svg>
+                  </span>
+                  <span>
+                    Ainda falta entrar dinheiro: {entradaPrevista.texto} cobre o mês. {entradaPrevista.depoisLabel}: {fmt(entradaPrevista.depoisValor)}.
+                  </span>
+                </li>
+              ) : (
+                <li className="saude-razao negativa">
+                  <span className="saude-razao-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                  </span>
+                  <span>Seu saldo até o fim do mês já está negativo.</span>
+                </li>
+              )
             )}
             {limite.diaApertado && (
               <li className="saude-razao atencao">
