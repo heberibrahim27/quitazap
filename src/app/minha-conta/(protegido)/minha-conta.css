@@ -341,7 +341,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .aba-destaque.verde { background: linear-gradient(135deg, rgba(53,211,136,0.22), rgba(255,255,255,0.7) 70%); }
 .aba-destaque.vermelho { background: linear-gradient(135deg, rgba(240,70,108,0.17), rgba(255,255,255,0.7) 70%); }
 .aba-destaque.azul { background: linear-gradient(135deg, rgba(79,140,255,0.2), rgba(255,255,255,0.7) 70%); }
-.aba-destaque-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+/* Rótulo no topo do card (esquerda) e chip na mesma linha (direita); o valor
+   vem logo abaixo, alinhado ao rótulo. O div interno vira "transparente"
+   (display: contents) pra não precisar mudar o HTML de cada página. */
+.aba-destaque-topo { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center; }
+.aba-destaque-topo > div { display: contents; }
+.aba-destaque-rot { grid-column: 1; grid-row: 1; }
+.aba-destaque-chip { grid-column: 2; grid-row: 1; }
+.aba-destaque-valor { grid-column: 1 / -1; grid-row: 2; }
 .aba-destaque-rot { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--ink-faint); }
 .aba-destaque-valor { margin: 3px 0 0; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; color: #0B1E33; }
 .aba-destaque.verde .aba-destaque-valor { color: #0E8F4A; }

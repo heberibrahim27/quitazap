@@ -13,7 +13,6 @@ export interface SegmentoResumo {
 // anterior e, quando faz sentido, a divisão em barra), os itens principais
 // (children) e o atalho pra página completa. A hero em si não muda de aba pra aba.
 export function AbaResumo({
-  titulo,
   destaque,
   delta,
   segmentos,
@@ -23,7 +22,6 @@ export function AbaResumo({
   rotuloLink,
   children,
 }: {
-  titulo: string;
   destaque: { rotulo: string; valor: string; chip?: string; tom: "verde" | "vermelho" | "azul" };
   delta?: { texto: string; bom: boolean } | null;
   segmentos?: SegmentoResumo[];
@@ -36,12 +34,8 @@ export function AbaResumo({
   const comValor = (segmentos ?? []).filter((s) => s.valor > 0);
   return (
     <div className="aba-panel">
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-label">{titulo}</span>
-        </p>
-      </div>
-
+      {/* Sem título acima do card: a aba ativa já diz onde o cliente está e o
+          mês está na pílula (pedido do Ibrahim, 08/10/2026 — repetia tudo). */}
       <section className={`card aba-destaque ${destaque.tom}`}>
         <div className="aba-destaque-topo">
           <div>

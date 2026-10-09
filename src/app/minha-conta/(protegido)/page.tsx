@@ -854,7 +854,6 @@ export default async function MinhaContaPage({
   const totalReceitasAba = receitasDoMes.reduce((soma, r) => soma + r.valor, 0);
   const painelReceita = (
     <AbaResumo
-      titulo={`Receitas — ${nomeMes}/${ano}`}
       destaque={{ rotulo: "Total de entradas", valor: fmtValor(totalReceitasAba), chip: `${receitasDoMes.length} entrada${receitasDoMes.length === 1 ? "" : "s"}`, tom: "verde" }}
       delta={compararComAnterior(totalReceitasAba, receitasAnt._sum.valor, false)}
       temItens={maioresReceitas.length > 0}
@@ -885,7 +884,6 @@ export default async function MinhaContaPage({
   const totalDespesasAba = totalFixasMes + totalVariaveisMes;
   const painelDespesas = (
     <AbaResumo
-      titulo={`Despesas — ${nomeMes}/${ano}`}
       destaque={{ rotulo: "Total de despesas", valor: fmtValor(totalDespesasAba), tom: "vermelho" }}
       delta={compararComAnterior(totalDespesasAba, despesasAnt._sum.valor, true)}
       segmentos={[
@@ -923,7 +921,6 @@ export default async function MinhaContaPage({
   const faltaMetas = Math.max(totalAlvoMetas - totalGuardadoMetas, 0);
   const painelMetas = (
     <AbaResumo
-      titulo="Metas"
       destaque={{ rotulo: "Guardado nas metas", valor: fmtValor(totalGuardadoMetas), chip: percentualMetas != null ? `${Math.round(percentualMetas * 100)}% do alvo` : undefined, tom: "azul" }}
       segmentos={
         totalAlvoMetas > 0

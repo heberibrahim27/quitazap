@@ -88,15 +88,6 @@ export default async function ReceitasPage({
       hrefAnterior={`/minha-conta/receitas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
       hrefSeguinte={`/minha-conta/receitas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
     >
-      <div className="card-head">
-        <p className="card-title">
-          <span className="title-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
-          </span>
-          <span className="title-label">Receitas — {nomeMes}/{ano}</span>
-        </p>
-      </div>
-
       <MesFiltro
         hrefAnterior={`/minha-conta/receitas?mes=${paramMes(mesAnterior.ano, mesAnterior.mes)}`}
         hrefSeguinte={`/minha-conta/receitas?mes=${paramMes(mesSeguinte.ano, mesSeguinte.mes)}`}
