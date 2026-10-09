@@ -1243,20 +1243,21 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 /* Trilho único (segmented control), em vez de pills soltas — a aba
    ativa vira um "chip" sólido dentro do trilho, como em apps premium. */
 .mc-tabs {
-  display: flex; gap: 3px; margin: 0 0 14px; padding: 4px;
-  background: rgba(30, 99, 233, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 16px;
+  /* Trilho afundado com a aba ativa em relevo (neomorfismo aprovado em 09/10/2026). */
+  display: flex; gap: 3px; margin: 0 0 14px; padding: 5px;
+  background: rgba(226, 234, 248, 0.7);
+  box-shadow: inset 4px 4px 9px rgba(140, 160, 200, 0.45), inset -4px -4px 9px rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
 }
 .mc-tab {
   flex: 1; text-align: center; text-decoration: none;
-  padding: 9px 10px; border-radius: 12px; font-size: 13px; font-weight: 700;
+  padding: 10px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
   color: var(--ink-dim); background: transparent; border: none;
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 .mc-tab.active {
-  background: #fff; color: #1E63E9;
-  box-shadow: 0 8px 16px -8px rgba(30,99,233,0.55), inset 0 1px 0 rgba(255,255,255,0.9);
+  background: linear-gradient(160deg, #fbfdff, #e9f0fc); color: #1E63E9;
+  box-shadow: -3px -3px 7px rgba(255,255,255,0.95), 4px 4px 9px rgba(140,160,200,0.55), inset 1px 1px 0 rgba(255,255,255,0.8);
 }
 
 /* ── Sections / cards (telas antigas: Plano, editar lançamento) ── */
@@ -1649,9 +1650,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .mc-input {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--mc-line);
-  border-radius: 12px;
-  padding: 12px 14px;
+  /* Campo afundado (neomorfismo aprovado em 09/10/2026): sem borda, sombra por dentro. */
+  border: none;
+  border-radius: 16px;
+  padding: 13px 16px;
+  box-shadow: inset 4px 4px 9px rgba(140, 160, 200, 0.5), inset -4px -4px 9px rgba(255, 255, 255, 0.95);
   /* 16px não é só estética: abaixo disso o Safari/iOS dá zoom automático
      ao focar o campo (mais visível no <input type="date">, que abre um
      picker nativo por cima) e pan pra centralizar o campo focado — como
@@ -1669,8 +1672,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .mc-input:focus {
-  border-color: rgba(30, 99, 233, 0.5);
   background: #fff;
+  box-shadow: inset 4px 4px 9px rgba(140, 160, 200, 0.4), inset -4px -4px 9px rgba(255, 255, 255, 0.95), 0 0 0 3px rgba(31, 91, 255, 0.25);
 }
 
 .mc-input option {
@@ -1698,8 +1701,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 .mc-btn-primary,
 .mc-btn-secondary {
-  border-radius: 12px;
-  padding: 13px 20px;
+  border-radius: 999px;
+  padding: 14px 22px;
   font-weight: 700;
   font-size: 14px;
   text-align: center;
@@ -1710,16 +1713,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .mc-btn-primary {
-  background: linear-gradient(135deg, #1F63F2, #0E3FCB);
+  background:
+    radial-gradient(160px 36px at 30% 0%, rgba(255, 255, 255, 0.35), transparent 70%),
+    linear-gradient(180deg, #4a92ff, #1f5bff);
   color: #fff;
-  box-shadow: 0 12px 22px -12px rgba(14, 63, 203, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 12px 22px -10px rgba(31, 91, 255, 0.8),
+    -3px -3px 8px rgba(255, 255, 255, 0.9),
+    inset 2px 2px 3px rgba(255, 255, 255, 0.45),
+    inset -3px -4px 8px rgba(0, 25, 130, 0.45);
 }
 
 .mc-btn-secondary {
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(30, 99, 233, 0.16);
-  color: #1B2B42;
-  box-shadow: 0 8px 16px -12px rgba(30, 99, 233, 0.45);
+  background: linear-gradient(160deg, #fbfdff, #e3ebfa);
+  color: #1f5bff;
+  box-shadow:
+    -4px -4px 9px rgba(255, 255, 255, 0.95),
+    5px 5px 12px rgba(140, 160, 200, 0.5),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 @media (min-width: 560px) {

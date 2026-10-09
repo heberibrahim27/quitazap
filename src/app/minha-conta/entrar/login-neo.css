@@ -157,3 +157,6 @@
 @media (prefers-reduced-motion: reduce) {
   .qzn-brand, .qzn-form { animation: none; }
 }
+
+/* Texto de apoio do formulário de primeiro acesso */
+.qzn-dica { margin: 0 0 2px; text-align: center; font-size: 13.5px; line-height: 1.5; color: var(--nq-muted); }

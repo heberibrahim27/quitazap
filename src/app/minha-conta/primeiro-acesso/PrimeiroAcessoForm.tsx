@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CARTAO_SEM_FOTO } from "./estilo";
 
 export function PrimeiroAcessoForm({ token }: { token: string }) {
   const router = useRouter();
@@ -43,58 +42,51 @@ export function PrimeiroAcessoForm({ token }: { token: string }) {
   }
 
   return (
-    <form className="qz-login-card" style={CARTAO_SEM_FOTO} onSubmit={enviar} autoComplete="off">
-      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "#fff" }}>Crie sua senha de acesso</p>
-      <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>
-        Mínimo de 8 caracteres. Depois é só entrar com seu WhatsApp e essa senha.
-      </p>
+    <form className="qzn-form" onSubmit={enviar} autoComplete="off">
+      <p className="qzn-dica">Mínimo de 8 caracteres. Depois é só entrar com seu WhatsApp e essa senha.</p>
 
-      <label>
-        <span className="qz-input-box">
-          <input
-            type={mostrar ? "text" : "password"}
-            placeholder="Nova senha"
-            required
-            minLength={8}
-            maxLength={72}
-            autoComplete="new-password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-          />
-        </span>
+      <label className="qzn-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="5" y="10.5" width="14" height="10" rx="3" />
+          <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+        </svg>
+        <input
+          type={mostrar ? "text" : "password"}
+          placeholder="Nova senha"
+          required
+          minLength={8}
+          maxLength={72}
+          autoComplete="new-password"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+        />
       </label>
 
-      <label>
-        <span className="qz-input-box">
-          <input
-            type={mostrar ? "text" : "password"}
-            placeholder="Repita a senha"
-            required
-            minLength={8}
-            maxLength={72}
-            autoComplete="new-password"
-            value={confirmacao}
-            onChange={(e) => setConfirmacao(e.target.value)}
-          />
-        </span>
+      <label className="qzn-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="5" y="10.5" width="14" height="10" rx="3" />
+          <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+        </svg>
+        <input
+          type={mostrar ? "text" : "password"}
+          placeholder="Repita a senha"
+          required
+          minLength={8}
+          maxLength={72}
+          autoComplete="new-password"
+          value={confirmacao}
+          onChange={(e) => setConfirmacao(e.target.value)}
+        />
       </label>
 
-      <button type="button" className="qz-forgot-link" onClick={() => setMostrar((v) => !v)}>
+      <button type="button" className="qzn-forgot-link" onClick={() => setMostrar((v) => !v)}>
         {mostrar ? "Ocultar senha" : "Mostrar senha"}
       </button>
 
-      {erro && <div className="qz-error-banner">{erro}</div>}
+      {erro && <div className="qzn-error-banner" role="alert">{erro}</div>}
 
-      <button className="qz-btn-enter" type="submit" disabled={enviando}>
-        <span className="qz-btn-beam">
-          <span className="qz-btn-beam-spin" />
-          <span className="qz-btn-beam-mask" />
-        </span>
-        <span className="qz-btn-surface">
-          <span className="qz-btn-scanlines" />
-          <span className="qz-btn-glow" />
-          <span className="qz-btn-label">{enviando ? "Criando…" : "Criar senha e entrar"}</span>
-        </span>
+      <button className="qzn-btn-enter" type="submit" disabled={enviando}>
+        {enviando ? "Criando…" : "Criar senha e entrar"}
       </button>
     </form>
   );

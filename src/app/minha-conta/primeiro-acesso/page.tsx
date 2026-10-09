@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { clienteIdDoTokenPrimeiroAcesso, verificarTokenPrimeiroAcesso } from "@/lib/primeiro-acesso";
-import { anton, inter } from "../entrar/fontes";
-import "../entrar/entrar.css";
-import { CARTAO_SEM_FOTO } from "./estilo";
+import { inter } from "../entrar/fontes";
+import "../entrar/login-neo.css";
 import { PrimeiroAcessoForm } from "./PrimeiroAcessoForm";
 
 export const dynamic = "force-dynamic";
@@ -37,43 +36,34 @@ export default async function PrimeiroAcessoPage({
   }
 
   return (
-    <div className={`qz-entrar ${inter.className} qz-fast`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="qz-bg-photo" src="/minha-conta/login-fundo.jpg" alt="" />
-      <div className="qz-bg-scrim" />
+    <div className={`qzn-entrar ${inter.className}`}>
+      <div className="qzn-blob alto b1" />
+      <div className="qzn-blob alto b2" />
+      <div className="qzn-blob fundo b3" />
 
-      <div className="qz-stage">
-        <div className="qz-zone-top">
-          <div className="qz-brand-row">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="qz-brand-logo" src="/minha-conta/logo-simbolo.webp" alt="QuitaZAP" />
-            <div className="qz-brand-sub">Minha Conta</div>
-          </div>
-          <h1 className={`qz-headline ${anton.className}`}>
-            <span><em>Bem-vindo ao</em></span>
-            <span><em>QuitaZAP.</em></span>
-          </h1>
-        </div>
-
-        <div className="qz-zone-mid">
-          <div className="qz-scene">
-            {problema ? (
-              <div className="qz-login-card" style={CARTAO_SEM_FOTO}>
-                <div className="qz-error-banner">{MENSAGENS_LINK[problema]}</div>
-                <Link href="/minha-conta/entrar" className="qz-forgot-link" style={{ textAlign: "center" }}>
-                  Ir para o login
-                </Link>
-              </div>
-            ) : (
-              <PrimeiroAcessoForm token={token} />
-            )}
+      <div className="qzn-stage">
+        <div className="qzn-brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="qzn-brand-logo" src="/minha-conta/logo-simbolo.webp" alt="QuitaZAP" />
+          <div>
+            <h1 className="qzn-title">Bem-vindo ao QuitaZAP</h1>
+            <p className="qzn-sub">Crie sua senha de acesso</p>
           </div>
         </div>
 
-        <div className="qz-zone-bottom">
-          <a href="/privacidade" style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)", textDecoration: "underline" }}>
-            Privacidade e Termos de Uso
-          </a>
+        {problema ? (
+          <div className="qzn-form">
+            <div className="qzn-error-banner" role="alert">{MENSAGENS_LINK[problema]}</div>
+            <Link href="/minha-conta/entrar" className="qzn-forgot-link" style={{ alignSelf: "center" }}>
+              Ir para o login
+            </Link>
+          </div>
+        ) : (
+          <PrimeiroAcessoForm token={token} />
+        )}
+
+        <div className="qzn-foot">
+          <a href="/privacidade">Privacidade e Termos de Uso</a>
         </div>
       </div>
     </div>
